@@ -1,10 +1,11 @@
 import HeroBanner from "@/components/shared/HeroSection";
-import Image from "next/image";
 
 export default function Home() {
   return (
-    <div>
-      <HeroBanner/>
-    </div>
+    <main className="min-h-screen bg-gray-100 p-4 sm:p-6 lg:p-8">
+      <div className="max-w-7xl mx-auto">
+        <HeroBanner />
+      </div>
+    </main>
   );
 }
