@@ -12,11 +12,10 @@ import {
   SheetClose,
   SheetTitle,
 } from "@/components/ui/sheet";
+import AnimatedFeatureButton from "../button/AnimatedFeatureButton";
 
-// Brand tokens — move these into tailwind.config.ts (extend.colors) or
-// globals.css CSS variables if other components need them too.
-const PRIMARY = "#1A202C"; // ink — logo, headline text, default CTA border
-const SECONDARY = "#1F5EA8"; // brand blue — hover/active accents, filled CTA
+const PRIMARY = "#1A202C";
+const SECONDARY = "#1F5EA8";
 
 const navLinks = [
   { name: "Product", href: "/product" },
@@ -25,7 +24,6 @@ const navLinks = [
   { name: "Log in", href: "/login" },
 ];
 
-// Staggered entrance for the desktop nav links
 const linkVariants = {
   hidden: { opacity: 0, y: -8 },
   visible: (i: number) => ({
@@ -47,11 +45,12 @@ export default function Navbar() {
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
-      className="overflow-hidden rounded-t-[2rem] bg-[#F1F3ED] shadow-sm"
+      /* overflow-hidden সরিয়ে overflow-visible ও z-50 যোগ করা হয়েছে */
+      className="relative z-50 overflow-visible rounded-t-[2rem] bg-[#F1F3ED] shadow-sm"
     >
-      <nav className="flex w-[90%] mx-auto  items-center justify-between px-10 py-4 lg:px-12">
+      <nav className="mx-auto grid max-w-7xl grid-cols-2 items-center px-6 py-4 lg:grid-cols-3 lg:px-12 overflow-visible">
         {/* Left: mobile menu trigger + logo */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 justify-self-start">
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
               <Button
@@ -115,7 +114,7 @@ export default function Navbar() {
         </div>
 
         {/* Center: desktop nav links */}
-        <ul className="hidden items-center gap-6 text-[15px] font-medium text-gray-700 lg:flex">
+        <ul className="col-start-2 hidden items-center justify-self-center gap-6 text-[15px] font-medium text-gray-700 lg:flex">
           {navLinks.map((link, index) => (
             <motion.li
               key={link.href}
@@ -135,20 +134,10 @@ export default function Navbar() {
           ))}
         </ul>
 
-        {/* Right: CTA */}
-        <motion.div
-          whileHover={{ scale: 1.04 }}
-          whileTap={{ scale: 0.96 }}
-          transition={{ type: "spring", stiffness: 400, damping: 17 }}
-        >
-          <Button
-            asChild
-            variant="outline"
-            className="h-10 rounded border-[#1A202C] bg-transparent px-6 text-[14px] font-medium tracking-wide text-[#1A202C] transition-all duration-300 hover:border-[#1F5EA8] hover:bg-[#1F5EA8] hover:text-white"
-          >
-            <Link href="/open-wallet">Open a wallet</Link>
-          </Button>
-        </motion.div>
+        {/* Right: CTA Button Wrapper */}
+        <div className="justify-self-end relative z-50 overflow-visible">
+          <AnimatedFeatureButton />
+        </div>
       </nav>
     </motion.header>
   );
