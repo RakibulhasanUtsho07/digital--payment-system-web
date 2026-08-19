@@ -4,7 +4,7 @@ import "./globals.css";
 import Navbar from "@/components/shared/Navbar";
 import { cn } from "@/lib/utils";
 import Footer from "@/components/shared/Footer";
-import PaymentFeatures from "@/components/shared/PaymentFeatures";
+
 
 const inter = Inter({subsets:['latin'],variable:'--font-sans'});
 
@@ -34,9 +34,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <main>
           
           {children}
-          <PaymentFeatures/>
-          <Footer/>
+        
+         
         </main>
+         <Footer/>
         
         </body>
     </html>
