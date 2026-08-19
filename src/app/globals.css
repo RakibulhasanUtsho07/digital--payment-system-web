@@ -49,8 +49,13 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
+  /* Page canvas — matches the #F1F3ED used by the Navbar/Hero sections,
+     so any component styled with bg-background (like PaymentFeatures)
+     sits on the same tone instead of shadcn's default white. */
+  --background: oklch(0.961 0.0082 121.63);
   --foreground: oklch(0.145 0 0);
+  /* Card surfaces stay white — this already matched the white cards used
+     in the Hero (balance preview, slideshow), so it's left as-is. */
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);

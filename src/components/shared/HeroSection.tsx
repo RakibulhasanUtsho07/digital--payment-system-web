@@ -87,7 +87,7 @@ export default function HeroBanner() {
   const slide = bannerSlides[currentIndex];
 
   return (
-    <section className="relative  overflow-hidden rounded-b-[2rem] bg-[#F1F3ED] py-16 lg:py-24">
+    <section className="relative  overflow-hidden rounded-b-[2rem] bg-[#F1F3ED] py-6 lg:py-8">
       <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-12 px-5 lg:grid-cols-2 lg:px-10">
         {/* =========================================
             Left Column: Value Proposition & CTAs
