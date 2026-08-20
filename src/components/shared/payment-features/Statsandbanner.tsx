@@ -81,11 +81,11 @@ export function StatsAndBanner({
   bannerVisible: boolean;
 }) {
   return (
-    <>
+    <div className="space-y-6 sm:space-y-8">
       {/* Live Stats */}
       <div
         ref={statsRef}
-        className={`grid grid-cols-2 lg:grid-cols-4 gap-6 p-8 rounded-3xl bg-card/50 border border-border/80 backdrop-blur-sm reveal ${statsVisible ? "in" : ""}`}
+        className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 p-5 sm:p-8 rounded-3xl bg-card/50 border border-border/80 backdrop-blur-sm reveal ${statsVisible ? "in" : ""}`}
       >
         {STATS.map((stat, idx) => (
           <StatItem key={idx} stat={stat} start={statsVisible} delay={idx * 120} />
@@ -95,20 +95,21 @@ export function StatsAndBanner({
       {/* Integration Banner */}
       <div
         ref={bannerRef}
-        className={`rounded-3xl bg-gradient-to-br from-card via-card to-primary/5 border border-border p-8 md:p-12 relative overflow-hidden shadow-lg reveal ${bannerVisible ? "in" : ""}`}
+        className={`rounded-3xl bg-gradient-to-br from-card via-card to-primary/5 border border-border p-6 sm:p-8 md:p-12 relative overflow-hidden shadow-lg reveal ${bannerVisible ? "in" : ""}`}
       >
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-          <div className="space-y-6">
-            <div className="inline-flex items-center gap-2 text-sm font-semibold text-primary">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-8 items-center">
+          <div className="space-y-6 text-center lg:text-left">
+            <div className="inline-flex items-center justify-center lg:justify-start gap-2 text-sm font-semibold text-primary">
               <Smartphone className="w-4 h-4" />
               Modern Mobile & Web SDK
             </div>
 
-            <h3 className="text-2xl md:text-3xl font-bold">
+            {/* Typography scaling for mobile to desktop */}
+            <h3 className="text-2xl sm:text-3xl lg:text-4xl font-bold leading-tight">
               Start accepting digital payments in under 5 minutes
             </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
               {HIGHLIGHTS.map((item, idx) => (
                 <div key={idx} className="flex items-center gap-2.5 text-sm text-muted-foreground">
                   <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
@@ -117,10 +118,11 @@ export function StatsAndBanner({
               ))}
             </div>
 
-            <div className="pt-2 flex flex-wrap gap-4">
+            {/* Buttons stack on mobile, row on larger screens */}
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 sm:gap-4">
               <Button
                 size="lg"
-                className="rounded-xl font-semibold shadow-md hover:shadow-lg hover:shadow-primary/30 hover:-translate-y-0.5 transition-all duration-300 group"
+                className="w-full sm:w-auto rounded-xl font-semibold shadow-md hover:shadow-lg hover:shadow-primary/30 hover:-translate-y-0.5 transition-all duration-300 group"
               >
                 Create Merchant Account
                 <ArrowUpRight className="w-4 h-4 ml-1.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
@@ -128,37 +130,30 @@ export function StatsAndBanner({
               <Button
                 size="lg"
                 variant="outline"
-                className="rounded-xl font-semibold hover:-translate-y-0.5 transition-all duration-300"
+                className="w-full sm:w-auto rounded-xl font-semibold hover:-translate-y-0.5 transition-all duration-300"
               >
-                View API Documentation
+                View API Docs
               </Button>
             </div>
           </div>
 
-          <div className="relative flex justify-center lg:justify-end">
+          <div className="relative flex justify-center lg:justify-end w-full">
             <LiveTransactionFeed />
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
 /* ---------------------------------------------------------
-   Live transaction feed — self-updating, feels like a real
-   payment stream: a new row slides in every ~2.5–4s, older
-   rows animate out once the list is full, and each visible
-   row's timestamp ticks upward in real time.
+   Live transaction feed
 --------------------------------------------------------- */
 
 function LiveTransactionFeed() {
   const MAX_VISIBLE = 5;
   const idRef = useRef(1);
 
-  // IMPORTANT: no Math.random()/Date.now() in initial state. Server render and
-  // the client's first render must produce identical markup, or React throws a
-  // hydration mismatch. So we start empty/static and only fill in randomized,
-  // time-based data inside a useEffect — which runs client-only, after hydration.
   const [txs, setTxs] = useState<Tx[]>([]);
   const [nowTick, setNowTick] = useState(0);
   const [volume, setVolume] = useState(482_310);
@@ -218,7 +213,8 @@ function LiveTransactionFeed() {
   }, []);
 
   return (
-    <div className="w-full max-w-sm p-6 rounded-2xl bg-card border border-border/80 shadow-2xl space-y-4">
+    // width responsive fix
+    <div className="w-full max-w-[100%] sm:max-w-md lg:max-w-sm xl:max-w-md p-5 sm:p-6 rounded-2xl bg-card border border-border/80 shadow-2xl space-y-4">
       <div className="flex justify-between items-center">
         <span className="text-xs font-medium text-muted-foreground">Live Transactions</span>
         <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">
@@ -232,7 +228,7 @@ function LiveTransactionFeed() {
           ? Array.from({ length: MAX_VISIBLE }, (_, i) => (
               <div
                 key={`skeleton-${i}`}
-                className="flex items-center justify-between gap-6 text-sm border-b border-border/40 px-2 py-2.5 mb-1 last:border-none animate-pulse"
+                className="flex items-center justify-between gap-4 sm:gap-6 text-sm border-b border-border/40 px-1 sm:px-2 py-2.5 mb-1 last:border-none animate-pulse"
               >
                 <div className="min-w-0 space-y-1.5">
                   <div className="h-3.5 w-20 rounded bg-muted" />
@@ -247,7 +243,7 @@ function LiveTransactionFeed() {
           : txs.map((tx) => (
               <div
                 key={tx.id}
-                className={`tx-row ${tx.leaving ? "tx-leaving" : ""} flex items-center justify-between gap-6 text-sm border-b border-border/40 px-2 py-2.5 mb-1 last:border-none`}
+                className={`tx-row ${tx.leaving ? "tx-leaving" : ""} flex items-center justify-between gap-4 sm:gap-6 text-sm border-b border-border/40 px-1 sm:px-2 py-2.5 mb-1 last:border-none`}
               >
                 <div className="min-w-0">
                   <div className="font-semibold text-foreground truncate">{tx.name}</div>
@@ -283,8 +279,7 @@ function LiveTransactionFeed() {
 }
 
 /* ---------------------------------------------------------
-   Stat item with count-up animation once scrolled into view,
-   plus a subtle hover lift so the row invites interaction.
+   Stat item component
 --------------------------------------------------------- */
 
 function StatItem({ stat, start, delay }: { stat: Stat; start: boolean; delay: number }): ReactNode {
@@ -294,17 +289,17 @@ function StatItem({ stat, start, delay }: { stat: Stat; start: boolean; delay: n
 
   return (
     <div
-      className={`stat-card flex items-center gap-4 p-3 rounded-2xl border border-transparent reveal ${start ? "in" : ""}`}
+      className={`stat-card flex items-center gap-3 sm:gap-4 p-3 sm:p-4 rounded-2xl border border-transparent reveal ${start ? "in" : ""}`}
       style={{ transitionDelay: start ? `${delay}ms` : "0ms" }}
     >
-      <div className="stat-icon w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-        <Icon className="w-6 h-6" />
+      <div className="stat-icon w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+        <Icon className="w-5 h-5 sm:w-6 sm:h-6" />
       </div>
       <div>
-        <div className="text-2xl md:text-3xl font-extrabold tabular-nums">
+        <div className="text-xl sm:text-2xl md:text-3xl font-extrabold tabular-nums">
           {formatStat(stat.value, animated)}
         </div>
-        <div className="text-xs md:text-sm text-muted-foreground font-medium">{stat.label}</div>
+        <div className="text-[11px] sm:text-xs md:text-sm text-muted-foreground font-medium">{stat.label}</div>
       </div>
     </div>
   );

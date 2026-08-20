@@ -13,7 +13,8 @@ export default function PaymentFeatures() {
   const [faqRef, faqInView] = useInView<HTMLDivElement>({ threshold: 0.15 });
 
   return (
-    <section className="py-24 bg-background relative overflow-hidden space-y-24">
+    /* py-24 কমিয়ে pt-4 sm:pt-8 pb-16 sm:pb-24 করা হয়েছে */
+    <section className="pt-4 sm:pt-8 pb-16 sm:pb-24 bg-background relative overflow-hidden space-y-6">
       <SectionStyles />
 
       <div
@@ -21,7 +22,7 @@ export default function PaymentFeatures() {
         style={{ animation: "floatGlow 8s ease-in-out infinite" }}
       />
 
-      <div className="max-w-7xl mx-auto px-6 space-y-24">
+      <div className="w-[95%] mx-auto px-4 sm:px-6 space-y-8">
         <FeatureHighlights rootRef={featuresRef} visible={featuresInView} />
 
         <StatsAndBanner

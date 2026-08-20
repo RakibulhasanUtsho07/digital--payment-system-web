@@ -4,17 +4,6 @@ import { useEffect, useState, type ReactNode } from "react";
 import { ArrowRight, ArrowUpRight, BarChart3, Globe2, ShieldCheck, Zap } from "lucide-react";
 import type { Feature } from "./Types";
 
-/* ---------------------------------------------------------
-   FeatureHighlights — the "Designed for lightning-fast
-   transactions" intro plus the interactive stepper below it:
-   left is a clickable step list (auto-advances on a timer,
-   with a progress bar under the active step); right is a
-   horizontal sliding "filmstrip" panel — each feature sits at
-   translateX = (index - active) * 100%, so the active one is
-   centered, the next one waits just off the right edge, and
-   the previous one slides fully out to the left.
---------------------------------------------------------- */
-
 const FEATURES: Feature[] = [
   {
     icon: Zap,
@@ -54,14 +43,16 @@ export function FeatureHighlights({
   visible: boolean;
 }) {
   return (
-    <div ref={rootRef}>
-      <div className={`text-center max-w-3xl mx-auto mb-16 space-y-4 reveal ${visible ? "in" : ""}`}>
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/20 bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider">
-          <Zap className="w-3.5 h-3.5" />
+    /* Top padding pt-0 এ সেট করা হয়েছে extra gap সরানোর জন্য */
+    <div ref={rootRef} className="w-full px-2 sm:px-6 lg:px-8 pt-0 pb-6 sm:pb-10">
+      {/* Header mb-6 sm:mb-10 করা হয়েছে */}
+      <div className={`text-center max-w-3xl mx-auto mb-6 sm:mb-10 lg:mb-12 space-y-3 sm:space-y-4 reveal ${visible ? "in" : ""}`}>
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/20 bg-primary/10 text-primary text-[11px] sm:text-xs font-semibold uppercase tracking-wider">
+          <Zap className="w-3.5 h-3.5 shrink-0" />
           Next-Gen Payment Experience
         </div>
 
-        <h2 className="text-3xl md:text-5xl font-extrabold tracking-tight">
+        <h2 className="text-2xl sm:text-4xl md:text-5xl font-extrabold tracking-tight leading-tight">
           Designed for{" "}
           <span className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
             lightning-fast
@@ -69,7 +60,7 @@ export function FeatureHighlights({
           transactions
         </h2>
 
-        <p className="text-muted-foreground text-base md:text-lg">
+        <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
           Empower your digital finance with cutting-edge tools built for seamless payments, robust
           security, and global scalability.
         </p>
@@ -101,12 +92,12 @@ function FeatureStepper({ features, visible }: { features: Feature[]; visible: b
 
   return (
     <div
-      className={`grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-10 items-center reveal ${visible ? "in" : ""}`}
+      className={`grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 items-stretch max-w-6xl mx-auto reveal ${visible ? "in" : ""}`}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
-      {/* Left: step list */}
-      <div className="space-y-3 order-2 md:order-1">
+      {/* Left: Interactive Step Navigation List */}
+      <div className="space-y-2.5 sm:space-y-3.5 order-2 lg:order-1 flex flex-col justify-center">
         {features.map((feature, i) => {
           const isActive = i === active;
           return (
@@ -114,29 +105,29 @@ function FeatureStepper({ features, visible }: { features: Feature[]; visible: b
               key={i}
               type="button"
               onClick={() => handleSelect(i)}
-              className={`relative w-full flex items-center justify-between gap-4 px-6 py-4 rounded-2xl text-left overflow-hidden transition-all duration-500 ${
+              className={`relative w-full flex items-center justify-between gap-3 sm:gap-4 px-4 py-3 sm:px-6 sm:py-4 rounded-xl sm:rounded-2xl text-left overflow-hidden transition-all duration-300 ${
                 isActive
-                  ? "bg-primary text-primary-foreground shadow-lg scale-[1.02]"
-                  : "bg-card border border-border/70 text-foreground hover:border-primary/40"
+                  ? "bg-primary text-primary-foreground shadow-lg scale-[1.01] sm:scale-[1.02]"
+                  : "bg-card border border-border/70 text-foreground hover:border-primary/40 active:scale-[0.99]"
               }`}
             >
-              <div>
-                <div className={`text-[11px] font-semibold mb-1 ${isActive ? "opacity-70" : "text-muted-foreground"}`}>
+              <div className="min-w-0 flex-1">
+                <div className={`text-[10px] sm:text-[11px] font-semibold mb-0.5 sm:mb-1 ${isActive ? "opacity-80" : "text-muted-foreground"}`}>
                   Step 0{i + 1}
                 </div>
-                <div className="font-semibold text-sm md:text-base">{feature.title}</div>
+                <div className="font-semibold text-xs sm:text-sm md:text-base truncate">{feature.title}</div>
               </div>
 
               {isActive ? (
-                <ArrowRight className="w-4 h-4 shrink-0" />
+                <ArrowRight className="w-4 h-4 shrink-0 ml-2" />
               ) : (
-                <ArrowUpRight className="w-4 h-4 shrink-0 text-muted-foreground" />
+                <ArrowUpRight className="w-4 h-4 shrink-0 ml-2 text-muted-foreground" />
               )}
 
               {isActive && !paused && (
                 <span
                   key={active}
-                  className="step-progress-fill absolute left-0 bottom-0 h-0.5 bg-primary-foreground/70"
+                  className="step-progress-fill absolute left-0 bottom-0 h-0.5 sm:h-1 bg-primary-foreground/80"
                   style={{ animationDuration: `${AUTO_MS}ms` }}
                 />
               )}
@@ -145,51 +136,57 @@ function FeatureStepper({ features, visible }: { features: Feature[]; visible: b
         })}
       </div>
 
-      {/* Right: sliding filmstrip panel */}
-      <div className="order-1 md:order-2 relative h-[320px] sm:h-[360px] rounded-3xl border border-border/80 bg-card overflow-hidden shadow-xl">
+      {/* Right: Responsive Filmstrip Visual Panel */}
+      <div className="order-1 lg:order-2 relative min-h-[300px] h-[320px] sm:h-[350px] lg:h-auto lg:min-h-[380px] rounded-2xl sm:rounded-3xl border border-border/80 bg-card overflow-hidden shadow-xl">
         {features.map((feature, i) => {
           const Icon = feature.icon;
           const offset = (i - active) * 100;
           return (
             <div
               key={i}
-              className="slide-panel-item absolute inset-0 p-8 md:p-10 flex flex-col justify-between"
+              className="slide-panel-item absolute inset-0 p-5 sm:p-8 lg:p-10 flex flex-col justify-between transition-all duration-500 ease-out"
               style={{
                 transform: `translateX(${offset}%)`,
                 opacity: i === active ? 1 : 0,
+                pointerEvents: i === active ? "auto" : "none",
               }}
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <div
                   key={i === active ? `active-${active}` : i}
-                  className={`w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center ${
+                  className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0 ${
                     i === active ? "icon-pop" : ""
                   }`}
                 >
-                  <Icon className="w-7 h-7" />
+                  <Icon className="w-6 h-6 sm:w-7 sm:h-7" />
                 </div>
-                <span className="text-[10px] font-bold px-2.5 py-1 rounded-md bg-muted text-muted-foreground border border-border">
+                <span className="text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-md sm:rounded-lg bg-muted text-muted-foreground border border-border shrink-0">
                   {feature.tag}
                 </span>
               </div>
 
-              <div>
-                <h3 className="text-2xl md:text-3xl font-bold mb-3 leading-tight">{feature.title}</h3>
-                <p className="text-muted-foreground text-sm md:text-base leading-relaxed max-w-sm">
+              <div className="my-auto py-4">
+                <h3 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 sm:mb-3 leading-tight">{feature.title}</h3>
+                <p className="text-muted-foreground text-xs sm:text-sm lg:text-base leading-relaxed max-w-md">
                   {feature.description}
                 </p>
               </div>
+
+              <div className="h-4" />
             </div>
           );
         })}
 
-        {/* Dot indicators bottom-right of panel */}
-        <div className="absolute bottom-5 right-6 flex items-center gap-1.5">
+        {/* Bottom Indicator Dots */}
+        <div className="absolute bottom-4 right-5 sm:bottom-5 sm:right-6 flex items-center gap-1.5 z-10">
           {features.map((_, i) => (
-            <span
+            <button
               key={i}
-              className={`h-1.5 rounded-full transition-all duration-400 ${
-                i === active ? "w-5 bg-primary" : "w-1.5 bg-border"
+              type="button"
+              onClick={() => handleSelect(i)}
+              aria-label={`Go to slide ${i + 1}`}
+              className={`h-1.5 rounded-full transition-all duration-300 ${
+                i === active ? "w-5 sm:w-6 bg-primary" : "w-1.5 bg-border hover:bg-muted-foreground/50"
               }`}
             />
           ))}

@@ -46,16 +46,19 @@ export default function Navbar() {
       transition={{ duration: 0.5, ease: "easeOut" }}
       className="relative z-50 overflow-visible rounded-t-[2rem] bg-[#F1F3ED] shadow-sm"
     >
-      <nav className="mx-auto grid max-w-7xl grid-cols-2 items-center px-6 py-4 lg:grid-cols-3 lg:px-12 overflow-visible">
+      {/* Grid এর বদলে Flexbox (flex justify-between) ব্যবহার করা হয়েছে যাতে ওভারল্যাপ না হয় */}
+      <nav className="mx-auto flex w-[95%] items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-12 overflow-visible">
+        
         {/* Left: mobile menu trigger + logo */}
-        <div className="flex items-center gap-1 justify-self-start">
+        {/* lg:flex-1 ব্যবহার করা হয়েছে যাতে ডেস্কটপে ৩ ভাগে জায়গা সমানভাবে নিয়ে সেন্টার মেনু ঠিক মাঝে থাকে */}
+        <div className="flex items-center gap-1 lg:flex-1 lg:justify-start">
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon"
                 aria-label="Toggle navigation menu"
-                className="mr-1 text-[#1A202C] hover:bg-black/5 hover:text-[#1F5EA8] lg:hidden"
+                className="mr-1 shrink-0 text-[#1A202C] hover:bg-black/5 hover:text-[#1F5EA8] lg:hidden"
               >
                 <Menu className="h-5 w-5" />
               </Button>
@@ -89,6 +92,7 @@ export default function Navbar() {
             whileHover={{ scale: 1.03 }}
             whileTap={{ scale: 0.97 }}
             transition={{ type: "spring", stiffness: 400, damping: 17 }}
+            className="shrink-0"
           >
             <Link href="/" className="flex items-center gap-2">
               <svg
@@ -98,6 +102,7 @@ export default function Navbar() {
                 fill="none"
                 stroke={PRIMARY}
                 strokeWidth="1.5"
+                className="shrink-0"
               >
                 <circle cx="12" cy="12" r="8" />
                 <path d="M12 4v16" />
@@ -112,7 +117,7 @@ export default function Navbar() {
         </div>
 
         {/* Center: desktop nav links */}
-        <ul className="col-start-2 hidden items-center justify-self-center gap-6 text-[15px] font-medium text-gray-700 lg:flex">
+        <ul className="hidden items-center justify-center gap-6 text-[15px] font-medium text-gray-700 lg:flex lg:flex-1">
           {navLinks.map((link, index) => (
             <motion.li
               key={link.href}
@@ -133,7 +138,7 @@ export default function Navbar() {
         </ul>
 
         {/* Right: CTA Button Wrapper */}
-        <div className="justify-self-end relative z-50 overflow-visible">
+        <div className="relative flex z-50 items-center justify-end overflow-visible lg:flex-1 shrink-0">
           <AnimatedFeatureButton />
         </div>
       </nav>
