@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { motion } from "framer-motion";
+import { motion, type Variants } from "framer-motion";
 import { Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,7 +15,6 @@ import {
 import AnimatedFeatureButton from "../button/AnimatedFeatureButton";
 
 const PRIMARY = "#1A202C";
-const SECONDARY = "#1F5EA8";
 
 const navLinks = [
   { name: "Product", href: "/product" },
@@ -24,7 +23,7 @@ const navLinks = [
   { name: "Log in", href: "/login" },
 ];
 
-const linkVariants = {
+const linkVariants: Variants = {
   hidden: { opacity: 0, y: -8 },
   visible: (i: number) => ({
     opacity: 1,
@@ -45,7 +44,6 @@ export default function Navbar() {
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
-      /* overflow-hidden সরিয়ে overflow-visible ও z-50 যোগ করা হয়েছে */
       className="relative z-50 overflow-visible rounded-t-[2rem] bg-[#F1F3ED] shadow-sm"
     >
       <nav className="mx-auto grid max-w-7xl grid-cols-2 items-center px-6 py-4 lg:grid-cols-3 lg:px-12 overflow-visible">
