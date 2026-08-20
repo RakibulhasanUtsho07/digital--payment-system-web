@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion, type Variants } from "framer-motion";
 import {
   ArrowRight,
   ChevronLeft,
@@ -44,14 +44,14 @@ const bannerSlides = [
 const SLIDE_DURATION = 4000;
 
 // Staggered entrance for the left column's children
-const containerVariants = {
+const containerVariants: Variants = {
   hidden: {},
   visible: {
     transition: { staggerChildren: 0.09, delayChildren: 0.1 },
   },
 };
 
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 16 },
   visible: {
     opacity: 1,
@@ -80,14 +80,12 @@ export default function HeroBanner() {
       setCurrentIndex((prevIndex) => (prevIndex + 1) % slideCount);
     }, SLIDE_DURATION);
     return () => clearInterval(timer);
-    // Restarting on currentIndex means a manual click gives the user a full
-    // interval before the next auto-advance, instead of cutting it short.
   }, [currentIndex, isPaused, shouldReduceMotion, slideCount]);
 
   const slide = bannerSlides[currentIndex];
 
   return (
-    <section className="relative  overflow-hidden rounded-b-[2rem] bg-[#F1F3ED] py-6 lg:py-8">
+    <section className="relative overflow-hidden rounded-b-[2rem] bg-[#F1F3ED] py-6 lg:py-8">
       <div className="mx-auto grid max-w-7xl grid-cols-1 items-center gap-12 px-5 lg:grid-cols-2 lg:px-10">
         {/* =========================================
             Left Column: Value Proposition & CTAs
@@ -174,9 +172,6 @@ export default function HeroBanner() {
             Right Column: Animated Slideshow
         ========================================= */}
         <div className="relative mt-10 flex justify-center lg:mt-0 lg:justify-end">
-          {/* Shared-width column: keeps the card and the dots below it
-              aligned to the same box regardless of whether this whole
-              block is centered (mobile) or pushed to the end (desktop). */}
           <div className="flex w-full max-w-md flex-col items-center lg:max-w-lg">
             <div
               role="region"
@@ -189,7 +184,7 @@ export default function HeroBanner() {
               className="relative h-[400px] w-full sm:h-[450px] lg:h-[500px]"
             >
               {/* Background Glow */}
-              <div className="absolute inset-4 rounded-[3rem] bg-[#F1F3ED]  blur-3xl" />
+              <div className="absolute inset-4 rounded-[3rem] bg-[#F1F3ED] blur-3xl" />
 
               {/* Floating wrapper */}
               <motion.div
@@ -263,10 +258,7 @@ export default function HeroBanner() {
               </motion.div>
             </div>
 
-            {/* Indicator Dots — normal flow now, so they contribute to this
-              column's height (fixing vertical centering against the left
-              column) and can no longer be clipped by the section's
-              overflow-hidden. */}
+            {/* Indicator Dots */}
             <div className="mt-6 flex gap-2">
               {bannerSlides.map((s, index) => (
                 <button
