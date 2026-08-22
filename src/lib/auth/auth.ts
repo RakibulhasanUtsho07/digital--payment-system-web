@@ -42,3 +42,8 @@ export function logout() {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
 }
+
+// 👉 Added clearAuth to fix the Next.js build error in layout.tsx
+export function clearAuth() {
+  logout(); 
+}
