@@ -4,21 +4,20 @@ import type { NextRequest } from "next/server";
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // কুকিজ বা হেডার থেকে টোকেন চেক করা (অথবা ক্লায়েন্ট সাইডে সেভ করা টোকেনের জন্য আমরা কুকি ব্যবহার করতে পারি)
-  // ফ্রন্টএন্ডে যদি কুডিতে টোকেন সেভ করেন অথবা লোকালস্টোরেজ চেক করতে চান:
-  const token = req.cookies.get("token")?.value;
+  // We check for both "access_token" (Express standard) and "token" just to be safe!
+  const token = req.cookies.get("access_token")?.value || req.cookies.get("token")?.value;
 
-  // ড্যাশবোর্ড বা প্রটেক্টেড রাউটগুলোতে টোকেন ছাড়া এক্সেস আটকাতে
+  // Protect dashboard routes
   if (pathname.startsWith("/dashboard") && !token) {
-    // টোকেন না থাকলে লগইন পেজে রিডাইরেক্ট হবে
+    // Redirect to login if no token is found
     const loginUrl = new URL("/login", req.url);
     return NextResponse.redirect(loginUrl);
   }
 
+  // Allow access if token exists
   return NextResponse.next();
 }
 
-// কোন কোন রাউটে এই মিডলওয়্যার কাজ করবে তা এখানে নির্ধারণ করা হয়
 export const config = {
   matcher: ["/dashboard/:path*"],
 };

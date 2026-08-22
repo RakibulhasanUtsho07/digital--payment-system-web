@@ -1,323 +1,323 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { motion, AnimatePresence, type Transition } from "framer-motion";
+import { useState, type FormEvent, type ElementType } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
+
 import {
-  Mail,
-  KeyRound,
-  UserRound,
   ArrowRight,
-  Sparkles,
-  ShieldCheck,
-  Zap,
-  WalletCards,
   Eye,
-  EyeOff
+  EyeOff,
+  Fingerprint,
+  KeyRound,
+  Mail,
+  ShieldCheck,
+  Sparkles,
+  TrendingUp,
+  WalletCards,
+  Zap,
+  Loader2,
 } from "lucide-react";
 
-type AuthMode = "signin" | "signup";
+import { apiClient } from "@/lib/api/client";
+import { saveAuth, type AuthUser } from "@/lib/auth/auth";
 
-export default function EnhancedAuthPage() {
-  const [mode, setMode] = useState<AuthMode>("signin");
-  const [isDesktop, setIsDesktop] = useState(true);
-  
-  const isSignIn = mode === "signin";
+/* =========================================================
+   TYPES
+========================================================= */
 
-  // Handle responsive layout detection to prevent SSR hydration mismatch
-  useEffect(() => {
-    const handleResize = () => setIsDesktop(window.innerWidth >= 1024);
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
+interface LoginResponse {
+  success: boolean;
+  message: string;
+  user: AuthUser;
+}
 
-  // 3D Transition Settings - FIXED: Added 'as const' to the ease array
-  const springTransition: Transition = { 
-    duration: 0.9, 
-    ease: [0.16, 1, 0.3, 1] as const 
+/* =========================================================
+   LOGIN PAGE
+========================================================= */
+
+export default function LoginPage() {
+  const router = useRouter();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  /* =========================================================
+     LOGIN SUBMIT
+  ========================================================= */
+
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setErrorMessage("");
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (!normalizedEmail) {
+      setErrorMessage("Please enter your email address.");
+      return;
+    }
+
+    if (!password) {
+      setErrorMessage("Please enter your password.");
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const data = await apiClient<LoginResponse>("/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email: normalizedEmail,
+          password,
+        }),
+      });
+
+      if (!data.success) {
+        throw new Error(data.message || "Login failed.");
+      }
+
+      // 👉 THE FIX: Save user state to frontend before redirecting
+      saveAuth("", data.user); 
+
+      router.replace("/dashboard/kyc");
+      router.refresh();
+    } catch (error) {
+      console.error("LOGIN ERROR:", error);
+      setErrorMessage(
+        error instanceof Error ? error.message : "Unable to login. Please try again."
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
+  /* =========================================================
+     UI
+  ========================================================= */
+
   return (
-    <div 
-      className="relative w-full min-h-screen flex flex-col lg:block overflow-hidden bg-white" 
-      style={{ perspective: "1500px" }} // Enables the 3D space
-    >
+    <div className="grid min-h-[760px] w-full grid-cols-1 lg:grid-cols-2">
       {/* =====================================================
-          BRANDING PANEL (Animated Blue Section)
+          LEFT BRAND PANEL
       ====================================================== */}
-      <motion.div
-        className="relative lg:absolute lg:top-0 lg:left-0 w-full lg:w-1/2 min-h-[500px] lg:h-full z-20 flex flex-col justify-between overflow-hidden bg-[#020617] lg:shadow-2xl"
-        style={{ transformStyle: "preserve-3d" }}
-        animate={
-          isDesktop
-            ? {
-                x: isSignIn ? "100%" : "0%",
-                rotateY: isSignIn ? [0, -8, 0] : [0, 8, 0],
-                scale: [1, 0.96, 1],
-              }
-            : { x: "0%", rotateY: 0, scale: 1 }
-        }
-        transition={springTransition}
-      >
-        {/* Animated Gradients & Textures */}
-        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 mix-blend-overlay z-0" />
-        <div className="absolute -top-[20%] -left-[10%] w-[70%] h-[70%] rounded-full bg-blue-600/30 blur-[120px] z-0 pointer-events-none" />
-        <div className="absolute bottom-[10%] right-[10%] w-[60%] h-[60%] rounded-full bg-cyan-500/20 blur-[130px] z-0 pointer-events-none" />
+      <section className="relative hidden overflow-hidden rounded-l-[2rem] bg-[#020617] lg:flex">
+        {/* Background */}
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(37,99,235,.18),transparent_40%),radial-gradient(circle_at_80%_80%,rgba(6,182,212,.12),transparent_35%)]" />
 
-        {/* Floating Abstract 3D Elements */}
-        <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-          {/* Faux Glass Card 1 */}
-          <motion.div
-            animate={{ y: [-15, 15, -15], rotateZ: [0, -3, 0] }}
-            transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute top-[20%] right-[-5%] w-64 h-40 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md shadow-2xl p-5"
-          >
-            <div className="w-12 h-8 rounded bg-white/20 mb-6" />
-            <div className="w-3/4 h-3 rounded bg-white/20 mb-3" />
-            <div className="w-1/2 h-3 rounded bg-white/10" />
-          </motion.div>
+        {/* Blue glow */}
+        <motion.div
+          animate={{ scale: [1, 1.15, 1], opacity: [0.18, 0.3, 0.18] }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+          className="pointer-events-none absolute -left-24 -top-24 h-[420px] w-[420px] rounded-full bg-blue-600/20 blur-[120px]"
+        />
 
-          {/* Glowing Ring */}
-          <motion.div
-            animate={{ scale: [1, 1.05, 1], opacity: [0.3, 0.6, 0.3] }}
-            transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute bottom-[25%] left-[10%] w-32 h-32 rounded-full border border-cyan-400/30 shadow-[0_0_30px_rgba(34,211,238,0.2)]"
-          />
-        </div>
+        {/* Cyan glow */}
+        <motion.div
+          animate={{ scale: [1, 1.2, 1], opacity: [0.1, 0.2, 0.1] }}
+          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+          className="pointer-events-none absolute -bottom-24 -right-20 h-[400px] w-[400px] rounded-full bg-cyan-500/20 blur-[120px]"
+        />
 
-        {/* Brand Content */}
-        <div className="relative z-10 flex flex-col h-full p-10 lg:p-16 justify-between">
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
-            <Link href="/" className="inline-flex items-center gap-3 group">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400 to-blue-600 text-white shadow-lg shadow-blue-500/30 group-hover:scale-105 transition-transform">
-                <WalletCards className="h-6 w-6" />
-              </div>
-              <div>
-                <p className="font-sans text-2xl font-bold tracking-tight text-white">NovaWallet</p>
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-300">Next-Gen Finance</p>
-              </div>
-            </Link>
-          </motion.div>
-
-          <div className="my-auto mt-16 lg:mt-auto relative">
-            <div className="inline-flex items-center gap-2 rounded-full border border-cyan-500/40 bg-cyan-500/10 px-4 py-2 mb-8 shadow-[0_0_15px_rgba(6,182,212,0.15)]">
-              <Sparkles className="h-4 w-4 text-cyan-400 animate-pulse" />
-              <span className="text-xs font-bold uppercase tracking-wider text-cyan-300">The Future of Banking</span>
+        {/* Content */}
+        <div className="relative z-10 flex w-full flex-col justify-between p-10 xl:p-14">
+          <Link href="/" className="flex w-fit items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-cyan-300 shadow-lg">
+              <WalletCards className="h-6 w-6" />
             </div>
+            <div>
+              <p className="text-xl font-black tracking-tight text-white">
+                Nova<span className="text-cyan-400">Wallet</span>
+              </p>
+              <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-cyan-300/70">
+                Digital Wallet System
+              </p>
+            </div>
+          </Link>
 
-            <h1 className="text-4xl lg:text-5xl font-extrabold leading-[1.1] text-white">
-              Control your money, <br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">
-                anytime, anywhere.
-              </span>
-            </h1>
-            
-            <p className="mt-6 text-base leading-relaxed text-blue-100/70 max-w-md">
-              Experience seamless digital transactions with state-of-the-art security. NovaWallet makes managing your finances effortlessly beautiful.
+          <div className="my-auto py-12">
+            <motion.div
+              initial={{ opacity: 0, y: 25 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7 }}
+            >
+              <div className="inline-flex items-center gap-2 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-4 py-2">
+                <Sparkles className="h-4 w-4 text-cyan-400" />
+                <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-300">
+                  Secure Access
+                </span>
+              </div>
+              <h1 className="mt-7 text-4xl font-extrabold leading-[1.1] text-white xl:text-5xl">
+                Welcome back.
+                <span className="mt-1 block bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
+                  Your wallet is ready.
+                </span>
+              </h1>
+              <p className="mt-6 max-w-lg text-sm leading-7 text-slate-300">
+                Access secure payments, fast transfers, KYC verification, transaction visibility, and intelligent financial insights from one secure wallet.
+              </p>
+            </motion.div>
+
+            <div className="mt-10 space-y-4">
+              <FeatureRow icon={ShieldCheck} title="Secure Payments" description="Protected payment flows" />
+              <FeatureRow icon={Zap} title="Fast Transfers" description="Simple peer-to-peer payments" />
+              <FeatureRow icon={TrendingUp} title="Smart Insights" description="Understand your spending" />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 text-[10px] text-slate-400">
+            <ShieldCheck className="h-4 w-4 text-emerald-400" />
+            <span>Private and secure account access</span>
+          </div>
+        </div>
+      </section>
+
+      {/* =====================================================
+          LOGIN FORM
+      ====================================================== */}
+      <section className="flex items-center justify-center bg-white px-6 py-12 sm:px-10 lg:px-14 xl:px-20">
+        <div className="w-full max-w-[420px]">
+          <motion.div
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+          >
+            <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl border border-blue-100 bg-blue-50 text-blue-600">
+              <Fingerprint className="h-6 w-6" />
+            </div>
+            <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">Sign in to Nova</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              Enter your credentials to access your wallet, transfers, and financial tools.
             </p>
+          </motion.div>
 
-            <div className="mt-10 flex flex-col gap-5">
-              {[
-                { icon: ShieldCheck, text: "Bank-Grade 256-bit Encryption" },
-                { icon: Zap, text: "Lightning-fast global transfers" }
-              ].map((item, idx) => (
-                <div key={idx} className="flex items-center gap-4 text-sm text-blue-50">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-cyan-400 backdrop-blur-sm">
-                    <item.icon className="h-5 w-5" />
-                  </div>
-                  <span className="font-medium text-blue-100/90">{item.text}</span>
-                </div>
-              ))}
+          {errorMessage && (
+            <motion.div
+              initial={{ opacity: 0, y: -5 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-600"
+            >
+              {errorMessage}
+            </motion.div>
+          )}
+
+          <form onSubmit={handleSubmit} className="mt-8 space-y-5">
+            {/* EMAIL */}
+            <div>
+              <label htmlFor="login-email" className="mb-2 block text-xs font-bold text-slate-700">
+                Email Address
+              </label>
+              <div className="relative">
+                <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  id="login-email"
+                  name="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="hello@example.com"
+                  autoComplete="email"
+                  required
+                  className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+                />
+              </div>
             </div>
-          </div>
-        </div>
-      </motion.div>
 
-      {/* =====================================================
-          AUTHENTICATION PANEL (White Form Section)
-      ====================================================== */}
-      <motion.div
-        className="relative w-full lg:absolute lg:top-0 lg:left-0 lg:w-1/2 min-h-screen lg:h-full z-10 flex flex-col bg-white"
-        style={{ transformStyle: "preserve-3d" }}
-        animate={
-          isDesktop
-            ? {
-                x: isSignIn ? "0%" : "100%",
-                rotateY: isSignIn ? [0, 10, 0] : [0, -10, 0],
-                scale: [1, 0.96, 1],
-              }
-            : { x: "0%", rotateY: 0, scale: 1 }
-        }
-        transition={springTransition}
-      >
-        {/* Subtle Grid Texture */}
-        <div 
-          className="absolute inset-0 z-0 pointer-events-none opacity-[0.03]" 
-          style={{ backgroundImage: 'radial-gradient(#000 2px, transparent 2px)', backgroundSize: '32px 32px' }}
-        />
-
-        <div className="relative z-10 flex-1 flex flex-col justify-center px-6 py-12 sm:px-16 lg:px-24">
-          
-          {/* Animated Toggle Switch */}
-          <div className="flex justify-center mb-12">
-            <div className="relative flex p-1 bg-slate-100/80 backdrop-blur-md rounded-full w-full max-w-[280px] border border-slate-200 shadow-inner">
-              <motion.div
-                className="absolute top-1 bottom-1 w-[calc(50%-4px)] bg-white rounded-full shadow-sm border border-slate-200/50"
-                initial={false}
-                animate={{ left: isSignIn ? "4px" : "calc(50%)" }}
-                transition={{ type: "spring", stiffness: 400, damping: 30 }}
-              />
-              <button
-                onClick={() => setMode("signin")}
-                className={`relative z-10 w-1/2 py-2.5 text-sm font-bold transition-colors ${isSignIn ? "text-blue-700" : "text-slate-500 hover:text-slate-700"}`}
-              >
-                Sign In
-              </button>
-              <button
-                onClick={() => setMode("signup")}
-                className={`relative z-10 w-1/2 py-2.5 text-sm font-bold transition-colors ${!isSignIn ? "text-blue-700" : "text-slate-500 hover:text-slate-700"}`}
-              >
-                Sign Up
-              </button>
-            </div>
-          </div>
-
-          {/* Form Area with AnimatePresence for smooth swapping */}
-          <div className="w-full max-w-[400px] mx-auto">
-            <AnimatePresence mode="wait">
-              {isSignIn ? (
-                <motion.div
-                  key="signin"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 20 }}
-                  transition={{ duration: 0.3 }}
+            {/* PASSWORD */}
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <label htmlFor="login-password" className="text-xs font-bold text-slate-700">
+                  Password
+                </label>
+                <Link href="/forgot-password" className="text-[10px] font-bold text-blue-600 hover:underline">
+                  Forgot password?
+                </Link>
+              </div>
+              <div className="relative">
+                <KeyRound className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  id="login-password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  autoComplete="current-password"
+                  required
+                  className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-11 text-sm font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((value) => !value)}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-600"
                 >
-                  <div className="mb-8">
-                    <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Welcome back</h2>
-                    <p className="mt-2 text-sm text-slate-500">Enter your credentials to access your account.</p>
-                  </div>
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
 
-                  <form className="space-y-5">
-                    <InputField id="email" label="Email Address" type="email" placeholder="hello@example.com" icon={Mail} />
-                    <InputField 
-                      id="password" 
-                      label="Password" 
-                      type="password" 
-                      placeholder="••••••••" 
-                      icon={KeyRound}
-                      helper={
-                        <Link href="#" className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors">
-                          Forgot password?
-                        </Link>
-                      }
-                    />
-                    <SubmitButton label="Sign In to Dashboard" />
-                  </form>
-                </motion.div>
+            {/* SUBMIT */}
+            <motion.button
+              type="submit"
+              disabled={isLoading}
+              whileHover={{ y: -2 }}
+              whileTap={{ scale: 0.98 }}
+              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#0F172A] text-sm font-bold text-white shadow-lg transition-all hover:bg-[#1E293B] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Signing in...
+                </>
               ) : (
-                <motion.div
-                  key="signup"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <div className="mb-8">
-                    <h2 className="text-3xl font-extrabold text-slate-900 tracking-tight">Create an account</h2>
-                    <p className="mt-2 text-sm text-slate-500">Join NovaWallet and take control of your finances.</p>
-                  </div>
-
-                  <form className="space-y-5">
-                    <div className="grid grid-cols-2 gap-4">
-                      <InputField id="firstName" label="First Name" placeholder="John" icon={UserRound} />
-                      <InputField id="lastName" label="Last Name" placeholder="Doe" icon={UserRound} />
-                    </div>
-                    <InputField id="email" label="Email Address" type="email" placeholder="hello@example.com" icon={Mail} />
-                    <InputField id="password" label="Password" type="password" placeholder="Create a secure password" icon={KeyRound} />
-                    <SubmitButton label="Create Account" />
-                  </form>
-                </motion.div>
+                <>
+                  Sign In
+                  <ArrowRight className="h-4 w-4" />
+                </>
               )}
-            </AnimatePresence>
-            
-            {/* Social Auth Separator */}
-            <div className="mt-8 relative flex items-center justify-center">
-              <div className="absolute inset-x-0 h-px bg-slate-200"></div>
-              <span className="relative bg-white px-4 text-xs font-semibold text-slate-400 uppercase tracking-wider">Or continue with</span>
-            </div>
+            </motion.button>
+          </form>
 
-            {/* Social Auth Buttons */}
-            <div className="mt-6 grid grid-cols-2 gap-4">
-              <SocialButton label="Google" />
-              <SocialButton label="Apple" />
-            </div>
+          <p className="mt-8 text-center text-sm text-slate-500">
+            Don't have an account?{" "}
+            <Link href="/register" className="font-bold text-blue-600 hover:underline">
+              Create an account
+            </Link>
+          </p>
+
+          <div className="mt-8 flex items-center justify-center gap-2 text-[10px] text-slate-400">
+            <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+            <span>Your wallet data stays private</span>
           </div>
         </div>
-      </motion.div>
+      </section>
     </div>
   );
 }
 
-/* =====================================================
-    REUSABLE FORM COMPONENTS
-====================================================== */
-
-function InputField({ id, label, type = "text", placeholder, icon: Icon, helper }: any) {
-  const [showPassword, setShowPassword] = useState(false);
-  const isPassword = type === "password";
-  const inputType = isPassword && showPassword ? "text" : type;
-
+/* =========================================================
+   FEATURE ROW
+========================================================= */
+function FeatureRow({ icon: Icon, title, description }: { icon: ElementType; title: string; description: string }) {
   return (
-    <div className="flex flex-col space-y-1.5">
-      <div className="flex justify-between items-center">
-        <label htmlFor={id} className="text-sm font-bold text-slate-700">{label}</label>
-        {helper}
-      </div>
-      <div className="relative group">
-        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-          <Icon className="h-5 w-5 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-        </div>
-        <input
-          id={id}
-          type={inputType}
-          placeholder={placeholder}
-          className="w-full pl-11 pr-10 py-3.5 bg-slate-50/50 border border-slate-200 rounded-xl text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 focus:bg-white transition-all shadow-sm"
-        />
-        {isPassword && (
-          <button
-            type="button"
-            onClick={() => setShowPassword(!showPassword)}
-            className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
-          >
-            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function SubmitButton({ label }: { label: string }) {
-  return (
-    <motion.button
-      whileHover={{ y: -2 }}
-      whileTap={{ scale: 0.98 }}
-      className="w-full mt-2 flex items-center justify-center gap-2 py-3.5 px-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-bold rounded-xl shadow-lg shadow-blue-600/25 transition-all"
+    <motion.div
+      initial={{ opacity: 0, x: -12 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.5 }}
+      className="flex items-center gap-3"
     >
-      {label}
-      <ArrowRight className="h-4 w-4" />
-    </motion.button>
-  );
-}
-
-function SocialButton({ label }: { label: string }) {
-  return (
-    <button type="button" className="flex items-center justify-center gap-2 py-2.5 border border-slate-200 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold transition-colors shadow-sm">
-      {/* Placeholder for SVG icon */}
-      <div className="h-4 w-4 bg-slate-200 rounded-full" />
-      {label}
-    </button>
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-cyan-400">
+        <Icon className="h-5 w-5" />
+      </div>
+      <div>
+        <p className="text-sm font-semibold text-white">{title}</p>
+        <p className="text-[10px] text-slate-400">{description}</p>
+      </div>
+    </motion.div>
   );
 }
