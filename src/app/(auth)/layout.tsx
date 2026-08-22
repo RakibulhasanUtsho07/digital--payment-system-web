@@ -189,7 +189,9 @@ export default function AuthLayout({
                 ease: [0.22, 1, 0.36, 1],
               }}
             >
-              {children}
+              <main>
+                {children}
+              </main>
             </motion.div>
           </AnimatePresence>
         </div>
