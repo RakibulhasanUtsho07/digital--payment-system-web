@@ -11,7 +11,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   
   // TODO: Replace with Real Auth Hook/Context later
-  const [userRole, setUserRole] = useState<"admin" | "user">("user"); // Change to "admin" to test admin UI
+  const [userRole, setUserRole] = useState<"admin" | "user">("admin"); // Change to "admin" to test admin UI
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleLogout = () => {
