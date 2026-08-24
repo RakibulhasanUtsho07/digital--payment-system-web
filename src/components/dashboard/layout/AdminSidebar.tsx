@@ -17,7 +17,6 @@ import {
   MessageSquareWarning,
   Lock,
   Percent,
-  UserCheck
 } from "lucide-react";
 
 const adminNavItems = [
@@ -37,36 +36,48 @@ export default function AdminSidebar({ onLogout }: { onLogout: () => void }) {
   const pathname = usePathname();
 
   return (
-    <div className="flex h-full flex-col bg-slate-900 text-slate-100">
-      {/* ======================= BRANDING ======================= */}
-      <div className="border-b border-white/10 px-5 py-5 shrink-0">
+    // Outer container: takes full height of parent, fixed width, deep dark premium theme.
+    <aside className="flex h-full w-[260px] flex-col bg-[#0B1320] text-slate-300 shadow-2xl overflow-hidden border-r border-slate-800/50">
+      
+      {/* ======================= BRANDING (Fixed Height) ======================= */}
+      {/* 
+        h-20 (80px) aligns the bottom border perfectly with the dashboard navbar.
+      */}
+      <div className="flex h-20 shrink-0 items-center border-b border-slate-800/80 px-6">
         <Link
           href="/dashboard"
           className="group flex items-center gap-3 transition-transform duration-300 hover:scale-[1.02]"
         >
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500/20 to-indigo-500/5 text-indigo-400 border border-indigo-500/30 shadow-lg shadow-indigo-900/30 transition-all duration-300 group-hover:rotate-12">
-            <ShieldCheck className="h-5 w-5" />
+          {/* Admin Logo with Indigo/Purple premium gradient */}
+          <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/20">
+            <ShieldCheck className="h-6 w-6" />
           </div>
-          <div>
-            <p className="font-serif text-lg font-bold text-white tracking-wide">
+          <div className="flex flex-col justify-center">
+            <h1 className="text-xl font-bold tracking-tight text-white leading-tight">
               Admin Panel
-            </p>
-            <p className="text-[8px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+            </h1>
+            <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-indigo-400">
               System Control
-            </p>
+            </span>
           </div>
         </Link>
       </div>
 
-      {/* ======================= NAVIGATION ======================= */}
+      {/* ======================= NAVIGATION (Scrollable independently) ======================= */}
+      {/* 
+        flex-1: takes up remaining space
+        overflow-y-auto: enables scrolling JUST for this section
+        [&::-webkit-scrollbar]:hidden: completely hides the scrollbar across all browsers
+      */}
       <div className="flex-1 overflow-y-auto px-4 py-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-        <p className="mb-4 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+        <p className="mb-4 px-3 text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">
           Management
         </p>
 
-        <nav className="space-y-1.5">
+        <nav className="space-y-1.5 pb-4">
           {adminNavItems.map((item) => {
             const Icon = item.icon;
+            // Matches exact route for dashboard, and startsWith for nested pages
             const active =
               item.href === "/dashboard"
                 ? pathname === "/dashboard"
@@ -77,65 +88,59 @@ export default function AdminSidebar({ onLogout }: { onLogout: () => void }) {
                 key={item.href}
                 href={item.href}
                 className={`
-                  group relative flex items-center gap-3 rounded-xl px-3.5 py-3 
-                  text-sm font-medium transition-all duration-300 ease-in-out
-                  overflow-hidden
+                  group relative flex items-center gap-3 rounded-xl px-3 py-2.5 
+                  text-sm font-semibold transition-all duration-300 ease-out overflow-hidden
                   ${
                     active
-                      ? "bg-indigo-600 text-white shadow-lg shadow-indigo-900/50 translate-x-1"
-                      : "text-slate-400 hover:bg-white/[0.06] hover:text-white hover:translate-x-1"
+                      ? "bg-[#14233A] text-white" 
+                      : "text-slate-400 hover:bg-slate-800/40 hover:text-slate-200"
                   }
                 `}
               >
-                {/* Active Left Border Indicator */}
+                {/* Active Left Glow Bar (Flush left) */}
                 {active && (
-                  <span className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-indigo-300 animate-pulse" />
+                  <span className="absolute left-0 top-1/2 h-7 w-[3px] -translate-y-1/2 rounded-r-full bg-indigo-400" />
                 )}
 
-                {/* Icon wrapper with hover scale */}
+                {/* Icon wrapper matching the image style but with Indigo tint */}
                 <span
                   className={`
-                    flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-300
+                    flex h-9 w-9 items-center justify-center rounded-[10px] transition-all duration-300
                     ${
                       active
-                        ? "bg-indigo-700/60 text-white"
-                        : "bg-white/[0.04] text-slate-400 group-hover:bg-indigo-500/20 group-hover:text-indigo-300 group-hover:scale-110"
+                        ? "bg-indigo-500/20 text-indigo-400"
+                        : "bg-transparent text-slate-500 group-hover:text-slate-300 group-hover:scale-110"
                     }
                   `}
                 >
-                  <Icon className="h-4 w-4 transition-transform duration-300" />
+                  <Icon className="h-5 w-5 transition-transform duration-300" />
                 </span>
 
                 <span className="flex-1">{item.label}</span>
 
-                {/* Chevron icon sliding on hover */}
-                <ChevronRight
-                  className={`h-4 w-4 transition-all duration-300 
-                    ${
-                      active
-                        ? "text-white opacity-100 translate-x-0"
-                        : "opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 text-slate-400"
-                    }
-                  `}
-                />
+                {/* Active arrow indicator */}
+                {active && (
+                  <ChevronRight className="h-4 w-4 text-indigo-400" />
+                )}
               </Link>
             );
           })}
         </nav>
       </div>
 
-      {/* ======================= LOGOUT ======================= */}
-      <div className="border-t border-white/10 p-4 shrink-0 bg-black/20">
+      {/* ======================= LOGOUT (Fixed at Bottom) ======================= */}
+      <div className="shrink-0 border-t border-slate-800/80 bg-[#080D16] p-4">
         <button
           onClick={onLogout}
-          className="group flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-sm font-medium text-rose-400 transition-all duration-300 hover:bg-rose-500/20 hover:text-rose-200 hover:shadow-[0_0_15px_rgba(244,63,94,0.2)]"
+          className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-400 transition-all duration-300 hover:bg-rose-500/10 hover:text-rose-400"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-400/10 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-12">
-            <LogOut className="h-4 w-4" />
+          <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-transparent text-slate-500 transition-all duration-300 group-hover:bg-rose-500/20 group-hover:text-rose-400 group-hover:scale-110">
+            <LogOut className="h-5 w-5" />
           </span>
           <span>Secure Logout</span>
         </button>
       </div>
-    </div>
+      
+    </aside>
   );
 }

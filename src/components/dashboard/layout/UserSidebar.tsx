@@ -39,37 +39,50 @@ export default function UserSidebar({ onLogout }: { onLogout: () => void }) {
   const pathname = usePathname();
 
   return (
-    <div className="flex h-full flex-col bg-[#123B66]">
-      {/* ======================= BRANDING ======================= */}
-      <div className="border-b border-white/10 px-5 py-5 shrink-0">
+    // Outer container: takes full height of parent.
+    // Using a very deep, rich navy blue matching your images perfectly.
+    <aside className="flex h-full w-[260px] flex-col bg-[#0B1320] text-slate-300 shadow-2xl overflow-hidden border-r border-slate-800/50">
+      
+      {/* ======================= BRANDING (Fixed Height) ======================= */}
+      {/* 
+        h-20 (80px) is standard for navbars. This perfectly aligns the bottom border 
+        with your dashboard navbar. If your navbar is slightly smaller/larger, change `h-20` to `h-16` (64px) or `h-[72px]`.
+      */}
+      <div className="flex h-20 shrink-0 items-center border-b border-slate-800/80 px-6">
         <Link
           href="/dashboard"
           className="group flex items-center gap-3 transition-transform duration-300 hover:scale-[1.02]"
         >
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-white/20 to-white/5 text-[#9DDCFF] shadow-lg ring-1 ring-white/10 transition-all duration-300 group-hover:rotate-12 group-hover:shadow-blue-500/20">
-            <WalletCards className="h-5 w-5" />
+          {/* Logo matching the image */}
+          <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-gradient-to-br from-[#4EA3E3] to-[#1F5EA8] text-white shadow-lg shadow-blue-500/20">
+            <WalletCards className="h-6 w-6" />
           </div>
-          <div>
-            <p className="font-serif text-lg font-bold text-white tracking-wide">
-              My Wallet
-            </p>
-            <p className="text-[8px] font-semibold uppercase tracking-[0.18em] text-blue-100/45">
+          <div className="flex flex-col justify-center">
+            <h1 className="text-xl font-bold tracking-tight text-white leading-tight">
+              NovaWallet
+            </h1>
+            <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#4EA3E3]">
               User Portal
-            </p>
+            </span>
           </div>
         </Link>
       </div>
 
-      {/* ======================= NAVIGATION ======================= */}
+      {/* ======================= NAVIGATION (Scrollable independently) ======================= */}
+      {/* 
+        flex-1: takes up remaining space
+        overflow-y-auto: enables scrolling JUST for this section
+        [&::-webkit-scrollbar]:hidden: completely hides the scrollbar across all browsers
+      */}
       <div className="flex-1 overflow-y-auto px-4 py-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-        <p className="mb-4 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-blue-100/35">
+        <p className="mb-4 px-3 text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">
           Main Menu
         </p>
 
-        <nav className="space-y-1.5">
+        <nav className="space-y-1.5 pb-4">
           {navItems.map((item) => {
             const Icon = item.icon;
-            // Dashboard should match exactly, others can match partially (nested routes)
+            // Matches exact route for dashboard, and startsWith for nested pages
             const active =
               item.href === "/dashboard"
                 ? pathname === "/dashboard"
@@ -80,65 +93,59 @@ export default function UserSidebar({ onLogout }: { onLogout: () => void }) {
                 key={item.href}
                 href={item.href}
                 className={`
-                  group relative flex items-center gap-3 rounded-xl px-3.5 py-3 
-                  text-sm font-medium transition-all duration-300 ease-in-out
-                  overflow-hidden
+                  group relative flex items-center gap-3 rounded-xl px-3 py-2.5 
+                  text-sm font-semibold transition-all duration-300 ease-out overflow-hidden
                   ${
                     active
-                      ? "bg-white text-[#173D68] shadow-[0_8px_20px_rgba(0,0,0,0.15)] translate-x-1"
-                      : "text-blue-100/65 hover:bg-white/[0.08] hover:text-white hover:translate-x-1"
+                      ? "bg-[#14233A] text-white" 
+                      : "text-slate-400 hover:bg-slate-800/40 hover:text-slate-200"
                   }
                 `}
               >
-                {/* Active Left Border Indicator */}
+                {/* Active Left Glow Bar (Flush left) */}
                 {active && (
-                  <span className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-[#4EA3E3] animate-pulse" />
+                  <span className="absolute left-0 top-1/2 h-7 w-[3px] -translate-y-1/2 rounded-r-full bg-[#4EA3E3]" />
                 )}
 
-                {/* Icon wrapper with hover scale effect */}
+                {/* Icon wrapper matching the image style */}
                 <span
                   className={`
-                    flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-300
+                    flex h-9 w-9 items-center justify-center rounded-[10px] transition-all duration-300
                     ${
                       active
-                        ? "bg-[#EAF3FC] text-[#1F5EA8]"
-                        : "bg-white/[0.05] text-blue-100/60 group-hover:bg-white/10 group-hover:text-[#9DDCFF] group-hover:scale-110"
+                        ? "bg-[#1F3A60] text-[#4EA3E3]"
+                        : "bg-transparent text-slate-500 group-hover:text-slate-300 group-hover:scale-110"
                     }
                   `}
                 >
-                  <Icon className="h-4 w-4 transition-transform duration-300" />
+                  <Icon className="h-5 w-5 transition-transform duration-300" />
                 </span>
 
                 <span className="flex-1">{item.label}</span>
 
-                {/* Chevron icon appearing on hover or active */}
-                <ChevronRight
-                  className={`h-4 w-4 transition-all duration-300 
-                    ${
-                      active
-                        ? "text-[#1F5EA8] opacity-100 translate-x-0"
-                        : "opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0"
-                    }
-                  `}
-                />
+                {/* Active arrow indicator matching your image */}
+                {active && (
+                  <ChevronRight className="h-4 w-4 text-[#4EA3E3]" />
+                )}
               </Link>
             );
           })}
         </nav>
       </div>
 
-      {/* ======================= LOGOUT ======================= */}
-      <div className="border-t border-white/10 p-4 shrink-0 bg-black/10">
+      {/* ======================= LOGOUT (Fixed at Bottom) ======================= */}
+      <div className="shrink-0 border-t border-slate-800/80 bg-[#080D16] p-4">
         <button
           onClick={onLogout}
-          className="group flex w-full items-center gap-3 rounded-xl px-3.5 py-3 text-sm font-medium text-red-200 transition-all duration-300 hover:bg-red-500/20 hover:text-red-100 hover:shadow-[0_0_15px_rgba(239,68,68,0.2)]"
+          className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-400 transition-all duration-300 hover:bg-rose-500/10 hover:text-rose-400"
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-400/10 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-12">
-            <LogOut className="h-4 w-4" />
+          <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-transparent text-slate-500 transition-all duration-300 group-hover:bg-rose-500/20 group-hover:text-rose-400 group-hover:scale-110">
+            <LogOut className="h-5 w-5" />
           </span>
-          <span>Logout</span>
+          <span>Sign Out</span>
         </button>
       </div>
-    </div>
+      
+    </aside>
   );
 }
