@@ -1,29 +1,17 @@
 "use client";
 
-import {
-  useEffect,
-  useState,
-} from "react";
-
-import {
-  useRouter,
-} from "next/navigation";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import UserDashboardOverview from "@/components/dashboard/views/UserDashboardOverview";
-
 import AdminDashboardOverview from "@/components/dashboard/views/AdminDashboardOverview";
-
-import {
-  apiClient,
-} from "@/lib/api/client";
+import { apiClient } from "@/lib/api/client";
 
 /* =========================================================
    TYPES
 ========================================================= */
 
-type UserRole =
-  | "admin"
-  | "user";
+type UserRole = "admin" | "user";
 
 type KYCStatus =
   | "not_started"
@@ -32,20 +20,11 @@ type KYCStatus =
   | "verified"
   | "rejected";
 
-type TransactionType =
-  | "TRANSFER"
-  | "DEPOSIT"
-  | "WITHDRAW";
+type TransactionType = "TRANSFER" | "DEPOSIT" | "WITHDRAW";
 
-type TransactionStatus =
-  | "PENDING"
-  | "COMPLETED"
-  | "FAILED";
+type TransactionStatus = "PENDING" | "COMPLETED" | "FAILED";
 
-type RiskScore =
-  | "LOW"
-  | "MEDIUM"
-  | "HIGH";
+type RiskScore = "LOW" | "MEDIUM" | "HIGH";
 
 interface CurrentUser {
   _id: string;
@@ -81,29 +60,15 @@ interface PopulatedUser {
 
 interface TransactionData {
   _id: string;
-
-  senderId:
-    | string
-    | PopulatedUser;
-
-  receiverId:
-    | string
-    | PopulatedUser;
-
+  senderId: string | PopulatedUser;
+  receiverId: string | PopulatedUser;
   amount: number;
-
   currency: string;
-
   type: TransactionType;
-
   status: TransactionStatus;
-
   reference?: string;
-
   riskScore: RiskScore;
-
   createdAt?: string;
-
   updatedAt?: string;
 }
 
@@ -118,29 +83,13 @@ interface TransactionsResponse {
 ========================================================= */
 
 export default function DashboardPage() {
-  const router =
-    useRouter();
+  const router = useRouter();
 
-  const [user, setUser] =
-    useState<CurrentUser | null>(
-      null
-    );
-
-  const [wallet, setWallet] =
-    useState<WalletData | null>(
-      null
-    );
-
-  const [transactions, setTransactions] =
-    useState<TransactionData[]>(
-      []
-    );
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [errorMessage, setErrorMessage] =
-    useState("");
+  const [user, setUser] = useState<CurrentUser | null>(null);
+  const [wallet, setWallet] = useState<WalletData | null>(null);
+  const [transactions, setTransactions] = useState<TransactionData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
 
   /* =========================================================
      LOAD DATA
@@ -149,119 +98,65 @@ export default function DashboardPage() {
   useEffect(() => {
     let mounted = true;
 
-    const loadDashboard =
-      async () => {
-        try {
-          setLoading(true);
-          setErrorMessage("");
+    const loadDashboard = async () => {
+      try {
+        setLoading(true);
+        setErrorMessage("");
 
-          const [
-            profileResponse,
-            walletResponse,
-            transactionsResponse,
-          ] =
-            await Promise.all([
-              apiClient<ProfileResponse>(
-                "/users/profile"
-              ),
+        const [profileResponse, walletResponse, transactionsResponse] =
+          await Promise.all([
+            apiClient<ProfileResponse>("/users/profile"),
+            apiClient<WalletResponse>("/wallet"),
+            apiClient<TransactionsResponse>("/transactions"),
+          ]);
 
-              apiClient<WalletResponse>(
-                "/wallet"
-              ),
-
-              apiClient<TransactionsResponse>(
-                "/transactions"
-              ),
-            ]);
-
-          if (!mounted) {
-            return;
-          }
-
-          if (
-            !profileResponse?.success ||
-            !profileResponse.user
-          ) {
-            throw new Error(
-              "Unable to load your profile."
-            );
-          }
-
-          if (
-            !walletResponse?.success ||
-            !walletResponse.wallet
-          ) {
-            throw new Error(
-              "Unable to load your wallet."
-            );
-          }
-
-          if (
-            !transactionsResponse?.success
-          ) {
-            throw new Error(
-              "Unable to load transactions."
-            );
-          }
-
-          setUser(
-            profileResponse.user
-          );
-
-          setWallet(
-            walletResponse.wallet
-          );
-
-          setTransactions(
-            transactionsResponse
-              .transactions || []
-          );
-        } catch (error) {
-          console.error(
-            "Dashboard loading error:",
-            error
-          );
-
-          if (!mounted) {
-            return;
-          }
-
-          const message =
-            error instanceof Error
-              ? error.message
-              : "Failed to load dashboard.";
-
-          setErrorMessage(
-            message
-          );
-
-          const lowerMessage =
-            message.toLowerCase();
-
-          if (
-            lowerMessage.includes(
-              "401"
-            ) ||
-            lowerMessage.includes(
-              "unauthorized"
-            ) ||
-            lowerMessage.includes(
-              "not authorized"
-            ) ||
-            lowerMessage.includes(
-              "authentication"
-            )
-          ) {
-            router.replace(
-              "/login"
-            );
-          }
-        } finally {
-          if (mounted) {
-            setLoading(false);
-          }
+        if (!mounted) {
+          return;
         }
-      };
+
+        if (!profileResponse?.success || !profileResponse.user) {
+          throw new Error("Unable to load your profile.");
+        }
+
+        if (!walletResponse?.success || !walletResponse.wallet) {
+          throw new Error("Unable to load your wallet.");
+        }
+
+        if (!transactionsResponse?.success) {
+          throw new Error("Unable to load transactions.");
+        }
+
+        setUser(profileResponse.user);
+        setWallet(walletResponse.wallet);
+        setTransactions(transactionsResponse.transactions || []);
+      } catch (error) {
+        console.error("Dashboard loading error:", error);
+
+        if (!mounted) {
+          return;
+        }
+
+        const message =
+          error instanceof Error ? error.message : "Failed to load dashboard.";
+
+        setErrorMessage(message);
+
+        const lowerMessage = message.toLowerCase();
+
+        if (
+          lowerMessage.includes("401") ||
+          lowerMessage.includes("unauthorized") ||
+          lowerMessage.includes("not authorized") ||
+          lowerMessage.includes("authentication")
+        ) {
+          router.replace("/login");
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
 
     loadDashboard();
 
@@ -286,7 +181,6 @@ export default function DashboardPage() {
             <p className="text-sm font-bold text-slate-800">
               Loading dashboard
             </p>
-
             <p className="mt-1 text-xs text-slate-400">
               Fetching wallet and transaction data...
             </p>
@@ -300,11 +194,7 @@ export default function DashboardPage() {
      ERROR
   ========================================================== */
 
-  if (
-    errorMessage ||
-    !user ||
-    !wallet
-  ) {
+  if (errorMessage || !user || !wallet) {
     return (
       <div className="flex min-h-[70vh] items-center justify-center px-4">
         <div className="w-full max-w-md rounded-3xl border border-red-200 bg-white p-7 text-center shadow-sm">
@@ -317,15 +207,12 @@ export default function DashboardPage() {
           </h2>
 
           <p className="mt-2 text-sm leading-6 text-slate-500">
-            {errorMessage ||
-              "Dashboard information is currently unavailable."}
+            {errorMessage || "Dashboard information is currently unavailable."}
           </p>
 
           <button
             type="button"
-            onClick={() =>
-              window.location.reload()
-            }
+            onClick={() => window.location.reload()}
             className="mt-6 rounded-xl bg-[#1F5EA8] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#17466F]"
           >
             Try Again
@@ -339,16 +226,12 @@ export default function DashboardPage() {
      ADMIN
   ========================================================== */
 
-  if (
-    user.role ===
-    "admin"
-  ) {
+  if (user.role === "admin") {
     return (
-      <AdminDashboardOverview
-        user={{
-          name: user.name,
-        }}
-      />
+      // Fixed: Removed the `user` prop since AdminDashboardOverview doesn't accept it.
+      // If you MUST pass the user prop because you use it in the child component, 
+      // you can use: <AdminDashboardOverview {...({ user: { name: user.name } } as any)} />
+      <AdminDashboardOverview />
     );
   }
 
@@ -362,15 +245,11 @@ export default function DashboardPage() {
         name: user.name,
         email: user.email,
         role: user.role,
-        greeting:
-          getGreeting(),
-        kycStatus:
-          user.kycStatus,
+        greeting: getGreeting(),
+        kycStatus: user.kycStatus,
       }}
       wallet={wallet}
-      transactions={
-        transactions
-      }
+      transactions={transactions}
     />
   );
 }
@@ -380,8 +259,7 @@ export default function DashboardPage() {
 ========================================================= */
 
 function getGreeting(): string {
-  const hour =
-    new Date().getHours();
+  const hour = new Date().getHours();
 
   if (hour < 12) {
     return "Good morning";

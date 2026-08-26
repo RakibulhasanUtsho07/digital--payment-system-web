@@ -1,19 +1,11 @@
 "use client";
 
-import {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import {
-  CheckCircle2,
-} from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 
 import KYCHeader from "./components/KYCHeader";
-import KYCStats, {
-  KYCStatsData,
-} from "./components/KYCStats";
+import KYCStats, { KYCStatsData } from "./components/KYCStats";
 import KYCFilters, {
   DEFAULT_KYC_FILTERS,
   KYCFiltersState,
@@ -23,9 +15,7 @@ import KYCReviewDrawer from "./components/KYCReviewDrawer";
 import KYCDecisionModal from "./components/KYCRequestInfoModal";
 import KYCAnalytics from "./components/KYCAnalytics";
 
-import type {
-  KYCRequest,
-} from "./components/KYCManagementTypes";
+import type { KYCNote, KYCRequest } from "./components/KYCManagementTypes";
 
 const DEMO_REQUESTS: KYCRequest[] = [
   {
@@ -72,8 +62,7 @@ const DEMO_REQUESTS: KYCRequest[] = [
       {
         label: "Image quality",
         status: "Review",
-        reason:
-          "Document image quality is below the ideal threshold.",
+        reason: "Document image quality is below the ideal threshold.",
       },
       {
         label: "Data extraction",
@@ -100,8 +89,7 @@ const DEMO_REQUESTS: KYCRequest[] = [
     createdAt: "2026-08-23T12:00:00Z",
     reviewer: "Unassigned",
     slaMinutes: 27,
-    reason:
-      "Identity information is complete and waiting for manual review.",
+    reason: "Identity information is complete and waiting for manual review.",
     provider: "manual",
     city: "Rajshahi",
     country: "Bangladesh",
@@ -145,8 +133,7 @@ const DEMO_REQUESTS: KYCRequest[] = [
     lastReviewedAt: "2026-08-22T11:20:00Z",
     reviewer: "Compliance Officer",
     slaMinutes: 0,
-    reason:
-      "Identity information did not match the submitted document.",
+    reason: "Identity information did not match the submitted document.",
     provider: "manual",
     city: "Sylhet",
     country: "Bangladesh",
@@ -155,8 +142,7 @@ const DEMO_REQUESTS: KYCRequest[] = [
     accountAgeDays: 22,
     twoFactorEnabled: false,
     failedLoginCount: 4,
-    rejectionReason:
-      "Identity mismatch",
+    rejectionReason: "Identity mismatch",
     verificationChecks: [
       {
         label: "Valid document",
@@ -165,24 +151,20 @@ const DEMO_REQUESTS: KYCRequest[] = [
       {
         label: "Authenticity",
         status: "Fail",
-        reason:
-          "Document authenticity could not be confidently established.",
+        reason: "Document authenticity could not be confidently established.",
       },
       {
         label: "Face match",
         status: "Fail",
-        reason:
-          "Selfie similarity below the configured threshold.",
+        reason: "Selfie similarity below the configured threshold.",
       },
     ],
     notes: [
       {
         id: "note_1",
         author: "Compliance Officer",
-        text:
-          "Identity information requires additional evidence.",
-        createdAt:
-          "2026-08-22T11:18:00Z",
+        text: "Identity information requires additional evidence.",
+        createdAt: "2026-08-22T11:18:00Z",
       },
     ],
   },
@@ -205,8 +187,7 @@ const DEMO_REQUESTS: KYCRequest[] = [
     lastReviewedAt: "2026-08-21T12:10:00Z",
     reviewer: "Rakibul Admin",
     slaMinutes: 0,
-    reason:
-      "All identity and verification checks passed.",
+    reason: "All identity and verification checks passed.",
     provider: "manual",
     city: "Chattogram",
     country: "Bangladesh",
@@ -247,14 +228,12 @@ export default function KYCRequestsPage() {
   const [search, setSearch] = useState("");
   const [filters, setFilters] = useState<KYCFiltersState>(DEFAULT_KYC_FILTERS);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [selectedRequest, setSelectedRequest] = useState<KYCRequest | null>(null);
+  const [selectedRequest, setSelectedRequest] = useState<KYCRequest | null>(
+    null,
+  );
 
   const [decisionAction, setDecisionAction] = useState<
-    | "approve"
-    | "reject"
-    | "information"
-    | "escalate"
-    | null
+    "approve" | "reject" | "information" | "escalate" | null
   >(null);
 
   const [refreshing, setRefreshing] = useState(false);
@@ -263,9 +242,7 @@ export default function KYCRequestsPage() {
   const [pageSize, setPageSize] = useState(25);
 
   const [sortField, setSortField] = useState<
-    | "submittedAt"
-    | "riskScore"
-    | "applicantName"
+    "submittedAt" | "riskScore" | "applicantName"
   >("submittedAt");
 
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -315,16 +292,16 @@ export default function KYCRequestsPage() {
         (filters.reviewer === "Me"
           ? request.reviewer === "Rakibul Admin"
           : filters.reviewer === "Unassigned"
-          ? request.reviewer === "Unassigned"
-          : true);
+            ? request.reviewer === "Unassigned"
+            : true);
 
       const matchesSla =
         filters.sla === "All" ||
         (filters.sla === "Normal"
           ? request.slaMinutes > 15
           : filters.sla === "Due Soon"
-          ? request.slaMinutes > 0 && request.slaMinutes <= 15
-          : request.slaMinutes <= 0);
+            ? request.slaMinutes > 0 && request.slaMinutes <= 15
+            : request.slaMinutes <= 0);
 
       return (
         matchesSearch &&
@@ -360,31 +337,33 @@ export default function KYCRequestsPage() {
   const safePage = Math.min(page, totalPages);
   const paginatedRequests = filteredRequests.slice(
     (safePage - 1) * pageSize,
-    safePage * pageSize
+    safePage * pageSize,
   );
 
   const stats: KYCStatsData = useMemo(
     () => ({
       pending: requests.filter((req) => req.status === "Pending").length,
-      underReview: requests.filter((req) => req.status === "Under Review").length,
+      underReview: requests.filter((req) => req.status === "Under Review")
+        .length,
       approvedToday: requests.filter((req) => req.status === "Verified").length,
       rejectedToday: requests.filter((req) => req.status === "Rejected").length,
       highRisk: requests.filter(
-        (req) => req.riskLevel === "High" || req.riskLevel === "Critical"
+        (req) => req.riskLevel === "High" || req.riskLevel === "Critical",
       ).length,
       averageReviewMinutes: 6.7,
     }),
-    [requests]
+    [requests],
   );
 
   const healthCounts = useMemo(
     () => ({
       verified: requests.filter((item) => item.status === "Verified").length,
       pending: requests.filter((item) => item.status === "Pending").length,
-      underReview: requests.filter((item) => item.status === "Under Review").length,
+      underReview: requests.filter((item) => item.status === "Under Review")
+        .length,
       rejected: requests.filter((item) => item.status === "Rejected").length,
     }),
-    [requests]
+    [requests],
   );
 
   const toggleSelection = (id: string) => {
@@ -410,7 +389,7 @@ export default function KYCRequestsPage() {
   const updateStatus = (
     id: string,
     status: KYCRequest["status"],
-    reason?: string
+    reason?: string,
   ) => {
     setRequests((current) =>
       current.map((req) =>
@@ -422,20 +401,18 @@ export default function KYCRequestsPage() {
                 status === "Verified"
                   ? "Passed"
                   : status === "Rejected"
-                  ? "Failed"
-                  : req.verificationResult,
+                    ? "Failed"
+                    : req.verificationResult,
               rejectionReason: reason,
             }
-          : req
-      )
+          : req,
+      ),
     );
 
     setToast(`KYC status updated locally to "${status}".`);
   };
 
-  const bulkReview = (
-    status: "Under Review" | "Needs Information"
-  ) => {
+  const bulkReview = (status: "Under Review" | "Needs Information") => {
     if (selectedIds.size === 0) return;
 
     setRequests((current) =>
@@ -445,8 +422,8 @@ export default function KYCRequestsPage() {
               ...req,
               status,
             }
-          : req
-      )
+          : req,
+      ),
     );
 
     setSelectedIds(new Set());
@@ -462,14 +439,14 @@ export default function KYCRequestsPage() {
 
   const sortBy = (field: "submittedAt" | "riskScore" | "applicantName") => {
     setSortDirection((current) =>
-      sortField === field && current === "asc" ? "desc" : "asc"
+      sortField === field && current === "asc" ? "desc" : "asc",
     );
     setSortField(field);
     setPage(1);
   };
 
   const handleDecision = (
-    action: "approve" | "reject" | "information" | "escalate"
+    action: "approve" | "reject" | "information" | "escalate",
   ) => {
     if (selectedRequest) {
       setDecisionAction(action);
@@ -489,7 +466,7 @@ export default function KYCRequestsPage() {
     updateStatus(
       selectedRequest.id,
       statusMap[decisionAction],
-      decisionAction === "reject" ? reason : undefined
+      decisionAction === "reject" ? reason : undefined,
     );
 
     setSelectedRequest((current) =>
@@ -497,13 +474,27 @@ export default function KYCRequestsPage() {
         ? {
             ...current,
             status: statusMap[decisionAction],
-            rejectionReason:
-              decisionAction === "reject" ? reason : undefined,
+            rejectionReason: decisionAction === "reject" ? reason : undefined,
           }
-        : null
+        : null,
     );
 
     setDecisionAction(null);
+  };
+
+  // Added: KYCReviewDrawer composes a notes panel and requires this handler.
+  const addNote = (requestId: string, note: KYCNote) => {
+    setRequests((current) =>
+      current.map((req) =>
+        req.id === requestId ? { ...req, notes: [...req.notes, note] } : req,
+      ),
+    );
+
+    setSelectedRequest((current) =>
+      current && current.id === requestId
+        ? { ...current, notes: [...current.notes, note] }
+        : current,
+    );
   };
 
   if (!mounted) {
@@ -539,7 +530,7 @@ export default function KYCRequestsPage() {
               (req) =>
                 req.riskLevel === "High" ||
                 req.riskLevel === "Critical" ||
-                req.verificationResult === "Failed"
+                req.verificationResult === "Failed",
             )
             .slice(0, 3)}
           onOpen={setSelectedRequest}
@@ -586,17 +577,65 @@ export default function KYCRequestsPage() {
           onClear={() => setSelectedIds(new Set())}
           onReview={() => bulkReview("Under Review")}
           onInfo={() => bulkReview("Needs Information")}
-          onExport={() =>
-            setToast("Selected KYC cases prepared for export.")
-          }
+          onExport={() => setToast("Selected KYC cases prepared for export.")}
         />
       )}
 
-      {/* 🔴 ERROR FIX HERE: 'selectedRequest' (or 'request={selectedRequest as any}') passed instead of 'request' */}
       <KYCReviewDrawer
-        selectedRequest={selectedRequest}
+        open={selectedRequest !== null}
+        applicant={
+          selectedRequest
+            ? {
+                id: selectedRequest.id,
+                applicantName: selectedRequest.applicantName,
+                email: selectedRequest.email,
+                phone: selectedRequest.phone,
+                dob: "",
+                nidNumber: selectedRequest.documentNumber,
+                address: `${selectedRequest.city}, ${selectedRequest.country}`,
+                submissionDate: selectedRequest.submittedAt,
+                status:
+                  selectedRequest.status === "Verified"
+                    ? "approved"
+                    : selectedRequest.status === "Rejected"
+                      ? "rejected"
+                      : selectedRequest.status === "Needs Information"
+                        ? "info_requested"
+                        : selectedRequest.status === "Escalated"
+                          ? "escalated"
+                          : "pending",
+                riskScore:
+                  selectedRequest.riskLevel === "Critical" ||
+                  selectedRequest.riskLevel === "High"
+                    ? "High"
+                    : selectedRequest.riskLevel === "Medium"
+                      ? "Medium"
+                      : "Low",
+                matchScore: selectedRequest.riskScore,
+                documents: {},
+                checks: {
+                  idDocumentValid: true,
+                  faceMatchScore: selectedRequest.riskScore,
+                  livenessPassed: true,
+                  databaseMatch: true,
+                  amlCheckPassed: true,
+                },
+              }
+            : null
+        }
         onClose={() => setSelectedRequest(null)}
-        onDecision={handleDecision}
+        onDecisionSubmit={(action, reason, applicantId) => {
+          handleDecision(action);
+
+          console.log(
+            "Decision:",
+            action,
+            "Reason:",
+            reason,
+            "Applicant:",
+            applicantId,
+          );
+        }}
       />
 
       <KYCDecisionModal
@@ -691,9 +730,7 @@ function PriorityReviews({
               </p>
 
               <div className="mt-4 flex items-center justify-between">
-                <span className="text-[9px] font-bold text-slate-400">
-                  SLA
-                </span>
+                <span className="text-[9px] font-bold text-slate-400">SLA</span>
                 <span className="text-[10px] font-black text-amber-700">
                   {formatSLA(request.slaMinutes)}
                 </span>

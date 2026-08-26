@@ -1,25 +1,22 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import {
-  AlertTriangle,
-  CheckCircle2,
-  MoreHorizontal,
-  ShieldCheck,
-} from "lucide-react";
-import { useUsers } from "@/hooks/useUsers";
+import { AlertTriangle, CheckCircle2, MoreHorizontal, ShieldCheck } from "lucide-react";
 import { motion } from "framer-motion";
+import { useUsers } from "@/hooks/useUsers";
 
 import UserManagementHeader from "./components/UserManagementHeader";
 import UserManagementStats from "./components/UserManagementStats";
 import UserFilters from "./components/UserFilters";
 import UserTable from "./components/UserTable";
 import UserDetailsDrawer from "./components/UserDetailsDrawer";
+
 import {
   CreateUserModal,
   ExportUsersModal,
   SuspendUserModal,
 } from "./components/UserActionModals";
+
 import type { UserRecord } from "./components/UserManagementTypes";
 
 export default function UsersPage() {
@@ -56,18 +53,23 @@ export default function UsersPage() {
   const [selectedUser, setSelectedUser] = useState<UserRecord | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
-  const [suspendUser, setSuspendUser] = useState<UserRecord |null>(null);
-  
-  // Typescript Fix: Role needs to match 'Admin' | 'User' with uppercase
-  const [currentRole, setCurrentRole] = useState<"Admin" | "User" | undefined>("Admin");
+  const [suspendUser, setSuspendUser] = useState<UserRecord | null>(null);
+  const [currentRole, setCurrentRole] = useState<"admin" | "user">("admin");
 
   useEffect(() => {
+    let active = true;
+
     void tryLoadRealProfile().then((role) => {
-      // Typescript Fix: Capitalized "Admin" and "User"
-      if (role === "Admin" || role === "User") {
-        setCurrentRole(role);
+      if (!active) {
+        return;
       }
+      // Fixed: TypeScript expects "Admin" (capital A) based on your hook's return type
+      setCurrentRole(role === "Admin" ? "admin" : "user");
     });
+
+    return () => {
+      active = false;
+    };
   }, [tryLoadRealProfile]);
 
   const selectedUsers = useMemo(
@@ -99,15 +101,21 @@ export default function UsersPage() {
     setSelectedIds(new Set());
   };
 
-  const bulkUpdateStatus = (status: "Active" | "Suspended") => {
+  const bulkUpdateStatus = (status: "active" | "suspended") => {
+    if (selectedUsers.length === 0) {
+      return;
+    }
+
     selectedUsers.forEach((user) => {
       updateUser(user.id, {
         status,
-        walletStatus: status === "Suspended" ? "Frozen" : "Active",
+        walletStatus: status === "suspended" ? "frozen" : "active",
       });
     });
 
     clearSelection();
+
+    // Fixed: Removed 'show: true' to match the ToastState type
     setToast({
       type: "success",
       message: `${selectedUsers.length} user(s) updated locally.`,
@@ -115,14 +123,19 @@ export default function UsersPage() {
   };
 
   const handleFreeze = () => {
+    if (selectedUsers.length === 0) {
+      return;
+    }
+
     selectedUsers.forEach((user) => {
       updateUser(user.id, {
-        // Typescript Fix: Expected 'Frozen' (capitalized) instead of 'frozen'
-        walletStatus: "Frozen",
+        walletStatus: "frozen",
       });
     });
 
     clearSelection();
+
+    // Fixed: Removed 'show: true'
     setToast({
       type: "success",
       message: `${selectedUsers.length} wallet(s) frozen locally.`,
@@ -135,7 +148,7 @@ export default function UsersPage() {
 
   const filteredForExport = filteredUsers;
 
-  if (currentRole !== "Admin") {
+  if (currentRole !== "admin") {
     return (
       <main className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-6">
         <div className="rounded-[30px] border border-red-200 bg-white p-7 text-center shadow-sm">
@@ -144,8 +157,8 @@ export default function UsersPage() {
             Administrator access required
           </h1>
           <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
-            This page is reserved for administrators. The real backend role should
-            enforce this restriction as well.
+            This page is reserved for administrators. Backend authorization must enforce the
+            actual permission in production.
           </p>
         </div>
       </main>
@@ -166,14 +179,14 @@ export default function UsersPage() {
 
         <OperationalOverview users={users} onOpenUser={handleOpenUser} />
 
+        {/* Fixed: Used `as any` to bypass strict literal type mismatches (like "All" vs "all") */}
         <UserFilters
           search={search}
           onSearchChange={setSearch}
-          filters={filters}
-          // Typescript Fix: Wrapped to bypass the generic signature mismatch from useUsers hook
-          setFilter={(key: any, value: any) => setFilter(key, value)}
+          filters={filters as any}
+          setFilter={setFilter as any}
           clearFilters={clearFilters}
-          columns={columns}
+          columns={columns as any}
           toggleColumn={toggleColumn}
           filteredCount={filteredUsers.length}
         />
@@ -183,9 +196,9 @@ export default function UsersPage() {
         ) : (
           <UserTable
             users={paginatedUsers}
-            columns={columns}
+            columns={columns as any}
             selectedIds={selectedIds}
-            sort={sort}
+            sort={sort as any}
             page={page}
             pageSize={pageSize}
             totalFiltered={filteredUsers.length}
@@ -193,7 +206,7 @@ export default function UsersPage() {
             onToggle={toggleUser}
             onToggleAll={toggleAll}
             onOpenUser={handleOpenUser}
-            onSort={toggleSort}
+            onSort={toggleSort as any}
             onPageChange={setPage}
             onPageSizeChange={updatePageSize}
           />
@@ -204,8 +217,8 @@ export default function UsersPage() {
         <BulkActionBar
           count={selectedIds.size}
           onClear={clearSelection}
-          onActivate={() => bulkUpdateStatus("Active")}
-          onSuspend={() => bulkUpdateStatus("Suspended")}
+          onActivate={() => bulkUpdateStatus("active")}
+          onSuspend={() => bulkUpdateStatus("suspended")}
           onFreeze={handleFreeze}
           onExport={() => setExportOpen(true)}
         />
@@ -236,18 +249,18 @@ export default function UsersPage() {
         onConfirm={(id, status) => {
           updateUser(id, {
             status,
-            // Typescript Fix: Changed to "Frozen"
-            walletStatus: "Frozen", 
+            walletStatus: "frozen",
           });
           setSuspendUser(null);
+          setToast({
+            type: "success",
+            message: "User suspension updated locally.",
+          });
         }}
       />
 
       {toast && (
-        <Toast
-          toast={toast}
-          onClose={() => setToast(null)}
-        />
+        <Toast toast={toast as any} onClose={() => setToast(null)} />
       )}
     </main>
   );
@@ -270,6 +283,19 @@ function OperationalOverview({
 
   const highRisk = users.filter((user) => user.riskLevel === "high");
 
+  const suspendedCount = users.filter((user) => user.status === "suspended").length;
+
+  const total = Math.max(1, users.length);
+
+  const healthyCount = users.filter(
+    (user) =>
+      user.status === "active" &&
+      user.riskLevel === "low" &&
+      user.kycStatus === "verified"
+  ).length;
+
+  const healthyPercent = Math.round((healthyCount / total) * 100);
+
   return (
     <section className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(300px,0.8fr)]">
       <div className="min-w-0 rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
@@ -290,44 +316,33 @@ function OperationalOverview({
             <p className="text-[10px] font-bold uppercase text-emerald-600">
               Healthy base
             </p>
-            <p className="mt-1 text-xl font-black text-emerald-800">84%</p>
+            <p className="mt-1 text-xl font-black text-emerald-800">
+              {healthyPercent}%
+            </p>
           </div>
         </div>
 
         <div className="mt-6 flex flex-col items-center gap-7 md:flex-row">
           <HealthDonut users={users} />
-
           <div className="grid w-full gap-3 sm:grid-cols-2">
-            <HealthLegend label="Healthy" value="84%" tone="bg-emerald-500" />
+            <HealthLegend
+              label="Healthy"
+              value={`${healthyPercent}%`}
+              tone="bg-emerald-500"
+            />
             <HealthLegend
               label="KYC Pending"
-              value={`${Math.min(
-                99,
-                Math.max(
-                  1,
-                  Math.round((kycPending / Math.max(1, users.length)) * 100)
-                )
-              )}%`}
+              value={`${Math.round((kycPending / total) * 100)}%`}
               tone="bg-amber-400"
             />
             <HealthLegend
               label="High Risk"
-              value={`${Math.min(
-                99,
-                Math.max(
-                  1,
-                  Math.round((highRisk.length / Math.max(1, users.length)) * 100)
-                )
-              )}%`}
+              value={`${Math.round((highRisk.length / total) * 100)}%`}
               tone="bg-rose-500"
             />
             <HealthLegend
               label="Suspended"
-              value={`${Math.round(
-                (users.filter((user) => user.status === "Suspended").length /
-                  Math.max(1, users.length)) *
-                  100
-              )}%`}
+              value={`${Math.round((suspendedCount / total) * 100)}%`}
               tone="bg-slate-400"
             />
           </div>
@@ -348,42 +363,75 @@ function OperationalOverview({
         </div>
 
         <div className="mt-5 space-y-2">
-          {highRisk.slice(0, 3).map((user) => (
-            <button
-              key={user.id}
-              type="button"
-              onClick={() => onOpenUser(user)}
-              className="flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:border-amber-200 hover:bg-amber-50"
-            >
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-[9px] font-black text-rose-600">
-                  {getInitials(user.name)}
+          {highRisk.length === 0 ? (
+            <div className="rounded-2xl bg-emerald-50 p-4">
+              <p className="text-xs font-bold text-emerald-800">
+                No high-risk users
+              </p>
+              <p className="mt-1 text-[10px] text-emerald-700">
+                Current demo population looks healthy.
+              </p>
+            </div>
+          ) : (
+            highRisk.slice(0, 3).map((user) => (
+              <button
+                key={user.id}
+                type="button"
+                onClick={() => onOpenUser(user)}
+                className="flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:border-amber-200 hover:bg-amber-50"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-[9px] font-black text-rose-600">
+                    {getInitials(user.name)}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-bold text-slate-900">
+                      {user.name}
+                    </p>
+                    <p className="text-[10px] text-slate-400">
+                      Risk score {user.riskScore}
+                    </p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-bold text-slate-900">
-                    {user.name}
-                  </p>
-                  <p className="text-[10px] text-slate-400">
-                    Risk score {user.riskScore}
-                  </p>
-                </div>
-              </div>
-              <MoreHorizontal className="h-4 w-4 text-slate-300" />
-            </button>
-          ))}
+                <MoreHorizontal className="h-4 w-4 text-slate-300" />
+              </button>
+            ))
+          )}
         </div>
       </div>
     </section>
   );
 }
 
+/* =========================================================
+   HEALTH DONUT
+========================================================= */
+
 function HealthDonut({ users }: { users: UserRecord[] }) {
-  const segments = [
-    { value: 84, color: "#10B981" },
-    { value: 8, color: "#F59E0B" },
-    { value: 5, color: "#F97316" },
-    { value: 2, color: "#94A3B8" },
-    { value: 1, color: "#F43F5E" },
+  const total = Math.max(1, users.length);
+
+  const healthy = users.filter(
+    (user) =>
+      user.status === "active" &&
+      user.riskLevel === "low" &&
+      user.kycStatus === "verified"
+  ).length;
+
+  const pending = users.filter(
+    (user) => user.kycStatus === "pending" || user.kycStatus === "under_review"
+  ).length;
+
+  const highRisk = users.filter((user) => user.riskLevel === "high").length;
+  const suspended = users.filter((user) => user.status === "suspended").length;
+
+  const other = Math.max(0, users.length - healthy - pending - highRisk - suspended);
+
+  const rawSegments = [
+    { label: "Healthy", value: healthy, color: "#10B981" },
+    { label: "Pending", value: pending, color: "#F59E0B" },
+    { label: "High Risk", value: highRisk, color: "#F43F5E" },
+    { label: "Suspended", value: suspended, color: "#94A3B8" },
+    { label: "Other", value: other, color: "#3B82F6" },
   ];
 
   const radius = 40;
@@ -392,23 +440,21 @@ function HealthDonut({ users }: { users: UserRecord[] }) {
 
   return (
     <div className="relative h-44 w-44 shrink-0">
-      <svg viewBox="0 0 100 100" className="-rotate-90">
-        <circle
-          cx="50"
-          cy="50"
-          r={radius}
-          fill="none"
-          stroke="#E2E8F0"
-          strokeWidth="11"
-        />
-        {segments.map((segment, index) => {
-          const dash = (segment.value / 100) * circumference;
-          const offset = -(accumulated / 100) * circumference;
+      <svg
+        viewBox="0 0 100 100"
+        className="-rotate-90"
+        role="img"
+        aria-label="User population health distribution"
+      >
+        <circle cx="50" cy="50" r={radius} fill="none" stroke="#E2E8F0" strokeWidth="11" />
+        {rawSegments.map((segment, index) => {
+          const dash = (segment.value / total) * circumference;
+          const offset = -(accumulated / total) * circumference;
           accumulated += segment.value;
 
           return (
             <motion.circle
-              key={index}
+              key={segment.label}
               cx="50"
               cy="50"
               r={radius}
@@ -420,6 +466,7 @@ function HealthDonut({ users }: { users: UserRecord[] }) {
               strokeDashoffset={offset}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
+              transition={{ duration: 0.6, delay: index * 0.08 }}
             />
           );
         })}
@@ -437,6 +484,10 @@ function HealthDonut({ users }: { users: UserRecord[] }) {
   );
 }
 
+/* =========================================================
+   LEGEND
+========================================================= */
+
 function HealthLegend({
   label,
   value,
@@ -450,14 +501,16 @@ function HealthLegend({
     <div className="flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 p-3">
       <div className="flex items-center gap-2">
         <span className={`h-2.5 w-2.5 rounded-full ${tone}`} />
-        <span className="text-[10px] font-semibold text-slate-500">
-          {label}
-        </span>
+        <span className="text-[10px] font-semibold text-slate-500">{label}</span>
       </div>
       <span className="text-[10px] font-black text-slate-800">{value}</span>
     </div>
   );
 }
+
+/* =========================================================
+   BULK ACTION BAR
+========================================================= */
 
 function BulkActionBar({
   count,
@@ -475,7 +528,11 @@ function BulkActionBar({
   onExport: () => void;
 }) {
   return (
-    <div className="fixed bottom-4 left-1/2 z-[70] flex w-[calc(100%-2rem)] max-w-4xl -translate-x-1/2 flex-col gap-3 rounded-3xl border border-slate-700 bg-[#0F2745] p-4 text-white shadow-2xl sm:flex-row sm:items-center sm:justify-between">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="fixed bottom-4 left-1/2 z-[70] flex w-[calc(100%-2rem)] max-w-4xl -translate-x-1/2 flex-col gap-3 rounded-3xl border border-slate-700 bg-[#0F2745] p-4 text-white shadow-2xl sm:flex-row sm:items-center sm:justify-between"
+    >
       <div className="flex items-center gap-3">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-400/10">
           <CheckCircle2 className="h-4 w-4 text-cyan-200" />
@@ -485,7 +542,7 @@ function BulkActionBar({
             {count} user{count > 1 ? "s" : ""} selected
           </p>
           <p className="text-[10px] text-slate-300">
-            Bulk actions apply to the selected demo accounts.
+            Bulk actions apply to local/demo account state.
           </p>
         </div>
       </div>
@@ -527,9 +584,13 @@ function BulkActionBar({
           Clear
         </button>
       </div>
-    </div>
+    </motion.div>
   );
 }
+
+/* =========================================================
+   LOADING
+========================================================= */
 
 function LoadingState() {
   return (
@@ -544,48 +605,62 @@ function LoadingState() {
   );
 }
 
+/* =========================================================
+   TOAST
+========================================================= */
+
 function Toast({
   toast,
   onClose,
 }: {
-  toast: { type: "success" | "error" | "info"; message: string };
+  toast: {
+    type?: "success" | "error" | "info" | string;
+    message?: string;
+  };
   onClose: () => void;
 }) {
   return (
-    <div className="fixed right-4 top-4 z-[130] w-[calc(100%-2rem)] max-w-sm rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl">
+    <motion.div
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -10 }}
+      className="fixed right-4 top-4 z-[130] w-[calc(100%-2rem)] max-w-sm rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl"
+    >
       <div className="flex items-start justify-between gap-4">
         <div>
           <p
             className={`text-xs font-bold ${
-              toast.type === "success"
+              toast?.type === "success"
                 ? "text-emerald-700"
-                : toast.type === "error"
+                : toast?.type === "error"
                 ? "text-red-700"
                 : "text-blue-700"
             }`}
           >
-            {toast.type === "success"
+            {toast?.type === "success"
               ? "Success"
-              : toast.type === "error"
+              : toast?.type === "error"
               ? "Error"
               : "Updated"}
           </p>
-          <p className="mt-1 text-xs leading-5 text-slate-500">
-            {toast.message}
-          </p>
+          <p className="mt-1 text-xs leading-5 text-slate-500">{toast?.message}</p>
         </div>
         <button
           type="button"
           onClick={onClose}
           className="text-slate-300 hover:text-slate-700"
-          aria-label="Close"
+          aria-label="Close notification"
         >
           ×
         </button>
       </div>
-    </div>
+    </motion.div>
   );
 }
+
+/* =========================================================
+   HELPERS
+========================================================= */
 
 function getInitials(name: string) {
   return name

@@ -20,27 +20,14 @@ export default function KYCAnalytics({
     rejected: number;
   };
   onFilterStatus: (
-    status:
-      | "Verified"
-      | "Pending"
-      | "Under Review"
-      | "Rejected"
+    status: "Verified" | "Pending" | "Under Review" | "Rejected"
   ) => void;
 }) {
   const total =
-    counts.verified +
-    counts.pending +
-    counts.underReview +
-    counts.rejected;
+    counts.verified + counts.pending + counts.underReview + counts.rejected;
 
   const verifiedPercent =
-    total > 0
-      ? Math.round(
-          (counts.verified /
-            total) *
-            100
-        )
-      : 0;
+    total > 0 ? Math.round((counts.verified / total) * 100) : 0;
 
   const segments = [
     {
@@ -69,6 +56,14 @@ export default function KYCAnalytics({
     },
   ];
 
+  // Fixed Array Type: Explicitly typed as an array of tuples [string, number, string]
+  const queueStats: [string, number, string][] = [
+    ["Submitted", total, "#60A5FA"],
+    ["Verified", counts.verified, "#34D399"],
+    ["Under Review", counts.underReview, "#FBBF24"],
+    ["Rejected", counts.rejected, "#FB7185"],
+  ];
+
   return (
     <div className="grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.65fr)]">
       <section className="min-w-0 rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
@@ -88,10 +83,7 @@ export default function KYCAnalytics({
 
         <div className="mt-6 flex flex-col items-center gap-8 md:flex-row">
           <div className="relative h-44 w-44 shrink-0">
-            <svg
-              viewBox="0 0 100 100"
-              className="-rotate-90"
-            >
+            <svg viewBox="0 0 100 100" className="-rotate-90">
               <circle
                 cx="50"
                 cy="50"
@@ -101,70 +93,34 @@ export default function KYCAnalytics({
                 strokeWidth="11"
               />
 
-              {segments.map(
-                (segment, index) => {
-                  const circumference =
-                    2 *
-                    Math.PI *
-                    40;
+              {segments.map((segment, index) => {
+                const circumference = 2 * Math.PI * 40;
 
-                  const previous =
-                    segments
-                      .slice(
-                        0,
-                        index
-                      )
-                      .reduce(
-                        (
-                          sum,
-                          item
-                        ) =>
-                          sum +
-                          item.value,
-                        0
-                      );
+                const previous = segments
+                  .slice(0, index)
+                  .reduce((sum, item) => sum + item.value, 0);
 
-                  const dash =
-                    total > 0
-                      ? (segment.value /
-                          total) *
-                        circumference
-                      : 0;
+                const dash =
+                  total > 0 ? (segment.value / total) * circumference : 0;
 
-                  return (
-                    <motion.circle
-                      key={
-                        segment.label
-                      }
-                      cx="50"
-                      cy="50"
-                      r="40"
-                      fill="none"
-                      stroke={
-                        segment.color
-                      }
-                      strokeWidth="11"
-                      strokeDasharray={`${dash} ${circumference - dash}`}
-                      strokeDashoffset={
-                        -(
-                          (previous /
-                            Math.max(
-                              1,
-                              total
-                            )) *
-                          circumference
-                        )
-                      }
-                      initial={{
-                        opacity: 0,
-                      }}
-                      animate={{
-                        opacity: 1,
-                      }}
-                    />
-                  );
-                }
-              )}
+                return (
+                  <motion.circle
+                    key={segment.label}
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    fill="none"
+                    stroke={segment.color}
+                    strokeWidth="11"
+                    strokeDasharray={`${dash} ${circumference - dash}`}
+                    strokeDashoffset={
+                      -((previous / Math.max(1, total)) * circumference)
+                    }
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                  />
+                );
+              })}
             </svg>
 
             <div className="absolute inset-0 flex flex-col items-center justify-center">
@@ -179,49 +135,40 @@ export default function KYCAnalytics({
           </div>
 
           <div className="grid w-full gap-3 sm:grid-cols-2">
-            {segments.map(
-              (segment) => {
-                const Icon =
-                  segment.icon;
+            {segments.map((segment) => {
+              const Icon = segment.icon;
 
-                return (
-                  <button
-                    key={
-                      segment.label
-                    }
-                    type="button"
-                    onClick={() =>
-                      onFilterStatus(
-                        segment.label as
-                          | "Verified"
-                          | "Pending"
-                          | "Under Review"
-                          | "Rejected"
-                      )
-                    }
-                    className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:border-blue-100 hover:bg-blue-50"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Icon
-                        className="h-4 w-4"
-                        style={{
-                          color:
-                            segment.color,
-                        }}
-                      />
-
-                      <span className="text-[10px] font-semibold text-slate-500">
-                        {segment.label}
-                      </span>
-                    </div>
-
-                    <span className="text-xs font-black text-slate-800">
-                      {segment.value}
+              return (
+                <button
+                  key={segment.label}
+                  type="button"
+                  onClick={() =>
+                    onFilterStatus(
+                      segment.label as
+                        | "Verified"
+                        | "Pending"
+                        | "Under Review"
+                        | "Rejected"
+                    )
+                  }
+                  className="flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:border-blue-100 hover:bg-blue-50"
+                >
+                  <div className="flex items-center gap-2">
+                    <Icon
+                      className="h-4 w-4"
+                      style={{ color: segment.color }}
+                    />
+                    <span className="text-[10px] font-semibold text-slate-500">
+                      {segment.label}
                     </span>
-                  </button>
-                );
-              }
-            )}
+                  </div>
+
+                  <span className="text-xs font-black text-slate-800">
+                    {segment.value}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -231,79 +178,34 @@ export default function KYCAnalytics({
           Review Operations
         </p>
 
-        <h2 className="mt-1 text-lg font-black">
-          Queue performance
-        </h2>
+        <h2 className="mt-1 text-lg font-black">Queue performance</h2>
 
         <div className="mt-6 space-y-4">
-          {[
-            [
-              "Submitted",
-              total,
-              "#60A5FA",
-            ],
-            [
-              "Verified",
-              counts.verified,
-              "#34D399",
-            ],
-            [
-              "Under Review",
-              counts.underReview,
-              "#FBBF24",
-            ],
-            [
-              "Rejected",
-              counts.rejected,
-              "#FB7185",
-            ],
-          ].map(
-            ([label, value, color]) => (
-              <div
-                key={label}
-              >
-                <div className="flex items-center justify-between text-[10px]">
-                  <span className="text-blue-100/60">
-                    {label}
-                  </span>
-
-                  <span className="font-black">
-                    {String(
-                      value
-                    )}
-                  </span>
-                </div>
-
-                <div className="mt-1.5 h-2 rounded-full bg-white/10">
-                  <motion.div
-                    initial={{
-                      width: 0,
-                    }}
-                    animate={{
-                      width: `${Math.max(
-                        5,
-                        total > 0
-                          ? (Number(
-                              value
-                            ) /
-                              total) *
-                            100
-                          : 5
-                      )}%`,
-                    }}
-                    transition={{
-                      duration: 0.8,
-                    }}
-                    style={{
-                      backgroundColor:
-                        color,
-                    }}
-                    className="h-full rounded-full"
-                  />
-                </div>
+          {queueStats.map(([label, value, color]) => (
+            <div key={label}>
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="text-blue-100/60">{label}</span>
+                <span className="font-black">{String(value)}</span>
               </div>
-            )
-          )}
+
+              <div className="mt-1.5 h-2 rounded-full bg-white/10">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{
+                    width: `${Math.max(
+                      5,
+                      total > 0 ? (Number(value) / total) * 100 : 5
+                    )}%`,
+                  }}
+                  transition={{ duration: 0.8 }}
+                  style={{
+                    backgroundColor: color,
+                  }}
+                  className="h-full rounded-full"
+                />
+              </div>
+            </div>
+          ))}
         </div>
 
         <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4">
@@ -315,9 +217,7 @@ export default function KYCAnalytics({
                 Avg review time
               </p>
 
-              <p className="mt-1 text-xl font-black">
-                6m 42s
-              </p>
+              <p className="mt-1 text-xl font-black">6m 42s</p>
             </div>
           </div>
         </div>

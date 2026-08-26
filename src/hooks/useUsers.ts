@@ -105,12 +105,12 @@ const MOCK_USERS: User[] = [
     name: "Rakibul Hasan",
     email: "rakibul.h@example.com",
     phone: "+8801711223344",
-    role: "User",
-    status: "Active",
-    kycStatus: "Verified",
-    walletStatus: "Active",
+    role: "user",
+    status: "active",
+    kycStatus: "verified",
+    walletStatus: "active",
     riskScore: 12,
-    riskLevel: "Low",
+    riskLevel: "low",
     balance: 25450,
     totalReceived: 120000,
     totalSent: 94550,
@@ -128,12 +128,12 @@ const MOCK_USERS: User[] = [
     name: "Nusrat Jahan",
     email: "nusrat.j@example.com",
     phone: "+8801822334455",
-    role: "Admin",
-    status: "Active",
-    kycStatus: "Verified",
-    walletStatus: "Active",
+    role: "admin",
+    status: "active",
+    kycStatus: "verified",
+    walletStatus: "active",
     riskScore: 5,
-    riskLevel: "Low",
+    riskLevel: "low",
     balance: 150000,
     totalReceived: 500000,
     totalSent: 350000,
@@ -151,12 +151,12 @@ const MOCK_USERS: User[] = [
     name: "Tanvir Ahmed",
     email: "tanvir.a@example.com",
     phone: "+8801933445566",
-    role: "User",
-    status: "Suspended",
-    kycStatus: "Rejected",
-    walletStatus: "Frozen",
+    role: "user",
+    status: "suspended",
+    kycStatus: "rejected",
+    walletStatus: "frozen",
     riskScore: 85,
-    riskLevel: "High",
+    riskLevel: "high",
     balance: 450,
     totalReceived: 5000,
     totalSent: 4550,
@@ -174,12 +174,12 @@ const MOCK_USERS: User[] = [
     name: "Farhana Akter",
     email: "farhana.a@example.com",
     phone: "+8801644556677",
-    role: "User",
-    status: "Restricted",
-    kycStatus: "Pending",
-    walletStatus: "Restricted",
+    role: "user",
+    status: "restricted",
+    kycStatus: "pending",
+    walletStatus: "restricted",
     riskScore: 45,
-    riskLevel: "Medium",
+    riskLevel: "medium",
     balance: 12500,
     totalReceived: 20000,
     totalSent: 7500,
@@ -381,10 +381,10 @@ export function useUsers() {
 
     return {
       totalUsers: users.length,
-      activeUsers: users.filter((u) => u.status === "Active").length,
-      pendingKyc: users.filter((u) => u.kycStatus === "Pending" || u.kycStatus === "Under Review").length,
-      suspended: users.filter((u) => u.status === "Suspended").length,
-      highRisk: users.filter((u) => u.riskLevel === "High").length,
+      activeUsers: users.filter((u) => u.status === "active").length,
+      pendingKyc: users.filter((u) => u.kycStatus === "pending" || u.kycStatus === "under_review").length,
+      suspended: users.filter((u) => u.status === "suspended").length,
+      highRisk: users.filter((u) => u.riskLevel === "high").length,
       newThisWeek,
     };
   }, [users]);
@@ -451,17 +451,38 @@ export function useUsers() {
     setToast({ type: "info", message: "User data refreshed." });
   };
 
-  const tryLoadRealProfile = useCallback(async (): Promise<"Admin" | "User" | undefined> => {
-    try {
-      const response = await apiClient<{ success: boolean; user?: { role?: string } }>("/users/profile");
-      const role = response.user?.role;
-      if (role?.toLowerCase() === "admin") return "Admin";
-      if (role?.toLowerCase() === "user") return "User";
-      return undefined;
-    } catch {
-      return undefined;
+ const tryLoadRealProfile = useCallback(async (): Promise<"Admin" | "User" | undefined> => {
+  try {
+    const response =
+      await apiClient<{
+        success: boolean;
+        user?: {
+          role?: string;
+        };
+      }>("/users/profile");
+
+    const role =
+      response.user?.role;
+
+    if (
+      role?.toLowerCase() ===
+      "admin"
+    ) {
+      return "Admin";
     }
-  }, []);
+
+    if (
+      role?.toLowerCase() ===
+      "user"
+    ) {
+      return "User";
+    }
+
+    return undefined;
+  } catch {
+    return undefined;
+  }
+}, []);
 
   /* =======================================================
      RETURN
