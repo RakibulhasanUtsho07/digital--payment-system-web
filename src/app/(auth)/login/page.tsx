@@ -88,105 +88,67 @@ export default function LoginPage() {
     }
 
     setIsLoading(true);
+try {
+  console.log(
+    "LOGIN API:",
+    "https://digital-wallet-backend-five.vercel.app/api/auth/login"
+  );
 
-    try {
-      console.log("LOGIN API:", `${API_URL}/auth/login`);
-      console.log("LOGIN FORM DEBUG:", {
+  const response = await fetch(
+    "https://digital-wallet-backend-five.vercel.app/api/auth/login",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include",
+      body: JSON.stringify({
         email: normalizedEmail,
-        passwordLength: password.length,
-      });
-      const response = await fetch(`${API_URL}/auth/login`, {
-        method: "POST",
-
-        headers: {
-          "Content-Type": "application/json",
-        },
-
-        /*
-         * IMPORTANT
-         * Backend HttpOnly cookie receive করার জন্য
-         * credentials অবশ্যই include করতে হবে।
-         */
-        credentials: "include",
-
-        body: JSON.stringify({
-          email: normalizedEmail,
-          password,
-        }),
-      });
-
-      /*
-       * Response JSON parsing
-       */
-      let data: LoginResponse | null = null;
-
-      try {
-        data = (await response.json()) as LoginResponse;
-      } catch {
-        throw new Error("Server returned an invalid response.");
-      }
-
-      console.log("LOGIN STATUS:", response.status);
-
-      console.log("LOGIN RESPONSE:", data);
-
-      /*
-       * Backend error
-       */
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || "Login failed.");
-      }
-
-      if (!data.user) {
-        throw new Error("User information was not returned by the server.");
-      }
-
-      /*
-       * =====================================================
-       * IMPORTANT:
-       * JWT token localStorage-এ রাখা হচ্ছে না।
-       *
-       * Backend ইতিমধ্যে access_token HttpOnly cookie
-       * সেট করছে।
-       *
-       * শুধু non-sensitive user information রাখা হচ্ছে
-       * UI state-এর জন্য।
-       * =====================================================
-       */
-
-      localStorage.setItem("auth_user", JSON.stringify(data.user));
-
-      /*
-       * Optional auth flag.
-       * এটা security proof নয়।
-       * Real authentication হচ্ছে HttpOnly cookie দিয়ে।
-       */
-      localStorage.setItem("is_authenticated", "true");
-
-      /*
-       * =====================================================
-       * REDIRECT
-       * =====================================================
-       */
-
-      if (data.user.role === "admin") {
-        router.replace("/dashboard");
-      } else {
-        router.replace("/dashboard");
-      }
-
-      router.refresh();
-    } catch (error) {
-      console.error("LOGIN ERROR:", error);
-
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Unable to login. Please try again.",
-      );
-    } finally {
-      setIsLoading(false);
+        password,
+      }),
     }
+  );
+
+  const data = await response.json();
+
+  console.log("LOGIN STATUS:", response.status);
+  console.log("LOGIN RESPONSE:", data);
+
+  if (!response.ok || !data.success) {
+    throw new Error(
+      data.message || "Login failed."
+    );
+  }
+
+  if (!data.user) {
+    throw new Error(
+      "User information was not returned by the server."
+    );
+  }
+
+  localStorage.setItem(
+    "auth_user",
+    JSON.stringify(data.user)
+  );
+
+  localStorage.setItem(
+    "is_authenticated",
+    "true"
+  );
+
+  router.replace("/dashboard");
+  router.refresh();
+} catch (error) {
+  console.error("LOGIN ERROR:", error);
+
+  setErrorMessage(
+    error instanceof Error
+      ? error.message
+      : "Unable to login. Please try again."
+  );
+} finally {
+  setIsLoading(false);
+}
   };
 
   /* =========================================================
