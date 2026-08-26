@@ -12,32 +12,24 @@ export async function apiClient<T>(
 ): Promise<T> {
   const { token, headers, ...rest } = options;
 
-  const response = await fetch(
-    `${API_URL}${endpoint}`,
-    {
-      ...rest,
-      headers: {
-        "Content-Type": "application/json",
+  // ১. ম্যানুয়াল টোকেন না থাকলে অটোমেটিক localStorage থেকে টোকেন নেওয়ার লজিক
+  let authToken = token;
+  if (!authToken && typeof window !== "undefined") {
+    authToken = localStorage.getItem("token") || undefined;
+  }
 
-        ...(token
-          ? {
-              Authorization: `Bearer ${token}`,
-            }
-          : {}),
-
-        ...headers,
-      },
-
-      // Required for the HttpOnly `access_token` cookie the backend sets
-      // on login/register to actually be stored by the browser, and sent
-      // back on every later request. Without this, cross-origin requests
-      // (localhost:3000 -> localhost:5000) silently drop the cookie in
-      // both directions — no error, the cookie just never exists.
-      credentials: "include",
-
-      cache: "no-store",
-    }
-  );
+  const response = await fetch(`${API_URL}${endpoint}`, {
+    ...rest,
+    headers: {
+      "Content-Type": "application/json",
+      // ২. টোকেন থাকলে Authorization হেডার যোগ হবে
+      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+      ...headers,
+    },
+    // ৩. HttpOnly কুকি আদান-প্রদানের জন্য
+    credentials: "include",
+    cache: "no-store",
+  });
 
   let data: unknown = null;
 
@@ -55,9 +47,7 @@ export async function apiClient<T>(
       data !== null &&
       "message" in data
     ) {
-      message = String(
-        (data as { message?: unknown }).message
-      );
+      message = String((data as { message?: unknown }).message);
     }
 
     throw new Error(message);
