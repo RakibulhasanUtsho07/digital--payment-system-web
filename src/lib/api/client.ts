@@ -2,34 +2,30 @@ const API_URL =
   process.env.NEXT_PUBLIC_API_URL ||
   "http://localhost:5000/api";
 
-type ApiOptions = RequestInit & {
-  token?: string;
-};
+type ApiOptions = RequestInit;
 
 export async function apiClient<T>(
   endpoint: string,
   options: ApiOptions = {}
 ): Promise<T> {
-  const { token, headers, ...rest } = options;
+  const { headers, ...rest } = options;
 
-  // ১. ম্যানুয়াল টোকেন না থাকলে অটোমেটিক localStorage থেকে টোকেন নেওয়ার লজিক
-  let authToken = token;
-  if (!authToken && typeof window !== "undefined") {
-    authToken = localStorage.getItem("token") || undefined;
-  }
+  const response = await fetch(
+    `${API_URL}${endpoint}`,
+    {
+      ...rest,
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
-    ...rest,
-    headers: {
-      "Content-Type": "application/json",
-      // ২. টোকেন থাকলে Authorization হেডার যোগ হবে
-      ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
-      ...headers,
-    },
-    // ৩. HttpOnly কুকি আদান-প্রদানের জন্য
-    credentials: "include",
-    cache: "no-store",
-  });
+      headers: {
+        "Content-Type": "application/json",
+        ...headers,
+      },
+
+      // Backend HttpOnly access_token cookie পাঠাবে
+      credentials: "include",
+
+      cache: "no-store",
+    }
+  );
 
   let data: unknown = null;
 
@@ -40,14 +36,21 @@ export async function apiClient<T>(
   }
 
   if (!response.ok) {
-    let message = "Something went wrong.";
+    let message =
+      "Something went wrong.";
 
     if (
       typeof data === "object" &&
       data !== null &&
       "message" in data
     ) {
-      message = String((data as { message?: unknown }).message);
+      message = String(
+        (
+          data as {
+            message?: unknown;
+          }
+        ).message
+      );
     }
 
     throw new Error(message);

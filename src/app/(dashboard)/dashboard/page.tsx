@@ -95,61 +95,123 @@ export default function DashboardPage() {
      LOAD DATA
   ========================================================== */
 
-  useEffect(() => {
-    let mounted = true;
+useEffect(() => {
+  let mounted = true;
 
-    const loadDashboard = async () => {
+  const loadDashboard =
+    async () => {
       try {
         setLoading(true);
         setErrorMessage("");
 
-        const [profileResponse, walletResponse, transactionsResponse] =
+        const [
+          profileResponse,
+          walletResponse,
+          transactionsResponse,
+        ] =
           await Promise.all([
-            apiClient<ProfileResponse>("/users/profile"),
-            apiClient<WalletResponse>("/wallet"),
-            apiClient<TransactionsResponse>("/transactions"),
+            apiClient<ProfileResponse>(
+              "/users/profile"
+            ),
+
+            apiClient<WalletResponse>(
+              "/wallet"
+            ),
+
+            apiClient<TransactionsResponse>(
+              "/transactions"
+            ),
           ]);
 
         if (!mounted) {
           return;
         }
 
-        if (!profileResponse?.success || !profileResponse.user) {
-          throw new Error("Unable to load your profile.");
+        if (
+          !profileResponse.success ||
+          !profileResponse.user
+        ) {
+          throw new Error(
+            "Unable to load your profile."
+          );
         }
 
-        if (!walletResponse?.success || !walletResponse.wallet) {
-          throw new Error("Unable to load your wallet.");
+        if (
+          !walletResponse.success ||
+          !walletResponse.wallet
+        ) {
+          throw new Error(
+            "Unable to load your wallet."
+          );
         }
 
-        if (!transactionsResponse?.success) {
-          throw new Error("Unable to load transactions.");
+        if (
+          !transactionsResponse.success
+        ) {
+          throw new Error(
+            "Unable to load transactions."
+          );
         }
 
-        setUser(profileResponse.user);
-        setWallet(walletResponse.wallet);
-        setTransactions(transactionsResponse.transactions || []);
+        setUser(
+          profileResponse.user
+        );
+
+        setWallet(
+          walletResponse.wallet
+        );
+
+        setTransactions(
+          transactionsResponse.transactions ??
+            []
+        );
       } catch (error) {
-        console.error("Dashboard loading error:", error);
+        console.error(
+          "Dashboard loading error:",
+          error
+        );
 
         if (!mounted) {
           return;
         }
 
         const message =
-          error instanceof Error ? error.message : "Failed to load dashboard.";
+          error instanceof Error
+            ? error.message
+            : "Failed to load dashboard.";
 
-        setErrorMessage(message);
+        setErrorMessage(
+          message
+        );
 
-        const lowerMessage = message.toLowerCase();
+        const lowerMessage =
+          message.toLowerCase();
 
         if (
-          lowerMessage.includes("401") ||
-          lowerMessage.includes("unauthorized") ||
-          lowerMessage.includes("not authorized") ||
-          lowerMessage.includes("authentication")
+          lowerMessage.includes(
+            "unauthorized"
+          ) ||
+          lowerMessage.includes(
+            "not authorized"
+          ) ||
+          lowerMessage.includes(
+            "authentication"
+          ) ||
+          lowerMessage.includes(
+            "token failed"
+          )
         ) {
-          router.replace("/login");
+          localStorage.removeItem(
+            "auth_user"
+          );
+
+          localStorage.removeItem(
+            "is_authenticated"
+          );
+
+          router.replace(
+            "/login"
+          );
         }
       } finally {
         if (mounted) {
@@ -158,13 +220,12 @@ export default function DashboardPage() {
       }
     };
 
-    loadDashboard();
+  loadDashboard();
 
-    return () => {
-      mounted = false;
-    };
-  }, [router]);
-
+  return () => {
+    mounted = false;
+  };
+}, [router]);
   /* =========================================================
      LOADING
   ========================================================== */
