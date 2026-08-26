@@ -67,7 +67,6 @@ export default function LoginPage() {
   /* =========================================================
      LOGIN SUBMIT
   ========================================================== */
-
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -77,78 +76,72 @@ export default function LoginPage() {
 
     if (!normalizedEmail) {
       setErrorMessage("Please enter your email address.");
-
       return;
     }
 
     if (!password) {
       setErrorMessage("Please enter your password.");
-
       return;
     }
 
     setIsLoading(true);
-try {
-  console.log(
-    "LOGIN API:",
-    "https://digital-wallet-backend-five.vercel.app/api/auth/login"
-  );
 
-  const response = await fetch(
-    "https://digital-wallet-backend-five.vercel.app/api/auth/login",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      credentials: "include",
-      body: JSON.stringify({
-        email: normalizedEmail,
-        password,
-      }),
+    try {
+      console.log(
+        "LOGIN API:",
+        "https://digital-wallet-backend-five.vercel.app/api/auth/login",
+      );
+
+      const response = await fetch(
+        "https://digital-wallet-backend-five.vercel.app/api/auth/login",
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type": "application/json",
+          },
+
+          credentials: "include",
+
+          body: JSON.stringify({
+            email: normalizedEmail,
+            password,
+          }),
+        },
+      );
+
+      const data = await response.json();
+
+      console.log("LOGIN STATUS:", response.status);
+
+      console.log("LOGIN RESPONSE:", data);
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Login failed.");
+      }
+
+      if (!data.user) {
+        throw new Error("User information was not returned by the server.");
+      }
+
+      // UI-এর জন্য user information
+      localStorage.setItem("auth_user", JSON.stringify(data.user));
+
+      localStorage.setItem("is_authenticated", "true");
+
+      // Login successful
+      router.replace("/dashboard");
+    } catch (error) {
+      console.error("LOGIN ERROR:", error);
+
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to login. Please try again.",
+      );
+    } finally {
+      setIsLoading(false);
     }
-  );
-
-  const data = await response.json();
-
-  console.log("LOGIN STATUS:", response.status);
-  console.log("LOGIN RESPONSE:", data);
-
-  if (!response.ok || !data.success) {
-    throw new Error(
-      data.message || "Login failed."
-    );
-  }
-
-  if (!data.user) {
-    throw new Error(
-      "User information was not returned by the server."
-    );
-  }
-
-  localStorage.setItem(
-    "auth_user",
-    JSON.stringify(data.user)
-  );
-
-  localStorage.setItem(
-    "is_authenticated",
-    "true"
-  );
-
-  router.replace("/dashboard");
-  router.refresh();
-} catch (error) {
-  console.error("LOGIN ERROR:", error);
-
-  setErrorMessage(
-    error instanceof Error
-      ? error.message
-      : "Unable to login. Please try again."
-  );
-} finally {
-  setIsLoading(false);
-}
   };
 
   /* =========================================================
