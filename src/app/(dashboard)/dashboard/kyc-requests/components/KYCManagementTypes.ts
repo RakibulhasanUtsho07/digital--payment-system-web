@@ -1,3 +1,10 @@
+export interface KYCNote {
+  id: string;
+  author: string;
+  text: string;
+  createdAt: string;
+}
+
 export type KYCStatus =
   | "Not Started"
   | "Pending"
@@ -76,10 +83,5 @@ export interface KYCRequest {
   selfieImageUrl?: string;
   rejectionReason?: string;
   verificationChecks: VerificationCheck[];
-  notes: {
-    id: string;
-    author: string;
-    text: string;
-    createdAt: string;
-  }[];
+  notes: KYCNote[];
 }
