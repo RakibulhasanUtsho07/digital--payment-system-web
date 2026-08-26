@@ -17,135 +17,544 @@ import {
   Settings,
   LogOut,
   ChevronRight,
-  Bell
+  Bell,
 } from "lucide-react";
 
+import { motion } from "framer-motion";
+
+/* =========================================================
+   NAVIGATION
+========================================================= */
+
 const navItems = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Wallet", href: "/dashboard/wallet", icon: WalletCards },
-  { label: "Send Money", href: "/dashboard/send", icon: Send },
-  { label: "Receive Money", href: "/dashboard/receive", icon: Download },
-  { label: "Transactions", href: "/dashboard/transactions", icon: ReceiptText },
-  { label: "KYC", href: "/dashboard/kyc", icon: FileCheck2 },
-  { label: "AI Insights", href: "/dashboard/insights", icon: Sparkles },
-  { label: "Budgeting", href: "/dashboard/budgeting", icon: PieChart },
-  { label: "Cash Flow", href: "/dashboard/cash-flow", icon: TrendingUp },
-  { label: "Receipts", href: "/dashboard/receipts", icon: Receipt },
-  { label: "Notifications", href: "/dashboard/notifications", icon: Bell },
-  { label: "Settings", href: "/dashboard/settings", icon: Settings },
+  {
+    label: "Dashboard",
+    href: "/dashboard",
+    icon: LayoutDashboard,
+  },
+  {
+    label: "Wallet",
+    href: "/dashboard/wallet",
+    icon: WalletCards,
+  },
+  {
+    label: "Send Money",
+    href: "/dashboard/send",
+    icon: Send,
+  },
+  {
+    label: "Receive Money",
+    href: "/dashboard/receive",
+    icon: Download,
+  },
+  {
+    label: "Transactions",
+    href: "/dashboard/transactions",
+    icon: ReceiptText,
+  },
+  {
+    label: "KYC",
+    href: "/dashboard/kyc",
+    icon: FileCheck2,
+  },
+  {
+    label: "AI Insights",
+    href: "/dashboard/insights",
+    icon: Sparkles,
+  },
+  {
+    label: "Budgeting",
+    href: "/dashboard/budgeting",
+    icon: PieChart,
+  },
+  {
+    label: "Cash Flow",
+    href: "/dashboard/cash-flow",
+    icon: TrendingUp,
+  },
+  {
+    label: "Receipts",
+    href: "/dashboard/receipts",
+    icon: Receipt,
+  },
+  {
+    label: "Notifications",
+    href: "/dashboard/notifications",
+    icon: Bell,
+  },
+  {
+    label: "Settings",
+    href: "/dashboard/settings",
+    icon: Settings,
+  },
 ];
 
-export default function UserSidebar({ onLogout }: { onLogout: () => void }) {
+/* =========================================================
+   PROPS
+========================================================= */
+
+interface UserSidebarProps {
+  onLogout: () => void;
+}
+
+/* =========================================================
+   USER SIDEBAR
+========================================================= */
+
+export default function UserSidebar({
+  onLogout,
+}: UserSidebarProps) {
   const pathname = usePathname();
 
   return (
-    // Outer container: takes full height of parent.
-    // Using a very deep, rich navy blue matching your images perfectly.
-    <aside className="flex h-full w-[260px] flex-col bg-[#0B1320] text-slate-300 shadow-2xl overflow-hidden border-r border-slate-800/50">
-      
-      {/* ======================= BRANDING (Fixed Height) ======================= */}
-      {/* 
-        h-20 (80px) is standard for navbars. This perfectly aligns the bottom border 
-        with your dashboard navbar. If your navbar is slightly smaller/larger, change `h-20` to `h-16` (64px) or `h-[72px]`.
-      */}
-      <div className="flex h-20 shrink-0 items-center border-b border-slate-800/80 px-6">
+    <motion.aside
+      initial={{
+        opacity: 0,
+        x: -22,
+      }}
+      animate={{
+        opacity: 1,
+        x: 0,
+      }}
+      transition={{
+        duration: 0.5,
+        ease: [0.22, 1, 0.36, 1],
+      }}
+      className="
+        relative
+        flex
+        h-dvh
+        w-[280px]
+        min-h-0
+        flex-col
+        overflow-hidden
+        border-r
+        border-white/[0.05]
+        bg-[#08111D]
+        text-slate-300
+        shadow-[15px_0_50px_rgba(2,8,18,0.15)]
+      "
+    >
+      {/* =====================================================
+          BACKGROUND EFFECTS
+      ====================================================== */}
+
+      <div
+        className="
+          pointer-events-none
+          absolute
+          -left-24
+          top-20
+          h-56
+          w-56
+          rounded-full
+          bg-blue-500/[0.06]
+          blur-[80px]
+        "
+      />
+
+      <div
+        className="
+          pointer-events-none
+          absolute
+          -right-24
+          bottom-24
+          h-52
+          w-52
+          rounded-full
+          bg-cyan-400/[0.04]
+          blur-[80px]
+        "
+      />
+
+      {/* =====================================================
+          BRAND
+      ====================================================== */}
+
+      <div
+        className="
+          relative
+          z-10
+          flex
+          h-[76px]
+          shrink-0
+          items-center
+          border-b
+          border-white/[0.06]
+          px-5
+        "
+      >
         <Link
           href="/dashboard"
-          className="group flex items-center gap-3 transition-transform duration-300 hover:scale-[1.02]"
+          className="group flex items-center gap-3"
         >
-          {/* Logo matching the image */}
-          <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-gradient-to-br from-[#4EA3E3] to-[#1F5EA8] text-white shadow-lg shadow-blue-500/20">
-            <WalletCards className="h-6 w-6" />
-          </div>
-          <div className="flex flex-col justify-center">
-            <h1 className="text-xl font-bold tracking-tight text-white leading-tight">
+          <motion.div
+            whileHover={{
+              scale: 1.06,
+              rotate: -4,
+            }}
+            whileTap={{
+              scale: 0.96,
+            }}
+            transition={{
+              type: "spring",
+              stiffness: 280,
+              damping: 18,
+            }}
+            className="
+              relative
+              flex
+              h-11
+              w-11
+              items-center
+              justify-center
+              overflow-hidden
+              rounded-[14px]
+              bg-gradient-to-br
+              from-[#51B7FF]
+              via-[#2C86D5]
+              to-[#175590]
+              text-white
+              shadow-[0_10px_30px_rgba(46,139,220,0.22)]
+            "
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent" />
+
+            <WalletCards className="relative z-10 h-[21px] w-[21px]" />
+          </motion.div>
+
+          <div className="min-w-0">
+            <h1 className="truncate text-[18px] font-black tracking-[-0.03em] text-white">
               NovaWallet
             </h1>
-            <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#4EA3E3]">
-              User Portal
-            </span>
+
+            <div className="mt-0.5 flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#4EA3E3] shadow-[0_0_8px_rgba(78,163,227,0.9)]" />
+
+              <span className="text-[8px] font-extrabold uppercase tracking-[0.22em] text-[#62B5EF]">
+                User Portal
+              </span>
+            </div>
           </div>
         </Link>
       </div>
 
-      {/* ======================= NAVIGATION (Scrollable independently) ======================= */}
-      {/* 
-        flex-1: takes up remaining space
-        overflow-y-auto: enables scrolling JUST for this section
-        [&::-webkit-scrollbar]:hidden: completely hides the scrollbar across all browsers
-      */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-        <p className="mb-4 px-3 text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">
-          Main Menu
-        </p>
+      {/* =====================================================
+          SCROLLABLE NAVIGATION
+      ====================================================== */}
 
-        <nav className="space-y-1.5 pb-4">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            // Matches exact route for dashboard, and startsWith for nested pages
-            const active =
-              item.href === "/dashboard"
-                ? pathname === "/dashboard"
-                : pathname.startsWith(item.href);
+      <div
+        className="
+          relative
+          z-10
+          min-h-0
+          flex-1
+          overflow-y-auto
+          overscroll-contain
+          scroll-smooth
+          px-3.5
+          py-5
 
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`
-                  group relative flex items-center gap-3 rounded-xl px-3 py-2.5 
-                  text-sm font-semibold transition-all duration-300 ease-out overflow-hidden
-                  ${
-                    active
-                      ? "bg-[#14233A] text-white" 
-                      : "text-slate-400 hover:bg-slate-800/40 hover:text-slate-200"
-                  }
-                `}
-              >
-                {/* Active Left Glow Bar (Flush left) */}
-                {active && (
-                  <span className="absolute left-0 top-1/2 h-7 w-[3px] -translate-y-1/2 rounded-r-full bg-[#4EA3E3]" />
-                )}
+          [scrollbar-width:none]
+          [-ms-overflow-style:none]
 
-                {/* Icon wrapper matching the image style */}
-                <span
-                  className={`
-                    flex h-9 w-9 items-center justify-center rounded-[10px] transition-all duration-300
-                    ${
-                      active
-                        ? "bg-[#1F3A60] text-[#4EA3E3]"
-                        : "bg-transparent text-slate-500 group-hover:text-slate-300 group-hover:scale-110"
-                    }
-                  `}
+          [&::-webkit-scrollbar]:hidden
+        "
+      >
+        <div className="px-2.5">
+          <p
+            className="
+              mb-3
+              text-[9px]
+              font-extrabold
+              uppercase
+              tracking-[0.18em]
+              text-slate-600
+            "
+          >
+            Main Menu
+          </p>
+        </div>
+
+        <nav className="space-y-1 pb-4">
+          {navItems.map(
+            (item, index) => {
+              const Icon = item.icon;
+
+              const active =
+                item.href === "/dashboard"
+                  ? pathname === "/dashboard"
+                  : pathname.startsWith(
+                      item.href
+                    );
+
+              return (
+                <motion.div
+                  key={item.href}
+                  initial={{
+                    opacity: 0,
+                    x: -10,
+                  }}
+                  animate={{
+                    opacity: 1,
+                    x: 0,
+                  }}
+                  transition={{
+                    duration: 0.32,
+                    delay:
+                      0.04 +
+                      index * 0.025,
+                    ease: [
+                      0.22,
+                      1,
+                      0.36,
+                      1,
+                    ],
+                  }}
                 >
-                  <Icon className="h-5 w-5 transition-transform duration-300" />
-                </span>
+                  <Link
+                    href={item.href}
+                    className={`
+                      group
+                      relative
+                      flex
+                      min-h-[48px]
+                      items-center
+                      gap-2.5
+                      overflow-hidden
+                      rounded-[14px]
+                      px-2.5
+                      py-1.5
 
-                <span className="flex-1">{item.label}</span>
+                      text-[13px]
+                      font-bold
 
-                {/* Active arrow indicator matching your image */}
-                {active && (
-                  <ChevronRight className="h-4 w-4 text-[#4EA3E3]" />
-                )}
-              </Link>
-            );
-          })}
+                      transition-colors
+                      duration-300
+
+                      ${
+                        active
+                          ? "text-white"
+                          : "text-[#8393A7] hover:text-slate-100"
+                      }
+                    `}
+                  >
+                    {/* Active animated background */}
+
+                    {active && (
+                      <motion.span
+                        layoutId="user-sidebar-active"
+                        transition={{
+                          type: "spring",
+                          stiffness: 300,
+                          damping: 28,
+                        }}
+                        className="
+                          absolute
+                          inset-0
+                          rounded-[14px]
+                          border
+                          border-[#3C8FD4]/20
+                          bg-gradient-to-r
+                          from-[#142A44]
+                          via-[#11243B]
+                          to-[#0E1D30]
+                          shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]
+                        "
+                      />
+                    )}
+
+                    {/* Hover background */}
+
+                    {!active && (
+                      <span
+                        className="
+                          absolute
+                          inset-0
+                          rounded-[14px]
+                          bg-white/[0.035]
+                          opacity-0
+                          transition-opacity
+                          duration-300
+                          group-hover:opacity-100
+                        "
+                      />
+                    )}
+
+                    {/* Active side light */}
+
+                    {active && (
+                      <motion.span
+                        layoutId="user-sidebar-light"
+                        className="
+                          absolute
+                          left-0
+                          top-1/2
+                          h-7
+                          w-[3px]
+                          -translate-y-1/2
+                          rounded-r-full
+                          bg-[#56B4F2]
+                          shadow-[0_0_14px_rgba(86,180,242,0.75)]
+                        "
+                      />
+                    )}
+
+                    {/* Icon */}
+
+                    <motion.span
+                      whileHover={{
+                        scale: 1.08,
+                      }}
+                      className={`
+                        relative
+                        z-10
+                        flex
+                        h-9
+                        w-9
+                        shrink-0
+                        items-center
+                        justify-center
+                        rounded-[11px]
+
+                        transition-all
+                        duration-300
+
+                        ${
+                          active
+                            ? "bg-[#1A3B61] text-[#62B9F2] shadow-[0_5px_15px_rgba(18,67,110,0.28)]"
+                            : "bg-transparent text-[#62758C] group-hover:bg-white/[0.045] group-hover:text-[#B6C4D3]"
+                        }
+                      `}
+                    >
+                      <Icon className="h-[18px] w-[18px]" />
+                    </motion.span>
+
+                    <span
+                      className="
+                        relative
+                        z-10
+                        min-w-0
+                        flex-1
+                        truncate
+                      "
+                    >
+                      {item.label}
+                    </span>
+
+                    {active && (
+                      <motion.span
+                        initial={{
+                          opacity: 0,
+                          x: -5,
+                        }}
+                        animate={{
+                          opacity: 1,
+                          x: 0,
+                        }}
+                        className="relative z-10"
+                      >
+                        <ChevronRight className="h-4 w-4 text-[#58ADE6]" />
+                      </motion.span>
+                    )}
+                  </Link>
+                </motion.div>
+              );
+            }
+          )}
         </nav>
+
+        {/* bottom breathing room */}
+
+        <div className="h-4" />
       </div>
 
-      {/* ======================= LOGOUT (Fixed at Bottom) ======================= */}
-      <div className="shrink-0 border-t border-slate-800/80 bg-[#080D16] p-4">
-        <button
+      {/* =====================================================
+          LOGOUT
+      ====================================================== */}
+
+      <div
+        className="
+          relative
+          z-20
+          shrink-0
+          border-t
+          border-white/[0.06]
+          bg-[#060D16]/95
+          p-3.5
+          backdrop-blur-xl
+        "
+      >
+        <motion.button
+          type="button"
           onClick={onLogout}
-          className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-400 transition-all duration-300 hover:bg-rose-500/10 hover:text-rose-400"
+          whileTap={{
+            scale: 0.98,
+          }}
+          className="
+            group
+            relative
+            flex
+            w-full
+            items-center
+            gap-2.5
+            overflow-hidden
+            rounded-[14px]
+            px-2.5
+            py-2
+
+            text-[13px]
+            font-bold
+            text-[#78899D]
+
+            transition-all
+            duration-300
+
+            hover:text-rose-300
+          "
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-transparent text-slate-500 transition-all duration-300 group-hover:bg-rose-500/20 group-hover:text-rose-400 group-hover:scale-110">
-            <LogOut className="h-5 w-5" />
+          <span
+            className="
+              absolute
+              inset-0
+              rounded-[14px]
+              bg-rose-500/[0.08]
+              opacity-0
+              transition-opacity
+              duration-300
+              group-hover:opacity-100
+            "
+          />
+
+          <span
+            className="
+              relative
+              z-10
+              flex
+              h-9
+              w-9
+              items-center
+              justify-center
+              rounded-[11px]
+
+              text-[#67798F]
+
+              transition-all
+              duration-300
+
+              group-hover:scale-105
+              group-hover:bg-rose-500/10
+              group-hover:text-rose-400
+            "
+          >
+            <LogOut className="h-[18px] w-[18px]" />
           </span>
-          <span>Sign Out</span>
-        </button>
+
+          <span className="relative z-10">
+            Sign Out
+          </span>
+        </motion.button>
       </div>
-      
-    </aside>
+    </motion.aside>
   );
 }

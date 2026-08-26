@@ -7,16 +7,15 @@ import React, {
 
 import { useRouter } from "next/navigation";
 
-import {
-  Menu,
-  Bell,
-  CircleUserRound,
-} from "lucide-react";
-
 import UserSidebar from "@/components/dashboard/layout/UserSidebar";
 import AdminSidebar from "@/components/dashboard/layout/AdminSidebar";
+import TopNavbar from "@/components/dashboard/layout/TopNavbar";
 
 import { apiClient } from "@/lib/api/client";
+
+/* =========================================================
+   TYPES
+========================================================= */
 
 type UserRole =
   | "admin"
@@ -28,6 +27,10 @@ interface StoredUser {
   email?: string;
   role?: UserRole;
 }
+
+/* =========================================================
+   DASHBOARD LAYOUT
+========================================================= */
 
 export default function DashboardLayout({
   children,
@@ -53,12 +56,17 @@ export default function DashboardLayout({
   );
 
   const [
+    userEmail,
+    setUserEmail,
+  ] = useState("");
+
+  const [
     mobileMenuOpen,
     setMobileMenuOpen,
   ] = useState(false);
 
   /* =========================================================
-     LOAD BASIC USER UI STATE
+     LOAD USER UI INFORMATION
   ========================================================== */
 
   useEffect(() => {
@@ -95,6 +103,14 @@ export default function DashboardLayout({
           parsedUser.name
         );
       }
+
+      if (
+        parsedUser.email
+      ) {
+        setUserEmail(
+          parsedUser.email
+        );
+      }
     } catch (error) {
       console.error(
         "Unable to read stored user:",
@@ -102,6 +118,29 @@ export default function DashboardLayout({
       );
     }
   }, []);
+
+  /* =========================================================
+     CLOSE MOBILE SIDEBAR
+  ========================================================== */
+
+  const closeMobileMenu =
+    () => {
+      setMobileMenuOpen(
+        false
+      );
+    };
+
+  /* =========================================================
+     TOGGLE MOBILE SIDEBAR
+  ========================================================== */
+
+  const toggleMobileMenu =
+    () => {
+      setMobileMenuOpen(
+        (current) =>
+          !current
+      );
+    };
 
   /* =========================================================
      LOGOUT
@@ -135,39 +174,64 @@ export default function DashboardLayout({
           "token"
         );
 
+        closeMobileMenu();
+
         router.replace(
           "/login"
         );
       }
     };
 
+  /* =========================================================
+     RETURN
+  ========================================================== */
+
   return (
     <div className="flex min-h-screen bg-[#F4F7FB] text-[#162A43]">
 
-      {/* Mobile backdrop */}
+      {/* =====================================================
+          MOBILE SIDEBAR BACKDROP
+      ====================================================== */}
 
       {mobileMenuOpen && (
         <button
           type="button"
           aria-label="Close sidebar"
-          className="fixed inset-0 z-40 bg-[#0B1F33]/40 backdrop-blur-sm lg:hidden"
-          onClick={() =>
-            setMobileMenuOpen(
-              false
-            )
+          onClick={
+            closeMobileMenu
           }
+          className="
+            fixed
+            inset-0
+            z-40
+            bg-[#07182A]/45
+            backdrop-blur-[3px]
+            lg:hidden
+          "
         />
       )}
 
-      {/* Sidebar */}
+      {/* =====================================================
+          SIDEBAR
+      ====================================================== */}
 
       <aside
         className={`
-          fixed inset-y-0 left-0 z-50
+          fixed
+          inset-y-0
+          left-0
+          z-50
           w-[280px]
+
+          transform
+
           transition-transform
           duration-300
+          ease-[cubic-bezier(0.22,1,0.36,1)]
+
           lg:static
+          lg:z-auto
+          lg:shrink-0
           lg:translate-x-0
 
           ${
@@ -193,69 +257,49 @@ export default function DashboardLayout({
         )}
       </aside>
 
-      {/* Main area */}
+      {/* =====================================================
+          RIGHT SIDE
+      ====================================================== */}
 
       <div className="flex min-w-0 flex-1 flex-col">
 
-        {/* Navbar */}
+        {/* ===================================================
+            TOP NAVBAR
+        ==================================================== */}
 
-        <header className="sticky top-0 z-30 flex h-[76px] items-center justify-between border-b border-[#E3EAF1] bg-white/90 px-4 backdrop-blur-xl sm:px-8">
-          <div className="flex items-center gap-3">
+        <TopNavbar
+          onMenuClick={
+            toggleMobileMenu
+          }
+          userName={
+            userName
+          }
+          userEmail={
+            userEmail
+          }
+          userRole={
+            userRole
+          }
+        />
 
-            <button
-              type="button"
-              onClick={() =>
-                setMobileMenuOpen(
-                  (
-                    current
-                  ) =>
-                    !current
-                )
-              }
-              className="rounded-xl border border-[#DCE5EE] p-2 text-[#405169] lg:hidden"
-            >
-              <Menu className="h-5 w-5" />
-            </button>
+        {/* ===================================================
+            PAGE CONTENT
+        ==================================================== */}
 
-            <h1 className="text-sm font-bold text-[#162A43] sm:text-base">
-              {userRole ===
-              "admin"
-                ? "Admin Control Center"
-                : "Dashboard"}
-            </h1>
-          </div>
+        <main
+          className="
+            flex-1
+            overflow-x-hidden
+            overflow-y-auto
 
-          <div className="flex items-center gap-3">
-
-            <button
-              type="button"
-              className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-[#DCE5EE] bg-white"
-            >
-              <Bell className="h-4 w-4" />
-
-              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-rose-500" />
-            </button>
-
-            <div className="flex items-center gap-2 rounded-xl border border-[#DCE5EE] bg-white px-3 py-1.5">
-              <CircleUserRound className="h-5 w-5 text-[#1F5EA8]" />
-
-              <div className="hidden text-left sm:block">
-                <p className="max-w-[130px] truncate text-[10px] font-bold text-[#334155]">
-                  {userName}
-                </p>
-
-                <p className="text-[8px] capitalize text-slate-400">
-                  {userRole}
-                </p>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        {/* Dynamic page */}
-
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-          <div className="mx-auto max-w-[1440px]">
+            p-4
+            sm:p-5
+            md:p-6
+            lg:p-7
+            xl:p-8
+          "
+        >
+          <div className="mx-auto w-full max-w-[1440px]">
             {children}
           </div>
         </main>
