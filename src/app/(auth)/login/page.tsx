@@ -1,25 +1,28 @@
 "use client";
 
-import { useState, type FormEvent, type ElementType } from "react";
+import {
+  useState,
+  type FormEvent,
+} from "react";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 
 import {
+  AnimatePresence,
+  motion,
+} from "framer-motion";
+
+import {
+  AlertCircle,
   ArrowRight,
   Eye,
   EyeOff,
   Fingerprint,
   KeyRound,
+  Loader2,
   Mail,
   ShieldCheck,
-  Sparkles,
-  TrendingUp,
-  WalletCards,
-  Zap,
-  Loader2,
-  AlertCircle,
 } from "lucide-react";
 
 /* =========================================================
@@ -31,8 +34,16 @@ interface AuthUser {
   name: string;
   email: string;
   phone?: string;
-  role: "user" | "admin";
-  kycStatus: "not_started" | "pending" | "verified" | "rejected";
+
+  role:
+    | "user"
+    | "admin";
+
+  kycStatus:
+    | "not_started"
+    | "pending"
+    | "verified"
+    | "rejected";
 }
 
 interface LoginResponse {
@@ -42,478 +53,1198 @@ interface LoginResponse {
 }
 
 /* =========================================================
-   API URL
-========================================================= */
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
-
-/* =========================================================
    LOGIN PAGE
 ========================================================= */
 
 export default function LoginPage() {
-  const router = useRouter();
+  const router =
+    useRouter();
 
-  const [email, setEmail] = useState("");
+  const [
+    email,
+    setEmail,
+  ] = useState("");
 
-  const [password, setPassword] = useState("");
+  const [
+    password,
+    setPassword,
+  ] = useState("");
 
-  const [showPassword, setShowPassword] = useState(false);
+  const [
+    showPassword,
+    setShowPassword,
+  ] = useState(false);
 
-  const [isLoading, setIsLoading] = useState(false);
+  const [
+    isLoading,
+    setIsLoading,
+  ] = useState(false);
 
-  const [errorMessage, setErrorMessage] = useState("");
-
+  const [
+    errorMessage,
+    setErrorMessage,
+  ] = useState("");
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:5000/api";
   /* =========================================================
-     LOGIN SUBMIT
+     LOGIN LOGIC
+     SAME LOGIC AS YOUR FIRST WORKING CODE
   ========================================================== */
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
 
-    setErrorMessage("");
+  // const handleSubmit = async (
+  //   e: FormEvent<HTMLFormElement>
+  // ) => {
+  //   e.preventDefault();
 
-    const normalizedEmail = email.trim().toLowerCase();
+  //   setErrorMessage("");
 
-    if (!normalizedEmail) {
-      setErrorMessage("Please enter your email address.");
-      return;
-    }
+  //   const normalizedEmail =
+  //     email
+  //       .trim()
+  //       .toLowerCase();
 
-    if (!password) {
-      setErrorMessage("Please enter your password.");
-      return;
-    }
+  //   if (!normalizedEmail) {
+  //     setErrorMessage(
+  //       "Please enter your email address."
+  //     );
 
-    setIsLoading(true);
+  //     return;
+  //   }
 
-    try {
-      console.log(
-        "LOGIN API:",
-        "https://digital-wallet-backend-five.vercel.app/api/auth/login",
-      );
+  //   if (!password) {
+  //     setErrorMessage(
+  //       "Please enter your password."
+  //     );
 
-      const response = await fetch(
-        "https://digital-wallet-backend-five.vercel.app/api/auth/login",
+  //     return;
+  //   }
+
+  //   setIsLoading(true);
+
+  //   try {
+  //     console.log(
+  //       "LOGIN API:",
+  //       "https://digital-wallet-backend-five.vercel.app/api/auth/login"
+  //     );
+
+  //     const response =
+  //       await fetch(
+  //         "https://digital-wallet-backend-five.vercel.app/api/auth/login",
+  //         {
+  //           method:
+  //             "POST",
+
+  //           headers: {
+  //             "Content-Type":
+  //               "application/json",
+  //           },
+
+  //           credentials:
+  //             "include",
+
+  //           body:
+  //             JSON.stringify({
+  //               email:
+  //                 normalizedEmail,
+
+  //               password,
+  //             }),
+  //         }
+  //       );
+
+  //     const data:
+  //       LoginResponse =
+  //         await response.json();
+
+  //     console.log(
+  //       "LOGIN STATUS:",
+  //       response.status
+  //     );
+
+  //     console.log(
+  //       "LOGIN RESPONSE:",
+  //       data
+  //     );
+
+  //     if (
+  //       !response.ok ||
+  //       !data.success
+  //     ) {
+  //       throw new Error(
+  //         data.message ||
+  //           "Login failed."
+  //       );
+  //     }
+
+  //     if (!data.user) {
+  //       throw new Error(
+  //         "User information was not returned by the server."
+  //       );
+  //     }
+
+  //     localStorage.setItem(
+  //       "auth_user",
+  //       JSON.stringify(
+  //         data.user
+  //       )
+  //     );
+
+  //     localStorage.setItem(
+  //       "is_authenticated",
+  //       "true"
+  //     );
+
+  //     router.replace(
+  //       "/dashboard"
+  //     );
+  //   } catch (error) {
+  //     console.error(
+  //       "LOGIN ERROR:",
+  //       error
+  //     );
+
+  //     setErrorMessage(
+  //       error instanceof Error
+  //         ? error.message
+  //         : "Unable to login. Please try again."
+  //     );
+  //   } finally {
+  //     setIsLoading(
+  //       false
+  //     );
+  //   }
+  // };
+const handleSubmit = async (
+  e: FormEvent<HTMLFormElement>
+) => {
+  e.preventDefault();
+
+  if (isLoading) {
+    return;
+  }
+
+  setErrorMessage("");
+
+  const normalizedEmail =
+    email
+      .trim()
+      .toLowerCase();
+
+  if (!normalizedEmail) {
+    setErrorMessage(
+      "Please enter your email address."
+    );
+
+    return;
+  }
+
+  if (!password) {
+    setErrorMessage(
+      "Please enter your password."
+    );
+
+    return;
+  }
+
+  setIsLoading(true);
+
+  try {
+    const loginUrl =
+      `${API_URL}/auth/login`;
+
+    console.log(
+      "LOGIN API:",
+      loginUrl
+    );
+
+    console.log(
+      "LOGIN REQUEST:",
+      {
+        email: normalizedEmail,
+        passwordLength:
+          password.length,
+      }
+    );
+
+    const response =
+      await fetch(
+        loginUrl,
         {
           method: "POST",
 
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type":
+              "application/json",
+
+            Accept:
+              "application/json",
           },
 
-          credentials: "include",
+          credentials:
+            "include",
 
-          body: JSON.stringify({
-            email: normalizedEmail,
-            password,
-          }),
-        },
+          body:
+            JSON.stringify({
+              email:
+                normalizedEmail,
+
+              password,
+            }),
+        }
       );
 
-      const data = await response.json();
+    let data:
+      LoginResponse | null =
+        null;
 
-      console.log("LOGIN STATUS:", response.status);
-
-      console.log("LOGIN RESPONSE:", data);
-
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || "Login failed.");
-      }
-
-      if (!data.user) {
-        throw new Error("User information was not returned by the server.");
-      }
-
-      // UI-এর জন্য user information
-      localStorage.setItem("auth_user", JSON.stringify(data.user));
-
-      localStorage.setItem("is_authenticated", "true");
-
-      // Login successful
-      router.replace("/dashboard");
-    } catch (error) {
-      console.error("LOGIN ERROR:", error);
-
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Unable to login. Please try again.",
+    try {
+      data =
+        (await response.json()) as LoginResponse;
+    } catch {
+      throw new Error(
+        "Invalid response from server."
       );
-    } finally {
-      setIsLoading(false);
     }
-  };
 
+    console.log(
+      "LOGIN STATUS:",
+      response.status
+    );
+
+    console.log(
+      "LOGIN RESPONSE:",
+      data
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        data?.message ||
+          `Login failed with status ${response.status}.`
+      );
+    }
+
+    if (
+      !data.success
+    ) {
+      throw new Error(
+        data.message ||
+          "Login failed."
+      );
+    }
+
+    if (!data.user) {
+      throw new Error(
+        "User information was not returned by the server."
+      );
+    }
+
+    localStorage.setItem(
+      "auth_user",
+      JSON.stringify(
+        data.user
+      )
+    );
+
+    localStorage.setItem(
+      "is_authenticated",
+      "true"
+    );
+
+    router.replace(
+      "/dashboard"
+    );
+
+    router.refresh();
+  } catch (error) {
+    console.error(
+      "LOGIN ERROR:",
+      error
+    );
+
+    if (
+      error instanceof TypeError
+    ) {
+      setErrorMessage(
+        "Unable to connect to the server. Please make sure the backend is running."
+      );
+
+      return;
+    }
+
+    setErrorMessage(
+      error instanceof Error
+        ? error.message
+        : "Unable to login. Please try again."
+    );
+  } finally {
+    setIsLoading(
+      false
+    );
+  }
+};
   /* =========================================================
      UI
   ========================================================== */
 
   return (
-    <div className="grid min-h-[760px] w-full grid-cols-1 lg:grid-cols-2">
+    <div
+      className="
+        relative
+        z-20
+        w-full
+        pointer-events-auto
+      "
+    >
       {/* =====================================================
-          LEFT PANEL
+          HEADER
       ====================================================== */}
 
-      <section className="relative hidden overflow-hidden rounded-l-[2rem] bg-[#020617] lg:flex">
-        {/* Background */}
-
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(37,99,235,.18),transparent_40%),radial-gradient(circle_at_80%_80%,rgba(6,182,212,.12),transparent_35%)]" />
-
-        {/* Blue glow */}
+      <motion.div
+        initial={{
+          opacity: 0,
+          y: 16,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        transition={{
+          duration: 0.5,
+          ease: [
+            0.22,
+            1,
+            0.36,
+            1,
+          ],
+        }}
+      >
+        {/* ICON */}
 
         <motion.div
-          animate={{
-            scale: [1, 1.15, 1],
-            opacity: [0.18, 0.3, 0.18],
+          whileHover={{
+            scale: 1.06,
+            rotate: -4,
           }}
           transition={{
-            duration: 8,
-            repeat: Infinity,
-            ease: "easeInOut",
+            type: "spring",
+            stiffness: 280,
+            damping: 18,
           }}
-          className="pointer-events-none absolute -left-24 -top-24 h-[420px] w-[420px] rounded-full bg-blue-600/20 blur-[120px]"
-        />
+          className="
+            mb-4
 
-        {/* Cyan glow */}
+            flex
+            h-[44px]
+            w-[44px]
+            items-center
+            justify-center
 
-        <motion.div
-          animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.1, 0.2, 0.1],
-          }}
-          transition={{
-            duration: 10,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-          className="pointer-events-none absolute -bottom-24 -right-20 h-[400px] w-[400px] rounded-full bg-cyan-500/20 blur-[120px]"
-        />
+            rounded-[14px]
 
-        {/* Content */}
+            border
+            border-[#D9E8F6]
 
-        <div className="relative z-10 flex w-full flex-col justify-between p-10 xl:p-14">
-          {/* Logo */}
+            bg-gradient-to-br
+            from-[#F3F9FF]
+            to-[#EAF4FF]
 
-          <Link href="/" className="flex w-fit items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-cyan-300 shadow-lg">
-              <WalletCards className="h-6 w-6" />
-            </div>
+            text-[#1F5EA8]
 
-            <div>
-              <p className="text-xl font-black tracking-tight text-white">
-                Nova
-                <span className="text-cyan-400">Wallet</span>
-              </p>
+            shadow-[0_10px_24px_rgba(31,94,168,0.08)]
+          "
+        >
+          <Fingerprint
+            className="
+              h-[20px]
+              w-[20px]
+            "
+          />
+        </motion.div>
 
-              <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-cyan-300/70">
-                Digital Wallet System
-              </p>
-            </div>
-          </Link>
+        {/* EYEBROW */}
 
-          {/* Main text */}
+        <p
+          className="
+            text-[9px]
+            font-black
+            uppercase
+            tracking-[0.19em]
 
-          <div className="my-auto py-12">
-            <motion.div
-              initial={{
-                opacity: 0,
-                y: 25,
-              }}
-              animate={{
-                opacity: 1,
-                y: 0,
-              }}
-              transition={{
-                duration: 0.7,
-              }}
-            >
-              <div className="inline-flex items-center gap-2 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-4 py-2">
-                <Sparkles className="h-4 w-4 text-cyan-400" />
+            text-[#1762AC]
+          "
+        >
+          Secure account access
+        </p>
 
-                <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-300">
-                  Secure Access
-                </span>
-              </div>
+        {/* TITLE */}
 
-              <h1 className="mt-7 text-4xl font-extrabold leading-[1.1] text-white xl:text-5xl">
-                Welcome back.
-                <span className="mt-1 block bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
-                  Your wallet is ready.
-                </span>
-              </h1>
+        <h1
+          className="
+            mt-2
 
-              <p className="mt-6 max-w-lg text-sm leading-7 text-slate-300">
-                Access secure payments, fast transfers, KYC verification,
-                transaction visibility, and intelligent financial insights from
-                one secure wallet.
-              </p>
-            </motion.div>
+            text-[32px]
+            font-black
+            leading-none
+            tracking-[-0.045em]
 
-            {/* Features */}
+            text-[#102A43]
 
-            <div className="mt-10 space-y-4">
-              <FeatureRow
-                icon={ShieldCheck}
-                title="Secure Payments"
-                description="Protected payment flows"
-              />
+            sm:text-[34px]
+          "
+        >
+          Sign in
+        </h1>
 
-              <FeatureRow
-                icon={Zap}
-                title="Fast Transfers"
-                description="Simple peer-to-peer payments"
-              />
+        {/* DESCRIPTION */}
 
-              <FeatureRow
-                icon={TrendingUp}
-                title="Smart Insights"
-                description="Understand your spending"
-              />
-            </div>
-          </div>
+        <p
+          className="
+            mt-4
 
-          <div className="flex items-center gap-2 text-[10px] text-slate-400">
-            <ShieldCheck className="h-4 w-4 text-emerald-400" />
+            max-w-[390px]
 
-            <span>Private and secure account access</span>
-          </div>
-        </div>
-      </section>
+            text-[12px]
+            font-medium
+            leading-[1.9]
+
+            text-[#718296]
+
+            sm:text-[13px]
+          "
+        >
+          Enter your account credentials
+          to continue to your secure
+          wallet.
+        </p>
+      </motion.div>
 
       {/* =====================================================
-          LOGIN FORM
+          ERROR
       ====================================================== */}
 
-      <section className="flex items-center justify-center bg-white px-6 py-12 sm:px-10 lg:px-14 xl:px-20">
-        <div className="w-full max-w-[420px]">
-          {/* Heading */}
-
+      <AnimatePresence>
+        {errorMessage && (
           <motion.div
             initial={{
               opacity: 0,
-              y: 18,
+              height: 0,
+              y: -7,
             }}
             animate={{
               opacity: 1,
+              height: "auto",
               y: 0,
             }}
-            transition={{
-              duration: 0.5,
+            exit={{
+              opacity: 0,
+              height: 0,
+              y: -5,
             }}
+            transition={{
+              duration: 0.25,
+            }}
+            className="
+              overflow-hidden
+            "
           >
-            <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl border border-blue-100 bg-blue-50 text-blue-600">
-              <Fingerprint className="h-6 w-6" />
+            <div
+              className="
+                mt-5
+
+                flex
+                items-start
+                gap-2.5
+
+                rounded-[14px]
+
+                border
+                border-rose-200
+
+                bg-rose-50
+
+                px-3.5
+                py-3
+
+                text-[11px]
+                font-semibold
+
+                text-rose-600
+              "
+            >
+              <AlertCircle
+                className="
+                  mt-0.5
+                  h-4
+                  w-4
+                  shrink-0
+                "
+              />
+
+              <span>
+                {errorMessage}
+              </span>
             </div>
-
-            <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">
-              Sign in to Nova
-            </h2>
-
-            <p className="mt-2 text-sm leading-6 text-slate-500">
-              Enter your credentials to access your wallet, transfers, and
-              financial tools.
-            </p>
           </motion.div>
+        )}
+      </AnimatePresence>
 
-          {/* Error */}
+      {/* =====================================================
+          FORM
+      ====================================================== */}
 
-          {errorMessage && (
-            <motion.div
-              initial={{
-                opacity: 0,
-                y: -5,
-              }}
-              animate={{
-                opacity: 1,
-                y: 0,
-              }}
-              className="mt-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-600"
-            >
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+      <motion.form
+        onSubmit={
+          handleSubmit
+        }
+        initial={{
+          opacity: 0,
+          y: 14,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        transition={{
+          delay: 0.07,
+          duration: 0.45,
+          ease: [
+            0.22,
+            1,
+            0.36,
+            1,
+          ],
+        }}
+        className="
+          relative
+          z-30
 
-              <span>{errorMessage}</span>
-            </motion.div>
-          )}
+          mt-7
+          space-y-5
 
-          {/* Form */}
+          pointer-events-auto
+        "
+      >
+        {/* ===================================================
+            EMAIL
+        ==================================================== */}
 
-          <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-            {/* EMAIL */}
+        <div
+          className="
+            relative
+            z-20
+          "
+        >
+          <label
+            htmlFor="login-email"
+            className="
+              mb-2
+              block
 
-            <div>
-              <label
-                htmlFor="login-email"
-                className="mb-2 block text-xs font-bold text-slate-700"
-              >
-                Email Address
-              </label>
+              cursor-pointer
 
-              <div className="relative">
-                <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              text-[10px]
+              font-extrabold
 
-                <input
-                  id="login-email"
-                  name="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="hello@example.com"
-                  autoComplete="email"
-                  disabled={isLoading}
-                  required
-                  className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:opacity-60"
-                />
-              </div>
-            </div>
+              text-[#344A60]
+            "
+          >
+            Email Address
+          </label>
 
-            {/* PASSWORD */}
+          <div
+            className="
+              group
+              relative
+            "
+          >
+            <Mail
+              className="
+                pointer-events-none
 
-            <div>
-              <div className="mb-2 flex items-center justify-between">
-                <label
-                  htmlFor="login-password"
-                  className="text-xs font-bold text-slate-700"
-                >
-                  Password
-                </label>
+                absolute
+                left-4
+                top-1/2
+                z-10
 
-                <Link
-                  href="/forgot-password"
-                  className="text-[10px] font-bold text-blue-600 hover:underline"
-                >
-                  Forgot password?
-                </Link>
-              </div>
+                h-4
+                w-4
 
-              <div className="relative">
-                <KeyRound className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                -translate-y-1/2
 
-                <input
-                  id="login-password"
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  autoComplete="current-password"
-                  disabled={isLoading}
-                  required
-                  className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-11 text-sm font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:opacity-60"
-                />
+                text-[#93A5B8]
 
-                <button
-                  type="button"
-                  disabled={isLoading}
-                  onClick={() => setShowPassword((value) => !value)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-600"
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
-                </button>
-              </div>
-            </div>
+                transition-colors
 
-            {/* SUBMIT */}
+                group-focus-within:text-[#1F5EA8]
+              "
+            />
 
-            <motion.button
-              type="submit"
-              disabled={isLoading}
-              whileHover={
-                isLoading
-                  ? undefined
-                  : {
-                      y: -2,
-                    }
+            <input
+              id="login-email"
+              name="email"
+              type="email"
+
+              value={email}
+
+              onChange={(
+                event
+              ) =>
+                setEmail(
+                  event.target
+                    .value
+                )
               }
-              whileTap={
+
+              placeholder="name@example.com"
+
+              autoComplete="email"
+
+              disabled={
                 isLoading
-                  ? undefined
-                  : {
-                      scale: 0.98,
-                    }
               }
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#0F172A] text-sm font-bold text-white shadow-lg transition-all hover:bg-[#1E293B] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Signing in...
-                </>
-              ) : (
-                <>
-                  Sign In
-                  <ArrowRight className="h-4 w-4" />
-                </>
-              )}
-            </motion.button>
-          </form>
 
-          {/* Register */}
+              required
 
-          <p className="mt-8 text-center text-sm text-slate-500">
-            Don&apos;t have an account?{" "}
-            <Link
-              href="/register"
-              className="font-bold text-blue-600 hover:underline"
-            >
-              Create an account
-            </Link>
-          </p>
+              className="
+                relative
+                z-20
 
-          {/* Security */}
+                h-[53px]
+                w-full
 
-          <div className="mt-8 flex items-center justify-center gap-2 text-[10px] text-slate-400">
-            <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                rounded-[14px]
 
-            <span>Your wallet data stays private</span>
+                border
+                border-[#D6E1EB]
+
+                bg-[#F7F9FC]
+
+                pl-11
+                pr-4
+
+                text-[13px]
+                font-semibold
+
+                text-[#18334B]
+
+                outline-none
+
+                transition-all
+                duration-200
+
+                placeholder:font-semibold
+                placeholder:text-[#A0AFC0]
+
+                hover:border-[#C4D4E3]
+
+                focus:border-[#3E8FD9]
+                focus:bg-white
+
+                focus:ring-4
+                focus:ring-blue-500/[0.07]
+
+                disabled:cursor-not-allowed
+                disabled:opacity-60
+              "
+            />
           </div>
         </div>
-      </section>
+
+        {/* ===================================================
+            PASSWORD
+        ==================================================== */}
+
+        <div
+          className="
+            relative
+            z-20
+          "
+        >
+          <div
+            className="
+              mb-2
+
+              flex
+              items-center
+              justify-between
+              gap-4
+            "
+          >
+            <label
+              htmlFor="login-password"
+              className="
+                cursor-pointer
+
+                text-[10px]
+                font-extrabold
+
+                text-[#344A60]
+              "
+            >
+              Password
+            </label>
+
+            <Link
+              href="/forgot-password"
+              className="
+                text-[9px]
+                font-extrabold
+
+                text-[#1762AC]
+
+                transition-colors
+
+                hover:text-[#104C85]
+              "
+            >
+              Forgot password?
+            </Link>
+          </div>
+
+          <div
+            className="
+              group
+              relative
+            "
+          >
+            <KeyRound
+              className="
+                pointer-events-none
+
+                absolute
+                left-4
+                top-1/2
+                z-10
+
+                h-4
+                w-4
+
+                -translate-y-1/2
+
+                text-[#93A5B8]
+
+                transition-colors
+
+                group-focus-within:text-[#1F5EA8]
+              "
+            />
+
+            <input
+              id="login-password"
+              name="password"
+
+              type={
+                showPassword
+                  ? "text"
+                  : "password"
+              }
+
+              value={
+                password
+              }
+
+              onChange={(
+                event
+              ) =>
+                setPassword(
+                  event.target
+                    .value
+                )
+              }
+
+              placeholder="Enter your password"
+
+              autoComplete="current-password"
+
+              required
+
+              disabled={
+                isLoading
+              }
+
+              className="
+                relative
+                z-20
+
+                h-[53px]
+                w-full
+
+                rounded-[14px]
+
+                border
+                border-[#D6E1EB]
+
+                bg-[#F7F9FC]
+
+                pl-11
+                pr-12
+
+                text-[13px]
+                font-semibold
+
+                text-[#18334B]
+
+                outline-none
+
+                transition-all
+                duration-200
+
+                placeholder:font-semibold
+                placeholder:text-[#A0AFC0]
+
+                hover:border-[#C4D4E3]
+
+                focus:border-[#3E8FD9]
+                focus:bg-white
+
+                focus:ring-4
+                focus:ring-blue-500/[0.07]
+
+                disabled:cursor-not-allowed
+                disabled:opacity-60
+              "
+            />
+
+            {/* SHOW / HIDE */}
+
+            <motion.button
+              type="button"
+
+              disabled={
+                isLoading
+              }
+
+              whileTap={{
+                scale: 0.86,
+              }}
+
+              onClick={() =>
+                setShowPassword(
+                  (current) =>
+                    !current
+                )
+              }
+
+              aria-label={
+                showPassword
+                  ? "Hide password"
+                  : "Show password"
+              }
+
+              className="
+                absolute
+                right-3
+                top-1/2
+                z-30
+
+                flex
+                h-8
+                w-8
+
+                -translate-y-1/2
+
+                items-center
+                justify-center
+
+                rounded-lg
+
+                text-[#92A4B8]
+
+                transition-all
+
+                hover:bg-[#EEF6FF]
+                hover:text-[#1F5EA8]
+
+                disabled:pointer-events-none
+              "
+            >
+              <AnimatePresence
+                mode="wait"
+                initial={
+                  false
+                }
+              >
+                <motion.span
+                  key={
+                    showPassword
+                      ? "hide"
+                      : "show"
+                  }
+                  initial={{
+                    opacity: 0,
+                    scale: 0.75,
+                  }}
+                  animate={{
+                    opacity: 1,
+                    scale: 1,
+                  }}
+                  exit={{
+                    opacity: 0,
+                    scale: 0.75,
+                  }}
+                  transition={{
+                    duration: 0.14,
+                  }}
+                >
+                  {showPassword ? (
+                    <EyeOff
+                      className="
+                        h-4
+                        w-4
+                      "
+                    />
+                  ) : (
+                    <Eye
+                      className="
+                        h-4
+                        w-4
+                      "
+                    />
+                  )}
+                </motion.span>
+              </AnimatePresence>
+            </motion.button>
+          </div>
+        </div>
+
+        {/* ===================================================
+            SUBMIT
+        ==================================================== */}
+
+        <motion.button
+          type="submit"
+
+          disabled={
+            isLoading
+          }
+
+          whileHover={
+            isLoading
+              ? undefined
+              : {
+                  y: -2,
+                }
+          }
+
+          whileTap={
+            isLoading
+              ? undefined
+              : {
+                  scale:
+                    0.985,
+                }
+          }
+
+          className="
+            group
+
+            relative
+            z-30
+
+            flex
+            h-[52px]
+            w-full
+
+            items-center
+            justify-center
+            gap-2
+
+            overflow-hidden
+
+            rounded-[14px]
+
+            bg-gradient-to-r
+            from-[#1D5A91]
+            via-[#2268A9]
+            to-[#2D86CB]
+
+            text-[13px]
+            font-extrabold
+
+            text-white
+
+            shadow-[0_17px_35px_rgba(31,94,168,0.24)]
+
+            transition-all
+
+            hover:shadow-[0_20px_42px_rgba(31,94,168,0.30)]
+
+            disabled:cursor-not-allowed
+            disabled:opacity-60
+          "
+        >
+          {/* LEFT GLASS SHAPE */}
+
+          {!isLoading && (
+            <motion.span
+              aria-hidden="true"
+
+              initial={{
+                x: 0,
+              }}
+
+              whileHover={{
+                x: 6,
+              }}
+
+              className="
+                pointer-events-none
+
+                absolute
+                bottom-0
+                left-0
+                top-0
+
+                w-[22px]
+
+                skew-x-[-12deg]
+
+                bg-white/[0.08]
+              "
+            />
+          )}
+
+          {/* LIGHT SWEEP */}
+
+          {!isLoading && (
+            <span
+              className="
+                pointer-events-none
+
+                absolute
+                -left-16
+                top-0
+
+                h-full
+                w-20
+
+                -skew-x-12
+
+                bg-white/[0.10]
+
+                transition-transform
+                duration-700
+
+                group-hover:translate-x-[560px]
+              "
+            />
+          )}
+
+          {isLoading ? (
+            <>
+              <Loader2
+                className="
+                  relative
+                  h-4
+                  w-4
+                  animate-spin
+                "
+              />
+
+              <span className="relative">
+                Signing in...
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="relative">
+                Sign In
+              </span>
+
+              <ArrowRight
+                className="
+                  relative
+
+                  h-4
+                  w-4
+
+                  transition-transform
+
+                  group-hover:translate-x-1
+                "
+              />
+            </>
+          )}
+        </motion.button>
+      </motion.form>
+
+      {/* =====================================================
+          CREATE ACCOUNT
+      ====================================================== */}
+
+      <motion.div
+        initial={{
+          opacity: 0,
+          y: 7,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        transition={{
+          delay: 0.18,
+          duration: 0.4,
+        }}
+      >
+        <p
+          className="
+            mt-7
+
+            text-center
+
+            text-[11px]
+            font-medium
+
+            text-[#78899B]
+          "
+        >
+          Don&apos;t have an account?{" "}
+
+          <Link
+            href="/register"
+            className="
+              font-extrabold
+              text-[#1762AC]
+
+              transition-colors
+
+              hover:text-[#104B82]
+            "
+          >
+            Create account
+          </Link>
+        </p>
+
+        {/* SECURITY */}
+
+        <div
+          className="
+            mt-5
+
+            flex
+            items-center
+            justify-center
+            gap-2
+
+            text-[9px]
+            font-semibold
+
+            text-[#9AA8B8]
+          "
+        >
+          <ShieldCheck
+            className="
+              h-3.5
+              w-3.5
+
+              text-emerald-600
+            "
+          />
+
+          Your account data stays private
+        </div>
+      </motion.div>
     </div>
-  );
-}
-
-/* =========================================================
-   FEATURE ROW
-========================================================= */
-
-function FeatureRow({
-  icon: Icon,
-  title,
-  description,
-}: {
-  icon: ElementType;
-  title: string;
-  description: string;
-}) {
-  return (
-    <motion.div
-      initial={{
-        opacity: 0,
-        x: -12,
-      }}
-      animate={{
-        opacity: 1,
-        x: 0,
-      }}
-      transition={{
-        duration: 0.5,
-      }}
-      className="flex items-center gap-3"
-    >
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-cyan-400">
-        <Icon className="h-5 w-5" />
-      </div>
-
-      <div>
-        <p className="text-sm font-semibold text-white">{title}</p>
-
-        <p className="text-[10px] text-slate-400">{description}</p>
-      </div>
-    </motion.div>
   );
 }

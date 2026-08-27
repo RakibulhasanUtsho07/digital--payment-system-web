@@ -1,18 +1,22 @@
 "use client";
 
 import {
-  useRef,
+  useEffect,
   useState,
   type ChangeEvent,
   type FormEvent,
-  type ElementType,
 } from "react";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 
 import {
+  AnimatePresence,
+  motion,
+} from "framer-motion";
+
+import {
+  AlertCircle,
   ArrowRight,
   Camera,
   CheckCircle2,
@@ -20,192 +24,306 @@ import {
   EyeOff,
   Fingerprint,
   KeyRound,
+  Loader2,
   Mail,
   Phone,
-  Shield,
-  ShieldCheck,
-  Sparkles,
   User,
-  WalletCards,
-  Zap,
+  type LucideIcon,
 } from "lucide-react";
 
 import { apiClient } from "@/lib/api/client";
-
-import {
-  saveAuth,
-  type AuthUser,
-} from "@/lib/auth/auth";
 
 /* =========================================================
    TYPES
 ========================================================= */
 
+interface AuthUser {
+  _id: string;
+  name: string;
+  email: string;
+  phone?: string;
+
+  role: "user" | "admin";
+
+  kycStatus:
+    | "not_started"
+    | "pending"
+    | "verified"
+    | "rejected";
+}
+
 interface RegisterResponse {
   success: boolean;
   message: string;
-  user: AuthUser;
-  token: string;
+  user?: AuthUser;
 }
 
 /* =========================================================
-   FEATURES
-========================================================= */
-
-const features = [
-  {
-    icon: ShieldCheck,
-    title: "Secure Payments",
-    description:
-      "Protected payment flows with validation and authentication.",
-  },
-  {
-    icon: Fingerprint,
-    title: "KYC Verification",
-    description:
-      "Identity verification designed for secure onboarding.",
-  },
-  {
-    icon: Zap,
-    title: "Smart Intelligence",
-    description:
-      "AI-assisted spending and financial insights.",
-  },
-];
-
-/* =========================================================
-   REGISTER PAGE
+   PAGE
 ========================================================= */
 
 export default function RegisterPage() {
   const router = useRouter();
 
-  /* ---------------------------------------------------------
-     FORM STATE
-  --------------------------------------------------------- */
+  const [firstName, setFirstName] =
+    useState("");
 
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  const [lastName, setLastName] =
+    useState("");
 
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
+  const [phone, setPhone] =
+    useState("");
 
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [email, setEmail] =
+    useState("");
 
-  /* ---------------------------------------------------------
-     UI STATE
-  --------------------------------------------------------- */
+  const [password, setPassword] =
+    useState("");
 
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] =
-    useState(false);
+  const [
+    confirmPassword,
+    setConfirmPassword,
+  ] = useState("");
 
-  const [profileImage, setProfileImage] = useState<string | null>(
+  const [
+    showPassword,
+    setShowPassword,
+  ] = useState(false);
+
+  const [
+    showConfirmPassword,
+    setShowConfirmPassword,
+  ] = useState(false);
+
+  const [
+    profileImage,
+    setProfileImage,
+  ] = useState<string | null>(
     null
   );
 
-  const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
+  const [
+    imageName,
+    setImageName,
+  ] = useState("");
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [
+    termsAccepted,
+    setTermsAccepted,
+  ] = useState(false);
+
+  const [
+    isLoading,
+    setIsLoading,
+  ] = useState(false);
+
+  const [
+    errorMessage,
+    setErrorMessage,
+  ] = useState("");
 
   /* =========================================================
-     IMAGE UPLOAD
-  ========================================================= */
+     CLEAN OBJECT URL
+  ========================================================== */
+
+  useEffect(() => {
+    return () => {
+      if (profileImage) {
+        URL.revokeObjectURL(
+          profileImage
+        );
+      }
+    };
+  }, [profileImage]);
+
+  /* =========================================================
+     IMAGE
+  ========================================================== */
 
   const handleImageUpload = (
-    e: ChangeEvent<HTMLInputElement>
+    event: ChangeEvent<HTMLInputElement>
   ) => {
-    const file = e.target.files?.[0];
+    const file =
+      event.target.files?.[0];
 
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      setErrorMessage(
-        "Please select a valid image file."
-      );
+    if (!file) {
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      setErrorMessage(
-        "Image size must be less than 5MB."
-      );
-      return;
-    }
-
-    const previewUrl = URL.createObjectURL(file);
-
-    setProfileImage(previewUrl);
     setErrorMessage("");
+
+    if (
+      !file.type.startsWith(
+        "image/"
+      )
+    ) {
+      setErrorMessage(
+        "Please select a valid image."
+      );
+
+      event.target.value = "";
+
+      return;
+    }
+
+    if (
+      file.size >
+      5 * 1024 * 1024
+    ) {
+      setErrorMessage(
+        "Image size must be below 5MB."
+      );
+
+      event.target.value = "";
+
+      return;
+    }
+
+    if (profileImage) {
+      URL.revokeObjectURL(
+        profileImage
+      );
+    }
+
+    const previewUrl =
+      URL.createObjectURL(
+        file
+      );
+
+    setProfileImage(
+      previewUrl
+    );
+
+    setImageName(
+      file.name
+    );
   };
 
   /* =========================================================
-     REGISTER
-  ========================================================= */
+     PHONE
+  ========================================================== */
+
+  const handlePhoneChange = (
+    value: string
+  ) => {
+    /*
+     * Allows numbers, spaces,
+     * + and - only.
+     */
+
+    const cleaned =
+      value.replace(
+        /[^0-9+\-\s]/g,
+        ""
+      );
+
+    setPhone(cleaned);
+  };
+
+  /* =========================================================
+     SUBMIT
+  ========================================================== */
 
   const handleSubmit = async (
-    e: FormEvent<HTMLFormElement>
+    event: FormEvent<HTMLFormElement>
   ) => {
-    e.preventDefault();
+    event.preventDefault();
+
+    if (isLoading) {
+      return;
+    }
 
     setErrorMessage("");
 
-    const trimmedFirstName = firstName.trim();
-    const trimmedLastName = lastName.trim();
-    const trimmedEmail = email.trim().toLowerCase();
-    const trimmedPhone = phone.trim();
+    const cleanFirstName =
+      firstName.trim();
+
+    const cleanLastName =
+      lastName.trim();
+
+    const cleanPhone =
+      phone.trim();
+
+    const cleanEmail =
+      email
+        .trim()
+        .toLowerCase();
 
     const fullName =
-      `${trimmedFirstName} ${trimmedLastName}`.trim();
+      `${cleanFirstName} ${cleanLastName}`.trim();
 
-    /* ---------------------------------------------------------
-       VALIDATION
-    --------------------------------------------------------- */
-
-    if (!trimmedFirstName || !trimmedLastName) {
+    if (!cleanFirstName) {
       setErrorMessage(
-        "Please enter your first and last name."
+        "Please enter your first name."
       );
+
       return;
     }
 
-    if (!trimmedEmail) {
+    if (!cleanLastName) {
       setErrorMessage(
-        "Please enter your email address."
+        "Please enter your last name."
       );
+
       return;
     }
 
-    if (!trimmedPhone) {
+    if (!cleanPhone) {
       setErrorMessage(
         "Please enter your phone number."
       );
+
       return;
     }
 
-    if (password.length < 6) {
+    if (!cleanEmail) {
       setErrorMessage(
-        "Password must be at least 6 characters."
+        "Please enter your email address."
       );
+
       return;
     }
 
-    if (password !== confirmPassword) {
+    if (
+      password.length < 6
+    ) {
+      setErrorMessage(
+        "Password must contain at least 6 characters."
+      );
+
+      return;
+    }
+
+    if (
+      password !==
+      confirmPassword
+    ) {
       setErrorMessage(
         "Passwords do not match."
       );
+
       return;
     }
 
-    /* ---------------------------------------------------------
-       START REQUEST
-    --------------------------------------------------------- */
+    if (!termsAccepted) {
+      setErrorMessage(
+        "Please accept the Terms and Privacy Policy."
+      );
+
+      return;
+    }
 
     setIsLoading(true);
 
     try {
+      /*
+       * Current backend registration endpoint
+       * accepts JSON.
+       *
+       * Do NOT send FormData until backend
+       * has multer/file upload support.
+       */
+
       const data =
         await apiClient<RegisterResponse>(
           "/auth/register",
@@ -214,24 +332,45 @@ export default function RegisterPage() {
 
             body: JSON.stringify({
               name: fullName,
-              email: trimmedEmail,
-              phone: trimmedPhone,
+              email: cleanEmail,
+              phone: cleanPhone,
               password,
             }),
           }
         );
 
-      /* -------------------------------------------------------
-         SAVE AUTH DATA
-      ------------------------------------------------------- */
+      if (
+        !data.success ||
+        !data.user
+      ) {
+        throw new Error(
+          data.message ||
+            "Registration failed."
+        );
+      }
 
-      saveAuth(data.token, data.user);
+      /*
+       * Auth itself comes from the
+       * backend HttpOnly cookie.
+       */
 
-      /* -------------------------------------------------------
-         REDIRECT
-      ------------------------------------------------------- */
+      localStorage.setItem(
+        "auth_user",
+        JSON.stringify(
+          data.user
+        )
+      );
 
-      router.replace("/dashboard");
+      localStorage.setItem(
+        "is_authenticated",
+        "true"
+      );
+
+      router.replace(
+        "/dashboard"
+      );
+
+      router.refresh();
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -244,467 +383,799 @@ export default function RegisterPage() {
   };
 
   /* =========================================================
-     UI
-  ========================================================= */
+     RETURN
+  ========================================================== */
 
   return (
-    <div className="grid min-h-[760px] w-full grid-cols-1 lg:grid-cols-12">
-
+    <div
+      className="
+        relative
+        z-10
+        w-full
+        pointer-events-auto
+      "
+    >
       {/* =====================================================
-          LEFT BRANDING PANEL
+          HEADER
       ====================================================== */}
 
-      <section className="relative hidden overflow-hidden rounded-l-[2rem] bg-[#020617] lg:col-span-7 lg:flex">
-
-        {/* Grid background */}
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_right,#ffffff08_1px,transparent_1px),linear-gradient(to_bottom,#ffffff08_1px,transparent_1px)] bg-[size:32px_32px]" />
-
-        {/* Blue glow */}
+      <motion.div
+        initial={{
+          opacity: 0,
+          y: 14,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        transition={{
+          duration: 0.45,
+          ease: [
+            0.22,
+            1,
+            0.36,
+            1,
+          ],
+        }}
+      >
         <motion.div
-          animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.2, 0.35, 0.2],
+          whileHover={{
+            scale: 1.06,
+            rotate: -4,
           }}
-          transition={{
-            duration: 9,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-          className="pointer-events-none absolute -left-24 -top-24 h-[420px] w-[420px] rounded-full bg-blue-600/20 blur-[120px]"
-        />
+          className="
+            mb-3
+            flex
+            h-10
+            w-10
+            items-center
+            justify-center
+            rounded-[13px]
+            border
+            border-[#D9E8F6]
+            bg-[#EEF6FF]
+            text-[#1F5EA8]
+            shadow-[0_8px_20px_rgba(31,94,168,0.08)]
+          "
+        >
+          <Fingerprint className="h-[18px] w-[18px]" />
+        </motion.div>
 
-        {/* Cyan glow */}
-        <motion.div
-          animate={{
-            scale: [1, 1.15, 1],
-            opacity: [0.12, 0.28, 0.12],
-          }}
-          transition={{
-            duration: 10,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-          className="pointer-events-none absolute -bottom-20 -right-20 h-[360px] w-[360px] rounded-full bg-cyan-500/20 blur-[110px]"
-        />
+        <p
+          className="
+            text-[9px]
+            font-extrabold
+            uppercase
+            tracking-[0.18em]
+            text-[#1F5EA8]
+          "
+        >
+          Secure onboarding
+        </p>
 
-        <div className="relative z-10 flex w-full flex-col justify-between p-10 xl:p-14">
+        <h1
+          className="
+            mt-1.5
+            text-[28px]
+            font-black
+            tracking-[-0.045em]
+            text-[#102A43]
+            sm:text-[30px]
+          "
+        >
+          Create account
+        </h1>
 
-          {/* --------------------------------------------------
-              BRAND
-          --------------------------------------------------- */}
-
-          <Link
-            href="/"
-            className="flex w-fit items-center gap-3"
-          >
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-cyan-400/30 bg-white/10 text-cyan-300 shadow-lg">
-              <WalletCards className="h-6 w-6" />
-            </div>
-
-            <div>
-              <p className="text-xl font-black text-white">
-                Nova
-                <span className="text-cyan-400">
-                  Wallet
-                </span>
-              </p>
-
-              <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-cyan-300/60">
-                Digital Wallet System
-              </p>
-            </div>
-          </Link>
-
-          {/* --------------------------------------------------
-              HERO CONTENT
-          --------------------------------------------------- */}
-
-          <div className="my-auto py-10">
-            <motion.div
-              initial={{
-                opacity: 0,
-                y: 25,
-              }}
-              animate={{
-                opacity: 1,
-                y: 0,
-              }}
-              transition={{
-                duration: 0.7,
-              }}
-            >
-              <div className="inline-flex items-center gap-2 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-4 py-2">
-                <Sparkles className="h-4 w-4 text-cyan-400" />
-
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-cyan-300">
-                  Join the platform
-                </span>
-              </div>
-
-              <h1 className="mt-7 text-4xl font-extrabold leading-[1.08] text-white xl:text-5xl">
-                Build a smarter
-                <span className="block bg-gradient-to-r from-cyan-300 via-blue-400 to-indigo-300 bg-clip-text text-transparent">
-                  financial future.
-                </span>
-              </h1>
-
-              <p className="mt-6 max-w-lg text-sm leading-7 text-slate-300">
-                Create your secure digital wallet and get access
-                to transfers, KYC verification, transaction tracking,
-                secure payments and intelligent financial assistance.
-              </p>
-            </motion.div>
-
-            {/* ------------------------------------------------
-                FEATURE CARDS
-            ------------------------------------------------- */}
-
-            <div className="mt-9 grid gap-3 sm:grid-cols-3">
-              {features.map((feature, index) => {
-                const Icon = feature.icon;
-
-                return (
-                  <motion.div
-                    key={feature.title}
-                    initial={{
-                      opacity: 0,
-                      y: 15,
-                    }}
-                    animate={{
-                      opacity: 1,
-                      y: 0,
-                    }}
-                    transition={{
-                      delay:
-                        0.15 + index * 0.08,
-                      duration: 0.45,
-                    }}
-                    whileHover={{
-                      y: -4,
-                    }}
-                    className="rounded-2xl border border-white/10 bg-white/[0.05] p-4 backdrop-blur-md"
-                  >
-                    <Icon className="h-5 w-5 text-cyan-400" />
-
-                    <p className="mt-3 text-xs font-semibold text-white">
-                      {feature.title}
-                    </p>
-
-                    <p className="mt-1 text-[9px] leading-4 text-slate-400">
-                      {feature.description}
-                    </p>
-                  </motion.div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* --------------------------------------------------
-              SECURITY FOOTER
-          --------------------------------------------------- */}
-
-          <div className="flex items-center gap-3 text-[10px] text-slate-400">
-            <Shield className="h-4 w-4 text-cyan-400" />
-
-            <span>
-              Secure onboarding • Private account access
-            </span>
-          </div>
-        </div>
-      </section>
+        <p
+          className="
+            mt-1
+            text-[11px]
+            font-medium
+            leading-5
+            text-[#718296]
+            sm:text-[12px]
+          "
+        >
+          Create your secure
+          digital wallet in a few
+          simple steps.
+        </p>
+      </motion.div>
 
       {/* =====================================================
-          REGISTER FORM PANEL
+          ERROR
       ====================================================== */}
 
-      <section className="flex items-center justify-center bg-white px-6 py-10 sm:px-10 lg:col-span-5 lg:px-12 xl:px-14">
-
-        <div className="w-full max-w-[450px]">
-
-          {/* --------------------------------------------------
-              HEADER
-          --------------------------------------------------- */}
-
+      <AnimatePresence>
+        {errorMessage && (
           <motion.div
             initial={{
               opacity: 0,
-              x: 15,
+              height: 0,
+              y: -5,
             }}
             animate={{
               opacity: 1,
-              x: 0,
+              height: "auto",
+              y: 0,
             }}
-            transition={{
-              duration: 0.5,
+            exit={{
+              opacity: 0,
+              height: 0,
             }}
+            className="overflow-hidden"
           >
-            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl border border-blue-100 bg-blue-50 text-blue-600">
-              <Fingerprint className="h-6 w-6" />
-            </div>
-
-            <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">
-              Create Account
-            </h2>
-
-            <p className="mt-2 text-sm text-slate-500">
-              Set up your secure wallet account.
-            </p>
-          </motion.div>
-
-          {/* --------------------------------------------------
-              ERROR MESSAGE
-          --------------------------------------------------- */}
-
-          {errorMessage && (
-            <motion.div
-              initial={{
-                opacity: 0,
-                y: -5,
-              }}
-              animate={{
-                opacity: 1,
-                y: 0,
-              }}
-              className="mt-5 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-600"
+            <div
+              className="
+                mt-3.5
+                flex
+                items-start
+                gap-2.5
+                rounded-[13px]
+                border
+                border-rose-200
+                bg-rose-50
+                px-3
+                py-2.5
+                text-[11px]
+                font-semibold
+                text-rose-600
+              "
             >
+              <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+
               {errorMessage}
-            </motion.div>
-          )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-          {/* --------------------------------------------------
-              REGISTER FORM
-          --------------------------------------------------- */}
+      {/* =====================================================
+          FORM
+      ====================================================== */}
 
-          <form
-            onSubmit={handleSubmit}
-            className="mt-7 space-y-4"
+      <motion.form
+        onSubmit={handleSubmit}
+        initial={{
+          opacity: 0,
+          y: 12,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        transition={{
+          delay: 0.05,
+          duration: 0.42,
+        }}
+        className="
+          relative
+          z-20
+          mt-4
+          space-y-3
+          pointer-events-auto
+        "
+      >
+        {/* ===================================================
+            IMAGE INPUT
+        ==================================================== */}
+
+        <div
+          className="
+            flex
+            items-center
+            gap-3
+            rounded-[14px]
+            border
+            border-[#E3EBF3]
+            bg-[#F8FAFC]
+            p-2.5
+          "
+        >
+          <label
+            htmlFor="register-profile-image"
+            className="
+              group
+              relative
+              z-20
+              flex
+              h-[58px]
+              w-[58px]
+              shrink-0
+              cursor-pointer
+              items-center
+              justify-center
+              overflow-hidden
+              rounded-[16px]
+              border
+              border-dashed
+              border-[#BDCDDD]
+              bg-white
+              transition-all
+              hover:border-[#4D95D5]
+              hover:bg-[#F0F8FF]
+            "
           >
-
-            {/* PROFILE IMAGE */}
-
-            <div className="flex justify-center pb-1">
-              <button
-                type="button"
-                onClick={() =>
-                  fileInputRef.current?.click()
-                }
-                className="group relative flex h-20 w-20 overflow-hidden rounded-full border-2 border-dashed border-slate-300 bg-slate-50 transition-all hover:border-cyan-500 hover:bg-cyan-50/50"
-              >
-                {profileImage ? (
-                  <img
-                    src={profileImage}
-                    alt="Profile preview"
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <span className="flex h-full w-full items-center justify-center">
-                    <Camera className="h-6 w-6 text-slate-400 transition group-hover:scale-110 group-hover:text-cyan-600" />
-                  </span>
-                )}
-
-                <span className="absolute inset-0 flex items-center justify-center bg-slate-900/50 opacity-0 transition group-hover:opacity-100">
-                  <Camera className="h-5 w-5 text-white" />
-                </span>
-              </button>
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="hidden"
+            {profileImage ? (
+              <img
+                src={profileImage}
+                alt="Profile preview"
+                className="
+                  h-full
+                  w-full
+                  object-cover
+                "
               />
-            </div>
-
-            {/* FIRST + LAST NAME */}
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <InputField
-                label="First Name"
-                value={firstName}
-                onChange={setFirstName}
-                placeholder="John"
-                icon={User}
+            ) : (
+              <Camera
+                className="
+                  h-5
+                  w-5
+                  text-[#8DA0B3]
+                  transition
+                  group-hover:text-[#1F5EA8]
+                "
               />
+            )}
 
-              <InputField
-                label="Last Name"
-                value={lastName}
-                onChange={setLastName}
-                placeholder="Doe"
-                icon={User}
-              />
-            </div>
+            <span
+              className="
+                pointer-events-none
+                absolute
+                inset-0
+                flex
+                items-center
+                justify-center
+                bg-[#102A43]/50
+                opacity-0
+                transition-opacity
+                group-hover:opacity-100
+              "
+            >
+              <Camera className="h-4 w-4 text-white" />
+            </span>
+          </label>
 
-            {/* PHONE */}
+          <input
+            id="register-profile-image"
+            name="profileImage"
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            onChange={
+              handleImageUpload
+            }
+            className="hidden"
+          />
 
-            <InputField
-              label="Phone Number"
-              value={phone}
-              onChange={setPhone}
-              placeholder="+880 1XXX-XXXXXX"
-              icon={Phone}
-              type="tel"
-            />
-
-            {/* EMAIL */}
-
-            <InputField
-              label="Email Address"
-              value={email}
-              onChange={setEmail}
-              placeholder="name@domain.com"
-              icon={Mail}
-              type="email"
-            />
-
-            {/* PASSWORD */}
-
-            <PasswordField
-              label="Password"
-              value={password}
-              onChange={setPassword}
-              placeholder="Create a secure password"
-              visible={showPassword}
-              onToggle={() =>
-                setShowPassword((value) => !value)
-              }
-            />
-
-            {/* CONFIRM PASSWORD */}
-
-            <PasswordField
-              label="Confirm Password"
-              value={confirmPassword}
-              onChange={setConfirmPassword}
-              placeholder="Repeat your password"
-              visible={showConfirmPassword}
-              onToggle={() =>
-                setShowConfirmPassword(
-                  (value) => !value
-                )
-              }
-            />
-
-            {/* TERMS */}
-
-            <label className="flex items-start gap-3 pt-1">
-              <input
-                type="checkbox"
-                required
-                className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-blue-600"
-              />
-
-              <span className="text-[10px] leading-5 text-slate-500">
-                I agree to the{" "}
-                <Link
-                  href="/terms"
-                  className="font-semibold text-blue-600 hover:underline"
-                >
-                  Terms
-                </Link>{" "}
-                and{" "}
-                <Link
-                  href="/privacy"
-                  className="font-semibold text-blue-600 hover:underline"
-                >
-                  Privacy Policy
-                </Link>
-                .
-              </span>
+          <div className="min-w-0 flex-1">
+            <label
+              htmlFor="register-profile-image"
+              className="
+                cursor-pointer
+                text-[11px]
+                font-extrabold
+                text-[#304A62]
+              "
+            >
+              Profile photo
             </label>
 
-            {/* ------------------------------------------------
-                SUBMIT BUTTON
-            ------------------------------------------------- */}
-
-            <motion.button
-              type="submit"
-              disabled={isLoading}
-              whileHover={{
-                y: -2,
-              }}
-              whileTap={{
-                scale: 0.98,
-              }}
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#0F172A] text-sm font-bold text-white shadow-lg transition-all hover:bg-[#1E293B] disabled:cursor-not-allowed disabled:opacity-60"
+            <p
+              className="
+                mt-0.5
+                truncate
+                text-[9px]
+                leading-4
+                text-[#8B9AAB]
+              "
             >
-              {isLoading ? (
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-              ) : (
-                <>
-                  Create Wallet
-                  <ArrowRight className="h-4 w-4" />
-                </>
-              )}
-            </motion.button>
-          </form>
-
-          {/* --------------------------------------------------
-              LOGIN LINK
-          --------------------------------------------------- */}
-
-          <p className="mt-7 text-center text-sm text-slate-500">
-            Already have an account?{" "}
-            <Link
-              href="/login"
-              className="font-bold text-blue-600 hover:underline"
-            >
-              Sign in
-            </Link>
-          </p>
-
-          {/* SECURITY */}
-          <div className="mt-5 flex items-center justify-center gap-2 text-[10px] text-slate-400">
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-
-            <span>
-              Secure digital wallet onboarding
-            </span>
+              {imageName ||
+                "Optional. JPG, PNG or WEBP up to 5MB."}
+            </p>
           </div>
         </div>
-      </section>
+
+        {/* ===================================================
+            FIRST + LAST NAME
+        ==================================================== */}
+
+        <div
+          className="
+            grid
+            grid-cols-1
+            gap-3
+            sm:grid-cols-2
+          "
+        >
+          <InputField
+            id="register-first-name"
+            name="firstName"
+            label="First Name"
+            value={firstName}
+            onChange={
+              setFirstName
+            }
+            placeholder="First name"
+            icon={User}
+            autoComplete="given-name"
+            disabled={
+              isLoading
+            }
+          />
+
+          <InputField
+            id="register-last-name"
+            name="lastName"
+            label="Last Name"
+            value={lastName}
+            onChange={
+              setLastName
+            }
+            placeholder="Last name"
+            icon={User}
+            autoComplete="family-name"
+            disabled={
+              isLoading
+            }
+          />
+        </div>
+
+        {/* ===================================================
+            PHONE + EMAIL
+        ==================================================== */}
+
+        <div
+          className="
+            grid
+            grid-cols-1
+            gap-3
+            sm:grid-cols-2
+          "
+        >
+          <InputField
+            id="register-phone"
+            name="phone"
+            label="Phone Number"
+            value={phone}
+            onChange={
+              handlePhoneChange
+            }
+            placeholder="+880 1XXX..."
+            icon={Phone}
+            type="tel"
+            inputMode="tel"
+            autoComplete="tel"
+            disabled={
+              isLoading
+            }
+          />
+
+          <InputField
+            id="register-email"
+            name="email"
+            label="Email Address"
+            value={email}
+            onChange={
+              setEmail
+            }
+            placeholder="name@example.com"
+            icon={Mail}
+            type="email"
+            inputMode="email"
+            autoComplete="email"
+            disabled={
+              isLoading
+            }
+          />
+        </div>
+
+        {/* ===================================================
+            PASSWORDS
+        ==================================================== */}
+
+        <div
+          className="
+            grid
+            grid-cols-1
+            gap-3
+            sm:grid-cols-2
+          "
+        >
+          <PasswordField
+            id="register-password"
+            name="password"
+            label="Password"
+            value={password}
+            onChange={
+              setPassword
+            }
+            visible={
+              showPassword
+            }
+            onToggle={() =>
+              setShowPassword(
+                (current) =>
+                  !current
+              )
+            }
+            autoComplete="new-password"
+            disabled={
+              isLoading
+            }
+          />
+
+          <PasswordField
+            id="register-confirm-password"
+            name="confirmPassword"
+            label="Confirm Password"
+            value={
+              confirmPassword
+            }
+            onChange={
+              setConfirmPassword
+            }
+            visible={
+              showConfirmPassword
+            }
+            onToggle={() =>
+              setShowConfirmPassword(
+                (current) =>
+                  !current
+              )
+            }
+            autoComplete="new-password"
+            disabled={
+              isLoading
+            }
+          />
+        </div>
+
+        {/* ===================================================
+            TERMS
+        ==================================================== */}
+
+        <label
+          className="
+            relative
+            z-20
+            flex
+            cursor-pointer
+            items-start
+            gap-2.5
+            px-1
+            pt-1
+          "
+        >
+          <input
+            type="checkbox"
+            checked={
+              termsAccepted
+            }
+            onChange={(event) =>
+              setTermsAccepted(
+                event.target
+                  .checked
+              )
+            }
+            disabled={
+              isLoading
+            }
+            className="
+              mt-0.5
+              h-4
+              w-4
+              shrink-0
+              cursor-pointer
+              accent-[#1F5EA8]
+            "
+          />
+
+          <span
+            className="
+              text-[9px]
+              font-medium
+              leading-5
+              text-[#6E7E90]
+            "
+          >
+            I agree to the{" "}
+
+            <Link
+              href="/terms"
+              className="
+                font-extrabold
+                text-[#1F5EA8]
+              "
+            >
+              Terms
+            </Link>{" "}
+            and{" "}
+
+            <Link
+              href="/privacy"
+              className="
+                font-extrabold
+                text-[#1F5EA8]
+              "
+            >
+              Privacy Policy
+            </Link>
+            .
+          </span>
+        </label>
+
+        {/* ===================================================
+            SUBMIT
+        ==================================================== */}
+
+        <motion.button
+          type="submit"
+          disabled={
+            isLoading
+          }
+          whileHover={
+            isLoading
+              ? undefined
+              : {
+                  y: -2,
+                }
+          }
+          whileTap={
+            isLoading
+              ? undefined
+              : {
+                  scale: 0.985,
+                }
+          }
+          className="
+            group
+            relative
+            z-20
+            flex
+            h-[48px]
+            w-full
+            items-center
+            justify-center
+            gap-2
+            overflow-hidden
+            rounded-[14px]
+            bg-gradient-to-r
+            from-[#174F82]
+            via-[#1F5EA8]
+            to-[#287EC5]
+            text-xs
+            font-extrabold
+            text-white
+            shadow-[0_12px_27px_rgba(31,94,168,0.22)]
+            transition-all
+            hover:shadow-[0_17px_34px_rgba(31,94,168,0.28)]
+            disabled:cursor-not-allowed
+            disabled:opacity-60
+          "
+        >
+          {!isLoading && (
+            <span
+              className="
+                pointer-events-none
+                absolute
+                -left-12
+                top-0
+                h-full
+                w-16
+                -skew-x-12
+                bg-white/10
+                transition-transform
+                duration-700
+                group-hover:translate-x-[560px]
+              "
+            />
+          )}
+
+          {isLoading ? (
+            <>
+              <Loader2 className="relative h-4 w-4 animate-spin" />
+
+              <span className="relative">
+                Creating account...
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="relative">
+                Create Wallet
+              </span>
+
+              <ArrowRight className="relative h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </>
+          )}
+        </motion.button>
+      </motion.form>
+
+      {/* =====================================================
+          BOTTOM
+      ====================================================== */}
+
+      <p
+        className="
+          mt-4
+          text-center
+          text-[10px]
+          font-medium
+          text-[#778799]
+        "
+      >
+        Already have an account?{" "}
+
+        <Link
+          href="/login"
+          className="
+            font-extrabold
+            text-[#1F5EA8]
+            hover:text-[#17466F]
+          "
+        >
+          Sign in
+        </Link>
+      </p>
+
+      <div
+        className="
+          mt-3
+          flex
+          items-center
+          justify-center
+          gap-2
+          text-[9px]
+          font-semibold
+          text-[#9AA7B5]
+        "
+      >
+        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+
+        Secure digital wallet onboarding
+      </div>
     </div>
   );
 }
 
 /* =========================================================
-   NORMAL INPUT
+   INPUT FIELD
 ========================================================= */
 
 function InputField({
+  id,
+  name,
   label,
   value,
   onChange,
   placeholder,
   icon: Icon,
   type = "text",
+  inputMode,
+  autoComplete,
+  disabled = false,
 }: {
+  id: string;
+  name: string;
   label: string;
   value: string;
-  onChange: (value: string) => void;
+
+  onChange:
+    (
+      value: string
+    ) => void;
+
   placeholder: string;
-  icon: ElementType;
+
+  icon:
+    LucideIcon;
+
   type?: string;
+
+  inputMode?:
+    | "text"
+    | "email"
+    | "tel"
+    | "numeric"
+    | "decimal"
+    | "search"
+    | "url"
+    | "none";
+
+  autoComplete?: string;
+
+  disabled?: boolean;
 }) {
   return (
-    <div>
-      <label className="mb-2 block text-xs font-bold text-slate-700">
+    <div
+      className="
+        relative
+        z-20
+        pointer-events-auto
+      "
+    >
+      <label
+        htmlFor={id}
+        className="
+          mb-1.5
+          block
+          cursor-pointer
+          text-[9px]
+          font-extrabold
+          text-[#344A60]
+        "
+      >
         {label}
       </label>
 
-      <div className="relative">
-        <Icon className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+      <div className="group relative">
+        <Icon
+          className="
+            pointer-events-none
+            absolute
+            left-3.5
+            top-1/2
+            z-10
+            h-3.5
+            w-3.5
+            -translate-y-1/2
+            text-[#91A0B1]
+            transition-colors
+            group-focus-within:text-[#1F5EA8]
+          "
+        />
 
         <input
+          id={id}
+          name={name}
           type={type}
           value={value}
-          onChange={(e) =>
-            onChange(e.target.value)
+          onChange={(
+            event
+          ) =>
+            onChange(
+              event.target.value
+            )
           }
-          placeholder={placeholder}
+          placeholder={
+            placeholder
+          }
+          inputMode={
+            inputMode
+          }
+          autoComplete={
+            autoComplete
+          }
           required
-          className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+          disabled={
+            disabled
+          }
+          className="
+            relative
+            z-0
+            h-[44px]
+            w-full
+            rounded-[12px]
+            border
+            border-[#DBE5EE]
+            bg-[#F8FAFC]
+            pl-10
+            pr-3
+            text-[11px]
+            font-semibold
+            text-[#18334B]
+            outline-none
+            transition-all
+            placeholder:font-medium
+            placeholder:text-[#9EABBA]
+            hover:border-[#CBD9E7]
+            focus:border-[#3E8FD9]
+            focus:bg-white
+            focus:ring-4
+            focus:ring-blue-500/[0.07]
+            disabled:cursor-not-allowed
+            disabled:opacity-60
+          "
         />
       </div>
     </div>
@@ -712,60 +1183,166 @@ function InputField({
 }
 
 /* =========================================================
-   PASSWORD INPUT
+   PASSWORD FIELD
 ========================================================= */
 
 function PasswordField({
+  id,
+  name,
   label,
   value,
   onChange,
-  placeholder,
   visible,
   onToggle,
+  autoComplete,
+  disabled = false,
 }: {
+  id: string;
+  name: string;
   label: string;
   value: string;
-  onChange: (value: string) => void;
-  placeholder: string;
+
+  onChange:
+    (
+      value: string
+    ) => void;
+
   visible: boolean;
-  onToggle: () => void;
+
+  onToggle:
+    () => void;
+
+  autoComplete?: string;
+
+  disabled?: boolean;
 }) {
   return (
-    <div>
-      <label className="mb-2 block text-xs font-bold text-slate-700">
+    <div
+      className="
+        relative
+        z-20
+        pointer-events-auto
+      "
+    >
+      <label
+        htmlFor={id}
+        className="
+          mb-1.5
+          block
+          cursor-pointer
+          text-[9px]
+          font-extrabold
+          text-[#344A60]
+        "
+      >
         {label}
       </label>
 
-      <div className="relative">
-        <KeyRound className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-
-        <input
-          type={visible ? "text" : "password"}
-          value={value}
-          onChange={(e) =>
-            onChange(e.target.value)
-          }
-          placeholder={placeholder}
-          required
-          className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-11 text-sm font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+      <div className="group relative">
+        <KeyRound
+          className="
+            pointer-events-none
+            absolute
+            left-3.5
+            top-1/2
+            z-10
+            h-3.5
+            w-3.5
+            -translate-y-1/2
+            text-[#91A0B1]
+            transition-colors
+            group-focus-within:text-[#1F5EA8]
+          "
         />
 
-        <button
+        <input
+          id={id}
+          name={name}
+          type={
+            visible
+              ? "text"
+              : "password"
+          }
+          value={value}
+          onChange={(
+            event
+          ) =>
+            onChange(
+              event.target.value
+            )
+          }
+          placeholder="••••••••"
+          autoComplete={
+            autoComplete
+          }
+          required
+          disabled={
+            disabled
+          }
+          className="
+            h-[44px]
+            w-full
+            rounded-[12px]
+            border
+            border-[#DBE5EE]
+            bg-[#F8FAFC]
+            pl-10
+            pr-10
+            text-[11px]
+            font-semibold
+            text-[#18334B]
+            outline-none
+            transition-all
+            focus:border-[#3E8FD9]
+            focus:bg-white
+            focus:ring-4
+            focus:ring-blue-500/[0.07]
+            disabled:cursor-not-allowed
+            disabled:opacity-60
+          "
+        />
+
+        <motion.button
           type="button"
-          onClick={onToggle}
+          disabled={
+            disabled
+          }
+          whileTap={{
+            scale: 0.86,
+          }}
+          onClick={
+            onToggle
+          }
           aria-label={
             visible
-              ? "Hide password"
-              : "Show password"
+              ? `Hide ${label}`
+              : `Show ${label}`
           }
-          className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors hover:text-slate-600"
+          className="
+            absolute
+            right-2.5
+            top-1/2
+            z-20
+            flex
+            h-7
+            w-7
+            -translate-y-1/2
+            items-center
+            justify-center
+            rounded-lg
+            text-[#91A0B1]
+            transition-all
+            hover:bg-blue-50
+            hover:text-[#1F5EA8]
+            disabled:pointer-events-none
+          "
         >
           {visible ? (
-            <EyeOff className="h-4 w-4" />
+            <EyeOff className="h-3.5 w-3.5" />
           ) : (
-            <Eye className="h-4 w-4" />
+            <Eye className="h-3.5 w-3.5" />
           )}
-        </button>
+        </motion.button>
       </div>
     </div>
   );

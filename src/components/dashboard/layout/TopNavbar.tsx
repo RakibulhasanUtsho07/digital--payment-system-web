@@ -1,10 +1,11 @@
 "use client";
 
-import React, {
+import {
   useEffect,
   useMemo,
   useRef,
   useState,
+  type ElementType,
 } from "react";
 
 import {
@@ -20,9 +21,7 @@ import {
 import {
   Activity,
   ArrowLeftRight,
-  ArrowUpRight,
   Bell,
-  BrainCircuit,
   ChevronDown,
   CircleUserRound,
   Command,
@@ -33,7 +32,6 @@ import {
   Search,
   Settings,
   ShieldCheck,
-  Sparkles,
   Users,
   WalletCards,
   X,
@@ -49,29 +47,17 @@ type UserRole =
 
 interface TopNavbarProps {
   onMenuClick: () => void;
-
   userName: string;
-
   userEmail?: string;
-
   userRole: UserRole;
 }
 
 interface SearchItem {
   id: string;
-
   title: string;
-
-  description: string;
-
   href: string;
-
-  icon: React.ElementType;
-
-  category: string;
-
-  roles?:
-    UserRole[];
+  icon: ElementType;
+  roles?: UserRole[];
 }
 
 /* =========================================================
@@ -81,208 +67,88 @@ interface SearchItem {
 const searchItems: SearchItem[] = [
   {
     id: "dashboard",
-
-    title:
-      "Dashboard Overview",
-
-    description:
-      "View wallet activity, account insights and financial overview.",
-
-    href:
-      "/dashboard",
-
-    icon:
-      LayoutDashboard,
-
-    category:
-      "Dashboard",
+    title: "Dashboard Overview",
+    href: "/dashboard",
+    icon: LayoutDashboard,
   },
 
   {
     id: "wallet",
-
-    title:
-      "Wallet",
-
-    description:
-      "View wallet balance and account information.",
-
-    href:
-      "/dashboard/wallet",
-
-    icon:
-      WalletCards,
-
-    category:
-      "Finance",
-
-    roles: [
-      "user",
-    ],
+    title: "Wallet",
+    href: "/dashboard/wallet",
+    icon: WalletCards,
+    roles: ["user"],
   },
 
   {
     id: "transactions",
+    title: "Transactions",
+    href: "/dashboard/transactions",
+    icon: ArrowLeftRight,
+    roles: ["user"],
+  },
 
-    title:
-      "Transactions",
-
-    description:
-      "Explore wallet transaction history and activity.",
-
-    href:
-      "/dashboard/transactions",
-
-    icon:
-      ArrowLeftRight,
-
-    category:
-      "Finance",
+  {
+    id: "all-transactions",
+    title: "System Transactions",
+    href: "/dashboard/all-transactions",
+    icon: ArrowLeftRight,
+    roles: ["admin"],
   },
 
   {
     id: "users",
-
-    title:
-      "User Management",
-
-    description:
-      "Manage platform users and account statuses.",
-
-    href:
-      "/dashboard/users",
-
-    icon:
-      Users,
-
-    category:
-      "Administration",
-
-    roles: [
-      "admin",
-    ],
+    title: "User Management",
+    href: "/dashboard/users",
+    icon: Users,
+    roles: ["admin"],
   },
 
   {
     id: "kyc",
-
-    title:
-      "KYC Verification",
-
-    description:
-      "Manage identity verification and KYC information.",
-
-    href:
-      "/dashboard/kyc",
-
-    icon:
-      FileCheck2,
-
-    category:
-      "Security",
+    title: "KYC Verification",
+    href: "/dashboard/kyc",
+    icon: FileCheck2,
+    roles: ["user"],
   },
 
   {
     id: "kyc-requests",
-
-    title:
-      "KYC Requests",
-
-    description:
-      "Review customer verification requests.",
-
-    href:
-      "/dashboard/kyc-requests",
-
-    icon:
-      ShieldCheck,
-
-    category:
-      "Administration",
-
-    roles: [
-      "admin",
-    ],
+    title: "KYC Approvals",
+    href: "/dashboard/kyc-requests",
+    icon: ShieldCheck,
+    roles: ["admin"],
   },
 
   {
-    id: "ai",
-
-    title:
-      "AI Insights",
-
-    description:
-      "Explore intelligent financial and platform insights.",
-
-    href:
-      "/dashboard/insights",
-
-    icon:
-      BrainCircuit,
-
-    category:
-      "Intelligence",
+    id: "analytics",
+    title: "Analytics & Reports",
+    href: "/dashboard/analytics",
+    icon: Activity,
+    roles: ["admin"],
   },
 
   {
     id: "logs",
-
-    title:
-      "System Logs",
-
-    description:
-      "Monitor system activity and operational events.",
-
-    href:
-      "/dashboard/logs",
-
-    icon:
-      Activity,
-
-    category:
-      "System",
-
-    roles: [
-      "admin",
-    ],
+    title: "System Logs",
+    href: "/dashboard/logs",
+    icon: Activity,
+    roles: ["admin"],
   },
 
   {
     id: "receipts",
-
-    title:
-      "Receipts",
-
-    description:
-      "View payment and transaction receipts.",
-
-    href:
-      "/dashboard/receipts",
-
-    icon:
-      ReceiptText,
-
-    category:
-      "Finance",
+    title: "Receipts",
+    href: "/dashboard/receipts",
+    icon: ReceiptText,
+    roles: ["user"],
   },
 
   {
     id: "settings",
-
-    title:
-      "Settings",
-
-    description:
-      "Manage account and application preferences.",
-
-    href:
-      "/dashboard/settings",
-
-    icon:
-      Settings,
-
-    category:
-      "Account",
+    title: "Settings",
+    href: "/dashboard/settings",
+    icon: Settings,
   },
 ];
 
@@ -303,6 +169,9 @@ const pageTitles: Record<
   "/dashboard/transactions":
     "Transactions",
 
+  "/dashboard/all-transactions":
+    "System Transactions",
+
   "/dashboard/users":
     "User Management",
 
@@ -311,6 +180,9 @@ const pageTitles: Record<
 
   "/dashboard/kyc-requests":
     "KYC Management",
+
+  "/dashboard/analytics":
+    "Analytics & Reports",
 
   "/dashboard/insights":
     "AI Insights",
@@ -329,7 +201,7 @@ const pageTitles: Record<
 };
 
 /* =========================================================
-   TOP NAVBAR
+   COMPONENT
 ========================================================= */
 
 export default function TopNavbar({
@@ -365,12 +237,21 @@ export default function TopNavbar({
   ] = useState(false);
 
   /* =========================================================
-     CURRENT PAGE
+     PAGE TITLE
   ========================================================== */
 
   const currentPageTitle =
     pageTitles[pathname] ||
     "Dashboard";
+
+  /* =========================================================
+     ROLE LABEL
+  ========================================================== */
+
+  const roleLabel =
+    userRole === "admin"
+      ? "Administrator"
+      : "Wallet User";
 
   /* =========================================================
      SEARCH RESULTS
@@ -393,29 +274,17 @@ export default function TopNavbar({
         );
 
       if (!query) {
-        return allowedItems;
+        return allowedItems.slice(
+          0,
+          6
+        );
       }
 
       return allowedItems.filter(
-        (item) => {
-          return (
-            item.title
-              .toLowerCase()
-              .includes(
-                query
-              ) ||
-            item.description
-              .toLowerCase()
-              .includes(
-                query
-              ) ||
-            item.category
-              .toLowerCase()
-              .includes(
-                query
-              )
-          );
-        }
+        (item) =>
+          item.title
+            .toLowerCase()
+            .includes(query)
       );
     }, [
       searchQuery,
@@ -423,35 +292,29 @@ export default function TopNavbar({
     ]);
 
   /* =========================================================
-     SEARCH CONTROLS
+     SEARCH OPEN
   ========================================================== */
 
-  const openSearch =
-    () => {
-      setSearchOpen(
-        true
-      );
+  const openSearch = () => {
+    setSearchOpen(true);
+    setProfileOpen(false);
+  };
 
-      setProfileOpen(
-        false
-      );
-    };
+  /* =========================================================
+     SEARCH CLOSE
+  ========================================================== */
 
-  const closeSearch =
-    () => {
-      setSearchOpen(
-        false
-      );
+  const closeSearch = () => {
+    setSearchOpen(false);
+    setSearchQuery("");
+  };
 
-      setSearchQuery(
-        ""
-      );
-    };
+  /* =========================================================
+     NAVIGATE
+  ========================================================== */
 
-  const handleNavigate =
-    (
-      href: string
-    ) => {
+  const navigateTo =
+    (href: string) => {
       closeSearch();
 
       router.push(
@@ -483,26 +346,16 @@ export default function TopNavbar({
               !current
           );
 
-          setProfileOpen(
-            false
-          );
+          setProfileOpen(false);
         }
 
         if (
           event.key ===
           "Escape"
         ) {
-          setSearchOpen(
-            false
-          );
-
-          setSearchQuery(
-            ""
-          );
-
-          setProfileOpen(
-            false
-          );
+          setSearchOpen(false);
+          setSearchQuery("");
+          setProfileOpen(false);
         }
       };
 
@@ -520,7 +373,7 @@ export default function TopNavbar({
   }, []);
 
   /* =========================================================
-     AUTOFOCUS
+     AUTO FOCUS
   ========================================================== */
 
   useEffect(() => {
@@ -536,44 +389,36 @@ export default function TopNavbar({
         100
       );
 
-    return () =>
+    return () => {
       window.clearTimeout(
         timer
       );
+    };
   }, [
     searchOpen,
   ]);
 
   /* =========================================================
-     USER LABEL
-  ========================================================== */
-
-  const roleLabel =
-    userRole === "admin"
-      ? "Administrator"
-      : "Wallet User";
-
-  /* =========================================================
-     RETURN
+     UI
   ========================================================== */
 
   return (
     <>
       {/* =====================================================
-          NAVBAR
+          TOP NAVBAR
       ====================================================== */}
 
       <motion.header
         initial={{
           opacity: 0,
-          y: -16,
+          y: -10,
         }}
         animate={{
           opacity: 1,
           y: 0,
         }}
         transition={{
-          duration: 0.5,
+          duration: 0.4,
           ease: [
             0.22,
             1,
@@ -587,404 +432,237 @@ export default function TopNavbar({
           z-30
 
           flex
-          h-[76px]
+          h-[74px]
           shrink-0
           items-center
-          justify-between
-          gap-3
 
           border-b
           border-[#E5ECF4]
 
-          bg-white/85
+          bg-white/95
 
-          px-3
-          backdrop-blur-2xl
+          px-4
+
+          backdrop-blur-xl
 
           sm:px-5
           lg:px-7
         "
       >
-        {/* ===================================================
-            LEFT
-        ==================================================== */}
-
-        <div className="flex min-w-0 items-center gap-3">
-          {/* MOBILE MENU */}
-
-          <motion.button
-            type="button"
-            aria-label="Open sidebar"
-            onClick={
-              onMenuClick
-            }
-            whileTap={{
-              scale: 0.9,
-            }}
-            className="
-              flex
-              h-10
-              w-10
-              shrink-0
-              items-center
-              justify-center
-
-              rounded-xl
-              border
-              border-[#DCE5EE]
-
-              bg-white
-
-              text-[#405169]
-
-              shadow-sm
-
-              transition-all
-
-              hover:border-[#BFD3E8]
-              hover:bg-[#F3F8FD]
-              hover:text-[#1F5EA8]
-
-              lg:hidden
-            "
-          >
-            <Menu className="h-[18px] w-[18px]" />
-          </motion.button>
-
-          {/* TITLE */}
-
-          <div className="min-w-0">
-            <div className="hidden items-center gap-2 sm:flex">
-              <span className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#8A9AAF]">
-                Digital Wallet
-              </span>
-
-              <span className="h-1 w-1 rounded-full bg-[#C7D3DF]" />
-
-              <span className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#1F5EA8]">
-                {userRole ===
-                "admin"
-                  ? "Control Center"
-                  : "My Wallet"}
-              </span>
-            </div>
-
-            <h1 className="mt-0.5 truncate text-sm font-extrabold tracking-tight text-[#102A43] sm:text-base">
-              {
-                currentPageTitle
-              }
-            </h1>
-          </div>
-        </div>
-
-        {/* ===================================================
-            DESKTOP SEARCH
-        ==================================================== */}
-
-        <motion.button
-          type="button"
-          onClick={
-            openSearch
-          }
-          whileHover={{
-            scale: 1.008,
-          }}
-          whileTap={{
-            scale: 0.99,
-          }}
+        <div
           className="
-            group
-
-            hidden
-            h-[44px]
+            flex
             w-full
-            max-w-[460px]
+            min-w-0
             items-center
-            gap-3
+            gap-4
 
-            rounded-2xl
-
-            border
-            border-[#DEE7F0]
-
-            bg-[#F7F9FC]
-
-            px-3
-
-            text-left
-
-            shadow-[0_5px_20px_rgba(15,39,69,0.035)]
-
-            transition-all
-
-            hover:border-[#BDD7F2]
-            hover:bg-white
-            hover:shadow-[0_10px_30px_rgba(31,94,168,0.08)]
-
-            md:flex
+            xl:gap-6
           "
         >
-          <div
-            className="
-              flex
-              h-8
-              w-8
-              shrink-0
-              items-center
-              justify-center
-
-              rounded-xl
-
-              bg-white
-
-              text-[#8797AA]
-
-              shadow-sm
-
-              transition-all
-
-              group-hover:bg-[#EEF5FC]
-              group-hover:text-[#1F5EA8]
-            "
-          >
-            <Search className="h-4 w-4" />
-          </div>
-
-          <span className="min-w-0 flex-1 truncate text-xs font-medium text-[#8C9BAE]">
-            Search transactions,
-            users, wallet,
-            settings...
-          </span>
+          {/* =================================================
+              LEFT
+          ================================================== */}
 
           <div
             className="
               flex
+              min-w-0
               shrink-0
               items-center
-              gap-1
+              gap-3
 
-              rounded-lg
-
-              border
-              border-[#E2E8F0]
-
-              bg-white
-
-              px-2
-              py-1
-
-              text-[9px]
-              font-extrabold
-              text-[#8695A8]
-
-              shadow-sm
+              lg:w-[190px]
+              xl:w-[210px]
             "
           >
-            <Command className="h-3 w-3" />
+            {/* MOBILE MENU */}
 
-            <span>K</span>
-          </div>
-        </motion.button>
-
-        {/* ===================================================
-            RIGHT
-        ==================================================== */}
-
-        <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
-
-          {/* MOBILE SEARCH */}
-
-          <motion.button
-            type="button"
-            onClick={
-              openSearch
-            }
-            whileTap={{
-              scale: 0.9,
-            }}
-            className="
-              flex
-              h-10
-              w-10
-              items-center
-              justify-center
-
-              rounded-xl
-              border
-              border-[#DCE5EE]
-
-              bg-white
-
-              text-[#60738A]
-
-              shadow-sm
-
-              transition-all
-
-              hover:border-[#BDD7F2]
-              hover:text-[#1F5EA8]
-
-              md:hidden
-            "
-          >
-            <Search className="h-4 w-4" />
-          </motion.button>
-
-          {/* AI INSIGHTS */}
-
-          <motion.button
-            type="button"
-            whileHover={{
-              y: -2,
-            }}
-            whileTap={{
-              scale: 0.95,
-            }}
-            onClick={() =>
-              router.push(
-                "/dashboard/insights"
-              )
-            }
-            className="
-              hidden
-              h-10
-              items-center
-              gap-1.5
-
-              rounded-xl
-
-              border
-              border-[#D9EAFE]
-
-              bg-[#EFF7FF]
-
-              px-3
-
-              text-[10px]
-              font-extrabold
-              text-[#1F5EA8]
-
-              transition-all
-
-              hover:border-[#BFDDFB]
-              hover:bg-[#E6F2FF]
-
-              sm:flex
-            "
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-
-            AI Insights
-          </motion.button>
-
-          {/* NOTIFICATION */}
-
-          <motion.button
-            type="button"
-            aria-label="Notifications"
-            whileHover={{
-              y: -2,
-            }}
-            whileTap={{
-              scale: 0.92,
-            }}
-            onClick={() =>
-              router.push(
-                "/dashboard/notifications"
-              )
-            }
-            className="
-              relative
-
-              flex
-              h-10
-              w-10
-              items-center
-              justify-center
-
-              rounded-xl
-
-              border
-              border-[#DCE5EE]
-
-              bg-white
-
-              text-[#60738A]
-
-              shadow-sm
-
-              transition-all
-
-              hover:border-[#BDD7F2]
-              hover:text-[#1F5EA8]
-            "
-          >
-            <Bell className="h-4 w-4" />
-
-            <span
-              className="
-                absolute
-                right-[8px]
-                top-[7px]
-
-                h-[7px]
-                w-[7px]
-
-                rounded-full
-
-                border
-                border-white
-
-                bg-rose-500
-              "
-            >
-              <span className="absolute inset-0 animate-ping rounded-full bg-rose-400 opacity-50" />
-            </span>
-          </motion.button>
-
-          {/* PROFILE */}
-
-          <div className="relative">
             <motion.button
               type="button"
+              aria-label="Open sidebar"
+              onClick={
+                onMenuClick
+              }
               whileTap={{
-                scale: 0.97,
-              }}
-              onClick={() => {
-                setProfileOpen(
-                  (current) =>
-                    !current
-                );
-
-                setSearchOpen(
-                  false
-                );
+                scale: 0.92,
               }}
               className="
                 flex
-                h-11
+                h-10
+                w-10
+                shrink-0
                 items-center
-                gap-2
+                justify-center
 
-                rounded-2xl
+                rounded-xl
 
                 border
-                border-[#DCE5EE]
+                border-[#DDE6EF]
 
                 bg-white
 
-                p-1.5
-                pr-2.5
+                text-[#52677D]
 
-                shadow-sm
+                shadow-[0_3px_10px_rgba(15,39,69,0.04)]
 
                 transition-all
 
-                hover:border-[#BFD3E8]
-                hover:shadow-[0_8px_24px_rgba(31,94,168,0.08)]
+                hover:border-[#BAD3EA]
+                hover:bg-[#F4F9FE]
+                hover:text-[#1F5EA8]
+
+                lg:hidden
+              "
+            >
+              <Menu
+                className="
+                  h-[18px]
+                  w-[18px]
+                "
+              />
+            </motion.button>
+
+            {/* PAGE INFO */}
+
+            <div
+              className="
+                min-w-0
               "
             >
               <div
+                className="
+                  hidden
+                  items-center
+                  gap-2
+
+                  sm:flex
+                "
+              >
+                <span
+                  className="
+                    whitespace-nowrap
+
+                    text-[9px]
+                    font-extrabold
+                    uppercase
+
+                    tracking-[0.17em]
+
+                    text-[#8798AC]
+                  "
+                >
+                  Digital Wallet
+                </span>
+
+                <span
+                  className="
+                    h-1
+                    w-1
+                    shrink-0
+
+                    rounded-full
+
+                    bg-[#CBD7E2]
+                  "
+                />
+
+                <span
+                  className="
+                    whitespace-nowrap
+
+                    text-[9px]
+                    font-extrabold
+                    uppercase
+
+                    tracking-[0.17em]
+
+                    text-[#226AB0]
+                  "
+                >
+                  {userRole ===
+                  "admin"
+                    ? "Control Center"
+                    : "My Wallet"}
+                </span>
+              </div>
+
+              <h1
+                className="
+                  mt-[3px]
+
+                  truncate
+
+                  text-[15px]
+                  font-extrabold
+
+                  tracking-[-0.025em]
+
+                  text-[#122F49]
+
+                  sm:text-[16px]
+                "
+              >
+                {currentPageTitle}
+              </h1>
+            </div>
+          </div>
+
+          {/* =================================================
+              CENTER SEARCH
+          ================================================== */}
+
+          <div
+            className="
+              hidden
+              min-w-0
+              flex-1
+              justify-center
+
+              md:flex
+            "
+          >
+            <motion.button
+              type="button"
+              onClick={
+                openSearch
+              }
+              whileTap={{
+                scale: 0.995,
+              }}
+              className="
+                group
+
+                flex
+                h-[44px]
+                w-full
+                max-w-[540px]
+                items-center
+                gap-3
+
+                rounded-[16px]
+
+                border
+                border-[#DFE8F1]
+
+                bg-[#F8FAFC]
+
+                px-3
+
+                text-left
+
+                shadow-[0_3px_14px_rgba(20,48,78,0.035)]
+
+                transition-all
+                duration-200
+
+                hover:border-[#C6DBEF]
+                hover:bg-white
+
+                hover:shadow-[0_8px_25px_rgba(31,94,168,0.07)]
+              "
+            >
+              <span
                 className="
                   flex
                   h-8
@@ -993,199 +671,611 @@ export default function TopNavbar({
                   items-center
                   justify-center
 
-                  rounded-xl
+                  rounded-[11px]
 
-                  bg-gradient-to-br
-                  from-[#102A43]
-                  via-[#174F82]
-                  to-[#2683D8]
+                  border
+                  border-[#E5EBF1]
 
-                  text-white
+                  bg-white
 
-                  shadow-[0_5px_14px_rgba(31,94,168,0.22)]
+                  text-[#8293A6]
+
+                  shadow-[0_2px_6px_rgba(15,39,69,0.04)]
+
+                  transition
+
+                  group-hover:text-[#1F5EA8]
                 "
               >
-                <CircleUserRound className="h-4 w-4" />
-              </div>
+                <Search
+                  className="
+                    h-[16px]
+                    w-[16px]
+                  "
+                />
+              </span>
 
-              <div className="hidden max-w-[125px] text-left lg:block">
-                <p className="truncate text-[10px] font-extrabold text-[#253A50]">
-                  {userName}
-                </p>
+              <span
+                className="
+                  min-w-0
+                  flex-1
+                  truncate
 
-                <p className="mt-[1px] text-[8px] font-bold uppercase tracking-wider text-[#94A3B8]">
-                  {roleLabel}
-                </p>
-              </div>
+                  text-[12px]
+                  font-medium
 
-              <ChevronDown
-                className={`
-                  hidden
-                  h-3.5
-                  w-3.5
-                  text-[#94A3B8]
+                  text-[#91A0B1]
+                "
+              >
+                Search transactions,
+                users, wallet,
+                settings...
+              </span>
 
-                  transition-transform
-                  duration-200
+              <span
+                className="
+                  flex
+                  shrink-0
+                  items-center
+                  gap-1
 
-                  lg:block
+                  rounded-[8px]
 
-                  ${
-                    profileOpen
-                      ? "rotate-180"
-                      : ""
-                  }
-                `}
+                  border
+                  border-[#E0E7EE]
+
+                  bg-white
+
+                  px-2
+                  py-1
+
+                  text-[9px]
+                  font-bold
+
+                  text-[#8B9AAC]
+
+                  shadow-sm
+                "
+              >
+                <Command
+                  className="
+                    h-3
+                    w-3
+                  "
+                />
+
+                K
+              </span>
+            </motion.button>
+          </div>
+
+          {/* =================================================
+              RIGHT
+          ================================================== */}
+
+          <div
+            className="
+              ml-auto
+
+              flex
+              shrink-0
+              items-center
+              gap-2
+            "
+          >
+            {/* MOBILE SEARCH */}
+
+            <motion.button
+              type="button"
+              aria-label="Search"
+              onClick={
+                openSearch
+              }
+              whileTap={{
+                scale: 0.92,
+              }}
+              className="
+                flex
+                h-10
+                w-10
+                items-center
+                justify-center
+
+                rounded-xl
+
+                border
+                border-[#DDE6EF]
+
+                bg-white
+
+                text-[#61768B]
+
+                transition-all
+
+                hover:border-[#BDD5EA]
+                hover:text-[#1F5EA8]
+
+                md:hidden
+              "
+            >
+              <Search
+                className="
+                  h-[17px]
+                  w-[17px]
+                "
               />
             </motion.button>
 
-            {/* PROFILE DROPDOWN */}
+            {/* ===============================================
+                AI INSIGHTS
+                NO ICON
+            =============================================== */}
 
-            <AnimatePresence>
-              {profileOpen && (
-                <>
-                  <button
-                    type="button"
-                    aria-label="Close profile menu"
-                    onClick={() =>
-                      setProfileOpen(
-                        false
-                      )
-                    }
-                    className="fixed inset-0 z-40 cursor-default"
-                  />
+            <motion.button
+              type="button"
+              onClick={() =>
+                router.push(
+                  "/dashboard/insights"
+                )
+              }
+              whileTap={{
+                scale: 0.96,
+              }}
+              className="
+                hidden
+                h-10
+                items-center
+                justify-center
 
-                  <motion.div
-                    initial={{
-                      opacity: 0,
-                      y: 10,
-                      scale: 0.96,
-                    }}
-                    animate={{
-                      opacity: 1,
-                      y: 0,
-                      scale: 1,
-                    }}
-                    exit={{
-                      opacity: 0,
-                      y: 8,
-                      scale: 0.97,
-                    }}
-                    transition={{
-                      duration: 0.18,
-                    }}
+                rounded-[13px]
+
+                border
+                border-[#CCE2F7]
+
+                bg-[#F0F7FE]
+
+                px-4
+
+                text-[10px]
+                font-extrabold
+
+                text-[#2168A8]
+
+                shadow-[0_3px_12px_rgba(31,94,168,0.035)]
+
+                transition-all
+                duration-200
+
+                hover:border-[#B6D5F2]
+                hover:bg-[#E8F4FF]
+
+                sm:flex
+              "
+            >
+              AI Insights
+            </motion.button>
+
+            {/* ===============================================
+                NOTIFICATION
+            =============================================== */}
+
+            <motion.button
+              type="button"
+              aria-label="Notifications"
+              onClick={() =>
+                router.push(
+                  "/dashboard/notifications"
+                )
+              }
+              whileTap={{
+                scale: 0.92,
+              }}
+              className="
+                relative
+
+                flex
+                h-10
+                w-10
+                items-center
+                justify-center
+
+                rounded-[13px]
+
+                border
+                border-[#DDE6EF]
+
+                bg-white
+
+                text-[#60758A]
+
+                shadow-[0_3px_10px_rgba(15,39,69,0.035)]
+
+                transition-all
+                duration-200
+
+                hover:border-[#BDD5EA]
+                hover:bg-[#F8FBFE]
+                hover:text-[#1F5EA8]
+              "
+            >
+              <Bell
+                className="
+                  h-[16px]
+                  w-[16px]
+                "
+              />
+
+              <span
+                className="
+                  absolute
+                  right-[8px]
+                  top-[7px]
+
+                  h-[6px]
+                  w-[6px]
+
+                  rounded-full
+
+                  bg-rose-500
+
+                  ring-2
+                  ring-white
+                "
+              />
+            </motion.button>
+
+            {/* ===============================================
+                PROFILE
+            =============================================== */}
+
+            <div
+              className="
+                relative
+              "
+            >
+              <motion.button
+                type="button"
+                onClick={() => {
+                  setProfileOpen(
+                    (current) =>
+                      !current
+                  );
+
+                  setSearchOpen(
+                    false
+                  );
+                }}
+                whileTap={{
+                  scale: 0.98,
+                }}
+                className="
+                  flex
+                  h-[44px]
+                  items-center
+                  gap-2
+
+                  rounded-[15px]
+
+                  border
+                  border-[#DDE6EF]
+
+                  bg-white
+
+                  p-[5px]
+                  pr-2.5
+
+                  shadow-[0_3px_12px_rgba(15,39,69,0.045)]
+
+                  transition-all
+                  duration-200
+
+                  hover:border-[#BCD3E8]
+
+                  hover:shadow-[0_7px_20px_rgba(31,94,168,0.07)]
+                "
+              >
+                <div
+                  className="
+                    flex
+                    h-[34px]
+                    w-[34px]
+                    shrink-0
+                    items-center
+                    justify-center
+
+                    rounded-[11px]
+
+                    bg-[#155485]
+
+                    text-white
+
+                    shadow-[0_4px_12px_rgba(21,84,133,0.18)]
+                  "
+                >
+                  <CircleUserRound
                     className="
-                      absolute
-                      right-0
-                      top-[54px]
-                      z-50
+                      h-[17px]
+                      w-[17px]
+                    "
+                  />
+                </div>
 
-                      w-[250px]
+                <div
+                  className="
+                    hidden
+                    max-w-[120px]
+                    text-left
 
-                      overflow-hidden
+                    lg:block
+                  "
+                >
+                  <p
+                    className="
+                      truncate
 
-                      rounded-[20px]
+                      text-[10px]
+                      font-extrabold
 
-                      border
-                      border-[#E2EAF2]
-
-                      bg-white
-
-                      p-2
-
-                      shadow-[0_25px_70px_rgba(15,39,69,0.18)]
+                      text-[#263C52]
                     "
                   >
-                    <div className="rounded-2xl bg-[#F5F8FC] p-3.5">
-                      <div className="flex items-center gap-3">
+                    {userName}
+                  </p>
+
+                  <p
+                    className="
+                      mt-[1px]
+
+                      text-[7.5px]
+                      font-extrabold
+                      uppercase
+
+                      tracking-[0.08em]
+
+                      text-[#9AA8B7]
+                    "
+                  >
+                    {roleLabel}
+                  </p>
+                </div>
+
+                <ChevronDown
+                  className={`
+                    hidden
+                    h-[14px]
+                    w-[14px]
+
+                    text-[#93A2B2]
+
+                    transition-transform
+                    duration-200
+
+                    lg:block
+
+                    ${
+                      profileOpen
+                        ? "rotate-180"
+                        : ""
+                    }
+                  `}
+                />
+              </motion.button>
+
+              {/* =============================================
+                  PROFILE DROPDOWN
+              ============================================== */}
+
+              <AnimatePresence>
+                {profileOpen && (
+                  <>
+                    <button
+                      type="button"
+                      aria-label="Close profile menu"
+                      onClick={() =>
+                        setProfileOpen(
+                          false
+                        )
+                      }
+                      className="
+                        fixed
+                        inset-0
+                        z-40
+
+                        cursor-default
+                      "
+                    />
+
+                    <motion.div
+                      initial={{
+                        opacity: 0,
+                        y: 8,
+                        scale: 0.97,
+                      }}
+                      animate={{
+                        opacity: 1,
+                        y: 0,
+                        scale: 1,
+                      }}
+                      exit={{
+                        opacity: 0,
+                        y: 6,
+                        scale: 0.98,
+                      }}
+                      transition={{
+                        duration: 0.16,
+                      }}
+                      className="
+                        absolute
+                        right-0
+                        top-[52px]
+                        z-50
+
+                        w-[240px]
+
+                        overflow-hidden
+
+                        rounded-[18px]
+
+                        border
+                        border-[#E2EAF2]
+
+                        bg-white
+
+                        p-2
+
+                        shadow-[0_22px_60px_rgba(15,39,69,0.16)]
+                      "
+                    >
+                      <div
+                        className="
+                          rounded-[14px]
+
+                          bg-[#F6F9FC]
+
+                          p-3
+                        "
+                      >
                         <div
                           className="
                             flex
-                            h-10
-                            w-10
-                            shrink-0
                             items-center
-                            justify-center
-
-                            rounded-xl
-
-                            bg-gradient-to-br
-                            from-[#102A43]
-                            to-[#247AC4]
-
-                            text-white
+                            gap-3
                           "
                         >
-                          <CircleUserRound className="h-[18px] w-[18px]" />
-                        </div>
+                          <div
+                            className="
+                              flex
+                              h-9
+                              w-9
+                              shrink-0
+                              items-center
+                              justify-center
 
-                        <div className="min-w-0">
-                          <p className="truncate text-xs font-extrabold text-[#102A43]">
-                            {userName}
-                          </p>
+                              rounded-[11px]
 
-                          {userEmail && (
-                            <p className="mt-0.5 truncate text-[9px] font-medium text-[#8392A5]">
-                              {userEmail}
+                              bg-[#155485]
+
+                              text-white
+                            "
+                          >
+                            <CircleUserRound
+                              className="
+                                h-[17px]
+                                w-[17px]
+                              "
+                            />
+                          </div>
+
+                          <div
+                            className="
+                              min-w-0
+                            "
+                          >
+                            <p
+                              className="
+                                truncate
+
+                                text-[11px]
+                                font-extrabold
+
+                                text-[#18324A]
+                              "
+                            >
+                              {userName}
                             </p>
-                          )}
 
-                          <p className="mt-1 text-[8px] font-extrabold uppercase tracking-[0.12em] text-[#1F5EA8]">
-                            {roleLabel}
-                          </p>
+                            {userEmail && (
+                              <p
+                                className="
+                                  mt-0.5
+                                  truncate
+
+                                  text-[9px]
+
+                                  text-[#8797A8]
+                                "
+                              >
+                                {
+                                  userEmail
+                                }
+                              </p>
+                            )}
+
+                            <p
+                              className="
+                                mt-1
+
+                                text-[8px]
+                                font-extrabold
+                                uppercase
+
+                                tracking-[0.1em]
+
+                                text-[#2A72B5]
+                              "
+                            >
+                              {roleLabel}
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setProfileOpen(
-                          false
-                        );
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setProfileOpen(
+                            false
+                          );
 
-                        router.push(
-                          "/dashboard/settings"
-                        );
-                      }}
-                      className="
-                        mt-1
+                          router.push(
+                            "/dashboard/settings"
+                          );
+                        }}
+                        className="
+                          mt-1
 
-                        flex
-                        w-full
-                        items-center
-                        justify-between
+                          flex
+                          w-full
+                          items-center
+                          gap-2
 
-                        rounded-xl
+                          rounded-[12px]
 
-                        px-3
-                        py-2.5
+                          px-3
+                          py-2.5
 
-                        text-left
-                        text-xs
-                        font-bold
-                        text-[#526579]
+                          text-left
+                          text-[11px]
+                          font-bold
 
-                        transition-all
+                          text-[#53687C]
 
-                        hover:bg-[#F5F8FC]
-                        hover:text-[#1F5EA8]
-                      "
-                    >
-                      Account Settings
+                          transition
 
-                      <ArrowUpRight className="h-3.5 w-3.5" />
-                    </button>
-                  </motion.div>
-                </>
-              )}
-            </AnimatePresence>
+                          hover:bg-[#F4F8FC]
+                          hover:text-[#1F5EA8]
+                        "
+                      >
+                        <Settings
+                          className="
+                            h-[15px]
+                            w-[15px]
+                          "
+                        />
+
+                        Account Settings
+                      </button>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
       </motion.header>
 
       {/* =====================================================
-          SEARCH MODAL
+          SIMPLE SEARCH MODAL
       ====================================================== */}
 
       <AnimatePresence>
@@ -1212,73 +1302,41 @@ export default function TopNavbar({
               items-start
               justify-center
 
-              bg-[#061525]/55
+              bg-[#09192A]/40
 
               px-3
-              pt-[8vh]
+              pt-[12vh]
 
-              backdrop-blur-md
+              backdrop-blur-[5px]
 
               sm:px-5
-              sm:pt-[11vh]
+              sm:pt-[14vh]
             "
           >
-            {/* BACKGROUND GLOW */}
-
             <motion.div
               initial={{
                 opacity: 0,
-                scale: 0.7,
-              }}
-              animate={{
-                opacity: 1,
-                scale: 1,
-              }}
-              className="
-                pointer-events-none
-
-                absolute
-                left-1/2
-                top-[4%]
-
-                h-[350px]
-                w-[90%]
-                max-w-[650px]
-
-                -translate-x-1/2
-
-                rounded-full
-
-                bg-[#2587E8]/15
-
-                blur-[110px]
-              "
-            />
-
-            {/* MODAL */}
-
-            <motion.div
-              initial={{
-                opacity: 0,
-                y: 55,
-                scale: 0.92,
-                rotateX: -8,
+                y: 22,
+                scale: 0.97,
               }}
               animate={{
                 opacity: 1,
                 y: 0,
                 scale: 1,
-                rotateX: 0,
               }}
               exit={{
                 opacity: 0,
-                y: 30,
-                scale: 0.95,
+                y: 14,
+                scale: 0.98,
               }}
               transition={{
-                type: "spring",
-                stiffness: 270,
-                damping: 25,
+                duration: 0.2,
+                ease: [
+                  0.22,
+                  1,
+                  0.36,
+                  1,
+                ],
               }}
               onMouseDown={(
                 event
@@ -1286,46 +1344,24 @@ export default function TopNavbar({
                 event.stopPropagation()
               }
               className="
-                relative
-
                 w-full
-                max-w-[720px]
+                max-w-[600px]
 
                 overflow-hidden
 
-                rounded-[26px]
+                rounded-[22px]
 
                 border
-                border-white/70
+                border-[#DFE8F1]
 
-                bg-white/95
+                bg-white
 
-                shadow-[0_40px_130px_rgba(3,16,31,0.40)]
-
-                backdrop-blur-2xl
+                shadow-[0_30px_90px_rgba(8,27,45,0.24)]
               "
             >
-              {/* TOP LIGHT */}
-
-              <div
-                className="
-                  absolute
-                  left-1/2
-                  top-0
-
-                  h-[2px]
-                  w-[45%]
-
-                  -translate-x-1/2
-
-                  bg-gradient-to-r
-                  from-transparent
-                  via-[#2E8BE5]
-                  to-transparent
-                "
-              />
-
-              {/* SEARCH INPUT */}
+              {/* =============================================
+                  SEARCH FIELD
+              ============================================== */}
 
               <div
                 className="
@@ -1334,32 +1370,23 @@ export default function TopNavbar({
                   gap-3
 
                   border-b
-                  border-[#E9EFF5]
+                  border-[#E8EEF4]
 
                   px-4
-                  py-4
+                  py-3.5
 
                   sm:px-5
                 "
               >
-                <div
+                <Search
                   className="
-                    flex
-                    h-11
-                    w-11
+                    h-[18px]
+                    w-[18px]
                     shrink-0
-                    items-center
-                    justify-center
 
-                    rounded-xl
-
-                    bg-[#EEF6FF]
-
-                    text-[#1F5EA8]
+                    text-[#6C8095]
                   "
-                >
-                  <Search className="h-[18px] w-[18px]" />
-                </div>
+                />
 
                 <input
                   ref={
@@ -1377,38 +1404,30 @@ export default function TopNavbar({
                         .value
                     )
                   }
-                  placeholder="Search your dashboard..."
+                  placeholder="Search dashboard..."
                   className="
-                    h-11
+                    h-10
                     min-w-0
                     flex-1
 
                     bg-transparent
 
-                    text-sm
+                    text-[14px]
                     font-semibold
-                    text-[#102A43]
+
+                    text-[#18324A]
 
                     outline-none
 
                     placeholder:font-medium
-                    placeholder:text-[#9AA8B8]
-
-                    sm:text-base
+                    placeholder:text-[#9BA9B8]
                   "
                 />
 
-                {searchQuery ? (
-                  <motion.button
+                {searchQuery && (
+                  <button
                     type="button"
-                    initial={{
-                      opacity: 0,
-                      scale: 0.7,
-                    }}
-                    animate={{
-                      opacity: 1,
-                      scale: 1,
-                    }}
+                    aria-label="Clear search"
                     onClick={() =>
                       setSearchQuery(
                         ""
@@ -1424,108 +1443,49 @@ export default function TopNavbar({
 
                       rounded-lg
 
-                      bg-[#F1F5F9]
-
-                      text-[#8190A3]
+                      text-[#8696A7]
 
                       transition
 
-                      hover:bg-[#E8EEF5]
+                      hover:bg-[#F1F5F9]
                       hover:text-[#334155]
                     "
                   >
-                    <X className="h-3.5 w-3.5" />
-                  </motion.button>
-                ) : (
-                  <span
-                    className="
-                      hidden
-
-                      rounded-lg
-
-                      border
-                      border-[#DEE6EE]
-
-                      bg-[#F8FAFC]
-
-                      px-2
-                      py-1
-
-                      text-[9px]
-                      font-extrabold
-                      text-[#8B99A9]
-
-                      sm:block
-                    "
-                  >
-                    ESC
-                  </span>
+                    <X
+                      className="
+                        h-[15px]
+                        w-[15px]
+                      "
+                    />
+                  </button>
                 )}
               </div>
 
-              {/* SEARCH DESCRIPTION */}
-
-              <div className="flex items-center justify-between gap-3 px-5 pb-3 pt-4">
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <Sparkles className="h-3 w-3 text-[#2C82D5]" />
-
-                    <p className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-[#1F5EA8]">
-                      Smart Search
-                    </p>
-                  </div>
-
-                  <p className="mt-1 text-[10px] text-[#8B99A9] sm:text-xs">
-                    Quickly navigate
-                    through your digital
-                    wallet.
-                  </p>
-                </div>
-
-                <span
-                  className="
-                    shrink-0
-
-                    rounded-full
-
-                    bg-[#EFF4F8]
-
-                    px-2.5
-                    py-1
-
-                    text-[9px]
-                    font-extrabold
-                    text-[#64768A]
-                  "
-                >
-                  {
-                    filteredItems.length
-                  }{" "}
-                  results
-                </span>
-              </div>
-
-              {/* RESULTS */}
+              {/* =============================================
+                  RESULT LIST
+              ============================================== */}
 
               <div
                 className="
-                  max-h-[430px]
+                  max-h-[360px]
                   overflow-y-auto
 
-                  px-3
-                  pb-3
+                  p-2.5
 
-                  [&::-webkit-scrollbar]:w-1.5
+                  [scrollbar-width:thin]
 
+                  [&::-webkit-scrollbar]:w-1
                   [&::-webkit-scrollbar-thumb]:rounded-full
-                  [&::-webkit-scrollbar-thumb]:bg-[#D9E3ED]
-
-                  [&::-webkit-scrollbar-track]:bg-transparent
+                  [&::-webkit-scrollbar-thumb]:bg-[#DCE5ED]
                 "
               >
                 {filteredItems.length >
                 0 ? (
-                  <div className="space-y-1">
+                  <div
+                    className="
+                      space-y-1
+                    "
+                  >
                     {filteredItems.map(
                       (
                         item,
@@ -1534,31 +1494,38 @@ export default function TopNavbar({
                         const Icon =
                           item.icon;
 
+                        const active =
+                          pathname ===
+                          item.href;
+
                         return (
                           <motion.button
-                            type="button"
                             key={
                               item.id
                             }
+                            type="button"
                             initial={{
                               opacity: 0,
-                              y: 9,
+                              y: 5,
                             }}
                             animate={{
                               opacity: 1,
                               y: 0,
                             }}
                             transition={{
+                              duration:
+                                0.18,
+
                               delay:
                                 index *
-                                0.025,
+                                0.015,
                             }}
                             onClick={() =>
-                              handleNavigate(
+                              navigateTo(
                                 item.href
                               )
                             }
-                            className="
+                            className={`
                               group
 
                               flex
@@ -1566,212 +1533,162 @@ export default function TopNavbar({
                               items-center
                               gap-3
 
-                              rounded-2xl
-
-                              border
-                              border-transparent
+                              rounded-[13px]
 
                               px-3
-                              py-3
+                              py-2.5
 
                               text-left
 
                               transition-all
+                              duration-150
 
-                              hover:border-[#DCEBFA]
-                              hover:bg-[#F4F9FE]
-                            "
+                              ${
+                                active
+                                  ? "bg-[#EEF6FD]"
+                                  : "hover:bg-[#F5F8FB]"
+                              }
+                            `}
                           >
-                            <div
-                              className="
+                            <span
+                              className={`
                                 flex
-                                h-11
-                                w-11
+                                h-9
+                                w-9
                                 shrink-0
                                 items-center
                                 justify-center
 
-                                rounded-xl
+                                rounded-[10px]
 
-                                border
-                                border-[#E5ECF3]
+                                transition
 
-                                bg-white
-
-                                text-[#60758B]
-
-                                shadow-sm
-
-                                transition-all
-
-                                group-hover:border-[#1F5EA8]
-                                group-hover:bg-[#1F5EA8]
-                                group-hover:text-white
-                                group-hover:shadow-[0_8px_18px_rgba(31,94,168,0.18)]
-                              "
-                            >
-                              <Icon className="h-[18px] w-[18px]" />
-                            </div>
-
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2">
-                                <h4 className="truncate text-xs font-extrabold text-[#16324B] sm:text-sm">
-                                  {
-                                    item.title
-                                  }
-                                </h4>
-
-                                <span
-                                  className="
-                                    hidden
-
-                                    rounded-md
-
-                                    bg-[#EDF2F7]
-
-                                    px-1.5
-                                    py-0.5
-
-                                    text-[8px]
-                                    font-extrabold
-                                    uppercase
-                                    tracking-wider
-
-                                    text-[#8190A2]
-
-                                    sm:inline-flex
-                                  "
-                                >
-                                  {
-                                    item.category
-                                  }
-                                </span>
-                              </div>
-
-                              <p className="mt-0.5 truncate text-[10px] leading-5 text-[#8A99AB] sm:text-xs">
-                                {
-                                  item.description
+                                ${
+                                  active
+                                    ? "bg-[#1F5EA8] text-white"
+                                    : "bg-[#F1F5F8] text-[#667A8F] group-hover:bg-white group-hover:text-[#1F5EA8]"
                                 }
-                              </p>
-                            </div>
-
-                            <div
-                              className="
-                                flex
-                                h-8
-                                w-8
-                                shrink-0
-                                translate-x-2
-                                items-center
-                                justify-center
-
-                                rounded-lg
-
-                                text-[#A6B2BF]
-
-                                opacity-0
-
-                                transition-all
-
-                                group-hover:translate-x-0
-                                group-hover:bg-white
-                                group-hover:text-[#1F5EA8]
-                                group-hover:opacity-100
-                              "
+                              `}
                             >
-                              <ArrowUpRight className="h-3.5 w-3.5" />
-                            </div>
+                              <Icon
+                                className="
+                                  h-[16px]
+                                  w-[16px]
+                                "
+                              />
+                            </span>
+
+                            <span
+                              className={`
+                                truncate
+
+                                text-[12px]
+                                font-bold
+
+                                ${
+                                  active
+                                    ? "text-[#1F5EA8]"
+                                    : "text-[#31485D]"
+                                }
+                              `}
+                            >
+                              {
+                                item.title
+                              }
+                            </span>
+
+                            {active && (
+                              <span
+                                className="
+                                  ml-auto
+
+                                  rounded-full
+
+                                  bg-[#DCEEFF]
+
+                                  px-2
+                                  py-0.5
+
+                                  text-[8px]
+                                  font-extrabold
+                                  uppercase
+
+                                  tracking-wider
+
+                                  text-[#1F5EA8]
+                                "
+                              >
+                                Current
+                              </span>
+                            )}
                           </motion.button>
                         );
                       }
                     )}
                   </div>
                 ) : (
-                  <motion.div
-                    initial={{
-                      opacity: 0,
-                      scale: 0.96,
-                    }}
-                    animate={{
-                      opacity: 1,
-                      scale: 1,
-                    }}
-                    className="flex flex-col items-center justify-center px-5 py-16 text-center"
+                  <div
+                    className="
+                      flex
+                      min-h-[170px]
+                      flex-col
+                      items-center
+                      justify-center
+
+                      px-5
+
+                      text-center
+                    "
                   >
                     <div
                       className="
                         flex
-                        h-14
-                        w-14
+                        h-11
+                        w-11
                         items-center
                         justify-center
 
-                        rounded-2xl
+                        rounded-xl
 
-                        bg-[#F0F4F8]
+                        bg-[#F1F5F8]
 
-                        text-[#8292A5]
+                        text-[#8494A5]
                       "
                     >
-                      <Search className="h-5 w-5" />
+                      <Search
+                        className="
+                          h-[18px]
+                          w-[18px]
+                        "
+                      />
                     </div>
 
-                    <h3 className="mt-4 text-sm font-extrabold text-[#102A43]">
-                      Nothing found
-                    </h3>
+                    <p
+                      className="
+                        mt-3
 
-                    <p className="mt-1 max-w-[280px] text-xs leading-5 text-[#8A99AA]">
-                      Try searching for
-                      wallet, transaction,
-                      user, KYC, settings
-                      or insights.
+                        text-[13px]
+                        font-extrabold
+
+                        text-[#243B51]
+                      "
+                    >
+                      No results found
                     </p>
-                  </motion.div>
+
+                    <p
+                      className="
+                        mt-1
+
+                        text-[10px]
+
+                        text-[#8B99A9]
+                      "
+                    >
+                      Try another keyword.
+                    </p>
+                  </div>
                 )}
-              </div>
-
-              {/* FOOTER */}
-
-              <div
-                className="
-                  flex
-                  flex-wrap
-                  items-center
-                  justify-between
-                  gap-3
-
-                  border-t
-                  border-[#E9EFF5]
-
-                  bg-[#F8FAFC]/90
-
-                  px-5
-                  py-3
-                "
-              >
-                <div className="flex items-center gap-4 text-[9px] font-bold text-[#8A99A9]">
-                  <span className="flex items-center gap-1.5">
-                    <kbd className="rounded border border-[#DDE5ED] bg-white px-1.5 py-0.5 shadow-sm">
-                      ESC
-                    </kbd>
-
-                    Close
-                  </span>
-
-                  <span className="hidden items-center gap-1.5 sm:flex">
-                    <kbd className="rounded border border-[#DDE5ED] bg-white px-1.5 py-0.5 shadow-sm">
-                      Ctrl K
-                    </kbd>
-
-                    Search
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-1.5 text-[9px] font-extrabold uppercase tracking-wider text-[#1F5EA8]">
-                  <Sparkles className="h-3 w-3" />
-
-                  Smart Navigation
-                </div>
               </div>
             </motion.div>
           </motion.div>

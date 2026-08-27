@@ -107,34 +107,33 @@ export default function UserSidebar({
   const pathname = usePathname();
 
   return (
-    <motion.aside
-      initial={{
-        opacity: 0,
-        x: -22,
-      }}
-      animate={{
-        opacity: 1,
-        x: 0,
-      }}
-      transition={{
-        duration: 0.5,
-        ease: [0.22, 1, 0.36, 1],
-      }}
-      className="
-        relative
-        flex
-        h-dvh
-        w-[280px]
-        min-h-0
-        flex-col
-        overflow-hidden
-        border-r
-        border-white/[0.05]
-        bg-[#08111D]
-        text-slate-300
-        shadow-[15px_0_50px_rgba(2,8,18,0.15)]
-      "
-    >
+<motion.aside
+  initial={{
+    opacity: 0,
+    x: -20,
+  }}
+  animate={{
+    opacity: 1,
+    x: 0,
+  }}
+  transition={{
+    duration: 0.45,
+    ease: [0.22, 1, 0.36, 1],
+  }}
+  className="
+    relative
+    flex
+    h-dvh
+    min-h-dvh
+    w-full
+    flex-col
+    overflow-hidden
+    border-r
+    border-white/[0.05]
+    bg-[#08111D]
+    text-slate-300
+  "
+>
       {/* =====================================================
           BACKGROUND EFFECTS
       ====================================================== */}
@@ -225,7 +224,7 @@ export default function UserSidebar({
 
           <div className="min-w-0">
             <h1 className="truncate text-[18px] font-black tracking-[-0.03em] text-white">
-              NovaWallet
+              Coffer
             </h1>
 
             <div className="mt-0.5 flex items-center gap-1.5">

@@ -5,13 +5,17 @@ import React, {
   useState,
 } from "react";
 
-import { useRouter } from "next/navigation";
+import {
+  useRouter,
+} from "next/navigation";
 
 import UserSidebar from "@/components/dashboard/layout/UserSidebar";
 import AdminSidebar from "@/components/dashboard/layout/AdminSidebar";
 import TopNavbar from "@/components/dashboard/layout/TopNavbar";
 
-import { apiClient } from "@/lib/api/client";
+import {
+  apiClient,
+} from "@/lib/api/client";
 
 /* =========================================================
    TYPES
@@ -21,11 +25,28 @@ type UserRole =
   | "admin"
   | "user";
 
-interface StoredUser {
-  _id?: string;
-  name?: string;
-  email?: string;
-  role?: UserRole;
+type KYCStatus =
+  | "not_started"
+  | "pending"
+  | "under_review"
+  | "verified"
+  | "rejected";
+
+interface CurrentUser {
+  _id: string;
+  name: string;
+  email: string;
+  phone?: string;
+
+  role: UserRole;
+
+  kycStatus:
+    KYCStatus;
+}
+
+interface ProfileResponse {
+  success: boolean;
+  user: CurrentUser;
 }
 
 /* =========================================================
@@ -35,92 +56,146 @@ interface StoredUser {
 export default function DashboardLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children:
+    React.ReactNode;
 }) {
   const router =
     useRouter();
 
+  /* =========================================================
+     USER
+  ========================================================== */
+
   const [
-    userRole,
-    setUserRole,
+    user,
+    setUser,
   ] =
-    useState<UserRole>(
-      "user"
+    useState<CurrentUser | null>(
+      null
     );
 
   const [
-    userName,
-    setUserName,
-  ] = useState(
-    "My Account"
-  );
-
-  const [
-    userEmail,
-    setUserEmail,
-  ] = useState("");
+    loading,
+    setLoading,
+  ] =
+    useState(true);
 
   const [
     mobileMenuOpen,
     setMobileMenuOpen,
-  ] = useState(false);
+  ] =
+    useState(false);
 
   /* =========================================================
-     LOAD USER UI INFORMATION
+     LOAD AUTHENTICATED USER FROM BACKEND
   ========================================================== */
 
   useEffect(() => {
-    try {
-      const savedUser =
-        localStorage.getItem(
-          "auth_user"
-        );
+    let mounted = true;
 
-      if (!savedUser) {
-        return;
-      }
+    const loadCurrentUser =
+      async () => {
+        try {
+          setLoading(
+            true
+          );
 
-      const parsedUser =
-        JSON.parse(
-          savedUser
-        ) as StoredUser;
+          const response =
+            await apiClient<ProfileResponse>(
+              "/users/profile"
+            );
 
-      if (
-        parsedUser.role ===
-          "admin" ||
-        parsedUser.role ===
-          "user"
-      ) {
-        setUserRole(
-          parsedUser.role
-        );
-      }
+          if (!mounted) {
+            return;
+          }
 
-      if (
-        parsedUser.name
-      ) {
-        setUserName(
-          parsedUser.name
-        );
-      }
+          if (
+            !response.success ||
+            !response.user
+          ) {
+            throw new Error(
+              "Unable to load authenticated user."
+            );
+          }
 
-      if (
-        parsedUser.email
-      ) {
-        setUserEmail(
-          parsedUser.email
-        );
-      }
-    } catch (error) {
-      console.error(
-        "Unable to read stored user:",
-        error
-      );
-    }
-  }, []);
+          /* ===============================================
+             BACKEND IS SOURCE OF TRUTH
+          =============================================== */
+
+          setUser(
+            response.user
+          );
+
+          /* ===============================================
+             OPTIONAL:
+             Keep localStorage user metadata synced.
+
+             Authentication itself still comes from
+             HttpOnly cookie.
+          =============================================== */
+
+          localStorage.setItem(
+            "auth_user",
+            JSON.stringify(
+              response.user
+            )
+          );
+
+          localStorage.setItem(
+            "is_authenticated",
+            "true"
+          );
+        } catch (error) {
+          console.error(
+            "Dashboard user loading error:",
+            error
+          );
+
+          if (!mounted) {
+            return;
+          }
+
+          /* ===============================================
+             CLEAR OLD CLIENT METADATA
+          =============================================== */
+
+          localStorage.removeItem(
+            "auth_user"
+          );
+
+          localStorage.removeItem(
+            "is_authenticated"
+          );
+
+          localStorage.removeItem(
+            "token"
+          );
+
+          /* ===============================================
+             NOT AUTHENTICATED
+          =============================================== */
+
+          router.replace(
+            "/login"
+          );
+        } finally {
+          if (mounted) {
+            setLoading(
+              false
+            );
+          }
+        }
+      };
+
+    loadCurrentUser();
+
+    return () => {
+      mounted = false;
+    };
+  }, [router]);
 
   /* =========================================================
-     CLOSE MOBILE SIDEBAR
+     MOBILE SIDEBAR
   ========================================================== */
 
   const closeMobileMenu =
@@ -129,10 +204,6 @@ export default function DashboardLayout({
         false
       );
     };
-
-  /* =========================================================
-     TOGGLE MOBILE SIDEBAR
-  ========================================================== */
 
   const toggleMobileMenu =
     () => {
@@ -162,6 +233,10 @@ export default function DashboardLayout({
           error
         );
       } finally {
+        /* ===============================================
+           CLEAR CLIENT METADATA
+        =============================================== */
+
         localStorage.removeItem(
           "auth_user"
         );
@@ -174,38 +249,170 @@ export default function DashboardLayout({
           "token"
         );
 
+        setUser(
+          null
+        );
+
         closeMobileMenu();
 
         router.replace(
           "/login"
         );
+
+        router.refresh();
       }
     };
 
   /* =========================================================
-     RETURN
+     LOADING
+  ========================================================== */
+
+  if (loading) {
+    return (
+      <div
+        className="
+          flex
+          min-h-dvh
+          w-full
+
+          items-center
+          justify-center
+
+          bg-[#F4F7FB]
+        "
+      >
+        <div
+          className="
+            flex
+            flex-col
+            items-center
+            gap-4
+          "
+        >
+          {/* ICON */}
+
+          <div
+            className="
+              flex
+              h-14
+              w-14
+
+              items-center
+              justify-center
+
+              rounded-2xl
+
+              bg-[#1F5EA8]
+
+              shadow-[0_16px_35px_rgba(31,94,168,0.22)]
+            "
+          >
+            <div
+              className="
+                h-6
+                w-6
+
+                animate-spin
+
+                rounded-full
+
+                border-2
+                border-white/30
+                border-t-white
+              "
+            />
+          </div>
+
+          {/* TEXT */}
+
+          <div
+            className="
+              text-center
+            "
+          >
+            <p
+              className="
+                text-sm
+                font-bold
+
+                text-[#162A43]
+              "
+            >
+              Loading dashboard
+            </p>
+
+            <p
+              className="
+                mt-1
+
+                text-xs
+
+                text-slate-400
+              "
+            >
+              Checking your account
+              and permissions...
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* =========================================================
+     USER MISSING
+  ========================================================== */
+
+  if (!user) {
+    return null;
+  }
+
+  /* =========================================================
+     ROLE FROM BACKEND
+  ========================================================== */
+
+  const userRole =
+    user.role;
+
+  /* =========================================================
+     UI
   ========================================================== */
 
   return (
-    <div className="flex min-h-screen bg-[#F4F7FB] text-[#162A43]">
+    <div
+      className="
+        flex
+        min-h-dvh
+        w-full
 
+        bg-[#F4F7FB]
+
+        text-[#162A43]
+      "
+    >
       {/* =====================================================
-          MOBILE SIDEBAR BACKDROP
+          MOBILE BACKDROP
       ====================================================== */}
 
       {mobileMenuOpen && (
         <button
           type="button"
+
           aria-label="Close sidebar"
+
           onClick={
             closeMobileMenu
           }
+
           className="
             fixed
             inset-0
             z-40
-            bg-[#07182A]/45
-            backdrop-blur-[3px]
+
+            bg-[#07182A]/50
+
+            backdrop-blur-[4px]
+
             lg:hidden
           "
         />
@@ -221,17 +428,23 @@ export default function DashboardLayout({
           inset-y-0
           left-0
           z-50
+
+          h-dvh
           w-[280px]
+          shrink-0
+
+          overflow-hidden
 
           transform
 
           transition-transform
           duration-300
+
           ease-[cubic-bezier(0.22,1,0.36,1)]
 
-          lg:static
-          lg:z-auto
-          lg:shrink-0
+          lg:sticky
+          lg:top-0
+          lg:z-40
           lg:translate-x-0
 
           ${
@@ -241,6 +454,10 @@ export default function DashboardLayout({
           }
         `}
       >
+        {/* ===============================================
+            ROLE COMES DIRECTLY FROM BACKEND
+        =============================================== */}
+
         {userRole ===
         "admin" ? (
           <AdminSidebar
@@ -261,8 +478,15 @@ export default function DashboardLayout({
           RIGHT SIDE
       ====================================================== */}
 
-      <div className="flex min-w-0 flex-1 flex-col">
-
+      <div
+        className="
+          flex
+          min-h-dvh
+          min-w-0
+          flex-1
+          flex-col
+        "
+      >
         {/* ===================================================
             TOP NAVBAR
         ==================================================== */}
@@ -271,14 +495,19 @@ export default function DashboardLayout({
           onMenuClick={
             toggleMobileMenu
           }
+
           userName={
-            userName
+            user.name ||
+            "My Account"
           }
+
           userEmail={
-            userEmail
+            user.email ||
+            ""
           }
+
           userRole={
-            userRole
+            user.role
           }
         />
 
@@ -288,18 +517,28 @@ export default function DashboardLayout({
 
         <main
           className="
+            min-h-0
             flex-1
+
             overflow-x-hidden
-            overflow-y-auto
+
+            bg-[#F4F7FB]
 
             p-4
+
             sm:p-5
             md:p-6
             lg:p-7
             xl:p-8
           "
         >
-          <div className="mx-auto w-full max-w-[1440px]">
+          <div
+            className="
+              mx-auto
+              w-full
+              max-w-[1440px]
+            "
+          >
             {children}
           </div>
         </main>
