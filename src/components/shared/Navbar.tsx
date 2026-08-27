@@ -552,7 +552,7 @@ export default function Navbar() {
                     text-left
                   "
                 >
-                  <BrandLogo />
+                  <CofferBrand />
 
                   <div>
                     <p
@@ -916,7 +916,7 @@ export default function Navbar() {
                 gap-2.5
               "
             >
-              <BrandLogo />
+              <CofferBrand />
 
               <div className="hidden xs:block">
                 <span
@@ -1435,121 +1435,264 @@ export default function Navbar() {
    BRAND LOGO
 ========================================================= */
 
-function BrandLogo() {
+/* =========================================================
+   BRAND LOGO
+========================================================= */
+
+/* =========================================================
+   COFFER BRAND
+========================================================= */
+
+function CofferBrand() {
   return (
     <motion.div
       whileHover={{
-        rotate: -4,
+        y: -1,
       }}
       transition={{
-        type:
-          "spring",
-
-        stiffness:
-          300,
-
-        damping:
-          18,
+        type: "spring",
+        stiffness: 320,
+        damping: 22,
       }}
       className="
-        relative
-
+        group
         flex
-        h-10
-        w-10
-        shrink-0
         items-center
-        justify-center
-
-        overflow-hidden
-
-        rounded-[13px]
-
-        border
-        border-black/[0.05]
-
-        bg-white
-
-        shadow-[0_6px_18px_rgba(15,23,42,0.06)]
+        gap-3
       "
     >
-      {/* decorative glow */}
+      {/* =====================================================
+          LOGO MARK
+      ====================================================== */}
 
       <div
         className="
-          pointer-events-none
-          absolute
-          -right-3
-          -top-3
+          relative
 
-          h-7
-          w-7
+          flex
+          h-[46px]
+          w-[46px]
+          shrink-0
+          items-center
+          justify-center
 
-          rounded-full
+          overflow-hidden
 
-          bg-blue-500/10
+          rounded-[15px]
 
-          blur-lg
+          border
+          border-[#DCE6EF]
+
+          bg-white
+
+          shadow-[0_8px_24px_rgba(15,39,69,0.08)]
         "
-      />
-
-      <svg
-        width="24"
-        height="24"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke={
-          PRIMARY
-        }
-        strokeWidth="1.55"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className="relative"
       >
-        <circle
-          cx="12"
-          cy="12"
-          r="8"
+        {/* soft blue background glow */}
+
+        <div
+          className="
+            pointer-events-none
+            absolute
+            -right-4
+            -top-4
+
+            h-10
+            w-10
+
+            rounded-full
+
+            bg-[#1F5EA8]/15
+
+            blur-xl
+          "
         />
 
-        <path d="M12 4v16" />
+        {/* main mark */}
 
-        <path d="M12 4c4.418 0 8 3.582 8 8s-3.582 8-8 8" />
+        <svg
+          width="31"
+          height="31"
+          viewBox="0 0 40 40"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          className="
+            relative
+            z-10
+          "
+        >
+          {/* wallet / coffer shell */}
 
-        <path d="M10 4h4" />
-      </svg>
+          <rect
+            x="6.5"
+            y="8"
+            width="27"
+            height="24"
+            rx="8"
+            stroke="#172033"
+            strokeWidth="2.2"
+          />
 
-      <motion.span
-        animate={{
-          opacity: [
-            0.3,
-            0.8,
-            0.3,
-          ],
-        }}
-        transition={{
-          duration: 2.5,
-          repeat:
-            Infinity,
+          {/* C shape */}
 
-          ease:
-            "easeInOut",
-        }}
+          <path
+            d="
+              M25.5 14.5
+              C23.9 13.2 21.8 12.5 19.6 12.5
+              C14.9 12.5 11.5 15.6 11.5 20
+              C11.5 24.4 14.9 27.5 19.6 27.5
+              C21.8 27.5 23.9 26.8 25.5 25.5
+            "
+            stroke="#1F5EA8"
+            strokeWidth="2.6"
+            strokeLinecap="round"
+          />
+
+          {/* wallet side tab */}
+
+          <path
+            d="M27 17H34V23H27C25.3 23 24 21.7 24 20C24 18.3 25.3 17 27 17Z"
+            fill="#EEF6FD"
+            stroke="#172033"
+            strokeWidth="1.7"
+          />
+
+          {/* money dot */}
+
+          <circle
+            cx="28.5"
+            cy="20"
+            r="1.25"
+            fill="#1F5EA8"
+          />
+        </svg>
+
+        {/* live indicator */}
+
+        <motion.span
+          animate={{
+            scale: [
+              1,
+              1.25,
+              1,
+            ],
+            opacity: [
+              0.7,
+              1,
+              0.7,
+            ],
+          }}
+          transition={{
+            duration: 2.2,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="
+            absolute
+            bottom-[4px]
+            right-[4px]
+
+            h-[8px]
+            w-[8px]
+
+            rounded-full
+
+            border-2
+            border-white
+
+            bg-[#1F5EA8]
+
+            shadow-[0_0_9px_rgba(31,94,168,0.55)]
+          "
+        />
+      </div>
+
+      {/* =====================================================
+          BRAND TEXT
+      ====================================================== */}
+
+      <div
         className="
-          absolute
-          bottom-[5px]
-          right-[5px]
-
-          h-1.5
-          w-1.5
-
-          rounded-full
-
-          bg-[#1F5EA8]
-
-          shadow-[0_0_7px_rgba(31,94,168,0.8)]
+          flex
+          min-w-0
+          flex-col
+          justify-center
         "
-      />
+      >
+        <div
+          className="
+            flex
+            items-center
+            gap-2
+          "
+        >
+          <span
+            className="
+              text-[20px]
+              font-black
+              leading-none
+
+              tracking-[-0.04em]
+
+              text-[#172033]
+
+              transition-colors
+
+              group-hover:text-[#1F5EA8]
+            "
+          >
+            Coffer
+          </span>
+
+          <span
+            className="
+              mt-[1px]
+
+              h-1.5
+              w-1.5
+
+              rounded-full
+
+              bg-[#1F5EA8]
+
+              shadow-[0_0_8px_rgba(31,94,168,0.45)]
+            "
+          />
+        </div>
+
+        <div
+          className="
+            mt-[5px]
+            flex
+            items-center
+            gap-1.5
+          "
+        >
+          <span
+            className="
+              h-px
+              w-4
+
+              bg-[#1F5EA8]/45
+            "
+          />
+
+          <span
+            className="
+              text-[8px]
+              font-extrabold
+              uppercase
+              leading-none
+
+              tracking-[0.19em]
+
+              text-[#788A9C]
+            "
+          >
+            Digital Wallet
+          </span>
+        </div>
+      </div>
     </motion.div>
   );
 }
