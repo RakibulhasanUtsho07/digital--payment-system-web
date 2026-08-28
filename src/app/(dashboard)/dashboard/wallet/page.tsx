@@ -1,164 +1,120 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useState,
+  type ElementType,
 } from "react";
 
 import Link from "next/link";
 
-import { AnimatePresence, motion } from "framer-motion";
-
 import {
   ArrowDownLeft,
   ArrowUpRight,
-  CheckCircle2,
   ChevronRight,
-  Copy,
   CreditCard,
-  Eye,
-  EyeOff,
   Loader2,
   RefreshCw,
   ShieldCheck,
   WalletCards,
 } from "lucide-react";
 
-import { apiClient } from "@/lib/api/client";
+import {
+  getMyWallet,
+  type WalletData,
+} from "@/lib/api/walletApi";
 
-/* =========================================================
-   TYPES
-========================================================= */
-
-interface WalletData {
-  _id: string;
-  userId: string;
-  balance: number;
-  createdAt?: string;
-  updatedAt?: string;
-
-  [key: string]: unknown;
-}
-
-interface WalletResponse {
-  success: boolean;
-  wallet: WalletData;
-}
+import PremiumWalletCard from "./components/PremiumWalletCard";
 
 /* =========================================================
    PAGE
 ========================================================= */
 
 export default function WalletPage() {
-  const [wallet, setWallet] =
-    useState<WalletData | null>(
-      null
-    );
+  const [
+    wallet,
+    setWallet,
+  ] = useState<WalletData | null>(
+    null
+  );
 
-  const [loading, setLoading] =
-    useState(true);
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
 
-  const [refreshing, setRefreshing] =
-    useState(false);
+  const [
+    refreshing,
+    setRefreshing,
+  ] = useState(false);
 
-  const [errorMessage, setErrorMessage] =
-    useState("");
-
-  const [copied, setCopied] =
-    useState(false);
-
-  // Balance visibility — starts shown; the toggle just masks the
-  // digits in place rather than hiding the whole card, so the
-  // layout never jumps.
-  const [showBalance, setShowBalance] =
-    useState(true);
+  const [
+    errorMessage,
+    setErrorMessage,
+  ] = useState("");
 
   /* =========================================================
      LOAD WALLET
   ========================================================== */
 
-  const loadWallet = async (
-    showLoader = true
-  ) => {
-    try {
-      if (showLoader) {
-        setLoading(true);
-      } else {
-        setRefreshing(true);
-      }
+  const loadWallet = useCallback(
+    async (
+      silent = false
+    ) => {
+      try {
+        if (silent) {
+          setRefreshing(true);
+        } else {
+          setLoading(true);
+        }
 
-      setErrorMessage("");
+        setErrorMessage("");
 
-      const data =
-        await apiClient<WalletResponse>(
-          "/wallet"
+        const response =
+          await getMyWallet();
+
+        if (
+          !response.success ||
+          !response.wallet
+        ) {
+          throw new Error(
+            response.message ||
+              "Unable to load wallet information."
+          );
+        }
+
+        setWallet(
+          response.wallet
+        );
+      } catch (error) {
+        console.error(
+          "Wallet loading error:",
+          error
         );
 
-      if (
-        !data ||
-        data.success !== true ||
-        !data.wallet
-      ) {
-        throw new Error(
-          "Unable to load wallet information."
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "Failed to load wallet."
         );
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
       }
-
-      setWallet(
-        data.wallet
-      );
-    } catch (error) {
-      console.error(
-        "Wallet loading error:",
-        error
-      );
-
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Failed to load wallet."
-      );
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+    },
+    []
+  );
 
   /* =========================================================
      INITIAL LOAD
   ========================================================== */
 
   useEffect(() => {
-    void loadWallet(true);
-  }, []);
-
-  /* =========================================================
-     COPY WALLET ID
-  ========================================================== */
-
-  const handleCopyWalletId =
-    async () => {
-      if (!wallet?._id) {
-        return;
-      }
-
-      try {
-        await navigator.clipboard.writeText(
-          wallet._id
-        );
-
-        setCopied(true);
-
-        window.setTimeout(() => {
-          setCopied(false);
-        }, 1800);
-      } catch (error) {
-        console.error(
-          "Copy wallet ID failed:",
-          error
-        );
-      }
-    };
+    void loadWallet();
+  }, [
+    loadWallet,
+  ]);
 
   /* =========================================================
      LOADING
@@ -166,19 +122,87 @@ export default function WalletPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[70vh] items-center justify-center px-4">
-        <div className="flex flex-col items-center gap-4 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#1F5EA8] text-white shadow-lg shadow-blue-500/20">
-            <Loader2 className="h-6 w-6 animate-spin" />
+      <div
+        className="
+          flex
+          min-h-[70vh]
+          items-center
+          justify-center
+          px-4
+        "
+      >
+        <div
+          className="
+            flex
+            flex-col
+            items-center
+            gap-4
+            text-center
+          "
+        >
+          <div
+            className="
+              relative
+
+              flex
+              h-14
+              w-14
+              items-center
+              justify-center
+
+              overflow-hidden
+
+              rounded-[18px]
+
+              bg-gradient-to-br
+              from-[#102D4E]
+              to-[#1F5EA8]
+
+              text-white
+
+              shadow-[0_14px_35px_rgba(31,94,168,0.22)]
+            "
+          >
+            <div
+              className="
+                absolute
+                inset-0
+
+                bg-gradient-to-br
+                from-white/15
+                to-transparent
+              "
+            />
+
+            <Loader2
+              className="
+                relative
+                h-6
+                w-6
+                animate-spin
+              "
+            />
           </div>
 
           <div>
-            <p className="text-sm font-bold text-slate-800">
-              Loading wallet
+            <p
+              className="
+                text-sm
+                font-extrabold
+                text-slate-800
+              "
+            >
+              Loading your wallet
             </p>
 
-            <p className="mt-1 text-xs text-slate-400">
-              Fetching your wallet information...
+            <p
+              className="
+                mt-1
+                text-xs
+                text-slate-400
+              "
+            >
+              Syncing your latest balance and wallet information...
             </p>
           </div>
         </div>
@@ -195,31 +219,124 @@ export default function WalletPage() {
     !wallet
   ) {
     return (
-      <div className="flex min-h-[70vh] items-center justify-center px-4">
-        <div className="w-full max-w-md rounded-3xl border border-red-200 bg-white p-7 text-center shadow-sm">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-600">
-            <CreditCard className="h-6 w-6" />
+      <div
+        className="
+          flex
+          min-h-[70vh]
+          items-center
+          justify-center
+          px-4
+        "
+      >
+        <div
+          className="
+            w-full
+            max-w-md
+
+            rounded-[28px]
+
+            border
+            border-rose-100
+
+            bg-white
+
+            p-7
+            text-center
+
+            shadow-[0_18px_50px_rgba(15,23,42,0.06)]
+          "
+        >
+          <div
+            className="
+              mx-auto
+
+              flex
+              h-14
+              w-14
+              items-center
+              justify-center
+
+              rounded-[18px]
+
+              bg-rose-50
+
+              text-rose-600
+            "
+          >
+            <CreditCard
+              className="
+                h-6
+                w-6
+              "
+            />
           </div>
 
-          <h2 className="mt-4 text-xl font-extrabold text-slate-900">
+          <h2
+            className="
+              mt-5
+
+              text-xl
+              font-black
+
+              tracking-[-0.02em]
+
+              text-slate-900
+            "
+          >
             Wallet unavailable
           </h2>
 
-          <p className="mt-2 text-sm leading-6 text-slate-500">
+          <p
+            className="
+              mt-2
+
+              text-sm
+              leading-6
+
+              text-slate-500
+            "
+          >
             {errorMessage ||
-              "Unable to retrieve wallet information."}
+              "Unable to retrieve your wallet information."}
           </p>
 
           <button
             type="button"
             onClick={() =>
-              void loadWallet(
-                true
-              )
+              void loadWallet()
             }
-            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#1F5EA8] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#17466F]"
+            className="
+              mt-6
+
+              inline-flex
+              h-11
+              items-center
+              justify-center
+              gap-2
+
+              rounded-[14px]
+
+              bg-[#1F5EA8]
+
+              px-5
+
+              text-xs
+              font-extrabold
+
+              text-white
+
+              transition
+
+              hover:bg-[#184E8D]
+            "
           >
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw
+              className="
+                h-4
+                w-4
+              "
+            />
+
             Try Again
           </button>
         </div>
@@ -227,34 +344,113 @@ export default function WalletPage() {
     );
   }
 
+  /* =========================================================
+     WALLET DATA
+  ========================================================== */
+
   const balance =
     Number(
       wallet.balance
     ) || 0;
 
   const formattedBalance =
-    formatCurrency(balance);
+    formatCurrency(
+      balance
+    );
+
+  /* =========================================================
+     PAGE
+  ========================================================== */
 
   return (
-    <main className="space-y-6 pb-10">
+    <main
+      className="
+        space-y-6
+        pb-10
+      "
+    >
       {/* =====================================================
           HEADER
       ====================================================== */}
 
-      <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <section
+        className="
+          flex
+          flex-col
+          gap-5
+
+          sm:flex-row
+          sm:items-end
+          sm:justify-between
+        "
+      >
         <div>
-          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#1F5EA8]">
-            <WalletCards className="h-3.5 w-3.5" />
+          <div
+            className="
+              mb-3
+
+              inline-flex
+              items-center
+              gap-2
+
+              rounded-full
+
+              border
+              border-blue-100
+
+              bg-[#F0F7FF]
+
+              px-3
+              py-1.5
+
+              text-[10px]
+              font-extrabold
+              uppercase
+
+              tracking-[0.16em]
+
+              text-[#1F5EA8]
+            "
+          >
+            <WalletCards
+              className="
+                h-3.5
+                w-3.5
+              "
+            />
+
             Digital Wallet
           </div>
 
-          <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
+          <h1
+            className="
+              text-2xl
+              font-black
+
+              tracking-[-0.035em]
+
+              text-[#102A43]
+
+              sm:text-3xl
+            "
+          >
             My Wallet
           </h1>
 
-          <p className="mt-2 text-sm leading-6 text-slate-500">
-            Manage your wallet balance, account details,
-            and quick payment actions from one place.
+          <p
+            className="
+              mt-2
+
+              max-w-2xl
+
+              text-sm
+              leading-6
+
+              text-[#718296]
+            "
+          >
+            Monitor your balance, manage wallet details and access
+            secure payment actions from one place.
           </p>
         </div>
 
@@ -262,11 +458,45 @@ export default function WalletPage() {
           type="button"
           onClick={() =>
             void loadWallet(
-              false
+              true
             )
           }
-          disabled={refreshing}
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-bold text-slate-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-[#1F5EA8] disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={
+            refreshing
+          }
+          className="
+            inline-flex
+            h-11
+            shrink-0
+            items-center
+            justify-center
+            gap-2
+
+            rounded-[14px]
+
+            border
+            border-[#DCE6EF]
+
+            bg-white
+
+            px-4
+
+            text-xs
+            font-bold
+
+            text-[#566C80]
+
+            shadow-[0_6px_20px_rgba(15,23,42,0.04)]
+
+            transition
+
+            hover:border-blue-200
+            hover:bg-blue-50
+            hover:text-[#1F5EA8]
+
+            disabled:cursor-not-allowed
+            disabled:opacity-60
+          "
         >
           <RefreshCw
             className={
@@ -277,158 +507,42 @@ export default function WalletPage() {
           />
 
           {refreshing
-            ? "Refreshing..."
+            ? "Syncing..."
             : "Refresh"}
         </button>
       </section>
 
       {/* =====================================================
-          MAIN WALLET CARD
+          PREMIUM WALLET CARD
       ====================================================== */}
 
-      <section className="relative overflow-hidden rounded-[30px] bg-gradient-to-br from-[#0F2745] via-[#173F6D] to-[#1F5EA8] p-6 text-white shadow-[0_20px_55px_rgba(23,63,109,0.2)] sm:p-8">
-        <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-cyan-300/10 blur-3xl" />
-
-        <div className="pointer-events-none absolute -bottom-24 left-1/3 h-72 w-72 rounded-full bg-blue-300/10 blur-3xl" />
-
-        <div className="relative z-10">
-          <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
-            {/* LEFT */}
-
-            <div>
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/10 backdrop-blur-md">
-                  <WalletCards className="h-6 w-6 text-cyan-200" />
-                </div>
-
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-100/70">
-                    Available Balance
-                  </p>
-
-                  <p className="mt-1 text-xs font-medium text-blue-100/70">
-                    Personal Wallet
-                  </p>
-                </div>
-              </div>
-
-              {/* BALANCE — animated show/hide. Masks digits in
-                  place (৳ 12,500 -> ৳ ••,•••) rather than swapping
-                  in a fixed placeholder, so the shape of the
-                  number stays recognizable without revealing it. */}
-              <div className="mt-7 flex items-center gap-3">
-                <AnimatePresence mode="wait" initial={false}>
-                  <motion.p
-                    key={showBalance ? "visible" : "masked"}
-                    initial={{ opacity: 0, filter: "blur(6px)", y: 6 }}
-                    animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
-                    exit={{ opacity: 0, filter: "blur(6px)", y: -6 }}
-                    transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-                    className={`text-4xl font-black tracking-tight sm:text-5xl ${
-                      showBalance ? "" : "select-none tracking-wider"
-                    }`}
-                    aria-hidden={!showBalance}
-                  >
-                    {showBalance
-                      ? formattedBalance
-                      : maskCurrency(formattedBalance)}
-                  </motion.p>
-                </AnimatePresence>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setShowBalance((value) => !value)
-                  }
-                  aria-label={
-                    showBalance
-                      ? "Hide balance"
-                      : "Show balance"
-                  }
-                  aria-pressed={!showBalance}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/10 text-cyan-100 backdrop-blur-md transition hover:bg-white/20 hover:text-white"
-                >
-                  <AnimatePresence mode="wait" initial={false}>
-                    <motion.span
-                      key={showBalance ? "eye" : "eye-off"}
-                      initial={{ opacity: 0, rotate: -45, scale: 0.6 }}
-                      animate={{ opacity: 1, rotate: 0, scale: 1 }}
-                      exit={{ opacity: 0, rotate: 45, scale: 0.6 }}
-                      transition={{ duration: 0.25 }}
-                      className="flex"
-                    >
-                      {showBalance ? (
-                        <Eye className="h-4 w-4" />
-                      ) : (
-                        <EyeOff className="h-4 w-4" />
-                      )}
-                    </motion.span>
-                  </AnimatePresence>
-                </button>
-
-                <span className="sr-only" role="status">
-                  {showBalance
-                    ? "Balance visible"
-                    : "Balance hidden"}
-                </span>
-              </div>
-
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-400/10 px-3 py-1.5 text-[10px] font-bold text-emerald-100">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  Wallet Active
-                </span>
-
-                <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[10px] font-bold text-blue-100">
-                  BDT
-                </span>
-              </div>
-            </div>
-
-            {/* RIGHT */}
-
-            <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-md lg:w-auto">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-blue-100/60">
-                    Wallet ID
-                  </p>
-
-                  <p className="mt-2 break-all text-sm font-bold text-white">
-                    {wallet._id}
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={
-                    handleCopyWalletId
-                  }
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white transition hover:bg-white/20"
-                  aria-label="Copy wallet ID"
-                >
-                  <Copy className="h-4 w-4" />
-                </button>
-              </div>
-
-              {copied && (
-                <p className="mt-3 text-[10px] font-semibold text-cyan-200">
-                  Wallet ID copied
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      </section>
+      <PremiumWalletCard
+        walletId={
+          wallet._id
+        }
+        balance={
+          balance
+        }
+      />
 
       {/* =====================================================
           QUICK ACTIONS
       ====================================================== */}
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section
+        className="
+          grid
+          gap-4
+
+          sm:grid-cols-2
+          lg:grid-cols-4
+        "
+      >
         <WalletAction
           href="/dashboard/send"
-          icon={ArrowUpRight}
+          icon={
+            ArrowUpRight
+          }
           title="Send Money"
           description="Transfer funds securely"
           iconClass="bg-blue-50 text-blue-600"
@@ -436,7 +550,9 @@ export default function WalletPage() {
 
         <WalletAction
           href="/dashboard/receive"
-          icon={ArrowDownLeft}
+          icon={
+            ArrowDownLeft
+          }
           title="Receive Money"
           description="Receive funds into wallet"
           iconClass="bg-emerald-50 text-emerald-600"
@@ -444,7 +560,9 @@ export default function WalletPage() {
 
         <WalletAction
           href="/dashboard/transactions"
-          icon={CreditCard}
+          icon={
+            CreditCard
+          }
           title="Transactions"
           description="View wallet activity"
           iconClass="bg-violet-50 text-violet-600"
@@ -452,7 +570,9 @@ export default function WalletPage() {
 
         <WalletAction
           href="/dashboard/kyc"
-          icon={ShieldCheck}
+          icon={
+            ShieldCheck
+          }
           title="KYC Verification"
           description="Secure your account"
           iconClass="bg-amber-50 text-amber-600"
@@ -463,27 +583,109 @@ export default function WalletPage() {
           WALLET INFORMATION
       ====================================================== */}
 
-      <section className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
+      <section
+        className="
+          grid
+          gap-6
+
+          lg:grid-cols-[1.3fr_0.7fr]
+        "
+      >
         {/* WALLET DETAILS */}
 
-        <div className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.04)] sm:p-6">
-          <div className="mb-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-              Account
-            </p>
+        <div
+          className="
+            rounded-[26px]
 
-            <h2 className="mt-1 text-lg font-extrabold text-slate-900">
-              Wallet Information
-            </h2>
+            border
+            border-[#DFE8F1]
+
+            bg-white
+
+            p-5
+
+            shadow-[0_12px_40px_rgba(15,23,42,0.045)]
+
+            sm:p-6
+          "
+        >
+          <div
+            className="
+              mb-6
+
+              flex
+              items-center
+              justify-between
+              gap-4
+            "
+          >
+            <div>
+              <p
+                className="
+                  text-[9px]
+                  font-extrabold
+                  uppercase
+
+                  tracking-[0.17em]
+
+                  text-[#1F5EA8]
+                "
+              >
+                Account
+              </p>
+
+              <h2
+                className="
+                  mt-1.5
+
+                  text-lg
+                  font-extrabold
+
+                  tracking-[-0.02em]
+
+                  text-[#18324A]
+                "
+              >
+                Wallet Information
+              </h2>
+            </div>
+
+            <div
+              className="
+                flex
+                h-10
+                w-10
+                items-center
+                justify-center
+
+                rounded-[13px]
+
+                bg-[#EEF6FD]
+
+                text-[#1F5EA8]
+              "
+            >
+              <WalletCards
+                className="
+                  h-[18px]
+                  w-[18px]
+                "
+              />
+            </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div
+            className="
+              grid
+              gap-3
+
+              sm:grid-cols-2
+            "
+          >
             <InfoCard
               label="Wallet Balance"
               value={
-                showBalance
-                  ? formattedBalance
-                  : maskCurrency(formattedBalance)
+                formattedBalance
               }
             />
 
@@ -494,7 +696,9 @@ export default function WalletPage() {
 
             <InfoCard
               label="Wallet Owner ID"
-              value={wallet.userId}
+              value={
+                wallet.userId
+              }
             />
 
             <InfoCard
@@ -521,60 +725,277 @@ export default function WalletPage() {
 
         {/* SECURITY */}
 
-        <div className="rounded-[26px] border border-emerald-100 bg-gradient-to-br from-emerald-50 to-blue-50 p-5 shadow-[0_10px_35px_rgba(15,23,42,0.04)] sm:p-6">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-emerald-600 shadow-sm">
-            <ShieldCheck className="h-5 w-5" />
-          </div>
+        <div
+          className="
+            relative
+            overflow-hidden
 
-          <h2 className="mt-5 text-lg font-extrabold text-slate-900">
-            Secure Wallet
-          </h2>
+            rounded-[26px]
 
-          <p className="mt-2 text-xs leading-5 text-slate-600">
-            Your wallet is protected by authenticated access.
-            Complete KYC verification before using advanced
-            wallet features.
-          </p>
+            border
+            border-[#DDEAF4]
 
-          <Link
-            href="/dashboard/kyc"
-            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-bold text-[#1F5EA8] shadow-sm transition hover:bg-slate-50"
+            bg-gradient-to-br
+            from-[#F2F9FF]
+            via-white
+            to-[#EFFAF7]
+
+            p-5
+
+            shadow-[0_12px_40px_rgba(15,23,42,0.04)]
+
+            sm:p-6
+          "
+        >
+          <div
+            className="
+              pointer-events-none
+              absolute
+              -right-16
+              -top-16
+
+              h-40
+              w-40
+
+              rounded-full
+
+              bg-blue-400/10
+
+              blur-3xl
+            "
+          />
+
+          <div
+            className="
+              relative
+              z-10
+            "
           >
-            Verification Center
-            <ChevronRight className="h-3.5 w-3.5" />
-          </Link>
+            <div
+              className="
+                flex
+                h-11
+                w-11
+                items-center
+                justify-center
+
+                rounded-[15px]
+
+                border
+                border-emerald-100
+
+                bg-white
+
+                text-emerald-600
+
+                shadow-sm
+              "
+            >
+              <ShieldCheck
+                className="
+                  h-5
+                  w-5
+                "
+              />
+            </div>
+
+            <h2
+              className="
+                mt-5
+
+                text-lg
+                font-extrabold
+
+                tracking-[-0.02em]
+
+                text-[#18324A]
+              "
+            >
+              Secure Wallet
+            </h2>
+
+            <p
+              className="
+                mt-2
+
+                text-xs
+                leading-5
+
+                text-[#687D91]
+              "
+            >
+              Your wallet is protected by authenticated access.
+              Complete identity verification to unlock protected
+              financial actions.
+            </p>
+
+            <Link
+              href="/dashboard/kyc"
+              className="
+                group
+
+                mt-5
+
+                inline-flex
+                h-10
+                items-center
+                gap-2
+
+                rounded-[13px]
+
+                border
+                border-blue-100
+
+                bg-white
+
+                px-4
+
+                text-[11px]
+                font-extrabold
+
+                text-[#1F5EA8]
+
+                shadow-sm
+
+                transition
+
+                hover:border-blue-200
+                hover:bg-blue-50
+              "
+            >
+              Verification Center
+
+              <ChevronRight
+                className="
+                  h-3.5
+                  w-3.5
+
+                  transition-transform
+
+                  group-hover:translate-x-0.5
+                "
+              />
+            </Link>
+          </div>
         </div>
       </section>
 
       {/* =====================================================
-          BALANCE NOTE
+          FOOTER NOTE
       ====================================================== */}
 
-      <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.04)] sm:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#1F5EA8]">
-              <WalletCards className="h-5 w-5" />
+      <section
+        className="
+          rounded-[26px]
+
+          border
+          border-[#DFE8F1]
+
+          bg-white
+
+          p-5
+
+          shadow-[0_10px_35px_rgba(15,23,42,0.035)]
+
+          sm:p-6
+        "
+      >
+        <div
+          className="
+            flex
+            flex-col
+            gap-4
+
+            sm:flex-row
+            sm:items-center
+            sm:justify-between
+          "
+        >
+          <div
+            className="
+              flex
+              items-start
+              gap-3
+            "
+          >
+            <div
+              className="
+                flex
+                h-10
+                w-10
+                shrink-0
+                items-center
+                justify-center
+
+                rounded-[13px]
+
+                bg-blue-50
+
+                text-[#1F5EA8]
+              "
+            >
+              <WalletCards
+                className="
+                  h-5
+                  w-5
+                "
+              />
             </div>
 
             <div>
-              <p className="text-sm font-bold text-slate-900">
+              <p
+                className="
+                  text-sm
+                  font-extrabold
+                  text-[#18324A]
+                "
+              >
                 Your money, one secure place.
               </p>
 
-              <p className="mt-1 text-xs leading-5 text-slate-500">
-                Use your wallet to send, receive, and track your
-                digital payments.
+              <p
+                className="
+                  mt-1
+
+                  text-xs
+                  leading-5
+
+                  text-[#77899B]
+                "
+              >
+                Send, receive and track your digital payments
+                through your Coffer wallet.
               </p>
             </div>
           </div>
 
           <Link
             href="/dashboard/transactions"
-            className="inline-flex items-center gap-1 text-xs font-bold text-[#1F5EA8] hover:underline"
+            className="
+              group
+
+              inline-flex
+              items-center
+              gap-1.5
+
+              text-xs
+              font-bold
+
+              text-[#1F5EA8]
+            "
           >
             View transaction history
-            <ChevronRight className="h-3.5 w-3.5" />
+
+            <ChevronRight
+              className="
+                h-3.5
+                w-3.5
+
+                transition-transform
+
+                group-hover:translate-x-0.5
+              "
+            />
           </Link>
         </div>
       </section>
@@ -594,31 +1015,105 @@ function WalletAction({
   iconClass,
 }: {
   href: string;
-  icon: React.ElementType;
+  icon: ElementType;
   title: string;
   description: string;
   iconClass: string;
 }) {
   return (
     <Link
-      href={href}
-      className="group rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.04)] transition duration-300 hover:-translate-y-1 hover:border-blue-100 hover:shadow-[0_16px_40px_rgba(15,23,42,0.07)]"
+      href={
+        href
+      }
+      className="
+        group
+
+        rounded-[23px]
+
+        border
+        border-[#E1E9F0]
+
+        bg-white
+
+        p-5
+
+        shadow-[0_10px_30px_rgba(15,23,42,0.035)]
+
+        transition
+        duration-300
+
+        hover:-translate-y-1
+        hover:border-blue-100
+        hover:shadow-[0_18px_40px_rgba(15,23,42,0.07)]
+      "
     >
-      <div className="flex items-start justify-between gap-3">
+      <div
+        className="
+          flex
+          items-start
+          justify-between
+          gap-3
+        "
+      >
         <div
-          className={`flex h-11 w-11 items-center justify-center rounded-xl ${iconClass}`}
+          className={`
+            flex
+            h-11
+            w-11
+            items-center
+            justify-center
+
+            rounded-[14px]
+
+            ${iconClass}
+          `}
         >
-          <Icon className="h-5 w-5" />
+          <Icon
+            className="
+              h-5
+              w-5
+            "
+          />
         </div>
 
-        <ChevronRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[#1F5EA8]" />
+        <ChevronRight
+          className="
+            h-4
+            w-4
+
+            text-slate-300
+
+            transition
+
+            group-hover:translate-x-0.5
+            group-hover:text-[#1F5EA8]
+          "
+        />
       </div>
 
-      <h3 className="mt-5 text-sm font-extrabold text-slate-900">
+      <h3
+        className="
+          mt-5
+
+          text-sm
+          font-extrabold
+
+          text-[#18324A]
+        "
+      >
         {title}
       </h3>
 
-      <p className="mt-1 text-[11px] leading-5 text-slate-400">
+      <p
+        className="
+          mt-1
+
+          text-[11px]
+          leading-5
+
+          text-[#8A9AAA]
+        "
+      >
         {description}
       </p>
     </Link>
@@ -632,20 +1127,53 @@ function WalletAction({
 function InfoCard({
   label,
   value,
-  valueClass = "text-slate-900",
+  valueClass =
+    "text-[#18324A]",
 }: {
   label: string;
   value: string;
   valueClass?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-      <p className="text-[10px] font-bold uppercase tracking-[0.13em] text-slate-400">
+    <div
+      className="
+        rounded-[17px]
+
+        border
+        border-[#EDF1F5]
+
+        bg-[#F8FAFC]
+
+        p-4
+      "
+    >
+      <p
+        className="
+          text-[9px]
+          font-extrabold
+          uppercase
+
+          tracking-[0.14em]
+
+          text-[#95A3B1]
+        "
+      >
         {label}
       </p>
 
       <p
-        className={`mt-2 break-all text-sm font-bold transition-all duration-300 ${valueClass}`}
+        className={`
+          mt-2
+
+          break-all
+
+          text-sm
+          font-bold
+
+          transition
+
+          ${valueClass}
+        `}
       >
         {value}
       </p>
@@ -665,18 +1193,13 @@ function formatCurrency(
   ).toLocaleString(
     "en-BD",
     {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
+      minimumFractionDigits:
+        0,
+
+      maximumFractionDigits:
+        2,
     }
   )}`;
-}
-
-// Replaces digits in an already-formatted currency string with
-// bullets, keeping the symbol/commas/decimal point — so the masked
-// balance still reads as "a number-shaped thing" instead of a
-// generic placeholder.
-function maskCurrency(formatted: string): string {
-  return formatted.replace(/[0-9]/g, "•");
 }
 
 /* =========================================================
@@ -691,7 +1214,9 @@ function formatDate(
   }
 
   const date =
-    new Date(value);
+    new Date(
+      value
+    );
 
   if (
     Number.isNaN(
@@ -704,11 +1229,20 @@ function formatDate(
   return date.toLocaleString(
     "en-BD",
     {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
+      day:
+        "2-digit",
+
+      month:
+        "short",
+
+      year:
+        "numeric",
+
+      hour:
+        "2-digit",
+
+      minute:
+        "2-digit",
     }
   );
 }
