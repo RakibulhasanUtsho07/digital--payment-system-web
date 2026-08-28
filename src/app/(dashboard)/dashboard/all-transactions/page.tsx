@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Clock3,
   Filter,
+  Loader2,
   RefreshCw,
   Search,
   ShieldAlert,
@@ -24,10 +25,13 @@ import {
   motion,
 } from "framer-motion";
 
+import { apiClient } from "@/lib/api/client";
+
 interface TransactionUser {
   _id: string;
   name?: string;
   email?: string;
+  phone?: string;
 }
 
 interface Transaction {
@@ -64,106 +68,12 @@ interface Transaction {
   updatedAt?: string;
 }
 
-const DEMO_TRANSACTIONS: Transaction[] =
-  [
-    {
-      _id: "txn_001",
-      senderId: {
-        _id: "usr_001",
-        name: "Rakibul Hasan",
-        email:
-          "rakibul@example.com",
-      },
-      receiverId: {
-        _id: "usr_002",
-        name: "Nusrat Jahan",
-        email:
-          "nusrat@example.com",
-      },
-      amount: 2500,
-      currency: "BDT",
-      type: "TRANSFER",
-      status: "COMPLETED",
-      reference:
-        "TRX-2026-001",
-      riskScore: "LOW",
-      createdAt:
-        "2026-08-24T08:30:00Z",
-    },
-
-    {
-      _id: "txn_002",
-      senderId: {
-        _id: "usr_003",
-        name: "Tanvir Ahmed",
-        email:
-          "tanvir@example.com",
-      },
-      receiverId: {
-        _id: "usr_004",
-        name: "Farhana Akter",
-        email:
-          "farhana@example.com",
-      },
-      amount: 8500,
-      currency: "BDT",
-      type: "TRANSFER",
-      status: "PENDING",
-      reference:
-        "TRX-2026-002",
-      riskScore: "MEDIUM",
-      createdAt:
-        "2026-08-24T09:15:00Z",
-    },
-
-    {
-      _id: "txn_003",
-      senderId: {
-        _id: "usr_005",
-        name: "Sadia Islam",
-        email:
-          "sadia@example.com",
-      },
-      receiverId: {
-        _id: "usr_006",
-        name: "Nayeem Hasan",
-        email:
-          "nayeem@example.com",
-      },
-      amount: 15000,
-      currency: "BDT",
-      type: "TRANSFER",
-      status: "FAILED",
-      reference:
-        "TRX-2026-003",
-      riskScore: "HIGH",
-      createdAt:
-        "2026-08-24T10:45:00Z",
-    },
-
-    {
-      _id: "txn_004",
-      senderId: {
-        _id: "usr_007",
-        name: "Mim Akter",
-        email:
-          "mim@example.com",
-      },
-      receiverId: {
-        _id: "system",
-        name: "Wallet Deposit",
-      },
-      amount: 12000,
-      currency: "BDT",
-      type: "DEPOSIT",
-      status: "COMPLETED",
-      reference:
-        "DEP-2026-004",
-      riskScore: "LOW",
-      createdAt:
-        "2026-08-24T11:10:00Z",
-    },
-  ];
+interface TransactionsResponse {
+  success: boolean;
+  count: number;
+  transactions: Transaction[];
+  message?: string;
+}
 
 function getUserName(
   value:
@@ -229,7 +139,7 @@ export default function AllTransactionsPage() {
     setTransactions,
   ] = useState<
     Transaction[]
-  >(DEMO_TRANSACTIONS);
+  >([]);
 
   const [
     search,
@@ -262,11 +172,77 @@ export default function AllTransactionsPage() {
   ] = useState(false);
 
   const [
+    loading,
+    setLoading,
+  ] = useState(true);
+
+  const [
+    errorMessage,
+    setErrorMessage,
+  ] = useState("");
+
+  const [
     page,
     setPage,
   ] = useState(1);
 
   const pageSize = 10;
+
+  const loadTransactions =
+    async (
+      showFullLoader = true
+    ) => {
+      try {
+        if (showFullLoader) {
+          setLoading(true);
+        } else {
+          setRefreshing(true);
+        }
+
+        setErrorMessage("");
+
+        const data =
+          await apiClient<TransactionsResponse>(
+            "/admin/transactions"
+          );
+
+        if (
+          !data ||
+          data.success !== true
+        ) {
+          throw new Error(
+            data?.message ||
+              "Failed to load all transactions."
+          );
+        }
+
+        setTransactions(
+          Array.isArray(
+            data.transactions
+          )
+            ? data.transactions
+            : []
+        );
+      } catch (error: unknown) {
+        console.error(
+          "ADMIN ALL TRANSACTIONS ERROR:",
+          error
+        );
+
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "Failed to load all transactions."
+        );
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    };
+
+  useEffect(() => {
+    void loadTransactions(true);
+  }, []);
 
   const filteredTransactions =
     useMemo(() => {
@@ -418,26 +394,30 @@ export default function AllTransactionsPage() {
 
   const refreshTransactions =
     async () => {
-      setRefreshing(
-        true
-      );
-
-      await new Promise(
-        (resolve) =>
-          window.setTimeout(
-            resolve,
-            600
-          )
-      );
-
-      setTransactions(
-        DEMO_TRANSACTIONS
-      );
-
-      setRefreshing(
+      await loadTransactions(
         false
       );
     };
+
+  if (loading) {
+    return (
+      <main className="flex min-h-[70vh] items-center justify-center bg-[#F6F8FB] px-4">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#0F2745] text-white shadow-lg">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-800">
+            Loading all transactions
+          </p>
+
+          <p className="mt-1 text-xs text-slate-400">
+            Fetching secure platform transaction data...
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#F6F8FB] pb-12">
@@ -493,6 +473,31 @@ export default function AllTransactionsPage() {
             </button>
           </div>
         </motion.section>
+
+        {errorMessage && (
+          <section className="rounded-2xl border border-rose-200 bg-rose-50 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-black text-rose-800">
+                  Could not load transactions
+                </p>
+                <p className="mt-1 text-xs text-rose-600">
+                  {errorMessage}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  void loadTransactions(true)
+                }
+                className="rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-rose-700"
+              >
+                Try Again
+              </button>
+            </div>
+          </section>
+        )}
 
         {/* stats */}
 
@@ -710,7 +715,8 @@ export default function AllTransactionsPage() {
                             <div>
                               <p className="text-xs font-black text-slate-800">
                                 {
-                                  transaction.reference
+                                  transaction.reference ||
+                                  "No reference"
                                 }
                               </p>
 

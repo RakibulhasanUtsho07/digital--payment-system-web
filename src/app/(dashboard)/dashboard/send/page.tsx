@@ -3,6 +3,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ElementType,
   type ReactNode,
@@ -17,6 +18,7 @@ import {
 
 import {
   ArrowRight,
+  ArrowUpRight,
   Banknote,
   CheckCircle2,
   ChevronLeft,
@@ -25,6 +27,7 @@ import {
   Eye,
   EyeOff,
   FileText,
+  Fingerprint,
   History,
   Loader2,
   LockKeyhole,
@@ -33,6 +36,7 @@ import {
   ShieldCheck,
   Sparkles,
   UserRound,
+  Zap,
   WalletCards,
   X,
 } from "lucide-react";
@@ -56,10 +60,15 @@ import { getMyWallet } from "@/lib/api/walletApi";
 interface TransferResponse {
   success: boolean;
   message?: string;
+  duplicate?: boolean;
+  retryable?: boolean;
   transaction?: {
     _id: string;
     amount: number;
     status: string;
+    currency?: string;
+    reference?: string;
+    createdAt?: string;
   };
 }
 
@@ -123,6 +132,17 @@ export default function SendMoneyPage() {
   // an older transaction-history endpoint, so this stores only confirmed
   // transfers completed during the current page session.
   const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryItem[]>([]);
+
+  /* =========================================================
+     IDEMPOTENCY
+
+     - Same logical transfer keeps the same key while retrying.
+     - Editing recipient / amount / note creates a fresh key.
+     - Password is intentionally NOT part of the fingerprint.
+  ========================================================== */
+
+  const idempotencyKeyRef = useRef<string | null>(null);
+  const transferFingerprintRef = useRef<string | null>(null);
 
   /* =========================================================
      WALLET BALANCE
@@ -208,6 +228,30 @@ export default function SendMoneyPage() {
   };
 
   /* =========================================================
+     IDEMPOTENCY KEY
+  ========================================================== */
+
+  const getIdempotencyKey = (): string => {
+    const amountInMinorUnits = Math.round(numericAmount * 100);
+
+    const fingerprint = JSON.stringify({
+      recipient: recipient.trim().toLowerCase(),
+      amountInMinorUnits,
+      reference: note.trim(),
+    });
+
+    if (
+      !idempotencyKeyRef.current ||
+      transferFingerprintRef.current !== fingerprint
+    ) {
+      idempotencyKeyRef.current = crypto.randomUUID();
+      transferFingerprintRef.current = fingerprint;
+    }
+
+    return idempotencyKeyRef.current;
+  };
+
+  /* =========================================================
      SEND MONEY
   ========================================================== */
 
@@ -216,12 +260,22 @@ export default function SendMoneyPage() {
       return;
     }
 
-    if (!password.trim()) {
+    if (!password) {
       setErrorMessage(
         "Enter your login password to confirm this transfer."
       );
       return;
     }
+
+    if (!isRecipientValid || !isAmountValid) {
+      setErrorMessage(
+        "The transfer details changed. Please review the recipient and amount again."
+      );
+      goToStep(1);
+      return;
+    }
+
+    const idempotencyKey = getIdempotencyKey();
 
     setErrorMessage("");
     setIsLoading(true);
@@ -229,6 +283,9 @@ export default function SendMoneyPage() {
     try {
       const data = await apiClient<TransferResponse>("/transfers", {
         method: "POST",
+        headers: {
+          "Idempotency-Key": idempotencyKey,
+        },
         body: JSON.stringify({
           recipient: recipient.trim(),
           amount: numericAmount,
@@ -246,13 +303,26 @@ export default function SendMoneyPage() {
           id: data.transaction._id,
           recipient: recipient.trim(),
           amount: Number(data.transaction.amount) || numericAmount,
-          status: data.transaction.status || "completed",
-          note: note.trim() || undefined,
-          createdAt: new Date().toISOString(),
+          status: data.transaction.status || "COMPLETED",
+          note: data.transaction.reference ?? (note.trim() || undefined),
+          createdAt: data.transaction.createdAt || new Date().toISOString(),
         };
 
-        setPaymentHistory((current) => [historyItem, ...current]);
+        setPaymentHistory((current) => {
+          if (current.some((item) => item.id === historyItem.id)) {
+            return current;
+          }
+
+          return [historyItem, ...current];
+        });
       }
+
+      /*
+       * The logical transfer is complete.
+       * A future transfer must receive a fresh idempotency key.
+       */
+      idempotencyKeyRef.current = null;
+      transferFingerprintRef.current = null;
 
       setPassword("");
       setShowPassword(false);
@@ -260,6 +330,10 @@ export default function SendMoneyPage() {
       goToStep(3);
       void loadBalance();
     } catch (error) {
+      /*
+       * Keep the current key on failure so a network retry
+       * of the SAME transfer remains idempotent.
+       */
       setErrorMessage(
         error instanceof Error
           ? error.message
@@ -285,6 +359,8 @@ export default function SendMoneyPage() {
     setShowPassword(false);
     setNote("");
     setErrorMessage("");
+    idempotencyKeyRef.current = null;
+    transferFingerprintRef.current = null;
   };
 
   /* =========================================================
@@ -302,37 +378,7 @@ export default function SendMoneyPage() {
       ====================================================== */}
 
       <section className="relative z-10 grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px] xl:items-stretch">
-        <motion.div
-          initial={{ opacity: 0, y: -12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="flex min-h-[220px] flex-col justify-between rounded-[30px] border border-[#DCE9F3] bg-white/90 p-6 shadow-[0_20px_60px_rgba(15,39,69,0.06)] backdrop-blur sm:p-8"
-        >
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-[#D8EAF8] bg-[#F3F9FF] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-[#1F6FB4]">
-              <Sparkles className="h-3.5 w-3.5" />
-              Secure Transfer
-            </div>
-
-            <h1 className="mt-4 text-3xl font-black tracking-[-0.045em] text-[#102A43] sm:text-[38px]">
-              Send money with confidence.
-            </h1>
-
-            <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-[#6D8297]">
-              Move funds from your Coffer wallet through a clear, secure,
-              step-by-step transfer flow.
-            </p>
-          </div>
-
-          <div className="mt-6 flex flex-wrap items-center gap-3 text-[10px] font-bold text-[#7890A5]">
-            <span className="inline-flex items-center gap-1.5">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-              Protected session
-            </span>
-            <span className="h-1 w-1 rounded-full bg-slate-300" />
-            <span>Review before sending</span>
-          </div>
-        </motion.div>
+        <TransferHeroCard />
 
         <BalanceRevealCard
           balanceLoading={balanceLoading}
@@ -809,6 +855,125 @@ export default function SendMoneyPage() {
         </motion.aside>
       </section>
     </main>
+  );
+}
+
+/* =========================================================
+   TRANSFER HERO CARD
+========================================================= */
+
+function TransferHeroCard() {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="group relative min-h-[220px] overflow-hidden rounded-[30px] border border-[#D9E7F2] bg-[linear-gradient(135deg,#FFFFFF_0%,#F8FBFF_48%,#F1F8FE_100%)] p-6 shadow-[0_24px_70px_rgba(15,61,103,0.08)] sm:p-7 lg:p-8"
+    >
+      <div className="pointer-events-none absolute -left-20 -top-24 h-64 w-64 rounded-full bg-sky-300/10 blur-[70px]" />
+      <div className="pointer-events-none absolute -bottom-24 right-[18%] h-56 w-56 rounded-full bg-blue-400/10 blur-[80px]" />
+      <div className="pointer-events-none absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-[#78BEEA]/45 to-transparent" />
+
+      <div className="relative z-10 grid h-full items-center gap-7 md:grid-cols-[minmax(0,1fr)_190px] lg:grid-cols-[minmax(0,1fr)_210px]">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-2 rounded-full border border-[#CFE7F7] bg-white/90 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-[#1769AA] shadow-[0_6px_18px_rgba(23,105,170,0.06)]">
+              <Sparkles className="h-3.5 w-3.5" />
+              Secure transfer
+            </span>
+
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50/80 px-2.5 py-1.5 text-[9px] font-black text-emerald-600">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.10)]" />
+              Protected
+            </span>
+          </div>
+
+          <h1 className="mt-4 max-w-[560px] text-[32px] font-black leading-[1.04] tracking-[-0.055em] text-[#0E2A43] sm:text-[38px] lg:text-[41px]">
+            Send money with
+            <span className="relative ml-2 inline-block text-[#1E70B5]">
+              confidence.
+              <motion.span
+                aria-hidden
+                className="absolute -bottom-1 left-0 h-[3px] w-full rounded-full bg-gradient-to-r from-[#1F77BA] via-[#61C3EA] to-transparent"
+                initial={{ scaleX: 0, originX: 0 }}
+                animate={{ scaleX: 1 }}
+                transition={{ delay: 0.45, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+              />
+            </span>
+          </h1>
+
+          <p className="mt-3 max-w-xl text-[13px] font-medium leading-6 text-[#6B8297] sm:text-sm">
+            A guided Coffer transfer flow with review, password confirmation,
+            encrypted transaction data, and duplicate-payment protection.
+          </p>
+
+          <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] font-bold text-[#6F879B]">
+            <span className="inline-flex items-center gap-1.5">
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+              Protected session
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <Fingerprint className="h-3.5 w-3.5 text-[#2B80C5]" />
+              Retry-safe payment
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <CheckCircle2 className="h-3.5 w-3.5 text-[#2B80C5]" />
+              Review before send
+            </span>
+          </div>
+        </div>
+
+        <div className="relative hidden h-[168px] md:block">
+          <motion.div
+            animate={{ y: [0, -5, 0] }}
+            transition={{ duration: 4.6, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute inset-0 overflow-hidden rounded-[24px] border border-[#D7E8F5] bg-white/80 p-4 shadow-[0_18px_42px_rgba(31,111,180,0.10)] backdrop-blur-xl"
+          >
+            <div className="absolute -right-10 -top-10 h-28 w-28 rounded-full bg-[#63C7EE]/15 blur-[34px]" />
+
+            <div className="relative flex items-center justify-between">
+              <div className="flex h-10 w-10 items-center justify-center rounded-[13px] bg-gradient-to-br from-[#155E9D] to-[#38A7DE] text-white shadow-[0_8px_20px_rgba(31,111,180,0.22)]">
+                <WalletCards className="h-[18px] w-[18px]" />
+              </div>
+
+              <motion.div
+                animate={{ x: [0, 5, 0] }}
+                transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#D9E9F5] bg-[#F4FAFF] text-[#1F72B5]"
+              >
+                <ArrowUpRight className="h-4 w-4" />
+              </motion.div>
+
+              <div className="flex h-10 w-10 items-center justify-center rounded-[13px] border border-emerald-100 bg-emerald-50 text-emerald-600">
+                <CheckCircle2 className="h-[18px] w-[18px]" />
+              </div>
+            </div>
+
+            <div className="relative mt-4 h-1.5 overflow-hidden rounded-full bg-[#E8F2F9]">
+              <motion.div
+                className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[#1E70B5] to-[#65C9EC]"
+                animate={{ width: ["18%", "100%", "18%"] }}
+                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+              />
+            </div>
+
+            <div className="relative mt-4 grid grid-cols-2 gap-2">
+              <div className="rounded-[12px] bg-[#F4F9FD] px-3 py-2.5">
+                <p className="text-[8px] font-black uppercase tracking-[0.12em] text-[#90A3B4]">Authorize</p>
+                <p className="mt-1 text-[10px] font-black text-[#29475F]">Password check</p>
+              </div>
+              <div className="rounded-[12px] bg-[#F4F9FD] px-3 py-2.5">
+                <p className="text-[8px] font-black uppercase tracking-[0.12em] text-[#90A3B4]">Protection</p>
+                <p className="mt-1 flex items-center gap-1 text-[10px] font-black text-[#29475F]">
+                  <Zap className="h-3 w-3 text-amber-500" />
+                  Duplicate safe
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    </motion.div>
   );
 }
 

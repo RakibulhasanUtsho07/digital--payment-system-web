@@ -48,6 +48,7 @@ interface UserRef {
   _id: string;
   name?: string;
   email?: string;
+  phone?: string;
 }
 
 interface Transaction {
@@ -82,6 +83,12 @@ interface TransactionsResponse {
   success: boolean;
   count: number;
   transactions: Transaction[];
+}
+
+interface TransactionDetailsResponse {
+  success: boolean;
+  transaction: Transaction;
+  message?: string;
 }
 
 type TypeFilter =
@@ -146,6 +153,11 @@ export default function TransactionsPage() {
     null
   );
 
+  const [
+    loadingTransactionId,
+    setLoadingTransactionId,
+  ] = useState<string | null>(null);
+
   /* =========================================================
      LOAD TRANSACTIONS
   ========================================================== */
@@ -207,6 +219,64 @@ export default function TransactionsPage() {
   useEffect(() => {
     void loadTransactions(true);
   }, [loadTransactions]);
+
+  /* =========================================================
+     LOAD SINGLE TRANSACTION DETAILS
+     GET /api/transactions/:id
+  ========================================================== */
+
+  const openTransactionDetails =
+    useCallback(
+      async (
+        transactionId: string
+      ) => {
+        try {
+          setLoadingTransactionId(
+            transactionId
+          );
+
+          setErrorMessage("");
+
+          const data =
+            await apiClient<TransactionDetailsResponse>(
+              `/transactions/${encodeURIComponent(
+                transactionId
+              )}`
+            );
+
+          if (
+            !data ||
+            data.success !== true ||
+            !data.transaction
+          ) {
+            throw new Error(
+              data?.message ||
+                "Failed to load transaction details."
+            );
+          }
+
+          setSelectedTransaction(
+            data.transaction
+          );
+        } catch (error: unknown) {
+          console.error(
+            "Transaction details loading error:",
+            error
+          );
+
+          setErrorMessage(
+            error instanceof Error
+              ? error.message
+              : "Failed to load transaction details."
+          );
+        } finally {
+          setLoadingTransactionId(
+            null
+          );
+        }
+      },
+      []
+    );
 
   /* =========================================================
      FILTER TRANSACTIONS
@@ -679,9 +749,13 @@ export default function TransactionsPage() {
                 <TransactionRow
                   key={item.id}
                   item={item}
+                  loading={
+                    loadingTransactionId ===
+                    item.id
+                  }
                   onView={() =>
-                    setSelectedTransaction(
-                      item.transaction
+                    void openTransactionDetails(
+                      item.id
                     )
                   }
                 />
@@ -762,9 +836,11 @@ function SummaryCard({
 function TransactionRow({
   item,
   onView,
+  loading,
 }: {
   item: TransactionView;
   onView: () => void;
+  loading: boolean;
 }) {
   const Icon =
     item.icon;
@@ -807,12 +883,19 @@ function TransactionRow({
         <button
           type="button"
           onClick={onView}
-          className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-[#1F5EA8]"
+          disabled={loading}
+          className="inline-flex h-10 min-w-[104px] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-[#1F5EA8] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <Eye className="h-4 w-4" />
+          {loading ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Eye className="h-4 w-4" />
+          )}
 
           <span className="hidden sm:inline">
-            Details
+            {loading
+              ? "Loading..."
+              : "Details"}
           </span>
         </button>
       </div>
