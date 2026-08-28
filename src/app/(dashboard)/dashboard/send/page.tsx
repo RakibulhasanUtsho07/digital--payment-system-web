@@ -2,16 +2,17 @@
 
 import {
   useEffect,
-  useRef,
+  useMemo,
   useState,
-  type ChangeEvent,
-  type KeyboardEvent,
+  type ElementType,
+  type ReactNode,
 } from "react";
+
+import Link from "next/link";
 
 import {
   AnimatePresence,
   motion,
-  useAnimation,
 } from "framer-motion";
 
 import {
@@ -24,38 +25,37 @@ import {
   Eye,
   EyeOff,
   FileText,
+  History,
   Loader2,
   LockKeyhole,
+  ReceiptText,
   Send,
   ShieldCheck,
   Sparkles,
   UserRound,
   WalletCards,
+  X,
 } from "lucide-react";
 
-import Link from "next/link";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 import { apiClient } from "@/lib/api/client";
+import { getMyWallet } from "@/lib/api/walletApi";
 
 /* =========================================================
    TYPES
 ========================================================= */
 
-interface WalletBalanceResponse {
-  success: boolean;
-
-  wallet: {
-    balance: number;
-
-    [key: string]: unknown;
-  };
-}
-
 interface TransferResponse {
   success: boolean;
-
   message?: string;
-
   transaction?: {
     _id: string;
     amount: number;
@@ -63,79 +63,36 @@ interface TransferResponse {
   };
 }
 
+interface PaymentHistoryItem {
+  id: string;
+  recipient: string;
+  amount: number;
+  status: string;
+  note?: string;
+  createdAt: string;
+}
+
 /* =========================================================
    CONSTANTS
 ========================================================= */
 
-const quickAmounts = [
-  100,
-  500,
-  1000,
-  5000,
-];
-
-const recentContacts = [
-  {
-    name: "Rakibul Islam",
-    phone: "017XX-XXXXXX",
-    initial: "RI",
-    gradient:
-      "from-blue-500 to-sky-400",
-    glow:
-      "shadow-blue-500/20",
-  },
-  {
-    name: "Anisur Rahman",
-    phone: "019XX-XXXXXX",
-    initial: "AR",
-    gradient:
-      "from-emerald-500 to-teal-400",
-    glow:
-      "shadow-emerald-500/20",
-  },
-  {
-    name: "Jahid Hasan",
-    phone: "018XX-XXXXXX",
-    initial: "JH",
-    gradient:
-      "from-violet-500 to-fuchsia-400",
-    glow:
-      "shadow-violet-500/20",
-  },
-];
-
-/* =========================================================
-   MOTION
-========================================================= */
+const quickAmounts = [100, 500, 1000, 5000];
 
 const stepVariants = {
-  enter: (
-    direction: number
-  ) => ({
+  enter: (direction: number) => ({
     opacity: 0,
-    x:
-      direction *
-      35,
-    filter:
-      "blur(5px)",
+    x: direction * 28,
+    filter: "blur(7px)",
   }),
-
   center: {
     opacity: 1,
     x: 0,
-    filter:
-      "blur(0px)",
+    filter: "blur(0px)",
   },
-
-  exit: (
-    direction: number
-  ) => ({
+  exit: (direction: number) => ({
     opacity: 0,
-    x:
-      direction *
-      -35,
-    filter:
-      "blur(5px)",
+    x: direction * -28,
+    filter: "blur(7px)",
   }),
 };
 
@@ -144,2190 +101,976 @@ const stepVariants = {
 ========================================================= */
 
 export default function SendMoneyPage() {
-  const [
-    step,
-    setStep,
-  ] =
-    useState<
-      1 | 2 | 3
-    >(1);
+  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [direction, setDirection] = useState(1);
 
-  const [
-    direction,
-    setDirection,
-  ] = useState(1);
+  const [amount, setAmount] = useState("");
+  const [recipient, setRecipient] = useState("");
+  const [note, setNote] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
-  const [
-    amount,
-    setAmount,
-  ] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  const [
-    recipient,
-    setRecipient,
-  ] = useState("");
+  const [balance, setBalance] = useState<number | null>(null);
+  const [balanceLoading, setBalanceLoading] = useState(true);
 
-  const [
-    note,
-    setNote,
-  ] = useState("");
+  // Requirement: hidden by default.
+  const [showBalance, setShowBalance] = useState(false);
 
-  const [
-    pin,
-    setPin,
-  ] = useState<
-    string[]
-  >([
-    "",
-    "",
-    "",
-    "",
-  ]);
-
-  const [
-    isLoading,
-    setIsLoading,
-  ] = useState(false);
-
-  const [
-    errorMessage,
-    setErrorMessage,
-  ] = useState("");
-
-  const [
-    balance,
-    setBalance,
-  ] =
-    useState<
-      number | null
-    >(null);
-
-  const [
-    balanceLoading,
-    setBalanceLoading,
-  ] = useState(true);
-
-  const [
-    showBalance,
-    setShowBalance,
-  ] = useState(true);
-
-  const pinValue =
-    pin.join("");
-
-  const pinControls =
-    useAnimation();
+  // The current backend response shown in the supplied file does not include
+  // an older transaction-history endpoint, so this stores only confirmed
+  // transfers completed during the current page session.
+  const [paymentHistory, setPaymentHistory] = useState<PaymentHistoryItem[]>([]);
 
   /* =========================================================
-     LOAD BALANCE
+     WALLET BALANCE
   ========================================================== */
 
+  const loadBalance = async () => {
+    try {
+      setBalanceLoading(true);
+
+      const data = await getMyWallet();
+
+      if (data?.success && data.wallet) {
+        setBalance(Number(data.wallet.balance) || 0);
+      }
+    } catch (error) {
+      console.error("Failed to load wallet balance:", error);
+    } finally {
+      setBalanceLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const loadBalance =
-      async () => {
-        try {
-          setBalanceLoading(
-            true
-          );
-
-          const data =
-            await apiClient<WalletBalanceResponse>(
-              "/wallet"
-            );
-
-          if (
-            data?.success &&
-            data.wallet
-          ) {
-            setBalance(
-              Number(
-                data.wallet
-                  .balance
-              ) || 0
-            );
-          }
-        } catch (
-          error
-        ) {
-          console.error(
-            "Failed to load wallet balance:",
-            error
-          );
-        } finally {
-          setBalanceLoading(
-            false
-          );
-        }
-      };
-
     void loadBalance();
   }, []);
 
   /* =========================================================
-     VALIDATION
+     DERIVED STATE
   ========================================================== */
 
-  const numericAmount =
-    Number(amount);
+  const numericAmount = Number(amount);
 
-  const isRecipientValid =
-    recipient
-      .trim()
-      .length >= 3;
+  const isRecipientValid = recipient.trim().length >= 3;
 
   const isAmountValid =
-    amount.trim() !==
-      "" &&
-    Number.isFinite(
-      numericAmount
-    ) &&
+    amount.trim() !== "" &&
+    Number.isFinite(numericAmount) &&
     numericAmount > 0 &&
-    (
-      balance ===
-        null ||
-      numericAmount <=
-        balance
-    );
+    (balance === null || numericAmount <= balance);
+
+  const formattedBalance = formatCurrency(balance ?? 0);
+
+  const recentRecipients = useMemo(() => {
+    const unique = new Map<string, PaymentHistoryItem>();
+
+    paymentHistory.forEach((item) => {
+      if (!unique.has(item.recipient)) {
+        unique.set(item.recipient, item);
+      }
+    });
+
+    return Array.from(unique.values()).slice(0, 4);
+  }, [paymentHistory]);
 
   /* =========================================================
      STEP NAVIGATION
   ========================================================== */
 
-  const goToStep = (
-    next:
-      | 1
-      | 2
-      | 3
-  ) => {
-    setDirection(
-      next > step
-        ? 1
-        : -1
-    );
-
+  const goToStep = (next: 1 | 2 | 3) => {
+    setDirection(next > step ? 1 : -1);
     setStep(next);
   };
 
-  const handleNext =
-    () => {
+  const handleNext = () => {
+    setErrorMessage("");
+
+    if (!isRecipientValid) {
       setErrorMessage(
-        ""
+        "Enter a valid mobile number or email for the recipient."
       );
+      return;
+    }
 
-      if (
-        !isRecipientValid
-      ) {
-        setErrorMessage(
-          "Enter a valid mobile number or email for the recipient."
-        );
+    if (!isAmountValid) {
+      setErrorMessage(
+        balance !== null && numericAmount > balance
+          ? "That amount is more than your available balance."
+          : "Enter a valid amount greater than 0."
+      );
+      return;
+    }
 
-        return;
-      }
-
-      if (
-        !isAmountValid
-      ) {
-        setErrorMessage(
-          balance !==
-              null &&
-            numericAmount >
-              balance
-            ? "That amount is more than your available balance."
-            : "Enter a valid amount greater than 0."
-        );
-
-        return;
-      }
-
-      goToStep(2);
-    };
+    goToStep(2);
+  };
 
   /* =========================================================
-     SEND
+     SEND MONEY
   ========================================================== */
 
-  const handleSend =
-    async () => {
-      if (
-        pinValue.length <
-        4
-      ) {
-        return;
-      }
+  const handleSend = async () => {
+    if (isLoading) {
+      return;
+    }
 
+    if (!password.trim()) {
       setErrorMessage(
-        ""
+        "Enter your login password to confirm this transfer."
       );
+      return;
+    }
 
-      setIsLoading(
-        true
-      );
+    setErrorMessage("");
+    setIsLoading(true);
 
-      try {
-        const data =
-          await apiClient<TransferResponse>(
-            "/transfers",
-            {
-              method:
-                "POST",
+    try {
+      const data = await apiClient<TransferResponse>("/transfers", {
+        method: "POST",
+        body: JSON.stringify({
+          recipient: recipient.trim(),
+          amount: numericAmount,
+          reference: note.trim() || undefined,
+          password,
+        }),
+      });
 
-              body:
-                JSON.stringify(
-                  {
-                    recipient:
-                      recipient.trim(),
-
-                    amount:
-                      numericAmount,
-
-                    note:
-                      note.trim() ||
-                      undefined,
-
-                    pin:
-                      pinValue,
-                  }
-                ),
-            }
-          );
-
-        if (
-          !data?.success
-        ) {
-          throw new Error(
-            data?.message ||
-              "Transfer failed."
-          );
-        }
-
-        goToStep(3);
-
-        void (async () => {
-          try {
-            const fresh =
-              await apiClient<WalletBalanceResponse>(
-                "/wallet"
-              );
-
-            if (
-              fresh?.success &&
-              fresh.wallet
-            ) {
-              setBalance(
-                Number(
-                  fresh
-                    .wallet
-                    .balance
-                ) || 0
-              );
-            }
-          } catch {
-            // Non-fatal refresh error
-          }
-        })();
-      } catch (
-        error
-      ) {
-        setErrorMessage(
-          error instanceof
-            Error
-            ? error.message
-            : "Transfer failed. Please try again."
-        );
-
-        setPin([
-          "",
-          "",
-          "",
-          "",
-        ]);
-
-        void pinControls.start(
-          {
-            x: [
-              0,
-              -10,
-              10,
-              -10,
-              10,
-              0,
-            ],
-
-            transition: {
-              duration:
-                0.4,
-            },
-          }
-        );
-      } finally {
-        setIsLoading(
-          false
-        );
+      if (!data?.success) {
+        throw new Error(data?.message || "Transfer failed.");
       }
-    };
+
+      if (data.transaction?._id) {
+        const historyItem: PaymentHistoryItem = {
+          id: data.transaction._id,
+          recipient: recipient.trim(),
+          amount: Number(data.transaction.amount) || numericAmount,
+          status: data.transaction.status || "completed",
+          note: note.trim() || undefined,
+          createdAt: new Date().toISOString(),
+        };
+
+        setPaymentHistory((current) => [historyItem, ...current]);
+      }
+
+      setPassword("");
+      setShowPassword(false);
+
+      goToStep(3);
+      void loadBalance();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Transfer failed. Please try again."
+      );
+
+      setPassword("");
+      setShowPassword(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   /* =========================================================
      RESET
   ========================================================== */
 
-  const handleReset =
-    () => {
-      goToStep(1);
-
-      setAmount("");
-
-      setRecipient("");
-
-      setPin([
-        "",
-        "",
-        "",
-        "",
-      ]);
-
-      setNote("");
-
-      setErrorMessage(
-        ""
-      );
-    };
-
-  const formattedBalance =
-    formatCurrency(
-      balance ?? 0
-    );
+  const handleReset = () => {
+    goToStep(1);
+    setAmount("");
+    setRecipient("");
+    setPassword("");
+    setShowPassword(false);
+    setNote("");
+    setErrorMessage("");
+  };
 
   /* =========================================================
-     RETURN
+     UI
   ========================================================== */
 
   return (
-    <div
-      className="
-        relative
-        mx-auto
-        w-full
-        max-w-[1380px]
-        pb-8
-      "
-    >
-      {/* =====================================================
-          BACKGROUND DECORATION
-      ====================================================== */}
-
-      <div
-        className="
-          pointer-events-none
-          absolute
-          -left-32
-          top-16
-          h-[320px]
-          w-[320px]
-          rounded-full
-          bg-blue-400/[0.06]
-          blur-[100px]
-        "
-      />
-
-      <div
-        className="
-          pointer-events-none
-          absolute
-          right-0
-          top-48
-          h-[300px]
-          w-[300px]
-          rounded-full
-          bg-cyan-400/[0.05]
-          blur-[100px]
-        "
-      />
+    <main className="relative mx-auto w-full max-w-[1420px] pb-10">
+      {/* ambient page glows */}
+      <div className="pointer-events-none absolute -left-40 top-20 h-[420px] w-[420px] rounded-full bg-[#77C8FF]/10 blur-[120px]" />
+      <div className="pointer-events-none absolute right-0 top-[420px] h-[360px] w-[360px] rounded-full bg-[#60A5FA]/10 blur-[110px]" />
 
       {/* =====================================================
-          HEADER
+          HEADER + BALANCE
       ====================================================== */}
 
-      <motion.section
-        initial={{
-          opacity: 0,
-          y: -14,
-        }}
-        animate={{
-          opacity: 1,
-          y: 0,
-        }}
-        transition={{
-          duration: 0.55,
-          ease: [
-            0.22,
-            1,
-            0.36,
-            1,
-          ],
-        }}
-        className="
-          relative
-          z-10
-          mb-6
-          flex
-          flex-col
-          gap-4
-          xl:flex-row
-          xl:items-center
-          xl:justify-between
-        "
-      >
-        {/* Header text */}
+      <section className="relative z-10 grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px] xl:items-stretch">
+        <motion.div
+          initial={{ opacity: 0, y: -12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="flex min-h-[220px] flex-col justify-between rounded-[30px] border border-[#DCE9F3] bg-white/90 p-6 shadow-[0_20px_60px_rgba(15,39,69,0.06)] backdrop-blur sm:p-8"
+        >
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#D8EAF8] bg-[#F3F9FF] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-[#1F6FB4]">
+              <Sparkles className="h-3.5 w-3.5" />
+              Secure Transfer
+            </div>
 
-        <div>
-          <div
-            className="
-              mb-2
-              inline-flex
-              items-center
-              gap-2
-              rounded-full
-              border
-              border-blue-100
-              bg-blue-50/80
-              px-3
-              py-1.5
-            "
-          >
-            <Sparkles className="h-3.5 w-3.5 text-blue-600" />
+            <h1 className="mt-4 text-3xl font-black tracking-[-0.045em] text-[#102A43] sm:text-[38px]">
+              Send money with confidence.
+            </h1>
 
-            <span
-              className="
-                text-[9px]
-                font-extrabold
-                uppercase
-                tracking-[0.17em]
-                text-blue-700
-              "
-            >
-              Smart Transfer
-            </span>
+            <p className="mt-3 max-w-2xl text-sm font-medium leading-6 text-[#6D8297]">
+              Move funds from your Coffer wallet through a clear, secure,
+              step-by-step transfer flow.
+            </p>
           </div>
 
-          <h1
-            className="
-              text-2xl
-              font-black
-              tracking-[-0.04em]
-              text-[#102A43]
-              sm:text-3xl
-              xl:text-[34px]
-            "
-          >
-            Send Money
-          </h1>
-
-          <p
-            className="
-              mt-1.5
-              max-w-xl
-              text-xs
-              font-medium
-              leading-6
-              text-slate-500
-              sm:text-sm
-            "
-          >
-            Transfer funds
-            quickly and
-            securely from
-            your NovaWallet
-            account.
-          </p>
-        </div>
-
-        {/* Balance */}
-
-        <motion.div
-          whileHover={{
-            y: -3,
-          }}
-          transition={{
-            type: "spring",
-            stiffness: 240,
-            damping: 18,
-          }}
-          className="
-            relative
-            w-full
-            overflow-hidden
-            rounded-[22px]
-            border
-            border-[#DFE9F3]
-            bg-white
-            px-4
-            py-3.5
-            shadow-[0_10px_35px_rgba(15,39,69,0.06)]
-            sm:w-auto
-            sm:min-w-[275px]
-          "
-        >
-          <div
-            className="
-              pointer-events-none
-              absolute
-              -right-8
-              -top-8
-              h-24
-              w-24
-              rounded-full
-              bg-blue-500/[0.08]
-              blur-2xl
-            "
-          />
-
-          <div className="relative flex items-center gap-3">
-            <div
-              className="
-                flex
-                h-11
-                w-11
-                shrink-0
-                items-center
-                justify-center
-                rounded-[14px]
-                bg-gradient-to-br
-                from-[#257DD1]
-                to-[#15558F]
-                text-white
-                shadow-[0_8px_20px_rgba(31,94,168,0.20)]
-              "
-            >
-              <WalletCards className="h-5 w-5" />
-            </div>
-
-            <div className="min-w-0 flex-1">
-              <p
-                className="
-                  text-[9px]
-                  font-extrabold
-                  uppercase
-                  tracking-[0.14em]
-                  text-slate-400
-                "
-              >
-                Available Balance
-              </p>
-
-              <div className="mt-0.5 flex items-center gap-2">
-                {balanceLoading ? (
-                  <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
-                ) : (
-                  <AnimatePresence
-                    mode="wait"
-                    initial={
-                      false
-                    }
-                  >
-                    <motion.p
-                      key={
-                        showBalance
-                          ? "visible"
-                          : "masked"
-                      }
-                      initial={{
-                        opacity: 0,
-                        filter:
-                          "blur(5px)",
-                      }}
-                      animate={{
-                        opacity: 1,
-                        filter:
-                          "blur(0px)",
-                      }}
-                      exit={{
-                        opacity: 0,
-                        filter:
-                          "blur(5px)",
-                      }}
-                      transition={{
-                        duration:
-                          0.2,
-                      }}
-                      className="
-                        truncate
-                        text-lg
-                        font-black
-                        tracking-tight
-                        text-[#102A43]
-                      "
-                    >
-                      {showBalance
-                        ? formattedBalance
-                        : maskCurrency(
-                            formattedBalance
-                          )}
-                    </motion.p>
-                  </AnimatePresence>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setShowBalance(
-                      (
-                        value
-                      ) =>
-                        !value
-                    )
-                  }
-                  aria-label={
-                    showBalance
-                      ? "Hide balance"
-                      : "Show balance"
-                  }
-                  className="
-                    flex
-                    h-7
-                    w-7
-                    items-center
-                    justify-center
-                    rounded-lg
-                    text-slate-400
-                    transition-all
-                    hover:bg-blue-50
-                    hover:text-blue-600
-                  "
-                >
-                  {showBalance ? (
-                    <Eye className="h-3.5 w-3.5" />
-                  ) : (
-                    <EyeOff className="h-3.5 w-3.5" />
-                  )}
-                </button>
-              </div>
-            </div>
+          <div className="mt-6 flex flex-wrap items-center gap-3 text-[10px] font-bold text-[#7890A5]">
+            <span className="inline-flex items-center gap-1.5">
+              <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+              Protected session
+            </span>
+            <span className="h-1 w-1 rounded-full bg-slate-300" />
+            <span>Review before sending</span>
           </div>
         </motion.div>
-      </motion.section>
+
+        <BalanceRevealCard
+          balanceLoading={balanceLoading}
+          formattedBalance={formattedBalance}
+          showBalance={showBalance}
+          onToggle={() => setShowBalance((current) => !current)}
+        />
+      </section>
 
       {/* =====================================================
-          MAIN GRID
+          MAIN WORKSPACE
       ====================================================== */}
 
-      <div
-        className="
-          relative
-          z-10
-          grid
-          grid-cols-1
-          items-start
-          gap-5
-          xl:grid-cols-[minmax(0,1fr)_340px]
-          2xl:grid-cols-[minmax(0,1fr)_360px]
-          xl:gap-6
-        "
-      >
-        {/* ===================================================
-            LEFT — TRANSFER CARD
-        ==================================================== */}
+      <section className="relative z-10 mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_350px]">
+        {/* TRANSFER PANEL */}
 
-        <motion.section
-          initial={{
-            opacity: 0,
-            y: 22,
-          }}
-          animate={{
-            opacity: 1,
-            y: 0,
-          }}
-          transition={{
-            duration: 0.55,
-            delay: 0.06,
-            ease: [
-              0.22,
-              1,
-              0.36,
-              1,
-            ],
-          }}
-          className="
-            relative
-            min-w-0
-            overflow-hidden
-            rounded-[28px]
-            border
-            border-[#E4ECF4]
-            bg-white
-            shadow-[0_18px_55px_rgba(15,39,69,0.07)]
-          "
+        <motion.div
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.55, delay: 0.05 }}
+          className="overflow-hidden rounded-[30px] border border-[#DFE9F2] bg-white shadow-[0_22px_65px_rgba(15,39,69,0.07)]"
         >
-          {/* Top decoration */}
-
-          <div
-            className="
-              pointer-events-none
-              absolute
-              left-1/2
-              top-0
-              h-[2px]
-              w-[55%]
-              -translate-x-1/2
-              bg-gradient-to-r
-              from-transparent
-              via-blue-500
-              to-transparent
-            "
-          />
-
-          <div
-            className="
-              pointer-events-none
-              absolute
-              -right-20
-              -top-20
-              h-56
-              w-56
-              rounded-full
-              bg-blue-500/[0.045]
-              blur-[70px]
-            "
-          />
-
-          <div
-            className="
-              relative
-              p-5
-              sm:p-7
-              lg:p-8
-              xl:p-9
-            "
-          >
-            {/* STEP HEADER */}
-
-            {step < 3 && (
-              <div className="mb-8">
-                <div className="mb-4 flex items-center justify-between gap-4">
-                  <div>
-                    <p
-                      className="
-                        text-[9px]
-                        font-extrabold
-                        uppercase
-                        tracking-[0.17em]
-                        text-blue-600
-                      "
-                    >
-                      Transfer Process
-                    </p>
-
-                    <p
-                      className="
-                        mt-1
-                        text-xs
-                        font-medium
-                        text-slate-400
-                      "
-                    >
-                      Step{" "}
-                      {step}{" "}
-                      of 2
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <StepBadge
-                      number={1}
-                      active={
-                        step >=
-                        1
-                      }
-                      label="Details"
-                    />
-
-                    <ChevronRight className="h-3.5 w-3.5 text-slate-300" />
-
-                    <StepBadge
-                      number={2}
-                      active={
-                        step >=
-                        2
-                      }
-                      label="Verify"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  {[1, 2].map(
-                    (
-                      item
-                    ) => (
-                      <div
-                        key={
-                          item
-                        }
-                        className="
-                          h-[5px]
-                          flex-1
-                          overflow-hidden
-                          rounded-full
-                          bg-[#EDF2F7]
-                        "
-                      >
-                        <motion.div
-                          initial={
-                            false
-                          }
-                          animate={{
-                            width:
-                              step >=
-                              item
-                                ? "100%"
-                                : "0%",
-                          }}
-                          transition={{
-                            duration:
-                              0.45,
-                            ease: [
-                              0.22,
-                              1,
-                              0.36,
-                              1,
-                            ],
-                          }}
-                          className="
-                            h-full
-                            rounded-full
-                            bg-gradient-to-r
-                            from-[#2B7FD1]
-                            to-[#4CA9EA]
-                          "
-                        />
-                      </div>
-                    )
-                  )}
-                </div>
+          <div className="border-b border-[#EDF2F6] bg-gradient-to-r from-[#FBFDFF] to-[#F6FAFE] px-5 py-5 sm:px-7">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#2B78BA]">
+                  Payment workspace
+                </p>
+                <h2 className="mt-1.5 text-xl font-black tracking-[-0.025em] text-[#17344D]">
+                  {step === 1
+                    ? "Transfer details"
+                    : step === 2
+                    ? "Review & authorize"
+                    : "Payment completed"}
+                </h2>
               </div>
-            )}
 
-            {/* ERROR */}
+              {step < 3 && <ProgressSteps step={step} />}
+            </div>
+          </div>
 
+          <div className="p-5 sm:p-7 lg:p-8">
             <AnimatePresence>
               {errorMessage && (
                 <motion.div
-                  initial={{
-                    opacity: 0,
-                    height: 0,
-                    y: -6,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    height:
-                      "auto",
-                    y: 0,
-                  }}
-                  exit={{
-                    opacity: 0,
-                    height: 0,
-                  }}
+                  initial={{ opacity: 0, y: -8, height: 0 }}
+                  animate={{ opacity: 1, y: 0, height: "auto" }}
+                  exit={{ opacity: 0, y: -8, height: 0 }}
                   className="overflow-hidden"
                 >
-                  <div
-                    className="
-                      mb-6
-                      rounded-2xl
-                      border
-                      border-rose-200
-                      bg-rose-50
-                      px-4
-                      py-3
-                      text-xs
-                      font-bold
-                      leading-5
-                      text-rose-600
-                    "
-                  >
-                    {
-                      errorMessage
-                    }
+                  <div className="mb-6 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-bold leading-5 text-rose-600">
+                    <X className="mt-0.5 h-4 w-4 shrink-0" />
+                    {errorMessage}
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
 
-            {/* STEPS */}
-
-            <AnimatePresence
-              mode="wait"
-              custom={
-                direction
-              }
-            >
-              {/* =========================
-                  STEP 1
-              ========================== */}
-
+            <AnimatePresence mode="wait" custom={direction}>
               {step === 1 && (
                 <motion.div
-                  key="step-1"
-                  custom={
-                    direction
-                  }
-                  variants={
-                    stepVariants
-                  }
+                  key="details"
+                  custom={direction}
+                  variants={stepVariants}
                   initial="enter"
                   animate="center"
                   exit="exit"
-                  transition={{
-                    duration:
-                      0.38,
-
-                    ease: [
-                      0.16,
-                      1,
-                      0.3,
-                      1,
-                    ],
-                  }}
+                  transition={{ duration: 0.36, ease: [0.16, 1, 0.3, 1] }}
                   className="space-y-6"
                 >
-                  {/* Recipient */}
-
-                  <FormField
-                    label="Send To"
-                    htmlFor="recipient"
-                  >
-                    <div className="group relative">
-                      <div
-                        className="
-                          pointer-events-none
-                          absolute
-                          inset-y-0
-                          left-0
-                          flex
-                          items-center
-                          pl-4
-                          text-slate-400
-                          transition-colors
-                          group-focus-within:text-blue-600
-                        "
-                      >
-                        <UserRound className="h-[18px] w-[18px]" />
-                      </div>
-
-                      <input
-                        id="recipient"
-                        type="text"
-                        placeholder="Enter mobile number or email"
-                        value={
-                          recipient
-                        }
-                        onChange={(
-                          event
-                        ) =>
-                          setRecipient(
-                            event
-                              .target
-                              .value
-                          )
-                        }
-                        className="
-                          h-[58px]
-                          w-full
-                          rounded-[16px]
-                          border
-                          border-[#DDE6EF]
-                          bg-[#F8FAFC]
-                          pl-12
-                          pr-4
-                          text-sm
-                          font-semibold
-                          text-[#253A50]
-                          outline-none
-                          transition-all
-                          placeholder:font-medium
-                          placeholder:text-[#9AA9BA]
-                          hover:border-[#CAD8E6]
-                          focus:border-[#3B8DDA]
-                          focus:bg-white
-                          focus:ring-4
-                          focus:ring-blue-500/[0.08]
-                        "
-                      />
-                    </div>
-                  </FormField>
-
-                  {/* Amount */}
-
-                  <FormField
-                    label="Amount (৳)"
-                    htmlFor="amount"
-                  >
-                    <div className="group relative">
-                      <div
-                        className="
-                          pointer-events-none
-                          absolute
-                          inset-y-0
-                          left-0
-                          flex
-                          items-center
-                          pl-4
-                          text-slate-400
-                          transition-colors
-                          group-focus-within:text-blue-600
-                        "
-                      >
-                        <Banknote className="h-[18px] w-[18px]" />
-                      </div>
-
-                      <input
-                        id="amount"
-                        type="number"
-                        min="1"
-                        step="0.01"
-                        inputMode="decimal"
-                        placeholder="0.00"
-                        value={
-                          amount
-                        }
-                        onChange={(
-                          event
-                        ) =>
-                          setAmount(
-                            event
-                              .target
-                              .value
-                          )
-                        }
-                        onKeyDown={(
-                          event
-                        ) => {
-                          if (
-                            [
-                              "-",
-                              "e",
-                              "E",
-                              "+",
-                            ].includes(
-                              event.key
-                            )
-                          ) {
-                            event.preventDefault();
-                          }
-                        }}
-                        className="
-                          h-[66px]
-                          w-full
-                          rounded-[16px]
-                          border
-                          border-[#DDE6EF]
-                          bg-[#F8FAFC]
-                          pl-12
-                          pr-4
-                          text-[24px]
-                          font-black
-                          tracking-tight
-                          text-[#17344D]
-                          outline-none
-                          transition-all
-                          placeholder:font-semibold
-                          placeholder:text-[#C4CFDA]
-                          hover:border-[#CAD8E6]
-                          focus:border-[#3B8DDA]
-                          focus:bg-white
-                          focus:ring-4
-                          focus:ring-blue-500/[0.08]
-                        "
-                      />
-                    </div>
-
-                    {/* Quick Amounts */}
-
-                    <div
-                      className="
-                        grid
-                        grid-cols-2
-                        gap-2.5
-                        pt-2
-                        sm:grid-cols-4
-                      "
+                  <div className="grid gap-5 lg:grid-cols-2">
+                    <FormField
+                      label="Recipient"
+                      hint="Mobile number or email"
+                      htmlFor="recipient"
                     >
-                      {quickAmounts.map(
-                        (
-                          quickAmount
-                        ) => {
-                          const disabled =
-                            balance !==
-                              null &&
-                            quickAmount >
-                              balance;
+                      <div className="group relative">
+                        <UserRound className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#93A5B7] transition group-focus-within:text-[#2B7BC0]" />
+                        <input
+                          id="recipient"
+                          type="text"
+                          autoComplete="off"
+                          placeholder="e.g. 01XXXXXXXXX or name@email.com"
+                          value={recipient}
+                          onChange={(event) => setRecipient(event.target.value)}
+                          className="h-[58px] w-full rounded-[16px] border border-[#DCE6EF] bg-[#F8FAFC] pl-12 pr-4 text-sm font-semibold text-[#243D54] outline-none transition placeholder:font-medium placeholder:text-[#9DABBA] hover:border-[#CAD8E6] focus:border-[#3D8DD2] focus:bg-white focus:ring-4 focus:ring-blue-500/[0.07]"
+                        />
+                      </div>
+                    </FormField>
 
-                          const active =
-                            amount ===
-                            String(
-                              quickAmount
-                            );
+                    <FormField
+                      label="Amount"
+                      hint="Bangladeshi Taka"
+                      htmlFor="amount"
+                    >
+                      <div className="group relative">
+                        <Banknote className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#93A5B7] transition group-focus-within:text-[#2B7BC0]" />
+                        <input
+                          id="amount"
+                          type="number"
+                          min="1"
+                          step="0.01"
+                          inputMode="decimal"
+                          placeholder="0.00"
+                          value={amount}
+                          onChange={(event) => setAmount(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (["-", "e", "E", "+"].includes(event.key)) {
+                              event.preventDefault();
+                            }
+                          }}
+                          className="h-[58px] w-full rounded-[16px] border border-[#DCE6EF] bg-[#F8FAFC] pl-12 pr-16 text-[21px] font-black tracking-[-0.02em] text-[#17344D] outline-none transition placeholder:text-[#C2CDD8] hover:border-[#CAD8E6] focus:border-[#3D8DD2] focus:bg-white focus:ring-4 focus:ring-blue-500/[0.07]"
+                        />
+                        <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 rounded-lg bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-[#6E8396] shadow-sm">
+                          BDT
+                        </span>
+                      </div>
+                    </FormField>
+                  </div>
 
-                          return (
-                            <motion.button
-                              key={
-                                quickAmount
-                              }
-                              type="button"
-                              disabled={
-                                disabled
-                              }
-                              onClick={() =>
-                                setAmount(
-                                  String(
-                                    quickAmount
-                                  )
-                                )
-                              }
-                              whileTap={
-                                disabled
-                                  ? undefined
-                                  : {
-                                      scale:
-                                        0.96,
-                                    }
-                              }
-                              whileHover={
-                                disabled
-                                  ? undefined
-                                  : {
-                                      y: -2,
-                                    }
-                              }
-                              className={`
-                                h-10
-                                rounded-xl
-                                border
-                                text-xs
-                                font-extrabold
-                                transition-all
-
-                                ${
-                                  disabled
-                                    ? "cursor-not-allowed border-[#EDF1F5] bg-[#FAFBFC] text-slate-300"
-                                    : active
-                                    ? "border-[#3E8FD9] bg-[#EDF6FF] text-[#1F6FB4] shadow-[0_5px_15px_rgba(31,111,180,0.08)]"
-                                    : "border-[#E0E8F0] bg-white text-[#66798D] hover:border-[#BFD9F1] hover:bg-[#F5FAFF] hover:text-[#1F6FB4]"
-                                }
-                              `}
-                            >
-                              +৳
-                              {
-                                quickAmount
-                              }
-                            </motion.button>
-                          );
-                        }
+                  <div>
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#71869A]">
+                        Quick amounts
+                      </p>
+                      {balance !== null && (
+                        <p className="text-[10px] font-semibold text-[#98A7B6]">
+                          Limited by available balance
+                        </p>
                       )}
                     </div>
-                  </FormField>
 
-                  {/* Note */}
+                    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                      {quickAmounts.map((quickAmount) => {
+                        const disabled =
+                          balance !== null && quickAmount > balance;
+                        const active = amount === String(quickAmount);
+
+                        return (
+                          <motion.button
+                            key={quickAmount}
+                            type="button"
+                            disabled={disabled}
+                            whileTap={disabled ? undefined : { scale: 0.97 }}
+                            whileHover={disabled ? undefined : { y: -2 }}
+                            onClick={() => setAmount(String(quickAmount))}
+                            className={`h-11 rounded-[13px] border text-xs font-black transition ${
+                              disabled
+                                ? "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300"
+                                : active
+                                ? "border-[#3E8FD9] bg-[#EEF7FF] text-[#1F6FB4] shadow-[0_7px_18px_rgba(31,111,180,0.09)]"
+                                : "border-[#E1E8EF] bg-white text-[#60768A] hover:border-[#BFD7EB] hover:bg-[#F7FBFF] hover:text-[#1F6FB4]"
+                            }`}
+                          >
+                            ৳ {quickAmount.toLocaleString("en-BD")}
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                  </div>
 
                   <FormField
-                    label="Reference Note"
-                    optional
+                    label="Payment note"
+                    hint="Optional reference"
                     htmlFor="note"
                   >
                     <div className="group relative">
-                      <div
-                        className="
-                          pointer-events-none
-                          absolute
-                          inset-y-0
-                          left-0
-                          flex
-                          items-center
-                          pl-4
-                          text-slate-400
-                          transition-colors
-                          group-focus-within:text-blue-600
-                        "
-                      >
-                        <FileText className="h-[18px] w-[18px]" />
-                      </div>
-
+                      <FileText className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-[#93A5B7] transition group-focus-within:text-[#2B7BC0]" />
                       <input
                         id="note"
                         type="text"
-                        placeholder="What is this transfer for?"
-                        value={
-                          note
-                        }
-                        onChange={(
-                          event
-                        ) =>
-                          setNote(
-                            event
-                              .target
-                              .value
-                          )
-                        }
-                        className="
-                          h-[56px]
-                          w-full
-                          rounded-[16px]
-                          border
-                          border-[#DDE6EF]
-                          bg-[#F8FAFC]
-                          pl-12
-                          pr-4
-                          text-sm
-                          font-semibold
-                          text-[#253A50]
-                          outline-none
-                          transition-all
-                          placeholder:font-medium
-                          placeholder:text-[#9AA9BA]
-                          hover:border-[#CAD8E6]
-                          focus:border-[#3B8DDA]
-                          focus:bg-white
-                          focus:ring-4
-                          focus:ring-blue-500/[0.08]
-                        "
+                        placeholder="Add a short note for this payment"
+                        value={note}
+                        onChange={(event) => setNote(event.target.value)}
+                        className="h-[56px] w-full rounded-[16px] border border-[#DCE6EF] bg-[#F8FAFC] pl-12 pr-4 text-sm font-semibold text-[#243D54] outline-none transition placeholder:font-medium placeholder:text-[#9DABBA] hover:border-[#CAD8E6] focus:border-[#3D8DD2] focus:bg-white focus:ring-4 focus:ring-blue-500/[0.07]"
                       />
                     </div>
                   </FormField>
 
-                  {/* Continue */}
-
                   <motion.button
                     type="button"
-                    onClick={
-                      handleNext
-                    }
-                    disabled={
-                      !recipient.trim() ||
-                      !amount
-                    }
-                    whileHover={
-                      !recipient.trim() ||
-                      !amount
-                        ? undefined
-                        : {
-                            y: -2,
-                          }
-                    }
-                    whileTap={{
-                      scale:
-                        0.985,
-                    }}
-                    className="
-                      group
-                      relative
-                      flex
-                      h-[56px]
-                      w-full
-                      items-center
-                      justify-center
-                      gap-2
-                      overflow-hidden
-                      rounded-[16px]
-                      bg-gradient-to-r
-                      from-[#2478C6]
-                      to-[#318DDB]
-                      text-sm
-                      font-extrabold
-                      text-white
-                      shadow-[0_12px_30px_rgba(37,120,198,0.20)]
-                      transition-all
-                      hover:shadow-[0_15px_35px_rgba(37,120,198,0.28)]
-                      disabled:cursor-not-allowed
-                      disabled:from-[#8FB2E8]
-                      disabled:to-[#86A7E4]
-                      disabled:shadow-none
-                    "
+                    onClick={handleNext}
+                    disabled={!recipient.trim() || !amount}
+                    whileTap={{ scale: 0.988 }}
+                    className="group relative flex h-[58px] w-full items-center justify-center gap-2 overflow-hidden rounded-[17px] bg-gradient-to-r from-[#15558F] via-[#1F6FB4] to-[#2C8DD2] text-sm font-black text-white shadow-[0_15px_35px_rgba(31,111,180,0.22)] transition hover:shadow-[0_18px_42px_rgba(31,111,180,0.28)] disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none"
                   >
-                    <span
-                      className="
-                        absolute
-                        -left-10
-                        top-0
-                        h-full
-                        w-20
-                        -skew-x-12
-                        bg-white/10
-                        transition-transform
-                        duration-700
-                        group-hover:translate-x-[650px]
-                      "
+                    <motion.span
+                      aria-hidden
+                      className="absolute inset-y-0 -left-20 w-20 skew-x-[-18deg] bg-white/15"
+                      animate={{ x: [0, 760] }}
+                      transition={{ duration: 3.2, repeat: Infinity, repeatDelay: 2.4 }}
                     />
-
-                    <span className="relative">
-                      Continue to Review
-                    </span>
-
-                    <ArrowRight
-                      className="
-                        relative
-                        h-[18px]
-                        w-[18px]
-                        transition-transform
-                        duration-300
-                        group-hover:translate-x-1
-                      "
-                    />
+                    <span className="relative">Review payment</span>
+                    <ArrowRight className="relative h-[18px] w-[18px] transition-transform group-hover:translate-x-1" />
                   </motion.button>
                 </motion.div>
               )}
 
-              {/* =========================
-                  STEP 2
-              ========================== */}
-
               {step === 2 && (
                 <motion.div
-                  key="step-2"
-                  custom={
-                    direction
-                  }
-                  variants={
-                    stepVariants
-                  }
+                  key="verify"
+                  custom={direction}
+                  variants={stepVariants}
                   initial="enter"
                   animate="center"
                   exit="exit"
-                  transition={{
-                    duration:
-                      0.38,
-
-                    ease: [
-                      0.16,
-                      1,
-                      0.3,
-                      1,
-                    ],
-                  }}
-                  className="space-y-6"
+                  transition={{ duration: 0.36, ease: [0.16, 1, 0.3, 1] }}
+                  className="space-y-5"
                 >
                   <button
                     type="button"
-                    onClick={() =>
-                      goToStep(
-                        1
-                      )
-                    }
-                    className="
-                      group
-                      flex
-                      items-center
-                      gap-1.5
-                      text-xs
-                      font-extrabold
-                      text-slate-500
-                      transition
-                      hover:text-blue-600
-                    "
+                    onClick={() => goToStep(1)}
+                    className="group inline-flex items-center gap-1.5 text-xs font-black text-[#6B7F92] transition hover:text-[#1F6FB4]"
                   >
-                    <ChevronLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
-
-                    Edit Details
+                    <ChevronLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
+                    Edit details
                   </button>
 
-                  {/* Review card */}
+                  <div className="overflow-hidden rounded-[24px] border border-[#DCE8F2] bg-gradient-to-br from-[#F8FCFF] to-[#EFF7FD]">
+                    <div className="border-b border-white bg-white/65 p-5 text-center sm:p-6">
+                      <p className="text-[9px] font-black uppercase tracking-[0.17em] text-[#6F8498]">
+                        You are sending
+                      </p>
+                      <h3 className="mt-2 text-4xl font-black tracking-[-0.05em] text-[#102A43]">
+                        {formatCurrency(numericAmount)}
+                      </h3>
+                    </div>
 
-                  <div
-                    className="
-                      relative
-                      overflow-hidden
-                      rounded-[22px]
-                      border
-                      border-[#DFE8F1]
-                      bg-gradient-to-br
-                      from-[#F8FBFE]
-                      to-[#F2F7FC]
-                      p-6
-                      text-center
-                    "
-                  >
-                    <div
-                      className="
-                        pointer-events-none
-                        absolute
-                        left-1/2
-                        top-0
-                        h-24
-                        w-56
-                        -translate-x-1/2
-                        rounded-full
-                        bg-blue-500/[0.08]
-                        blur-[45px]
-                      "
-                    />
-
-                    <p className="relative text-xs font-semibold text-slate-500">
-                      You are
-                      sending
-                    </p>
-
-                    <motion.h2
-                      initial={{
-                        scale:
-                          0.96,
-                      }}
-                      animate={{
-                        scale: 1,
-                      }}
-                      className="
-                        relative
-                        mt-2
-                        text-3xl
-                        font-black
-                        tracking-[-0.04em]
-                        text-[#102A43]
-                        sm:text-4xl
-                      "
-                    >
-                      {formatCurrency(
-                        numericAmount
-                      )}
-                    </motion.h2>
-
-                    <div
-                      className="
-                        relative
-                        mx-auto
-                        mt-6
-                        flex
-                        max-w-md
-                        items-center
-                        justify-center
-                        gap-3
-                        rounded-2xl
-                        border
-                        border-white
-                        bg-white/80
-                        p-3
-                        shadow-sm
-                        backdrop-blur
-                      "
-                    >
-                      <div
-                        className="
-                          flex
-                          h-11
-                          w-11
-                          shrink-0
-                          items-center
-                          justify-center
-                          rounded-xl
-                          bg-gradient-to-br
-                          from-blue-500
-                          to-sky-400
-                          text-sm
-                          font-black
-                          text-white
-                          shadow-lg
-                          shadow-blue-500/15
-                        "
-                      >
-                        {recipient
-                          .charAt(
-                            0
-                          )
-                          .toUpperCase()}
-                      </div>
-
-                      <div className="min-w-0 text-left">
-                        <p className="truncate text-sm font-extrabold text-[#193750]">
-                          {
-                            recipient
-                          }
-                        </p>
-
-                        <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                          NovaWallet Recipient
-                        </p>
-                      </div>
+                    <div className="grid gap-3 p-4 sm:grid-cols-2 sm:p-5">
+                      <ReviewItem
+                        icon={UserRound}
+                        label="Recipient"
+                        value={recipient}
+                      />
+                      <ReviewItem
+                        icon={FileText}
+                        label="Reference"
+                        value={note.trim() || "No note added"}
+                      />
                     </div>
                   </div>
 
-                  {/* PIN */}
-
-                  <div
-                    className="
-                      rounded-[20px]
-                      border
-                      border-[#E3EAF1]
-                      bg-white
-                      p-5
-                      sm:p-6
-                    "
-                  >
-                    <div className="mb-5 text-center">
-                      <div
-                        className="
-                          mx-auto
-                          flex
-                          h-11
-                          w-11
-                          items-center
-                          justify-center
-                          rounded-[14px]
-                          bg-[#EEF6FF]
-                          text-[#2677C2]
-                        "
-                      >
+                  <div className="rounded-[22px] border border-[#E0E8F0] bg-white p-5 sm:p-6">
+                    <div className="text-center">
+                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[16px] bg-[#EEF7FF] text-[#1F6FB4]">
                         <LockKeyhole className="h-5 w-5" />
                       </div>
 
-                      <h3 className="mt-3 text-sm font-extrabold text-[#17344D]">
-                        Enter Security PIN
+                      <h3 className="mt-3 text-sm font-black text-[#17344D]">
+                        Confirm with your login password
                       </h3>
 
-                      <p className="mt-1 text-[11px] leading-5 text-slate-400">
-                        Enter your
-                        4-digit PIN
-                        to authorize
-                        this transfer.
+                      <p className="mt-1 text-[11px] leading-5 text-[#8798A8]">
+                        Re-enter your account password to authorize this transfer.
                       </p>
                     </div>
 
-                    <PinInput
-                      value={
-                        pin
-                      }
-                      onChange={
-                        setPin
-                      }
-                      controls={
-                        pinControls
-                      }
-                    />
+                    <div className="relative mt-5">
+                      <input
+                        id="transfer-password"
+                        type={showPassword ? "text" : "password"}
+                        autoComplete="current-password"
+                        value={password}
+                        onChange={(event) => {
+                          setPassword(event.target.value);
+                          if (errorMessage) {
+                            setErrorMessage("");
+                          }
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" && password.trim() && !isLoading) {
+                            void handleSend();
+                          }
+                        }}
+                        placeholder="Enter your login password"
+                        className="h-[58px] w-full rounded-[16px] border border-[#DCE6EF] bg-[#F8FAFC] px-4 pr-12 text-sm font-semibold text-[#243D54] outline-none transition placeholder:font-medium placeholder:text-[#9DABBA] hover:border-[#CAD8E6] focus:border-[#3D8DD2] focus:bg-white focus:ring-4 focus:ring-blue-500/[0.07]"
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((current) => !current)}
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-[#8A9AAA] transition hover:text-[#1F6FB4]"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-[18px] w-[18px]" />
+                        ) : (
+                          <Eye className="h-[18px] w-[18px]" />
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="mt-3 flex items-start gap-2 rounded-[13px] bg-[#F7FAFD] px-3 py-2.5">
+                      <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                      <p className="text-[10px] font-medium leading-5 text-[#7A8D9F]">
+                        Your password is sent only to the secure backend over HTTPS for verification and is never stored in the transaction.
+                      </p>
+                    </div>
                   </div>
 
                   <motion.button
                     type="button"
-                    onClick={
-                      handleSend
-                    }
-                    disabled={
-                      pinValue.length <
-                        4 ||
-                      isLoading
-                    }
-                    whileHover={
-                      pinValue.length <
-                        4 ||
-                      isLoading
-                        ? undefined
-                        : {
-                            y: -2,
-                          }
-                    }
-                    whileTap={{
-                      scale:
-                        0.985,
+                    onClick={() => {
+                      void handleSend();
                     }}
-                    className="
-                      group
-                      flex
-                      h-[56px]
-                      w-full
-                      items-center
-                      justify-center
-                      gap-2
-                      rounded-[16px]
-                      bg-gradient-to-r
-                      from-[#1D70BD]
-                      to-[#278AD7]
-                      text-sm
-                      font-extrabold
-                      text-white
-                      shadow-[0_12px_30px_rgba(31,112,189,0.22)]
-                      transition-all
-                      disabled:cursor-not-allowed
-                      disabled:opacity-50
-                      disabled:shadow-none
-                    "
+                    disabled={!password.trim() || isLoading}
+                    whileTap={{ scale: 0.988 }}
+                    className="flex h-[58px] w-full items-center justify-center gap-2 rounded-[17px] bg-gradient-to-r from-[#0F5D9E] to-[#278AD7] text-sm font-black text-white shadow-[0_14px_34px_rgba(31,112,189,0.22)] transition disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none"
                   >
                     {isLoading ? (
                       <>
                         <Loader2 className="h-5 w-5 animate-spin" />
-
-                        Processing...
+                        Processing payment...
                       </>
                     ) : (
                       <>
-                        <Send className="h-[18px] w-[18px] transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-
-                        Confirm &amp;
-                        Send
+                        <Send className="h-[18px] w-[18px]" />
+                        Confirm & send
                       </>
                     )}
                   </motion.button>
                 </motion.div>
               )}
 
-              {/* =========================
-                  SUCCESS
-              ========================== */}
-
               {step === 3 && (
                 <motion.div
-                  key="step-3"
-                  custom={
-                    direction
-                  }
-                  variants={
-                    stepVariants
-                  }
+                  key="success"
+                  custom={direction}
+                  variants={stepVariants}
                   initial="enter"
                   animate="center"
                   exit="exit"
-                  transition={{
-                    duration:
-                      0.4,
-                  }}
-                  className="
-                    flex
-                    min-h-[470px]
-                    flex-col
-                    items-center
-                    justify-center
-                    py-6
-                    text-center
-                  "
+                  transition={{ duration: 0.38 }}
+                  className="flex min-h-[500px] flex-col items-center justify-center py-8 text-center"
                 >
-                  <motion.div
-                    initial={{
-                      opacity: 0,
-                      scale:
-                        0.55,
-                    }}
-                    animate={{
-                      opacity: 1,
-                      scale: 1,
-                    }}
-                    transition={{
-                      type:
-                        "spring",
-                      stiffness:
-                        250,
-                      damping:
-                        18,
-                    }}
-                    className="relative"
-                  >
+                  <div className="relative">
                     <motion.div
-                      animate={{
-                        scale: [
-                          1,
-                          1.45,
-                          1,
-                        ],
-
-                        opacity: [
-                          0.18,
-                          0,
-                          0.18,
-                        ],
-                      }}
-                      transition={{
-                        duration: 2,
-                        repeat:
-                          Infinity,
-                      }}
-                      className="
-                        absolute
-                        -inset-5
-                        rounded-full
-                        bg-emerald-400/25
-                      "
+                      className="absolute -inset-6 rounded-full bg-emerald-400/20"
+                      animate={{ scale: [1, 1.55, 1], opacity: [0.18, 0, 0.18] }}
+                      transition={{ duration: 2, repeat: Infinity }}
                     />
-
-                    <div
-                      className="
-                        relative
-                        flex
-                        h-24
-                        w-24
-                        items-center
-                        justify-center
-                        rounded-[28px]
-                        bg-emerald-50
-                        text-emerald-500
-                        shadow-[0_15px_40px_rgba(16,185,129,0.13)]
-                      "
+                    <motion.div
+                      initial={{ scale: 0.55, opacity: 0, rotate: -12 }}
+                      animate={{ scale: 1, opacity: 1, rotate: 0 }}
+                      transition={{ type: "spring", stiffness: 240, damping: 18 }}
+                      className="relative flex h-24 w-24 items-center justify-center rounded-[30px] border border-emerald-100 bg-emerald-50 text-emerald-500 shadow-[0_18px_42px_rgba(16,185,129,0.14)]"
                     >
                       <CheckCircle2 className="h-14 w-14" />
-                    </div>
-                  </motion.div>
+                    </motion.div>
+                  </div>
 
-                  <motion.div
-                    initial={{
-                      opacity: 0,
-                      y: 12,
-                    }}
-                    animate={{
-                      opacity: 1,
-                      y: 0,
-                    }}
-                    transition={{
-                      delay:
-                        0.16,
-                    }}
-                    className="mt-6"
-                  >
-                    <span
-                      className="
-                        rounded-full
-                        bg-emerald-50
-                        px-3
-                        py-1.5
-                        text-[9px]
-                        font-extrabold
-                        uppercase
-                        tracking-[0.15em]
-                        text-emerald-600
-                      "
-                    >
-                      Completed
-                    </span>
+                  <span className="mt-7 rounded-full bg-emerald-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.16em] text-emerald-600">
+                    Payment sent
+                  </span>
 
-                    <h2
-                      className="
-                        mt-4
-                        text-2xl
-                        font-black
-                        tracking-tight
-                        text-[#102A43]
-                      "
-                    >
-                      Transfer
-                      Successful
-                    </h2>
+                  <h2 className="mt-4 text-2xl font-black tracking-[-0.035em] text-[#102A43] sm:text-3xl">
+                    Transfer completed successfully
+                  </h2>
 
-                    <p
-                      className="
-                        mx-auto
-                        mt-2
-                        max-w-md
-                        text-sm
-                        leading-6
-                        text-slate-500
-                      "
-                    >
-                      You sent{" "}
-                      <span className="font-extrabold text-[#17344D]">
-                        {formatCurrency(
-                          numericAmount
-                        )}
-                      </span>{" "}
-                      to{" "}
-                      <span className="font-extrabold text-[#17344D]">
-                        {
-                          recipient
-                        }
-                      </span>
-                      .
-                    </p>
-                  </motion.div>
+                  <p className="mt-2 max-w-md text-sm leading-6 text-[#74879A]">
+                    {formatCurrency(numericAmount)} was sent to{" "}
+                    <span className="font-black text-[#17344D]">{recipient}</span>.
+                  </p>
 
-                  <motion.div
-                    initial={{
-                      opacity: 0,
-                      y: 12,
-                    }}
-                    animate={{
-                      opacity: 1,
-                      y: 0,
-                    }}
-                    transition={{
-                      delay:
-                        0.24,
-                    }}
-                    className="
-                      mt-8
-                      grid
-                      w-full
-                      max-w-md
-                      grid-cols-1
-                      gap-3
-                      sm:grid-cols-2
-                    "
-                  >
+                  <div className="mt-8 grid w-full max-w-md grid-cols-1 gap-3 sm:grid-cols-2">
                     <button
                       type="button"
-                      onClick={
-                        handleReset
-                      }
-                      className="
-                        h-12
-                        rounded-xl
-                        border
-                        border-[#DDE6EE]
-                        bg-white
-                        text-xs
-                        font-extrabold
-                        text-[#566B80]
-                        transition-all
-                        hover:border-blue-200
-                        hover:bg-blue-50
-                        hover:text-blue-700
-                      "
+                      onClick={handleReset}
+                      className="h-12 rounded-[14px] border border-[#DCE6EF] bg-white text-xs font-black text-[#61768A] transition hover:border-blue-200 hover:bg-blue-50 hover:text-[#1F6FB4]"
                     >
-                      Send Another
+                      Send another
                     </button>
 
                     <Link
                       href="/dashboard"
-                      className="
-                        flex
-                        h-12
-                        items-center
-                        justify-center
-                        rounded-xl
-                        bg-[#1F6FB4]
-                        text-xs
-                        font-extrabold
-                        text-white
-                        transition-all
-                        hover:bg-[#185C96]
-                      "
+                      className="flex h-12 items-center justify-center rounded-[14px] bg-[#1F6FB4] text-xs font-black text-white transition hover:bg-[#195E98]"
                     >
-                      Back to
-                      Dashboard
+                      Back to dashboard
                     </Link>
-                  </motion.div>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
-        </motion.section>
+        </motion.div>
 
-        {/* ===================================================
-            RIGHT SIDE
-        ==================================================== */}
+        {/* RIGHT SIDEBAR */}
 
         <motion.aside
-          initial={{
-            opacity: 0,
-            x: 18,
-          }}
-          animate={{
-            opacity: 1,
-            x: 0,
-          }}
-          transition={{
-            duration: 0.55,
-            delay: 0.14,
-            ease: [
-              0.22,
-              1,
-              0.36,
-              1,
-            ],
-          }}
-          className="
-            space-y-5
-            xl:sticky
-            xl:top-[100px]
-          "
+          initial={{ opacity: 0, x: 16 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.55, delay: 0.12 }}
+          className="space-y-5 xl:sticky xl:top-[100px]"
         >
-          {/* RECENT CONTACTS */}
-
-          <div
-            className="
-              overflow-hidden
-              rounded-[26px]
-              border
-              border-[#E3EBF3]
-              bg-white
-              p-5
-              shadow-[0_15px_45px_rgba(15,39,69,0.06)]
-              sm:p-6
-            "
-          >
+          <div className="rounded-[26px] border border-[#E1EAF2] bg-white p-5 shadow-[0_16px_46px_rgba(15,39,69,0.05)]">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="flex items-center gap-2">
-                  <div
-                    className="
-                      flex
-                      h-9
-                      w-9
-                      items-center
-                      justify-center
-                      rounded-xl
-                      bg-blue-50
-                      text-blue-600
-                    "
-                  >
-                    <Clock3 className="h-[17px] w-[17px]" />
-                  </div>
-
-                  <div>
-                    <h3 className="text-sm font-extrabold text-[#17344D]">
-                      Recent
-                      Transfers
-                    </h3>
-
-                    <p className="mt-0.5 text-[9px] font-semibold text-slate-400">
-                      Quick
-                      recipients
-                    </p>
-                  </div>
+                <div className="flex h-10 w-10 items-center justify-center rounded-[13px] bg-[#EEF7FF] text-[#1F6FB4]">
+                  <Clock3 className="h-[18px] w-[18px]" />
                 </div>
+                <h3 className="mt-4 text-sm font-black text-[#17344D]">
+                  Recent recipients
+                </h3>
+                <p className="mt-1 text-[10px] leading-5 text-[#8B9AAA]">
+                  Reuse recipients from transfers completed in this session.
+                </p>
               </div>
-
-              <span
-                className="
-                  rounded-full
-                  bg-[#F0F5FA]
-                  px-2.5
-                  py-1
-                  text-[9px]
-                  font-extrabold
-                  text-slate-500
-                "
-              >
-                {
-                  recentContacts.length
-                }
-              </span>
             </div>
 
-            <div className="mt-5 space-y-2">
-              {recentContacts.map(
-                (
-                  contact,
-                  index
-                ) => (
-                  <motion.button
-                    key={
-                      contact.phone
-                    }
+            <div className="mt-4 space-y-2">
+              {recentRecipients.length > 0 ? (
+                recentRecipients.map((item) => (
+                  <button
+                    key={item.id}
                     type="button"
-                    initial={{
-                      opacity: 0,
-                      x: 12,
-                    }}
-                    animate={{
-                      opacity: 1,
-                      x: 0,
-                    }}
-                    transition={{
-                      delay:
-                        0.22 +
-                        index *
-                          0.07,
-                    }}
-                    whileHover={{
-                      x: 3,
-                    }}
-                    whileTap={{
-                      scale:
-                        0.98,
-                    }}
-                    onClick={() =>
-                      setRecipient(
-                        contact.phone
-                      )
-                    }
-                    className="
-                      group
-                      flex
-                      w-full
-                      items-center
-                      gap-3
-                      rounded-[16px]
-                      border
-                      border-transparent
-                      p-2.5
-                      text-left
-                      transition-all
-                      hover:border-[#E0ECF7]
-                      hover:bg-[#F7FAFD]
-                    "
-                  >
-                    <div
-                      className={`
-                        flex
-                        h-11
-                        w-11
-                        shrink-0
-                        items-center
-                        justify-center
-                        rounded-[14px]
-                        bg-gradient-to-br
-                        ${contact.gradient}
-                        text-xs
-                        font-black
-                        text-white
-                        shadow-lg
-                        ${contact.glow}
-                      `}
-                    >
-                      {
-                        contact.initial
+                    onClick={() => {
+                      setRecipient(item.recipient);
+                      if (step !== 1) {
+                        goToStep(1);
                       }
+                    }}
+                    className="group flex w-full items-center gap-3 rounded-[15px] border border-transparent p-2.5 text-left transition hover:border-[#DFEAF4] hover:bg-[#F8FBFE]"
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-gradient-to-br from-[#256FB0] to-[#51B9EA] text-xs font-black text-white shadow-[0_8px_20px_rgba(37,111,176,0.15)]">
+                      {getInitial(item.recipient)}
                     </div>
-
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-extrabold text-[#203B55] transition-colors group-hover:text-blue-700">
-                        {
-                          contact.name
-                        }
+                      <p className="truncate text-xs font-black text-[#294258]">
+                        {item.recipient}
                       </p>
-
-                      <p className="mt-0.5 truncate text-[10px] font-medium text-slate-400">
-                        {
-                          contact.phone
-                        }
+                      <p className="mt-0.5 text-[9px] font-semibold text-[#98A5B3]">
+                        Last sent {formatCurrency(item.amount)}
                       </p>
                     </div>
-
-                    <ChevronRight className="h-4 w-4 -translate-x-1 text-slate-300 opacity-0 transition-all group-hover:translate-x-0 group-hover:text-blue-500 group-hover:opacity-100" />
-                  </motion.button>
-                )
+                    <ChevronRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[#1F6FB4]" />
+                  </button>
+                ))
+              ) : (
+                <div className="rounded-[16px] border border-dashed border-[#DCE6EF] bg-[#FAFCFE] px-4 py-5 text-center">
+                  <UserRound className="mx-auto h-5 w-5 text-[#A1B0BE]" />
+                  <p className="mt-2 text-[10px] font-semibold leading-5 text-[#8A9AAA]">
+                    Recent recipients will appear here after you complete a transfer.
+                  </p>
+                </div>
               )}
             </div>
           </div>
 
-          {/* SECURITY CARD */}
+          <PaymentHistoryDrawer history={paymentHistory} />
 
-          <motion.div
-            whileHover={{
-              y: -4,
-            }}
-            transition={{
-              type: "spring",
-              stiffness: 220,
-              damping: 18,
-            }}
-            className="
-              relative
-              overflow-hidden
-              rounded-[26px]
-              bg-gradient-to-br
-              from-[#0E3156]
-              via-[#164E82]
-              to-[#1D67A8]
-              p-6
-              text-white
-              shadow-[0_20px_45px_rgba(20,78,130,0.22)]
-            "
-          >
-            <div
-              className="
-                pointer-events-none
-                absolute
-                -right-14
-                -top-14
-                h-40
-                w-40
-                rounded-full
-                border
-                border-white/10
-              "
-            />
+          <div className="relative overflow-hidden rounded-[26px] bg-gradient-to-br from-[#0A2A49] via-[#164E82] to-[#2078B7] p-6 text-white shadow-[0_22px_50px_rgba(20,78,130,0.22)]">
+            <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full border border-white/10" />
+            <div className="pointer-events-none absolute -bottom-20 -left-10 h-44 w-44 rounded-full bg-sky-300/10 blur-[50px]" />
 
-            <div
-              className="
-                pointer-events-none
-                absolute
-                -right-6
-                -top-6
-                h-24
-                w-24
-                rounded-full
-                border
-                border-white/10
-              "
-            />
-
-            <div
-              className="
-                pointer-events-none
-                absolute
-                -bottom-20
-                -left-10
-                h-40
-                w-40
-                rounded-full
-                bg-sky-300/10
-                blur-[45px]
-              "
-            />
-
-            <div
-              className="
-                relative
-                flex
-                h-11
-                w-11
-                items-center
-                justify-center
-                rounded-[14px]
-                border
-                border-white/10
-                bg-white/10
-                backdrop-blur
-              "
-            >
-              <ShieldCheck className="h-5 w-5 text-sky-200" />
+            <div className="relative flex h-11 w-11 items-center justify-center rounded-[14px] border border-white/10 bg-white/10 backdrop-blur">
+              <ShieldCheck className="h-5 w-5 text-[#BFE8FF]" />
             </div>
 
-            <h3 className="relative mt-5 text-base font-extrabold">
-              Secure
-              Transfer
+            <h3 className="relative mt-5 text-base font-black">
+              Payment protection
             </h3>
 
-            <p
-              className="
-                relative
-                mt-2
-                text-xs
-                font-medium
-                leading-6
-                text-blue-100/90
-              "
-            >
-              Your transfer
-              is protected
-              through secure
-              authentication.
-              Keep your PIN
-              private.
+            <p className="relative mt-2 text-xs font-medium leading-6 text-blue-100/90">
+              Review the recipient and amount before authorizing. Never share your account password.
             </p>
 
-            <div
-              className="
-                relative
-                mt-5
-                flex
-                items-center
-                gap-2
-                rounded-xl
-                border
-                border-white/10
-                bg-white/[0.07]
-                px-3
-                py-2.5
-              "
-            >
+            <div className="relative mt-5 flex items-center gap-2 rounded-[13px] border border-white/10 bg-white/[0.07] px-3 py-2.5">
               <LockKeyhole className="h-3.5 w-3.5 text-sky-200" />
-
-              <span
-                className="
-                  text-[9px]
-                  font-extrabold
-                  uppercase
-                  tracking-[0.13em]
-                  text-blue-100
-                "
-              >
-                Protected session
+              <span className="text-[9px] font-black uppercase tracking-[0.14em] text-blue-100">
+                Secure confirmation flow
               </span>
             </div>
-          </motion.div>
+          </div>
         </motion.aside>
+      </section>
+    </main>
+  );
+}
+
+/* =========================================================
+   BALANCE CARD
+========================================================= */
+
+function BalanceRevealCard({
+  balanceLoading,
+  formattedBalance,
+  showBalance,
+  onToggle,
+}: {
+  balanceLoading: boolean;
+  formattedBalance: string;
+  showBalance: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <motion.button
+      type="button"
+      onClick={onToggle}
+      whileHover={{ y: -3 }}
+      whileTap={{ scale: 0.992 }}
+      aria-label={showBalance ? "Hide balance" : "Reveal balance"}
+      className="group relative min-h-[220px] w-full overflow-hidden rounded-[30px] border border-white/10 bg-gradient-to-br from-[#07192C] via-[#0B365C] to-[#176DA7] p-6 text-left text-white shadow-[0_26px_65px_rgba(13,65,105,0.24)] sm:p-7"
+    >
+      <motion.div
+        className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#62D4FF]/20 blur-[80px]"
+        animate={{ x: [0, 18, 0], y: [0, 12, 0], scale: [1, 1.08, 1] }}
+        transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
+      />
+      <div className="pointer-events-none absolute -bottom-28 left-10 h-64 w-64 rounded-full bg-blue-500/20 blur-[90px]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/35 to-transparent" />
+
+      <div className="relative z-10 flex h-full flex-col justify-between">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-[14px] border border-white/10 bg-white/10 backdrop-blur">
+              <WalletCards className="h-5 w-5 text-[#9BE8FF]" />
+            </div>
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#9DDBFF]">
+                Available balance
+              </p>
+              <p className="mt-1 text-[11px] font-semibold text-white/50">
+                Coffer wallet · BDT
+              </p>
+            </div>
+          </div>
+
+          <div className="flex h-9 w-9 items-center justify-center rounded-[12px] border border-white/10 bg-white/10 text-[#C6F1FF] backdrop-blur">
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span
+                key={showBalance ? "eye" : "eye-off"}
+                initial={{ opacity: 0, scale: 0.6, rotate: -45 }}
+                animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                exit={{ opacity: 0, scale: 0.6, rotate: 45 }}
+                className="flex"
+              >
+                {showBalance ? (
+                  <Eye className="h-4 w-4" />
+                ) : (
+                  <EyeOff className="h-4 w-4" />
+                )}
+              </motion.span>
+            </AnimatePresence>
+          </div>
+        </div>
+
+        <div className="mt-7">
+          {balanceLoading ? (
+            <div className="flex h-[64px] items-center gap-3">
+              <Loader2 className="h-5 w-5 animate-spin text-[#9BE8FF]" />
+              <span className="text-xs font-bold text-white/60">Syncing balance...</span>
+            </div>
+          ) : (
+            <div className="relative h-[68px] overflow-hidden rounded-[18px]">
+              <AnimatePresence mode="wait" initial={false}>
+                {showBalance ? (
+                  <motion.div
+                    key="revealed"
+                    initial={{ opacity: 0, y: 30, filter: "blur(12px)" }}
+                    animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                    exit={{ opacity: 0, y: -26, filter: "blur(12px)" }}
+                    transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
+                    className="flex h-full items-center"
+                  >
+                    <span className="bg-gradient-to-r from-white via-[#E8FAFF] to-[#91E3FF] bg-clip-text text-[38px] font-black tracking-[-0.05em] text-transparent sm:text-[46px]">
+                      {formattedBalance}
+                    </span>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="hidden"
+                    initial={{ opacity: 0, y: -18 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 18 }}
+                    className="absolute inset-0 flex items-center overflow-hidden rounded-[18px] border border-white/10 bg-[#06182A]/35 px-4 backdrop-blur-xl"
+                  >
+                    <motion.div
+                      className="absolute inset-y-0 -left-24 w-24 bg-gradient-to-r from-transparent via-white/12 to-transparent"
+                      animate={{ x: [0, 520] }}
+                      transition={{ duration: 2.8, repeat: Infinity, repeatDelay: 0.8 }}
+                    />
+
+                    <div className="relative flex items-center gap-2.5">
+                      {[0, 1, 2, 3, 4, 5].map((item) => (
+                        <motion.span
+                          key={item}
+                          className="w-[8px] rounded-full bg-[#A8EBFF] shadow-[0_0_12px_rgba(168,235,255,0.45)]"
+                          animate={{
+                            height: [8, 18, 8],
+                            opacity: [0.35, 1, 0.35],
+                          }}
+                          transition={{
+                            duration: 1.25,
+                            repeat: Infinity,
+                            delay: item * 0.08,
+                          }}
+                        />
+                      ))}
+                    </div>
+
+                    <span className="relative ml-auto text-[9px] font-black uppercase tracking-[0.14em] text-[#A6E8FF]">
+                      Tap to reveal
+                    </span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <span className="inline-flex items-center gap-1.5 text-[9px] font-semibold text-white/45">
+              <LockKeyhole className="h-3 w-3 text-[#8FE6FF]" />
+              {showBalance ? "Tap again to hide" : "Privacy mode is active"}
+            </span>
+
+            <span className="rounded-full border border-emerald-300/15 bg-emerald-400/10 px-2.5 py-1 text-[9px] font-black text-emerald-200">
+              Wallet active
+            </span>
+          </div>
+        </div>
       </div>
-    </div>
+    </motion.button>
+  );
+}
+
+/* =========================================================
+   PAYMENT HISTORY DRAWER
+========================================================= */
+
+function PaymentHistoryDrawer({
+  history,
+}: {
+  history: PaymentHistoryItem[];
+}) {
+  return (
+    <Sheet>
+      <SheetTrigger asChild>
+        <button
+          type="button"
+          className="group flex w-full items-center justify-between gap-4 rounded-[22px] border border-[#DEE8F1] bg-white p-4 text-left shadow-[0_12px_38px_rgba(15,39,69,0.045)] transition hover:-translate-y-0.5 hover:border-[#C9DDED] hover:shadow-[0_18px_44px_rgba(15,39,69,0.07)]"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-[#EEF7FF] text-[#1F6FB4]">
+              <History className="h-[19px] w-[19px]" />
+            </div>
+            <div>
+              <p className="text-xs font-black text-[#213E57]">Payment history</p>
+              <p className="mt-0.5 text-[9px] font-semibold text-[#91A0AF]">
+                {history.length > 0
+                  ? `${history.length} confirmed payment${history.length > 1 ? "s" : ""}`
+                  : "View recent payment activity"}
+              </p>
+            </div>
+          </div>
+          <ChevronRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[#1F6FB4]" />
+        </button>
+      </SheetTrigger>
+
+      <SheetContent
+        side="right"
+        className="w-full overflow-y-auto border-l border-[#E0E8F0] bg-[#F7FAFC] p-0 sm:max-w-[470px]"
+      >
+        <SheetHeader className="sticky top-0 z-20 border-b border-[#E6EDF3] bg-white/95 px-5 py-5 text-left backdrop-blur sm:px-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-[#EEF7FF] text-[#1F6FB4]">
+              <ReceiptText className="h-5 w-5" />
+            </div>
+            <div>
+              <SheetTitle className="text-base font-black tracking-[-0.02em] text-[#17344D]">
+                Payment history
+              </SheetTitle>
+              <SheetDescription className="mt-1 text-[10px] leading-5 text-[#8597A7]">
+                Confirmed transfers completed from this payment screen.
+              </SheetDescription>
+            </div>
+          </div>
+        </SheetHeader>
+
+        <div className="p-4 sm:p-5">
+          {history.length > 0 ? (
+            <div className="space-y-3">
+              {history.map((item, index) => (
+                <motion.div
+                  key={item.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.04 }}
+                  className="rounded-[18px] border border-[#E1E9F0] bg-white p-4 shadow-[0_8px_24px_rgba(15,39,69,0.035)]"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-gradient-to-br from-[#1F6FB4] to-[#4CB5EA] text-xs font-black text-white">
+                        {getInitial(item.recipient)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-black text-[#213E57]">
+                          {item.recipient}
+                        </p>
+                        <p className="mt-0.5 text-[9px] font-semibold text-[#96A4B1]">
+                          {formatPaymentTime(item.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <p className="text-sm font-black text-[#17344D]">
+                        -{formatCurrency(item.amount)}
+                      </p>
+                      <span className="mt-1 inline-flex rounded-full bg-emerald-50 px-2 py-1 text-[8px] font-black uppercase tracking-[0.1em] text-emerald-600">
+                        {item.status}
+                      </span>
+                    </div>
+                  </div>
+
+                  {item.note && (
+                    <div className="mt-3 rounded-[12px] bg-[#F7FAFC] px-3 py-2 text-[10px] font-medium leading-5 text-[#73869A]">
+                      {item.note}
+                    </div>
+                  )}
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex min-h-[420px] flex-col items-center justify-center px-6 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-[22px] border border-[#DDE8F1] bg-white text-[#7E9AB2] shadow-sm">
+                <History className="h-7 w-7" />
+              </div>
+              <h3 className="mt-5 text-sm font-black text-[#17344D]">
+                No payments yet
+              </h3>
+              <p className="mt-2 max-w-xs text-[11px] leading-6 text-[#8C9CAB]">
+                Payments completed during this session will appear here with amount, recipient and status.
+              </p>
+            </div>
+          )}
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -2337,110 +1080,72 @@ export default function SendMoneyPage() {
 
 function FormField({
   label,
+  hint,
   htmlFor,
-  optional = false,
   children,
 }: {
   label: string;
+  hint?: string;
   htmlFor: string;
-  optional?: boolean;
-  children:
-    React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-3">
-        <label
-          htmlFor={
-            htmlFor
-          }
-          className="
-            text-xs
-            font-extrabold
-            text-[#304A62]
-          "
-        >
+        <label htmlFor={htmlFor} className="text-xs font-black text-[#304A62]">
           {label}
         </label>
-
-        {optional && (
-          <span
-            className="
-              rounded-md
-              bg-slate-100
-              px-2
-              py-1
-              text-[8px]
-              font-extrabold
-              uppercase
-              tracking-wider
-              text-slate-400
-            "
-          >
-            Optional
-          </span>
+        {hint && (
+          <span className="text-[9px] font-semibold text-[#98A6B5]">{hint}</span>
         )}
       </div>
-
       {children}
     </div>
   );
 }
 
 /* =========================================================
-   STEP BADGE
+   PROGRESS STEPS
 ========================================================= */
 
-function StepBadge({
+function ProgressSteps({ step }: { step: 1 | 2 | 3 }) {
+  return (
+    <div className="flex items-center gap-2 rounded-[14px] border border-[#E0E9F1] bg-white p-1.5 shadow-sm">
+      <ProgressPill number={1} label="Details" active={step >= 1} current={step === 1} />
+      <ChevronRight className="h-3.5 w-3.5 text-slate-300" />
+      <ProgressPill number={2} label="Verify" active={step >= 2} current={step === 2} />
+    </div>
+  );
+}
+
+function ProgressPill({
   number,
   label,
   active,
+  current,
 }: {
   number: number;
   label: string;
   active: boolean;
+  current: boolean;
 }) {
   return (
-    <div className="flex items-center gap-1.5">
-      <motion.span
-        animate={{
-          backgroundColor:
-            active
-              ? "#1F6FB4"
-              : "#EEF2F6",
-
-          color:
-            active
-              ? "#FFFFFF"
-              : "#94A3B8",
-        }}
-        className="
-          flex
-          h-6
-          w-6
-          items-center
-          justify-center
-          rounded-lg
-          text-[9px]
-          font-black
-        "
+    <div
+      className={`flex items-center gap-2 rounded-[10px] px-2.5 py-2 transition ${
+        current ? "bg-[#EEF7FF]" : ""
+      }`}
+    >
+      <span
+        className={`flex h-6 w-6 items-center justify-center rounded-[8px] text-[9px] font-black ${
+          active ? "bg-[#1F6FB4] text-white" : "bg-slate-100 text-slate-400"
+        }`}
       >
         {number}
-      </motion.span>
-
+      </span>
       <span
-        className={`
-          hidden
-          text-[9px]
-          font-extrabold
-          sm:inline
-
-          ${
-            active
-              ? "text-[#31506C]"
-              : "text-slate-400"
-          }
-        `}
+        className={`hidden text-[9px] font-black sm:inline ${
+          active ? "text-[#35546E]" : "text-slate-400"
+        }`}
       >
         {label}
       </span>
@@ -2449,211 +1154,79 @@ function StepBadge({
 }
 
 /* =========================================================
-   PIN INPUT
+   REVIEW ITEM
 ========================================================= */
 
-function PinInput({
+function ReviewItem({
+  icon: Icon,
+  label,
   value,
-  onChange,
-  controls,
 }: {
-  value: string[];
-
-  onChange: (
-    next: string[]
-  ) => void;
-
-  controls:
-    ReturnType<
-      typeof useAnimation
-    >;
+  icon: ElementType;
+  label: string;
+  value: string;
 }) {
-  const inputRefs =
-    useRef<
-      Array<HTMLInputElement | null>
-    >([]);
-
-  const handleChange = (
-    index: number,
-    raw: string
-  ) => {
-    const digit =
-      raw
-        .replace(
-          /\D/g,
-          ""
-        )
-        .slice(-1);
-
-    const next = [
-      ...value,
-    ];
-
-    next[index] =
-      digit;
-
-    onChange(next);
-
-    if (
-      digit &&
-      index <
-        value.length -
-          1
-    ) {
-      inputRefs.current[
-        index + 1
-      ]?.focus();
-    }
-  };
-
-  const handleKeyDown =
-    (
-      index: number,
-      event:
-        KeyboardEvent<HTMLInputElement>
-    ) => {
-      if (
-        event.key ===
-          "Backspace" &&
-        !value[index] &&
-        index > 0
-      ) {
-        inputRefs.current[
-          index - 1
-        ]?.focus();
-      }
-    };
-
   return (
-    <motion.div
-      animate={
-        controls
-      }
-      className="
-        flex
-        items-center
-        justify-center
-        gap-2.5
-        sm:gap-3
-      "
-    >
-      {value.map(
-        (
-          digit,
-          index
-        ) => (
-          <motion.input
-            key={
-              index
-            }
-            ref={(
-              element
-            ) => {
-              inputRefs.current[
-                index
-              ] =
-                element;
-            }}
-            type="password"
-            inputMode="numeric"
-            maxLength={1}
-            value={
-              digit
-            }
-            aria-label={`PIN digit ${
-              index +
-              1
-            }`}
-            animate={
-              digit
-                ? {
-                    scale: [
-                      1,
-                      1.08,
-                      1,
-                    ],
-                  }
-                : {
-                    scale: 1,
-                  }
-            }
-            transition={{
-              duration:
-                0.18,
-            }}
-            onChange={(
-              event: ChangeEvent<HTMLInputElement>
-            ) =>
-              handleChange(
-                index,
-                event
-                  .target
-                  .value
-              )
-            }
-            onKeyDown={(
-              event
-            ) =>
-              handleKeyDown(
-                index,
-                event
-              )
-            }
-            className={`
-              h-[58px]
-              w-[58px]
-              rounded-[16px]
-              border
-              text-center
-              text-xl
-              font-black
-              text-[#18364F]
-              outline-none
-              transition-all
-              focus:ring-4
-
-              sm:h-16
-              sm:w-16
-
-              ${
-                digit
-                  ? "border-blue-500 bg-blue-50 shadow-[0_7px_18px_rgba(59,130,246,0.08)] focus:ring-blue-500/10"
-                  : "border-[#DCE5EE] bg-[#F8FAFC] focus:border-blue-500 focus:bg-white focus:ring-blue-500/10"
-              }
-            `}
-          />
-        )
-      )}
-    </motion.div>
+    <div className="rounded-[16px] border border-white bg-white/80 p-4 shadow-sm backdrop-blur">
+      <div className="flex items-start gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-[#EEF7FF] text-[#1F6FB4]">
+          <Icon className="h-4 w-4" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-[8px] font-black uppercase tracking-[0.13em] text-[#91A0AF]">
+            {label}
+          </p>
+          <p className="mt-1 break-all text-xs font-black leading-5 text-[#2B455C]">
+            {value}
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
 
 /* =========================================================
-   CURRENCY
+   HELPERS
 ========================================================= */
 
-function formatCurrency(
-  amount: number
-): string {
-  return `৳ ${Number(
-    amount || 0
-  ).toLocaleString(
-    "en-BD",
-    {
-      minimumFractionDigits:
-        2,
-
-      maximumFractionDigits:
-        2,
-    }
-  )}`;
+function formatCurrency(amount: number): string {
+  return `৳ ${Number(amount || 0).toLocaleString("en-BD", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
-function maskCurrency(
-  formatted: string
-): string {
-  return formatted.replace(
-    /[0-9]/g,
-    "•"
-  );
+function getInitial(value: string): string {
+  const cleaned = value.trim();
+
+  if (!cleaned) {
+    return "U";
+  }
+
+  if (cleaned.includes("@")) {
+    return cleaned.charAt(0).toUpperCase();
+  }
+
+  const digits = cleaned.replace(/\D/g, "");
+
+  if (digits.length >= 2) {
+    return digits.slice(-2);
+  }
+
+  return cleaned.charAt(0).toUpperCase();
+}
+
+function formatPaymentTime(value: string): string {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Just now";
+  }
+
+  return date.toLocaleString("en-BD", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
