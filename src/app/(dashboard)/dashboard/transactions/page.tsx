@@ -13,12 +13,17 @@ import {
   CheckCircle2,
   ChevronRight,
   Clock3,
+  Copy,
   CreditCard,
+  Download,
   Eye,
   Filter,
   Loader2,
+  Printer,
+  ReceiptText,
   RefreshCw,
   Search,
+  ShieldCheck,
   X,
   XCircle,
 } from "lucide-react";
@@ -39,17 +44,16 @@ type TransactionStatus =
   | "COMPLETED"
   | "FAILED";
 
-type RiskScore =
-  | "LOW"
-  | "MEDIUM"
-  | "HIGH";
-
 interface UserRef {
   _id: string;
   name?: string;
   email?: string;
   phone?: string;
 }
+
+type TransactionDirection =
+  | "IN"
+  | "OUT";
 
 interface Transaction {
   _id: string;
@@ -62,6 +66,14 @@ interface Transaction {
     | string
     | UserRef;
 
+  counterparty?:
+    | string
+    | UserRef
+    | null;
+
+  direction?:
+    TransactionDirection;
+
   amount: number;
 
   currency: string;
@@ -71,8 +83,6 @@ interface Transaction {
   status: TransactionStatus;
 
   reference?: string;
-
-  riskScore?: RiskScore;
 
   createdAt?: string;
 
@@ -922,8 +932,14 @@ function createTransactionView(
     transaction.type ===
     "TRANSFER";
 
+  const direction =
+    transaction.direction ||
+    (isDeposit
+      ? "IN"
+      : "OUT");
+
   const isCredit =
-    isDeposit;
+    direction === "IN";
 
   let title =
     "Transaction";
@@ -932,13 +948,19 @@ function createTransactionView(
     "Wallet activity";
 
   let icon =
-    ArrowUpRight;
+    isCredit
+      ? ArrowDownLeft
+      : ArrowUpRight;
 
   let iconClass =
-    "bg-blue-50 text-blue-600";
+    isCredit
+      ? "bg-emerald-50 text-emerald-600"
+      : "bg-blue-50 text-blue-600";
 
   let amountClass =
-    "text-slate-900";
+    isCredit
+      ? "text-emerald-600"
+      : "text-slate-900";
 
   if (isDeposit) {
     title =
@@ -979,10 +1001,23 @@ function createTransactionView(
   }
 
   if (isTransfer) {
+    const counterparty =
+      transaction.counterparty ||
+      (
+        direction === "IN"
+          ? transaction.senderId
+          : transaction.receiverId
+      );
+
+    const counterpartyName =
+      getUserName(
+        counterparty
+      );
+
     title =
-      `Transfer with ${getUserName(
-        transaction.receiverId
-      )}`;
+      direction === "IN"
+        ? `Received from ${counterpartyName}`
+        : `Sent to ${counterpartyName}`;
 
     subtitle =
       transaction.reference
@@ -990,17 +1025,24 @@ function createTransactionView(
         : "Peer-to-peer transfer";
 
     icon =
-      ArrowUpRight;
+      direction === "IN"
+        ? ArrowDownLeft
+        : ArrowUpRight;
 
     iconClass =
-      "bg-blue-50 text-blue-600";
+      direction === "IN"
+        ? "bg-emerald-50 text-emerald-600"
+        : "bg-blue-50 text-blue-600";
 
     amountClass =
-      "text-slate-900";
+      direction === "IN"
+        ? "text-emerald-600"
+        : "text-slate-900";
   }
 
   return {
-    id: transaction._id,
+    id:
+      transaction._id,
 
     title,
 
@@ -1084,6 +1126,11 @@ function TransactionModal({
   transaction: Transaction;
   onClose: () => void;
 }) {
+  const [
+    copied,
+    setCopied,
+  ] = useState(false);
+
   const typeLabel =
     transaction.type ===
     "TRANSFER"
@@ -1093,123 +1140,347 @@ function TransactionModal({
       ? "Deposit"
       : "Withdrawal";
 
+  const direction =
+    transaction.direction ||
+    (
+      transaction.type === "DEPOSIT"
+        ? "IN"
+        : "OUT"
+    );
+
+  const counterparty =
+    transaction.counterparty ||
+    (
+      transaction.type === "TRANSFER"
+        ? direction === "IN"
+          ? transaction.senderId
+          : transaction.receiverId
+        : null
+    );
+
+  const receiptNumber =
+    `COFFER-${transaction._id
+      .slice(-10)
+      .toUpperCase()}`;
+
+  const handleCopyId =
+    async () => {
+      try {
+        await navigator.clipboard.writeText(
+          transaction._id
+        );
+
+        setCopied(
+          true
+        );
+
+        window.setTimeout(
+          () =>
+            setCopied(
+              false
+            ),
+          1600
+        );
+      } catch (error) {
+        console.error(
+          "Copy transaction ID failed:",
+          error
+        );
+      }
+    };
+
+  const handlePrint =
+    () => {
+      const printWindow =
+        window.open(
+          "",
+          "_blank",
+          "width=760,height=900"
+        );
+
+      if (!printWindow) {
+        return;
+      }
+
+      printWindow.document.open();
+
+      printWindow.document.write(
+        buildReceiptHtml(
+          transaction,
+          receiptNumber
+        )
+      );
+
+      printWindow.document.close();
+
+      printWindow.focus();
+
+      window.setTimeout(
+        () => {
+          printWindow.print();
+        },
+        250
+      );
+    };
+
+  const handleDownload =
+    () => {
+      const html =
+        buildReceiptHtml(
+          transaction,
+          receiptNumber
+        );
+
+      const blob =
+        new Blob(
+          [html],
+          {
+            type:
+              "text/html;charset=utf-8",
+          }
+        );
+
+      const url =
+        URL.createObjectURL(
+          blob
+        );
+
+      const link =
+        document.createElement(
+          "a"
+        );
+
+      link.href =
+        url;
+
+      link.download =
+        `coffer-receipt-${transaction._id}.html`;
+
+      document.body.appendChild(
+        link
+      );
+
+      link.click();
+
+      link.remove();
+
+      URL.revokeObjectURL(
+        url
+      );
+    };
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <button
         type="button"
         onClick={onClose}
-        aria-label="Close transaction details"
-        className="absolute inset-0 bg-slate-950/50 backdrop-blur-sm"
+        aria-label="Close transaction receipt"
+        className="absolute inset-0 bg-slate-950/55 backdrop-blur-sm"
       />
 
-      <div className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-slate-400">
-              Transaction Details
+      <div className="relative z-10 max-h-[92vh] w-full max-w-[590px] overflow-y-auto rounded-[30px] border border-slate-200 bg-white shadow-[0_28px_90px_rgba(15,23,42,0.24)]">
+        {/* RECEIPT HEADER */}
+        <div className="relative overflow-hidden border-b border-slate-100 bg-[linear-gradient(135deg,#F8FCFF_0%,#FFFFFF_58%,#F1F8FE_100%)] p-6 sm:p-7">
+          <div className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-blue-400/10 blur-[70px]" />
+
+          <div className="relative flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3.5">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-[#123E67] text-white shadow-[0_10px_25px_rgba(18,62,103,0.18)]">
+                <ReceiptText className="h-5 w-5" />
+              </div>
+
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#2B78BA]">
+                  Coffer receipt
+                </p>
+
+                <h2 className="mt-1 text-xl font-black tracking-[-0.025em] text-[#17344D]">
+                  Transaction Receipt
+                </h2>
+
+                <p className="mt-1 text-[11px] font-semibold text-slate-400">
+                  {receiptNumber}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+            >
+              <X className="h-4.5 w-4.5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6 sm:p-7">
+          {/* AMOUNT */}
+          <div className="rounded-[24px] border border-[#E4ECF3] bg-[#F8FBFD] p-5 text-center">
+            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-[13px] bg-white text-[#1F5EA8] shadow-sm">
+              {direction === "IN" ? (
+                <ArrowDownLeft className="h-4.5 w-4.5" />
+              ) : (
+                <ArrowUpRight className="h-4.5 w-4.5" />
+              )}
+            </div>
+
+            <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+              {direction === "IN"
+                ? "Money received"
+                : "Money sent"}
             </p>
 
-            <h2 className="mt-1 text-xl font-extrabold text-slate-900">
-              {typeLabel}
-            </h2>
+            <p className="mt-2 text-3xl font-black tracking-[-0.035em] text-[#17344D] sm:text-4xl">
+              {formatCurrency(
+                transaction.amount
+              )}
+            </p>
+
+            <div className="mt-4 flex justify-center">
+              <StatusBadge
+                status={
+                  transaction.status
+                }
+              />
+            </div>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500 transition hover:bg-slate-200 hover:text-slate-900"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+          {/* VERIFIED RECEIPT */}
+          <div className="mt-5 flex items-start gap-3 rounded-[18px] border border-emerald-100 bg-emerald-50/70 px-4 py-3">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
 
-        <div className="mt-6 rounded-2xl bg-slate-50 p-5 text-center">
-          <p className="text-xs font-semibold text-slate-400">
-            Amount
-          </p>
+            <div>
+              <p className="text-[11px] font-extrabold text-emerald-800">
+                Secure transaction record
+              </p>
 
-          <p className="mt-2 text-3xl font-black text-slate-900">
-            {formatCurrency(
-              transaction.amount
-            )}
-          </p>
+              <p className="mt-0.5 text-[10px] leading-4 text-emerald-700/75">
+                Receipt details are loaded from your authenticated transaction record.
+              </p>
+            </div>
+          </div>
 
-          <div className="mt-3 flex justify-center">
-            <StatusBadge
-              status={
-                transaction.status
+          {/* DETAILS */}
+          <div className="mt-6 space-y-4">
+            <DetailRow
+              label="Transaction ID"
+              value={
+                transaction._id
               }
             />
+
+            <DetailRow
+              label="Type"
+              value={
+                typeLabel
+              }
+            />
+
+            <DetailRow
+              label="Direction"
+              value={
+                direction === "IN"
+                  ? "Incoming"
+                  : "Outgoing"
+              }
+            />
+
+            <DetailRow
+              label="Currency"
+              value={
+                transaction.currency
+              }
+            />
+
+            {transaction.type ===
+              "TRANSFER" &&
+              counterparty && (
+                <DetailRow
+                  label="Counterparty"
+                  value={getUserDisplay(
+                    counterparty
+                  )}
+                />
+              )}
+
+            <DetailRow
+              label="Reference"
+              value={
+                transaction.reference ||
+                "No reference"
+              }
+            />
+
+            <DetailRow
+              label="Date & Time"
+              value={formatDate(
+                transaction.createdAt
+              )}
+            />
+
+            {transaction.updatedAt && (
+              <DetailRow
+                label="Last Updated"
+                value={formatDate(
+                  transaction.updatedAt
+                )}
+              />
+            )}
           </div>
-        </div>
 
-        <div className="mt-6 space-y-4">
-          <DetailRow
-            label="Transaction ID"
-            value={
-              transaction._id
-            }
-          />
-
-          <DetailRow
-            label="Type"
-            value={typeLabel}
-          />
-
-          <DetailRow
-            label="Currency"
-            value={
-              transaction.currency
-            }
-          />
-
-          <DetailRow
-            label="Reference"
-            value={
-              transaction.reference ||
-              "N/A"
-            }
-          />
-
-          <DetailRow
-            label="Risk Score"
-            value={
-              transaction.riskScore ||
-              "LOW"
-            }
-          />
-
-          <DetailRow
-            label="Created"
-            value={formatDate(
-              transaction.createdAt
-            )}
-          />
-
-          <DetailRow
-            label="Sender"
-            value={getUserDisplay(
-              transaction.senderId
-            )}
-          />
-
-          <DetailRow
-            label="Receiver"
-            value={getUserDisplay(
-              transaction.receiverId
-            )}
-          />
-        </div>
-
-        <div className="mt-6 flex justify-end">
+          {/* ID COPY */}
           <button
             type="button"
-            onClick={onClose}
-            className="rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-bold text-white transition hover:bg-slate-800"
+            onClick={() =>
+              void handleCopyId()
+            }
+            className="mt-5 flex w-full items-center justify-between gap-3 rounded-[16px] border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:border-blue-200 hover:bg-blue-50/50"
           >
-            Close
+            <div className="min-w-0">
+              <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                Transaction identifier
+              </p>
+
+              <p className="mt-1 truncate text-[11px] font-bold text-slate-700">
+                {transaction._id}
+              </p>
+            </div>
+
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-[#1F5EA8] shadow-sm">
+              {copied ? (
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+              ) : (
+                <Copy className="h-4 w-4" />
+              )}
+            </div>
           </button>
+
+          {/* ACTIONS */}
+          <div className="mt-6 grid gap-2.5 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-[14px] bg-[#173F63] px-4 text-xs font-extrabold text-white shadow-[0_10px_25px_rgba(23,63,99,0.16)] transition hover:bg-[#103553]"
+            >
+              <Printer className="h-4 w-4" />
+              Print / Save PDF
+            </button>
+
+            <button
+              type="button"
+              onClick={handleDownload}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-[14px] border border-slate-200 bg-white px-4 text-xs font-extrabold text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-[#1F5EA8]"
+            >
+              <Download className="h-4 w-4" />
+              Download Receipt
+            </button>
+          </div>
+
+          <p className="mt-4 text-center text-[9px] leading-4 text-slate-400">
+            Use “Print / Save PDF” to save a PDF copy from your browser.
+          </p>
         </div>
       </div>
     </div>
@@ -1336,6 +1607,323 @@ function getUserDisplay(
   }
 
   return user;
+}
+
+/* =========================================================
+   RECEIPT HELPERS
+========================================================= */
+
+function escapeHtml(
+  value: string
+): string {
+  return value
+    .replace(
+      /&/g,
+      "&amp;"
+    )
+    .replace(
+      /</g,
+      "&lt;"
+    )
+    .replace(
+      />/g,
+      "&gt;"
+    )
+    .replace(
+      /"/g,
+      "&quot;"
+    )
+    .replace(
+      /'/g,
+      "&#039;"
+    );
+}
+
+function buildReceiptHtml(
+  transaction: Transaction,
+  receiptNumber: string
+): string {
+  const typeLabel =
+    transaction.type ===
+    "TRANSFER"
+      ? "Transfer"
+      : transaction.type ===
+        "DEPOSIT"
+      ? "Deposit"
+      : "Withdrawal";
+
+  const direction =
+    transaction.direction ||
+    (
+      transaction.type === "DEPOSIT"
+        ? "IN"
+        : "OUT"
+    );
+
+  const counterparty =
+    transaction.counterparty ||
+    (
+      transaction.type === "TRANSFER"
+        ? direction === "IN"
+          ? transaction.senderId
+          : transaction.receiverId
+        : null
+    );
+
+  const counterpartyText =
+    counterparty
+      ? getUserDisplay(
+          counterparty
+        )
+      : "N/A";
+
+  const rows = [
+    [
+      "Receipt No.",
+      receiptNumber,
+    ],
+    [
+      "Transaction ID",
+      transaction._id,
+    ],
+    [
+      "Type",
+      typeLabel,
+    ],
+    [
+      "Direction",
+      direction === "IN"
+        ? "Incoming"
+        : "Outgoing",
+    ],
+    [
+      "Amount",
+      formatCurrency(
+        transaction.amount
+      ),
+    ],
+    [
+      "Currency",
+      transaction.currency,
+    ],
+    ...(transaction.type === "TRANSFER"
+      ? [
+          [
+            "Counterparty",
+            counterpartyText,
+          ],
+        ]
+      : []),
+    [
+      "Reference",
+      transaction.reference ||
+        "No reference",
+    ],
+    [
+      "Status",
+      transaction.status,
+    ],
+    [
+      "Date & Time",
+      formatDate(
+        transaction.createdAt
+      ),
+    ],
+  ];
+
+  const rowHtml =
+    rows
+      .map(
+        ([label, value]) =>
+          `<tr>
+            <td>${escapeHtml(
+              String(label)
+            )}</td>
+            <td>${escapeHtml(
+              String(value)
+            )}</td>
+          </tr>`
+      )
+      .join("");
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1"
+  />
+  <title>Coffer Receipt ${escapeHtml(
+    receiptNumber
+  )}</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 36px 20px;
+      background: #f4f7fa;
+      color: #17344d;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    .receipt {
+      max-width: 700px;
+      margin: 0 auto;
+      overflow: hidden;
+      border: 1px solid #dde7ef;
+      border-radius: 24px;
+      background: #ffffff;
+    }
+
+    .header {
+      padding: 28px 30px;
+      border-bottom: 1px solid #e8eef3;
+      background: #f8fbfd;
+    }
+
+    .eyebrow {
+      margin: 0 0 6px;
+      color: #2b78ba;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 26px;
+      line-height: 1.2;
+    }
+
+    .receipt-no {
+      margin-top: 8px;
+      color: #7890a4;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .amount {
+      margin: 24px 30px 0;
+      padding: 24px;
+      border: 1px solid #e3ebf1;
+      border-radius: 18px;
+      background: #f8fbfd;
+      text-align: center;
+    }
+
+    .amount small {
+      display: block;
+      margin-bottom: 8px;
+      color: #8194a5;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+    }
+
+    .amount strong {
+      font-size: 34px;
+    }
+
+    .status {
+      display: inline-block;
+      margin-top: 12px;
+      padding: 7px 11px;
+      border-radius: 999px;
+      background: #ecfdf5;
+      color: #047857;
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .08em;
+    }
+
+    table {
+      width: calc(100% - 60px);
+      margin: 24px 30px;
+      border-collapse: collapse;
+    }
+
+    td {
+      padding: 13px 0;
+      border-bottom: 1px solid #eef2f5;
+      vertical-align: top;
+      font-size: 12px;
+    }
+
+    td:first-child {
+      width: 34%;
+      color: #8494a4;
+      font-weight: 700;
+    }
+
+    td:last-child {
+      text-align: right;
+      word-break: break-word;
+      font-weight: 700;
+    }
+
+    .footer {
+      margin: 0 30px 28px;
+      padding-top: 2px;
+      color: #8a9aaa;
+      font-size: 10px;
+      line-height: 1.6;
+      text-align: center;
+    }
+
+    @media print {
+      body {
+        padding: 0;
+        background: #ffffff;
+      }
+
+      .receipt {
+        max-width: none;
+        border: 0;
+        border-radius: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="receipt">
+    <header class="header">
+      <p class="eyebrow">Coffer secure receipt</p>
+      <h1>Transaction Receipt</h1>
+      <div class="receipt-no">${escapeHtml(
+        receiptNumber
+      )}</div>
+    </header>
+
+    <section class="amount">
+      <small>Transaction amount</small>
+      <strong>${escapeHtml(
+        formatCurrency(
+          transaction.amount
+        )
+      )}</strong>
+      <div class="status">${escapeHtml(
+        transaction.status
+      )}</div>
+    </section>
+
+    <table>
+      <tbody>
+        ${rowHtml}
+      </tbody>
+    </table>
+
+    <footer class="footer">
+      This receipt was generated from your authenticated Coffer transaction record.
+      Sensitive account information is masked.
+    </footer>
+  </main>
+</body>
+</html>`;
 }
 
 /* =========================================================
