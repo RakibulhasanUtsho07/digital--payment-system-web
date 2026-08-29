@@ -133,6 +133,19 @@ interface ReviewKYCResponse {
   kyc?: Partial<AdminKYCRecord>;
 }
 
+interface KYCPrivateDocuments {
+  frontUrl?: string;
+  backUrl?: string;
+  selfieUrl?: string;
+}
+
+interface KYCDocumentsResponse {
+  success: boolean;
+  message?: string;
+  expiresIn?: number;
+  documents?: KYCPrivateDocuments;
+}
+
 /* =========================================================
    MAPPERS
 ========================================================= */
@@ -520,6 +533,26 @@ export default function KYCRequestsPage() {
       null
     );
 
+  const [
+    privateDocuments,
+    setPrivateDocuments,
+  ] =
+    useState<KYCPrivateDocuments>(
+      {}
+    );
+
+  const [
+    documentsLoading,
+    setDocumentsLoading,
+  ] =
+    useState(false);
+
+  const [
+    documentsError,
+    setDocumentsError,
+  ] =
+    useState("");
+
   const [errorMessage, setErrorMessage] =
     useState("");
 
@@ -690,6 +723,119 @@ export default function KYCRequestsPage() {
         timer
       );
   }, [toast]);
+
+  /* =======================================================
+     LOAD PRIVATE KYC DOCUMENTS
+
+     Fetch only when an admin opens a review drawer.
+     Signed URLs are temporary and never stored in app state
+     beyond the currently selected review.
+  ======================================================== */
+
+  useEffect(() => {
+    let cancelled =
+      false;
+
+    const loadDocuments =
+      async () => {
+        if (
+          !selectedRequest
+        ) {
+          setPrivateDocuments(
+            {}
+          );
+
+          setDocumentsError(
+            ""
+          );
+
+          setDocumentsLoading(
+            false
+          );
+
+          return;
+        }
+
+        try {
+          setDocumentsLoading(
+            true
+          );
+
+          setDocumentsError(
+            ""
+          );
+
+          setPrivateDocuments(
+            {}
+          );
+
+          const response =
+            await apiClient<KYCDocumentsResponse>(
+              `/admin/kyc/${selectedRequest.id}/documents`
+            );
+
+          if (
+            !response ||
+            response.success !==
+              true
+          ) {
+            throw new Error(
+              response?.message ||
+                "Failed to load KYC documents."
+            );
+          }
+
+          if (
+            cancelled
+          ) {
+            return;
+          }
+
+          setPrivateDocuments(
+            response.documents ||
+              {}
+          );
+        } catch (error) {
+          if (
+            cancelled
+          ) {
+            return;
+          }
+
+          console.error(
+            "KYC private documents loading error:",
+            error
+          );
+
+          setDocumentsError(
+            error instanceof Error
+              ? error.message
+              : "Failed to load KYC documents."
+          );
+
+          setPrivateDocuments(
+            {}
+          );
+        } finally {
+          if (
+            !cancelled
+          ) {
+            setDocumentsLoading(
+              false
+            );
+          }
+        }
+      };
+
+    void loadDocuments();
+
+    return () => {
+      cancelled =
+        true;
+    };
+  }, [
+    selectedRequest?.id,
+  ]);
 
   /* =======================================================
      FILTER + SORT
@@ -1477,6 +1623,61 @@ export default function KYCRequestsPage() {
         />
       )}
 
+      {selectedRequest &&
+        (documentsLoading ||
+          documentsError) && (
+          <div
+            className="
+              fixed
+              bottom-4
+              right-4
+              z-[160]
+
+              w-[calc(100%-2rem)]
+              max-w-sm
+
+              rounded-2xl
+              border
+              border-slate-200
+
+              bg-white
+              p-4
+
+              shadow-2xl
+            "
+          >
+            {documentsLoading ? (
+              <div className="flex items-center gap-3">
+                <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+
+                <div>
+                  <p className="text-xs font-black text-slate-900">
+                    Loading secure documents
+                  </p>
+
+                  <p className="mt-1 text-[10px] text-slate-500">
+                    Generating temporary private image access.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start gap-3">
+                <AlertCircle className="mt-0.5 h-4 w-4 text-amber-500" />
+
+                <div>
+                  <p className="text-xs font-black text-slate-900">
+                    Documents unavailable
+                  </p>
+
+                  <p className="mt-1 text-[10px] leading-5 text-slate-500">
+                    {documentsError}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
       <KYCReviewDrawer
         open={
           selectedRequest !==
@@ -1541,12 +1742,19 @@ export default function KYCRequestsPage() {
                   selectedRequest.riskScore,
 
                 /*
-                 * Private Cloudinary files are deliberately not
-                 * exposed by /admin/kyc/pending. A dedicated
-                 * admin-only signed-URL endpoint is needed before
-                 * these three URLs can be populated safely.
+                 * Temporary signed Cloudinary URLs are fetched
+                 * only after this admin opens the review drawer.
                  */
-                documents: {},
+                documents: {
+                  frontUrl:
+                    privateDocuments.frontUrl,
+
+                  backUrl:
+                    privateDocuments.backUrl,
+
+                  selfieUrl:
+                    privateDocuments.selfieUrl,
+                },
 
                 checks: {
                   idDocumentValid:

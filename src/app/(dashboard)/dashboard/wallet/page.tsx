@@ -9,6 +9,7 @@ import {
   type FormEvent,
 } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   ArrowDownLeft,
@@ -18,6 +19,7 @@ import {
   ChevronRight,
   CreditCard,
   Loader2,
+  LockKeyhole,
   Plus,
   RefreshCw,
   ShieldCheck,
@@ -34,6 +36,7 @@ import {
   withdrawFunds,
   type FundsResponse,
 } from "@/lib/api/fundsApi";
+import { apiClient } from "@/lib/api/client";
 
 import PremiumWalletCard from "./components/PremiumWalletCard";
 
@@ -50,11 +53,33 @@ type IdempotencyState = {
   key: string;
 };
 
+type KYCStatus =
+  | "not_started"
+  | "pending"
+  | "under_review"
+  | "verified"
+  | "rejected";
+
+interface KYCStatusResponse {
+  success: boolean;
+  message?: string;
+  kyc?: {
+    status?: KYCStatus;
+  };
+  userKycStatus?:
+    | "not_started"
+    | "pending"
+    | "verified"
+    | "rejected";
+}
+
 /* =========================================================
    PAGE
 ========================================================= */
 
 export default function WalletPage() {
+  const router = useRouter();
+
   const [wallet, setWallet] =
     useState<WalletData | null>(null);
 
@@ -66,6 +91,18 @@ export default function WalletPage() {
 
   const [errorMessage, setErrorMessage] =
     useState("");
+
+  const [kycStatus, setKycStatus] =
+    useState<KYCStatus | null>(null);
+
+  const [kycLoading, setKycLoading] =
+    useState(true);
+
+  const [kycError, setKycError] =
+    useState("");
+
+  const [kycGuardOpen, setKycGuardOpen] =
+    useState(false);
 
   const [fundsAction, setFundsAction] =
     useState<FundsAction | null>(null);
@@ -139,15 +176,111 @@ export default function WalletPage() {
     []
   );
 
+  const loadKYCStatus =
+    useCallback(
+      async () => {
+        try {
+          setKycLoading(true);
+          setKycError("");
+
+          const response =
+            await apiClient<KYCStatusResponse>(
+              "/kyc/status"
+            );
+
+          if (!response?.success) {
+            throw new Error(
+              response?.message ||
+                "Unable to verify KYC status."
+            );
+          }
+
+          const status =
+            response.kyc?.status ||
+            response.userKycStatus ||
+            "not_started";
+
+          setKycStatus(status);
+        } catch (error) {
+          console.error(
+            "KYC status loading error:",
+            error
+          );
+
+          setKycStatus(null);
+
+          setKycError(
+            error instanceof Error
+              ? error.message
+              : "Unable to verify KYC status."
+          );
+        } finally {
+          setKycLoading(false);
+        }
+      },
+      []
+    );
+
   useEffect(() => {
     void loadWallet();
-  }, [loadWallet]);
+    void loadKYCStatus();
+  }, [
+    loadWallet,
+    loadKYCStatus,
+  ]);
+
+  const refreshWalletPage =
+    async () => {
+      await Promise.allSettled([
+        loadWallet(true),
+        loadKYCStatus(),
+      ]);
+    };
+
+  const requireVerifiedKYC = (
+    onVerified: () => void
+  ) => {
+    if (
+      !kycLoading &&
+      !kycError &&
+      kycStatus === "verified"
+    ) {
+      onVerified();
+      return;
+    }
+
+    setKycGuardOpen(true);
+  };
+
+  const openProtectedRoute = (
+    href: string
+  ) => {
+    requireVerifiedKYC(
+      () => router.push(href)
+    );
+  };
 
   /* =========================================================
      FUNDS MODAL
   ========================================================== */
 
   const openFundsModal = (
+    action: FundsAction
+  ) => {
+    if (action === "withdraw") {
+      requireVerifiedKYC(
+        () =>
+          openFundsModalUnsafe(
+            "withdraw"
+          )
+      );
+      return;
+    }
+
+    openFundsModalUnsafe(action);
+  };
+
+  const openFundsModalUnsafe = (
     action: FundsAction
   ) => {
     setFundsAction(action);
@@ -448,7 +581,7 @@ export default function WalletPage() {
           <button
             type="button"
             onClick={() =>
-              void loadWallet(true)
+              void refreshWalletPage()
             }
             disabled={refreshing}
             className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-[14px] border border-[#DCE6EF] bg-white px-4 text-xs font-bold text-[#566C80] shadow-[0_6px_20px_rgba(15,23,42,0.04)] transition hover:border-blue-200 hover:bg-blue-50 hover:text-[#1F5EA8] disabled:cursor-not-allowed disabled:opacity-60"
@@ -470,6 +603,8 @@ export default function WalletPage() {
         <PremiumWalletCard
           walletId={wallet._id}
           balance={balance}
+          kycStatus={kycStatus}
+          kycLoading={kycLoading}
         />
 
         {/* QUICK ACTIONS */}
@@ -487,19 +622,35 @@ export default function WalletPage() {
           <WalletActionButton
             icon={Banknote}
             title="Withdraw"
-            description="Withdraw from wallet balance"
+            description={
+              kycStatus === "verified"
+                ? "Withdraw from wallet balance"
+                : "KYC verification required"
+            }
             iconClass="bg-rose-50 text-rose-600"
             onClick={() =>
               openFundsModal("withdraw")
             }
           />
 
-          <WalletAction
-            href="/dashboard/send"
-            icon={ArrowUpRight}
+          <WalletActionButton
+            icon={
+              kycStatus === "verified"
+                ? ArrowUpRight
+                : LockKeyhole
+            }
             title="Send Money"
-            description="Transfer funds securely"
+            description={
+              kycStatus === "verified"
+                ? "Transfer funds securely"
+                : "KYC verification required"
+            }
             iconClass="bg-blue-50 text-blue-600"
+            onClick={() =>
+              openProtectedRoute(
+                "/dashboard/send"
+              )
+            }
           />
 
           <WalletAction
@@ -597,7 +748,11 @@ export default function WalletPage() {
               </h2>
 
               <p className="mt-2 text-xs leading-5 text-[#687D91]">
-                Your wallet is protected by authenticated access. Complete identity verification to unlock protected financial actions.
+                {getWalletKYCMessage(
+                  kycStatus,
+                  kycLoading,
+                  kycError
+                )}
               </p>
 
               <Link
@@ -640,6 +795,25 @@ export default function WalletPage() {
         </section>
       </main>
 
+      <KYCGuardModal
+        open={kycGuardOpen}
+        status={kycStatus}
+        loading={kycLoading}
+        errorMessage={kycError}
+        onRetry={() =>
+          void loadKYCStatus()
+        }
+        onClose={() =>
+          setKycGuardOpen(false)
+        }
+        onGoToKYC={() => {
+          setKycGuardOpen(false);
+          router.push(
+            "/dashboard/kyc"
+          );
+        }}
+      />
+
       {fundsAction && (
         <FundsModal
           action={fundsAction}
@@ -662,6 +836,187 @@ export default function WalletPage() {
       )}
     </>
   );
+}
+
+/* =========================================================
+   KYC GUARD
+========================================================= */
+
+function KYCGuardModal({
+  open,
+  status,
+  loading,
+  errorMessage,
+  onRetry,
+  onClose,
+  onGoToKYC,
+}: {
+  open: boolean;
+  status: KYCStatus | null;
+  loading: boolean;
+  errorMessage: string;
+  onRetry: () => void;
+  onClose: () => void;
+  onGoToKYC: () => void;
+}) {
+  if (!open) {
+    return null;
+  }
+
+  const content =
+    getWalletKYCContent(status);
+
+  return (
+    <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
+      <button
+        type="button"
+        aria-label="Close KYC notice"
+        onClick={onClose}
+        className="absolute inset-0 bg-slate-950/55 backdrop-blur-sm"
+      />
+
+      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-2xl">
+        <div className="relative overflow-hidden border-b border-[#E7EEF5] bg-gradient-to-br from-[#F7FBFF] to-white p-6">
+          <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-blue-300/15 blur-3xl" />
+
+          <div className="relative flex items-start justify-between gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-[16px] border border-blue-100 bg-white text-[#1F5EA8] shadow-sm">
+              {loading ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <ShieldCheck className="h-5 w-5" />
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-50 hover:text-slate-700"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+
+          <p className="relative mt-5 text-[9px] font-black uppercase tracking-[0.16em] text-[#1F5EA8]">
+            Identity verification
+          </p>
+
+          <h2 className="relative mt-1.5 text-xl font-black tracking-[-0.02em] text-[#18324A]">
+            {loading
+              ? "Checking KYC status"
+              : errorMessage
+              ? "Unable to verify KYC"
+              : content.title}
+          </h2>
+
+          <p className="relative mt-2 text-xs leading-5 text-[#718296]">
+            {loading
+              ? "Please wait while we confirm your current verification status."
+              : errorMessage ||
+                content.description}
+          </p>
+        </div>
+
+        <div className="p-6">
+          {errorMessage ? (
+            <button
+              type="button"
+              onClick={onRetry}
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-[#1F5EA8] text-xs font-extrabold text-white transition hover:bg-[#184E8D]"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Check Again
+            </button>
+          ) : status === "verified" ? (
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-11 w-full rounded-[14px] bg-emerald-600 text-xs font-extrabold text-white transition hover:bg-emerald-700"
+            >
+              Continue
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onGoToKYC}
+              disabled={loading}
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-[#1F5EA8] text-xs font-extrabold text-white transition hover:bg-[#184E8D] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <ShieldCheck className="h-4 w-4" />
+              {content.cta}
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          )}
+
+          <p className="mt-3 text-center text-[10px] leading-4 text-slate-400">
+            Backend verification still protects Send Money and Withdraw even if this UI check is bypassed.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function getWalletKYCContent(
+  status: KYCStatus | null
+): {
+  title: string;
+  description: string;
+  cta: string;
+} {
+  switch (status) {
+    case "verified":
+      return {
+        title: "Identity verified",
+        description:
+          "Your KYC is verified and protected wallet actions are available.",
+        cta: "Continue",
+      };
+
+    case "pending":
+    case "under_review":
+      return {
+        title: "KYC is under review",
+        description:
+          "Your documents are being reviewed. Send Money and Withdraw will unlock after approval.",
+        cta: "View KYC Status",
+      };
+
+    case "rejected":
+      return {
+        title: "KYC needs resubmission",
+        description:
+          "Your previous verification was not approved. Review the status and resubmit the required documents.",
+        cta: "Review & Resubmit",
+      };
+
+    case "not_started":
+    default:
+      return {
+        title: "KYC verification required",
+        description:
+          "Complete identity verification to use Send Money and Withdraw.",
+        cta: "Start Verification",
+      };
+  }
+}
+
+function getWalletKYCMessage(
+  status: KYCStatus | null,
+  loading: boolean,
+  errorMessage: string
+): string {
+  if (loading) {
+    return "Checking your identity verification status...";
+  }
+
+  if (errorMessage) {
+    return "We could not confirm your KYC status. Protected financial actions remain locked until verification can be checked.";
+  }
+
+  return getWalletKYCContent(
+    status
+  ).description;
 }
 
 /* =========================================================

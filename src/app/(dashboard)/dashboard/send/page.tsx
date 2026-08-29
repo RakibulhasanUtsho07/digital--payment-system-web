@@ -81,6 +81,26 @@ interface PaymentHistoryItem {
   createdAt: string;
 }
 
+type KYCStatus =
+  | "not_started"
+  | "pending"
+  | "under_review"
+  | "verified"
+  | "rejected";
+
+interface KYCStatusResponse {
+  success: boolean;
+  message?: string;
+  kyc?: {
+    status?: KYCStatus;
+  };
+  userKycStatus?:
+    | "not_started"
+    | "pending"
+    | "verified"
+    | "rejected";
+}
+
 /* =========================================================
    CONSTANTS
 ========================================================= */
@@ -124,6 +144,13 @@ export default function SendMoneyPage() {
 
   const [balance, setBalance] = useState<number | null>(null);
   const [balanceLoading, setBalanceLoading] = useState(true);
+
+  const [kycStatus, setKycStatus] =
+    useState<KYCStatus | null>(null);
+  const [kycLoading, setKycLoading] =
+    useState(true);
+  const [kycError, setKycError] =
+    useState("");
 
   // Requirement: hidden by default.
   const [showBalance, setShowBalance] = useState(false);
@@ -169,6 +196,58 @@ export default function SendMoneyPage() {
   }, []);
 
   /* =========================================================
+     KYC STATUS
+
+     Frontend guard is intentionally fail-closed.
+     The backend requireVerifiedKYC middleware remains the
+     source-of-truth security boundary for the transfer itself.
+  ========================================================== */
+
+  const loadKYCStatus = async () => {
+    try {
+      setKycLoading(true);
+      setKycError("");
+
+      const response =
+        await apiClient<KYCStatusResponse>(
+          "/kyc/status"
+        );
+
+      if (!response?.success) {
+        throw new Error(
+          response?.message ||
+            "Unable to verify your identity status."
+        );
+      }
+
+      const status =
+        response.kyc?.status ||
+        response.userKycStatus ||
+        "not_started";
+
+      setKycStatus(status);
+    } catch (error) {
+      console.error(
+        "KYC status loading error:",
+        error
+      );
+
+      setKycStatus(null);
+      setKycError(
+        error instanceof Error
+          ? error.message
+          : "Unable to verify your KYC status."
+      );
+    } finally {
+      setKycLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadKYCStatus();
+  }, []);
+
+  /* =========================================================
      DERIVED STATE
   ========================================================== */
 
@@ -207,6 +286,13 @@ export default function SendMoneyPage() {
 
   const handleNext = () => {
     setErrorMessage("");
+
+    if (kycStatus !== "verified") {
+      setErrorMessage(
+        "Verified KYC is required before you can send money."
+      );
+      return;
+    }
 
     if (!isRecipientValid) {
       setErrorMessage(
@@ -257,6 +343,13 @@ export default function SendMoneyPage() {
 
   const handleSend = async () => {
     if (isLoading) {
+      return;
+    }
+
+    if (kycStatus !== "verified") {
+      setErrorMessage(
+        "Verified KYC is required before you can send money."
+      );
       return;
     }
 
@@ -366,6 +459,25 @@ export default function SendMoneyPage() {
   /* =========================================================
      UI
   ========================================================== */
+
+  if (kycLoading) {
+    return <KYCCheckingState />;
+  }
+
+  if (
+    kycError ||
+    kycStatus !== "verified"
+  ) {
+    return (
+      <KYCRequiredState
+        status={kycStatus}
+        errorMessage={kycError}
+        onRetry={() =>
+          void loadKYCStatus()
+        }
+      />
+    );
+  }
 
   return (
     <main className="relative mx-auto w-full max-w-[1420px] pb-10">
@@ -856,6 +968,162 @@ export default function SendMoneyPage() {
       </section>
     </main>
   );
+}
+
+/* =========================================================
+   KYC GATE STATES
+========================================================= */
+
+function KYCCheckingState() {
+  return (
+    <main className="mx-auto flex min-h-[68vh] w-full max-w-[760px] items-center justify-center px-4">
+      <motion.div
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full rounded-[30px] border border-[#DFE8F1] bg-white p-8 text-center shadow-[0_22px_65px_rgba(15,39,69,0.07)]"
+      >
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-[#EEF7FF] text-[#1F6FB4]">
+          <Loader2 className="h-6 w-6 animate-spin" />
+        </div>
+
+        <h1 className="mt-5 text-xl font-black text-[#17344D]">
+          Checking verification
+        </h1>
+
+        <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#71869A]">
+          Confirming your KYC status before opening the secure transfer workspace.
+        </p>
+      </motion.div>
+    </main>
+  );
+}
+
+function KYCRequiredState({
+  status,
+  errorMessage,
+  onRetry,
+}: {
+  status: KYCStatus | null;
+  errorMessage: string;
+  onRetry: () => void;
+}) {
+  const content =
+    getKYCGuardContent(status);
+
+  return (
+    <main className="mx-auto flex min-h-[68vh] w-full max-w-[760px] items-center justify-center px-4">
+      <motion.div
+        initial={{
+          opacity: 0,
+          y: 18,
+          scale: 0.985,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          scale: 1,
+        }}
+        transition={{
+          duration: 0.42,
+          ease: [0.16, 1, 0.3, 1],
+        }}
+        className="relative w-full overflow-hidden rounded-[32px] border border-[#DCE7F0] bg-white p-7 text-center shadow-[0_24px_70px_rgba(15,39,69,0.08)] sm:p-9"
+      >
+        <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-blue-300/10 blur-[80px]" />
+
+        <div className="relative">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[21px] border border-blue-100 bg-[#F1F8FF] text-[#1F6FB4] shadow-sm">
+            {errorMessage ? (
+              <X className="h-7 w-7" />
+            ) : (
+              <ShieldCheck className="h-7 w-7" />
+            )}
+          </div>
+
+          <div className="mx-auto mt-5 inline-flex items-center gap-2 rounded-full border border-[#D8E8F5] bg-[#F7FBFF] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.15em] text-[#2B78BA]">
+            <LockKeyhole className="h-3.5 w-3.5" />
+            Protected financial action
+          </div>
+
+          <h1 className="mt-5 text-2xl font-black tracking-[-0.03em] text-[#17344D]">
+            {errorMessage
+              ? "Verification check unavailable"
+              : content.title}
+          </h1>
+
+          <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-[#71869A]">
+            {errorMessage ||
+              content.description}
+          </p>
+
+          <div className="mt-7 flex flex-col justify-center gap-3 sm:flex-row">
+            {errorMessage ? (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-[15px] bg-[#1F6FB4] px-5 text-xs font-black text-white transition hover:bg-[#185C97]"
+              >
+                <Loader2 className="h-4 w-4" />
+                Check Again
+              </button>
+            ) : (
+              <Link
+                href="/dashboard/kyc"
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-[15px] bg-[#1F6FB4] px-5 text-xs font-black text-white shadow-[0_12px_28px_rgba(31,111,180,0.20)] transition hover:bg-[#185C97]"
+              >
+                <ShieldCheck className="h-4 w-4" />
+                {content.cta}
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            )}
+
+            <Link
+              href="/dashboard/wallet"
+              className="inline-flex h-12 items-center justify-center rounded-[15px] border border-[#DCE6EF] bg-white px-5 text-xs font-black text-[#60768A] transition hover:bg-[#F8FBFD]"
+            >
+              Back to Wallet
+            </Link>
+          </div>
+        </div>
+      </motion.div>
+    </main>
+  );
+}
+
+function getKYCGuardContent(
+  status: KYCStatus | null
+): {
+  title: string;
+  description: string;
+  cta: string;
+} {
+  switch (status) {
+    case "pending":
+    case "under_review":
+      return {
+        title: "KYC is under review",
+        description:
+          "Your identity documents have been submitted. Send Money will unlock automatically after an administrator verifies your KYC.",
+        cta: "View Verification Status",
+      };
+
+    case "rejected":
+      return {
+        title: "KYC needs resubmission",
+        description:
+          "Your previous verification was not approved. Review the verification status and submit the required identity information again.",
+        cta: "Review & Resubmit",
+      };
+
+    case "not_started":
+    default:
+      return {
+        title: "Complete KYC to send money",
+        description:
+          "Identity verification is required before money can be transferred from your wallet.",
+        cta: "Start Verification",
+      };
+  }
 }
 
 /* =========================================================

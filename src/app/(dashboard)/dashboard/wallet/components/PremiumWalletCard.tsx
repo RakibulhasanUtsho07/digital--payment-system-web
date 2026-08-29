@@ -22,10 +22,75 @@ import {
    TYPES
 ========================================================= */
 
+type WalletKYCStatus =
+  | "not_started"
+  | "pending"
+  | "under_review"
+  | "verified"
+  | "rejected";
+
 interface PremiumWalletCardProps {
   walletId: string;
 
   balance: number;
+
+  kycStatus?: WalletKYCStatus | null;
+
+  kycLoading?: boolean;
+}
+
+function getKYCBadge(
+  status: WalletKYCStatus | null,
+  loading: boolean
+): {
+  label: string;
+  className: string;
+  verified: boolean;
+} {
+  if (loading) {
+    return {
+      label: "Checking KYC",
+      className:
+        "border-white/10 bg-white/[0.06] text-[#CDEBFF]",
+      verified: false,
+    };
+  }
+
+  switch (status) {
+    case "verified":
+      return {
+        label: "Identity Verified",
+        className:
+          "border-emerald-400/20 bg-emerald-400/10 text-emerald-200",
+        verified: true,
+      };
+
+    case "pending":
+    case "under_review":
+      return {
+        label: "KYC Under Review",
+        className:
+          "border-amber-300/20 bg-amber-300/10 text-amber-100",
+        verified: false,
+      };
+
+    case "rejected":
+      return {
+        label: "KYC Rejected",
+        className:
+          "border-rose-300/20 bg-rose-300/10 text-rose-100",
+        verified: false,
+      };
+
+    case "not_started":
+    default:
+      return {
+        label: "KYC Required",
+        className:
+          "border-white/10 bg-white/[0.06] text-[#CDEBFF]",
+        verified: false,
+      };
+  }
 }
 
 /* =========================================================
@@ -35,6 +100,8 @@ interface PremiumWalletCardProps {
 export default function PremiumWalletCard({
   walletId,
   balance,
+  kycStatus = null,
+  kycLoading = false,
 }: PremiumWalletCardProps) {
   const [
     showBalance,
@@ -99,6 +166,12 @@ export default function PremiumWalletCard({
         maximumFractionDigits:
           2,
       }
+    );
+
+  const kycBadge =
+    getKYCBadge(
+      kycStatus,
+      kycLoading
     );
 
   /* =========================================================
@@ -1003,6 +1076,18 @@ export default function PremiumWalletCard({
                 </span>
 
                 Wallet Active
+              </div>
+
+              <div
+                className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[10px] font-bold ${kycBadge.className}`}
+              >
+                {kycBadge.verified ? (
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                ) : (
+                  <LockKeyhole className="h-3.5 w-3.5" />
+                )}
+
+                {kycBadge.label}
               </div>
 
               <div
