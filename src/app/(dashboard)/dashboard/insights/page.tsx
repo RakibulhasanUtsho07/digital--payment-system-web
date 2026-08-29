@@ -18,9 +18,11 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   Activity,
+  AlertCircle,
   Calendar,
   ChevronDown,
   Loader2,
+  RefreshCw,
   PieChart as PieChartIcon,
   Sparkles,
   TrendingDown,
@@ -39,213 +41,35 @@ import {
   Tooltip,
   XAxis,
   YAxis,
-} from "recharts";
+ } from "recharts";
+
+import {
+  getFinancialInsights,
+  type CashflowData,
+  type ExpenseCategoryData,
+  type FinancialInsightsResponse,
+  type InsightsTimeRange,
+} from "@/lib/api/insightsApi";
 
 /* =========================================================
    TYPES
 ========================================================= */
 
 type TimeRange =
-  | "week"
-  | "month"
-  | "year";
+  InsightsTimeRange;
 
-interface CashflowData {
-  name: string;
-  income: number;
-  expense: number;
-}
-
-interface CategoryData {
-  name: string;
-  value: number;
+interface CategoryData
+  extends ExpenseCategoryData {
   color: string;
 }
 
-interface SummaryData {
-  totalIncome: number;
-  totalSpent: number;
-  netBalance: number;
-}
-
-/* =========================================================
-   MOCK DATA
-========================================================= */
-
-const MOCK_CASHFLOW: Record<
-  TimeRange,
-  CashflowData[]
-> = {
-  week: [
-    {
-      name: "Mon",
-      income: 120,
-      expense: 80,
-    },
-    {
-      name: "Tue",
-      income: 200,
-      expense: 150,
-    },
-    {
-      name: "Wed",
-      income: 150,
-      expense: 100,
-    },
-    {
-      name: "Thu",
-      income: 300,
-      expense: 200,
-    },
-    {
-      name: "Fri",
-      income: 250,
-      expense: 120,
-    },
-    {
-      name: "Sat",
-      income: 400,
-      expense: 300,
-    },
-    {
-      name: "Sun",
-      income: 350,
-      expense: 250,
-    },
-  ],
-
-  month: [
-    {
-      name: "Week 1",
-      income: 4000,
-      expense: 2400,
-    },
-    {
-      name: "Week 2",
-      income: 3000,
-      expense: 1398,
-    },
-    {
-      name: "Week 3",
-      income: 2000,
-      expense: 9800,
-    },
-    {
-      name: "Week 4",
-      income: 2780,
-      expense: 3908,
-    },
-  ],
-
-  year: [
-    {
-      name: "Jan",
-      income: 4000,
-      expense: 2400,
-    },
-    {
-      name: "Feb",
-      income: 3000,
-      expense: 1398,
-    },
-    {
-      name: "Mar",
-      income: 2000,
-      expense: 9800,
-    },
-    {
-      name: "Apr",
-      income: 2780,
-      expense: 3908,
-    },
-    {
-      name: "May",
-      income: 1890,
-      expense: 4800,
-    },
-    {
-      name: "Jun",
-      income: 2390,
-      expense: 3800,
-    },
-    {
-      name: "Jul",
-      income: 3490,
-      expense: 4300,
-    },
-    {
-      name: "Aug",
-      income: 4000,
-      expense: 2400,
-    },
-    {
-      name: "Sep",
-      income: 3000,
-      expense: 1398,
-    },
-    {
-      name: "Oct",
-      income: 2000,
-      expense: 9800,
-    },
-    {
-      name: "Nov",
-      income: 2780,
-      expense: 3908,
-    },
-    {
-      name: "Dec",
-      income: 1890,
-      expense: 4800,
-    },
-  ],
-};
-
-const MOCK_CATEGORIES: CategoryData[] = [
-  {
-    name: "Food & Dining",
-    value: 1250,
-    color: "#06B6D4",
-  },
-  {
-    name: "Transfers",
-    value: 850,
-    color: "#3B82F6",
-  },
-  {
-    name: "Bills & Utilities",
-    value: 650,
-    color: "#10B981",
-  },
-  {
-    name: "Entertainment",
-    value: 300,
-    color: "#8B5CF6",
-  },
+const CATEGORY_COLORS = [
+  "#06B6D4",
+  "#3B82F6",
+  "#10B981",
+  "#8B5CF6",
+  "#F59E0B",
 ];
-
-const MOCK_SUMMARY: Record<
-  TimeRange,
-  SummaryData
-> = {
-  week: {
-    totalIncome: 1770,
-    totalSpent: 1200,
-    netBalance: 570,
-  },
-
-  month: {
-    totalIncome: 11780,
-    totalSpent: 17506,
-    netBalance: -5726,
-  },
-
-  year: {
-    totalIncome: 33130,
-    totalSpent: 48312,
-    netBalance: -15182,
-  },
-};
 
 /* =========================================================
    UTILITIES
@@ -260,6 +84,25 @@ function formatCurrency(
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   })}`;
+}
+
+function formatTrend(
+  value:
+    number | null | undefined
+): string {
+  if (
+    value === null ||
+    value === undefined
+  ) {
+    return "New";
+  }
+
+  const prefix =
+    value > 0
+      ? "+"
+      : "";
+
+  return `${prefix}${value}%`;
 }
 
 /* =========================================================
@@ -312,10 +155,24 @@ export default function InsightsPage() {
     );
 
   const [
+    data,
+    setData,
+  ] =
+    useState<FinancialInsightsResponse | null>(
+      null
+    );
+
+  const [
     isLoading,
     setIsLoading,
   ] =
     useState(true);
+
+  const [
+    errorMessage,
+    setErrorMessage,
+  ] =
+    useState("");
 
   const [
     isDropdownOpen,
@@ -323,41 +180,94 @@ export default function InsightsPage() {
   ] =
     useState(false);
 
+  const loadInsights =
+    async (
+      range: TimeRange
+    ) => {
+      try {
+        setIsLoading(true);
+        setErrorMessage("");
+
+        const response =
+          await getFinancialInsights(
+            range
+          );
+
+        if (
+          !response ||
+          response.success !== true
+        ) {
+          throw new Error(
+            response?.message ||
+              "Unable to load financial insights."
+          );
+        }
+
+        setData(
+          response
+        );
+      } catch (error) {
+        console.error(
+          "Insights loading error:",
+          error
+        );
+
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "Unable to load financial insights."
+        );
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
   useEffect(() => {
-    setIsLoading(true);
-
-    const timer =
-      window.setTimeout(
-        () => {
-          setIsLoading(false);
-        },
-        600
-      );
-
-    return () =>
-      window.clearTimeout(
-        timer
-      );
+    void loadInsights(
+      timeRange
+    );
   }, [timeRange]);
 
   const summary =
-    MOCK_SUMMARY[
-      timeRange
-    ];
+    data?.summary || {
+      totalIncome: 0,
+      totalSpent: 0,
+      netBalance: 0,
+    };
 
-  const cashflow =
-    MOCK_CASHFLOW[
-      timeRange
-    ];
+  const cashflow:
+    CashflowData[] =
+      data?.cashflow || [];
+
+  const categories:
+    CategoryData[] =
+      (
+        data?.expenseCategories ||
+        []
+      ).map(
+        (
+          category,
+          index
+        ) => ({
+          ...category,
+
+          color:
+            CATEGORY_COLORS[
+              index %
+                CATEGORY_COLORS.length
+            ],
+        })
+      );
 
   const incomeTrend =
-    "+12.5%";
+    formatTrend(
+      data?.trends.income
+    );
 
   const expenseTrend =
-    timeRange ===
-    "month"
-      ? "+20.1%"
-      : "-5.4%";
+    formatTrend(
+      data?.trends.expense
+    );
 
   return (
     <main className="mx-auto w-full max-w-6xl space-y-6 px-4 pb-12 sm:px-6">
@@ -486,6 +396,37 @@ export default function InsightsPage() {
           </AnimatePresence>
         </div>
       </motion.div>
+
+      {errorMessage && (
+        <section className="flex flex-col gap-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
+
+            <div>
+              <p className="text-sm font-extrabold text-rose-800">
+                Unable to load insights
+              </p>
+
+              <p className="mt-1 text-xs leading-5 text-rose-600">
+                {errorMessage}
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() =>
+              void loadInsights(
+                timeRange
+              )
+            }
+            className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 text-xs font-extrabold text-white transition hover:bg-rose-700"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Try Again
+          </button>
+        </section>
+      )}
 
       {/* =====================================================
           CONTENT
@@ -627,14 +568,17 @@ export default function InsightsPage() {
             </p>
 
             <div className="mt-4 text-xs font-medium">
-              {summary.netBalance >
-              0 ? (
+              {summary.netBalance > 0 ? (
                 <span className="text-emerald-500">
                   Positive cashflow
                 </span>
-              ) : (
+              ) : summary.netBalance < 0 ? (
                 <span className="text-red-500">
                   Deficit cashflow
+                </span>
+              ) : (
+                <span className="text-slate-400">
+                  Balanced cashflow
                 </span>
               )}
             </div>
@@ -661,16 +605,8 @@ export default function InsightsPage() {
             </h3>
 
             <p className="mt-1 text-sm text-slate-600">
-              You spent{" "}
-              <span className="font-bold text-red-500">
-                20% more
-              </span>{" "}
-              on Food & Dining this{" "}
-              {timeRange} compared
-              to the previous period.
-              Consider setting a budget
-              limit to keep your savings
-              on track.
+              {data?.insight ||
+                "Your real transaction analytics will appear here once completed activity is available for this period."}
             </p>
           </div>
         </motion.div>
@@ -863,12 +799,12 @@ export default function InsightsPage() {
                 <PieChartIcon className="h-4 w-4 text-slate-400" />
 
                 <h2 className="text-lg font-extrabold text-slate-900">
-                  Top Expenses
+                  Expense Breakdown
                 </h2>
               </div>
 
               <p className="text-xs text-slate-500">
-                By category
+                Completed outgoing transactions
               </p>
             </div>
 
@@ -876,6 +812,12 @@ export default function InsightsPage() {
               {isLoading ? (
                 <div className="flex h-[250px] items-center justify-center rounded-xl bg-slate-50">
                   <Loader2 className="h-6 w-6 animate-spin text-slate-300" />
+                </div>
+              ) : categories.length === 0 ? (
+                <div className="flex h-[250px] items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50 px-5 text-center">
+                  <p className="max-w-[240px] text-xs leading-5 text-slate-400">
+                    No completed outgoing transfers or withdrawals were found for this period.
+                  </p>
                 </div>
               ) : (
                 <>
@@ -887,7 +829,7 @@ export default function InsightsPage() {
                       <PieChart>
                         <Pie
                           data={
-                            MOCK_CATEGORIES
+                            categories
                           }
                           cx="50%"
                           cy="50%"
@@ -903,7 +845,7 @@ export default function InsightsPage() {
                           dataKey="value"
                           stroke="none"
                         >
-                          {MOCK_CATEGORIES.map(
+                          {categories.map(
                             (
                               entry,
                               index
@@ -942,7 +884,7 @@ export default function InsightsPage() {
                   </div>
 
                   <div className="mt-4 space-y-3">
-                    {MOCK_CATEGORIES.map(
+                    {categories.map(
                       (
                         category
                       ) => (
