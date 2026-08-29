@@ -28,211 +28,34 @@ import {
   Receipt,
   Lock,
   ArrowUpRight,
+  Loader2,
+  RefreshCw,
+  Save,
 } from "lucide-react";
+
+import {
+  archiveNotificationApi,
+  fetchNotificationPreferences,
+  fetchNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+  runBulkNotificationAction,
+  saveNotificationPreferences,
+  type NotificationData as Notification,
+  type NotificationPreferences as Preferences,
+  type NotificationPriority as Priority,
+  type NotificationType,
+} from "@/lib/api/notificationApi";
 
 /* =========================================================
    TYPES
 ========================================================= */
 
-type NotificationType =
-  | "security"
-  | "transaction"
-  | "budget"
-  | "kyc"
-  | "receipt"
-  | "system";
-
-type Priority =
-  | "critical"
-  | "high"
-  | "normal"
-  | "low";
-
 type FilterType =
   | "all"
   | "unread"
+  | "archived"
   | NotificationType;
-
-interface Notification {
-  id: string;
-  type: NotificationType;
-  priority: Priority;
-  title: string;
-  message: string;
-  date: string;
-  isRead: boolean;
-  isArchived: boolean;
-  actionLink?: string;
-  actionText?: string;
-  amount?: number;
-  currency?: string;
-  merchant?: string;
-}
-
-interface Preferences {
-  channels: {
-    inApp: boolean;
-    email: boolean;
-    push: boolean;
-  };
-
-  categories: Record<
-    NotificationType,
-    boolean
-  >;
-
-  quietHours: {
-    enabled: boolean;
-    start: string;
-    end: string;
-  };
-
-  digest:
-    | "off"
-    | "daily"
-    | "weekly";
-}
-
-/* =========================================================
-   MOCK DATA
-========================================================= */
-
-const generateMockNotifications =
-  (): Notification[] => {
-    const now = new Date();
-
-    const yesterday =
-      new Date(now);
-
-    yesterday.setDate(
-      yesterday.getDate() - 1
-    );
-
-    const lastWeek =
-      new Date(now);
-
-    lastWeek.setDate(
-      lastWeek.getDate() - 5
-    );
-
-    return [
-      {
-        id: "n-1",
-        type: "security",
-        priority: "critical",
-        title:
-          "New device sign-in detected",
-        message:
-          "A new Chrome session was detected in Dhaka. Wasn't you? Secure your account now.",
-        date:
-          now.toISOString(),
-        isRead: false,
-        isArchived: false,
-        actionLink:
-          "/dashboard/security",
-        actionText:
-          "Secure Account",
-      },
-
-      {
-        id: "n-2",
-        type: "budget",
-        priority: "high",
-        title:
-          "Food budget is 84% used",
-        message:
-          "You have approximately ৳960 remaining this month for Food & Dining.",
-        date: new Date(
-          now.getTime() -
-            1000 * 60 * 30
-        ).toISOString(),
-        isRead: false,
-        isArchived: false,
-        actionLink:
-          "/dashboard/budgeting",
-        actionText:
-          "Review Budget",
-      },
-
-      {
-        id: "n-3",
-        type: "transaction",
-        priority: "normal",
-        title:
-          "Payment completed",
-        message:
-          "Your payment to TechLand was successfully processed.",
-        date: new Date(
-          now.getTime() -
-            1000 * 60 * 120
-        ).toISOString(),
-        isRead: true,
-        isArchived: false,
-        amount: 1450,
-        currency: "৳",
-        merchant:
-          "TechLand",
-        actionLink:
-          "/dashboard/transactions",
-        actionText:
-          "View Transaction",
-      },
-
-      {
-        id: "n-4",
-        type: "kyc",
-        priority: "normal",
-        title:
-          "KYC verification approved",
-        message:
-          "Your identity verification is complete. Your account limits have been upgraded.",
-        date:
-          yesterday.toISOString(),
-        isRead: false,
-        isArchived: false,
-        actionLink:
-          "/dashboard/kyc",
-        actionText:
-          "View Profile",
-      },
-
-      {
-        id: "n-5",
-        type: "receipt",
-        priority: "high",
-        title:
-          "Warranty expiring soon",
-        message:
-          "Your Sony Headphones warranty expires in 14 days.",
-        date:
-          yesterday.toISOString(),
-        isRead: true,
-        isArchived: false,
-        merchant:
-          "Gadget Zone",
-        actionLink:
-          "/dashboard/receipts",
-        actionText:
-          "View Receipt",
-      },
-
-      {
-        id: "n-6",
-        type: "transaction",
-        priority: "normal",
-        title:
-          "Money Received",
-        message:
-          "You received a transfer from Rahim Uddin.",
-        date:
-          lastWeek.toISOString(),
-        isRead: true,
-        isArchived: false,
-        amount: 5000,
-        currency: "৳",
-      },
-    ];
-  };
 
 /* =========================================================
    DEFAULT PREFERENCES
@@ -306,110 +129,164 @@ export default function NotificationCenterPage() {
       null
     );
 
+  const [loading, setLoading] =
+    useState(true);
+
+  const [refreshing, setRefreshing] =
+    useState(false);
+
+  const [savingPreferences, setSavingPreferences] =
+    useState(false);
+
+  const [errorMessage, setErrorMessage] =
+    useState("");
+
+  const [toast, setToast] =
+    useState<string | null>(
+      null
+    );
+
   /* =========================================================
-     HYDRATION + LOCAL STORAGE
+     BACKEND DATA
   ========================================================== */
 
-  useEffect(() => {
-    setIsMounted(true);
+  const showToast =
+    (message: string) => {
+      setToast(
+        message
+      );
 
-    try {
-      const storedNotifs =
-        localStorage.getItem(
-          "novawallet_notifications"
+      window.setTimeout(
+        () =>
+          setToast(
+            null
+          ),
+        2800
+      );
+    };
+
+  const loadNotificationCenter =
+    async (
+      silent = false
+    ) => {
+      try {
+        if (silent) {
+          setRefreshing(
+            true
+          );
+        } else {
+          setLoading(
+            true
+          );
+        }
+
+        setErrorMessage(
+          ""
         );
 
-      const storedPrefs =
-        localStorage.getItem(
-          "novawallet_notif_prefs"
-        );
+        const [
+          notificationResponse,
+          preferenceResponse,
+        ] =
+          await Promise.all([
+            fetchNotifications(),
+            fetchNotificationPreferences(),
+          ]);
 
-      if (storedNotifs) {
-        const parsed =
-          JSON.parse(
-            storedNotifs
-          ) as Notification[];
+        if (
+          !notificationResponse
+            ?.success ||
+          !Array.isArray(
+            notificationResponse
+              .notifications
+          )
+        ) {
+          throw new Error(
+            notificationResponse
+              ?.message ||
+              "Unable to load notifications."
+          );
+        }
 
-        setNotifications(parsed);
-      } else {
-        const initial =
-          generateMockNotifications();
+        if (
+          !preferenceResponse
+            ?.success ||
+          !preferenceResponse
+            .preferences
+        ) {
+          throw new Error(
+            preferenceResponse
+              ?.message ||
+              "Unable to load notification preferences."
+          );
+        }
 
         setNotifications(
-          initial
+          notificationResponse
+            .notifications
         );
-
-        localStorage.setItem(
-          "novawallet_notifications",
-          JSON.stringify(
-            initial
-          )
-        );
-      }
-
-      if (storedPrefs) {
-        const parsedPrefs =
-          JSON.parse(
-            storedPrefs
-          ) as Preferences;
 
         setPreferences(
-          parsedPrefs
+          preferenceResponse
+            .preferences
+        );
+
+        setDrawerNotification(
+          (
+            current
+          ) => {
+            if (!current) {
+              return null;
+            }
+
+            return (
+              notificationResponse
+                .notifications.find(
+                  (
+                    item
+                  ) =>
+                    item.id ===
+                    current.id
+                ) ||
+              null
+            );
+          }
+        );
+
+        setIsMounted(
+          true
+        );
+      } catch (
+        error
+      ) {
+        console.error(
+          "Notification center load error:",
+          error
+        );
+
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "Unable to load notification center."
+        );
+
+        setIsMounted(
+          true
+        );
+      } finally {
+        setLoading(
+          false
+        );
+
+        setRefreshing(
+          false
         );
       }
-    } catch (error) {
-      console.error(
-        "Failed to initialize notification data:",
-        error
-      );
-
-      const fallback =
-        generateMockNotifications();
-
-      setNotifications(
-        fallback
-      );
-
-      setPreferences(
-        DEFAULT_PREFERENCES
-      );
-    }
-  }, []);
-
-  /* =========================================================
-     SYNC LOCAL STORAGE
-  ========================================================== */
+    };
 
   useEffect(() => {
-    if (!isMounted) {
-      return;
-    }
-
-    try {
-      localStorage.setItem(
-        "novawallet_notifications",
-        JSON.stringify(
-          notifications
-        )
-      );
-
-      localStorage.setItem(
-        "novawallet_notif_prefs",
-        JSON.stringify(
-          preferences
-        )
-      );
-    } catch (error) {
-      console.error(
-        "Failed to save notification preferences:",
-        error
-      );
-    }
-  }, [
-    notifications,
-    preferences,
-    isMounted,
-  ]);
+    void loadNotificationCenter();
+  }, []);
 
   /* =========================================================
      DERIVED STATE
@@ -449,6 +326,162 @@ export default function NotificationCenterPage() {
         !notification.isRead
     ).length;
 
+  const archivedCount =
+    notifications.filter(
+      (
+        notification
+      ) =>
+        notification.isArchived
+    ).length;
+
+  const notificationActivity =
+    useMemo(() => {
+      const today =
+        new Date();
+
+      today.setHours(
+        0,
+        0,
+        0,
+        0
+      );
+
+      return Array.from(
+        {
+          length: 7,
+        },
+        (
+          _,
+          index
+        ) => {
+          const date =
+            new Date(
+              today
+            );
+
+          date.setDate(
+            today.getDate() -
+              (
+                6 -
+                index
+              )
+          );
+
+          const count =
+            notifications.filter(
+              (
+                notification
+              ) => {
+                const created =
+                  new Date(
+                    notification.date
+                  );
+
+                return (
+                  created.getFullYear() ===
+                    date.getFullYear() &&
+                  created.getMonth() ===
+                    date.getMonth() &&
+                  created.getDate() ===
+                    date.getDate()
+                );
+              }
+            ).length;
+
+          return {
+            label:
+              date.toLocaleDateString(
+                "en-US",
+                {
+                  weekday: "short",
+                }
+              ),
+            count,
+          };
+        }
+      );
+    }, [notifications]);
+
+  const maxActivityCount =
+    Math.max(
+      ...notificationActivity.map(
+        (
+          item
+        ) =>
+          item.count
+      ),
+      1
+    );
+
+  const categoryStats =
+    useMemo(() => {
+      const counts:
+        Record<
+          NotificationType,
+          number
+        > = {
+        security: 0,
+        transaction: 0,
+        budget: 0,
+        kyc: 0,
+        receipt: 0,
+        system: 0,
+      };
+
+      notifications.forEach(
+        (
+          notification
+        ) => {
+          counts[
+            notification.type
+          ] += 1;
+        }
+      );
+
+      const entries =
+        Object.entries(
+          counts
+        ) as Array<
+          [
+            NotificationType,
+            number,
+          ]
+        >;
+
+      entries.sort(
+        (
+          a,
+          b
+        ) =>
+          b[1] -
+          a[1]
+      );
+
+      const [
+        topType,
+        topCount,
+      ] =
+        entries[0];
+
+      return {
+        topType,
+        topCount,
+        topPercent:
+          notifications.length >
+          0
+            ? Math.round(
+                (
+                  topCount /
+                  notifications.length
+                ) *
+                  100
+              )
+            : 0,
+        transactionCount:
+          counts.transaction,
+      };
+    }, [notifications]);
+
   /* =========================================================
      FILTERED NOTIFICATIONS
   ========================================================== */
@@ -459,6 +492,15 @@ export default function NotificationCenterPage() {
         activeNotifications;
 
       if (
+        filterType ===
+        "archived"
+      ) {
+        result =
+          notifications.filter(
+            (notification) =>
+              notification.isArchived
+          );
+      } else if (
         filterType ===
         "unread"
       ) {
@@ -526,88 +568,195 @@ export default function NotificationCenterPage() {
       );
     }, [
       activeNotifications,
+      notifications,
       filterType,
       searchQuery,
     ]);
 
   /* =========================================================
-     MARK AS READ
+     BACKEND ACTIONS
   ========================================================== */
 
   const handleMarkAsRead =
-    (id: string) => {
-      setNotifications(
-        (previous) =>
-          previous.map(
-            (notification) =>
-              notification.id === id
-                ? {
-                    ...notification,
-                    isRead: true,
-                  }
-                : notification
-          )
-      );
-    };
+    async (
+      id: string
+    ) => {
+      const current =
+        notifications.find(
+          (
+            notification
+          ) =>
+            notification.id ===
+            id
+        );
 
-  /* =========================================================
-     ARCHIVE
-  ========================================================== */
+      if (
+        !current ||
+        current.isRead
+      ) {
+        return;
+      }
+
+      try {
+        const response =
+          await markNotificationRead(
+            id
+          );
+
+        setNotifications(
+          (
+            previous
+          ) =>
+            previous.map(
+              (
+                notification
+              ) =>
+                notification.id ===
+                id
+                  ? response.notification
+                  : notification
+            )
+        );
+
+        setDrawerNotification(
+          (
+            drawer
+          ) =>
+            drawer?.id ===
+            id
+              ? response.notification
+              : drawer
+        );
+      } catch (
+        error
+      ) {
+        showToast(
+          error instanceof Error
+            ? error.message
+            : "Unable to mark notification as read."
+        );
+      }
+    };
 
   const handleArchive =
-    (id: string) => {
-      setNotifications(
-        (previous) =>
-          previous.map(
-            (notification) =>
-              notification.id === id
-                ? {
-                    ...notification,
-                    isArchived: true,
-                  }
-                : notification
-          )
-      );
+    async (
+      id: string
+    ) => {
+      try {
+        const response =
+          await archiveNotificationApi(
+            id
+          );
 
-      setDrawerNotification(
-        null
-      );
+        setNotifications(
+          (
+            previous
+          ) =>
+            previous.map(
+              (
+                notification
+              ) =>
+                notification.id ===
+                id
+                  ? response.notification
+                  : notification
+            )
+        );
+
+        setDrawerNotification(
+          null
+        );
+
+        showToast(
+          response.message ||
+            "Notification archived."
+        );
+      } catch (
+        error
+      ) {
+        showToast(
+          error instanceof Error
+            ? error.message
+            : "Unable to archive notification."
+        );
+      }
     };
-
-  /* =========================================================
-     MARK ALL READ
-  ========================================================== */
 
   const handleMarkAllRead =
-    () => {
-      setNotifications(
-        (previous) =>
-          previous.map(
-            (notification) => ({
-              ...notification,
-              isRead: true,
-            })
-          )
-      );
+    async () => {
+      try {
+        const response =
+          await markAllNotificationsRead();
+
+        setNotifications(
+          (
+            previous
+          ) =>
+            previous.map(
+              (
+                notification
+              ) =>
+                notification.isArchived
+                  ? notification
+                  : {
+                      ...notification,
+                      isRead: true,
+                    }
+            )
+        );
+
+        setDrawerNotification(
+          (
+            current
+          ) =>
+            current
+              ? {
+                  ...current,
+                  isRead: true,
+                }
+              : null
+        );
+
+        showToast(
+          response.message ||
+            "All notifications marked as read."
+        );
+      } catch (
+        error
+      ) {
+        showToast(
+          error instanceof Error
+            ? error.message
+            : "Unable to mark all notifications as read."
+        );
+      }
     };
 
-  /* =========================================================
-     SELECTION
-  ========================================================== */
-
   const toggleSelection =
-    (id: string) => {
+    (
+      id: string
+    ) => {
       setSelectedIds(
-        (current) => {
+        (
+          current
+        ) => {
           const next =
-            new Set(current);
+            new Set(
+              current
+            );
 
           if (
-            next.has(id)
+            next.has(
+              id
+            )
           ) {
-            next.delete(id);
+            next.delete(
+              id
+            );
           } else {
-            next.add(id);
+            next.add(
+              id
+            );
           }
 
           return next;
@@ -615,12 +764,8 @@ export default function NotificationCenterPage() {
       );
     };
 
-  /* =========================================================
-     BULK ACTION
-  ========================================================== */
-
   const handleBulkAction =
-    (
+    async (
       action:
         | "read"
         | "archive"
@@ -633,62 +778,128 @@ export default function NotificationCenterPage() {
         return;
       }
 
-      setNotifications(
-        (previous) =>
-          previous
-            .map(
-              (notification) => {
-                if (
+      try {
+        const ids =
+          Array.from(
+            selectedIds
+          );
+
+        const response =
+          await runBulkNotificationAction(
+            ids,
+            action
+          );
+
+        if (
+          action ===
+          "delete"
+        ) {
+          setNotifications(
+            (
+              previous
+            ) =>
+              previous.filter(
+                (
+                  notification
+                ) =>
                   !selectedIds.has(
                     notification.id
                   )
-                ) {
-                  return notification;
-                }
+              )
+          );
+        } else {
+          setNotifications(
+            (
+              previous
+            ) =>
+              previous.map(
+                (
+                  notification
+                ) => {
+                  if (
+                    !selectedIds.has(
+                      notification.id
+                    )
+                  ) {
+                    return notification;
+                  }
 
-                if (
-                  action ===
-                  "read"
-                ) {
+                  if (
+                    action ===
+                    "archive"
+                  ) {
+                    return {
+                      ...notification,
+                      isArchived: true,
+                      isRead: true,
+                    };
+                  }
+
                   return {
                     ...notification,
                     isRead: true,
                   };
                 }
+              )
+          );
+        }
 
-                if (
-                  action ===
-                  "archive"
-                ) {
-                  return {
-                    ...notification,
-                    isArchived:
-                      true,
-                  };
-                }
+        setSelectedIds(
+          new Set()
+        );
 
-                return notification;
-              }
-            )
-            .filter(
-              (notification) =>
-                !(
-                  action ===
-                    "delete" &&
-                  selectedIds.has(
-                    notification.id
-                  )
-                )
-            )
-      );
+        setDrawerNotification(
+          null
+        );
 
-      setSelectedIds(
-        new Set()
-      );
+        showToast(
+          response.message ||
+            "Notification action completed."
+        );
+      } catch (
+        error
+      ) {
+        showToast(
+          error instanceof Error
+            ? error.message
+            : "Unable to update selected notifications."
+        );
+      }
+    };
 
-      setDrawerNotification(
-        null
-      );
+  const handleSavePreferences =
+    async () => {
+      try {
+        setSavingPreferences(
+          true
+        );
+
+        const response =
+          await saveNotificationPreferences(
+            preferences
+          );
+
+        setPreferences(
+          response.preferences
+        );
+
+        showToast(
+          response.message ||
+            "Notification preferences saved."
+        );
+      } catch (
+        error
+      ) {
+        showToast(
+          error instanceof Error
+            ? error.message
+            : "Unable to save notification preferences."
+        );
+      } finally {
+        setSavingPreferences(
+          false
+        );
+      }
     };
 
   /* =========================================================
@@ -705,9 +916,59 @@ export default function NotificationCenterPage() {
      HYDRATION GUARD
   ========================================================== */
 
-  if (!isMounted) {
+  if (
+    !isMounted ||
+    loading
+  ) {
     return (
-      <div className="min-h-screen bg-[#F6F8FB]" />
+      <div className="flex min-h-[70vh] items-center justify-center bg-[#F6F8FB] px-4">
+        <div className="flex flex-col items-center text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-blue-100 bg-white shadow-sm">
+            <Loader2 className="h-6 w-6 animate-spin text-[#1F5EA8]" />
+          </div>
+
+          <p className="mt-4 text-sm font-bold text-[#0F2745]">
+            Loading notifications
+          </p>
+
+          <p className="mt-1 text-xs text-slate-400">
+            Syncing your alerts and preferences.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (
+    errorMessage &&
+    notifications.length ===
+      0
+  ) {
+    return (
+      <div className="flex min-h-[70vh] items-center justify-center bg-[#F6F8FB] px-4">
+        <div className="w-full max-w-md rounded-3xl border border-rose-100 bg-white p-7 text-center shadow-sm">
+          <AlertTriangle className="mx-auto h-7 w-7 text-rose-500" />
+
+          <h1 className="mt-4 text-lg font-bold text-[#0F2745]">
+            Notification Center unavailable
+          </h1>
+
+          <p className="mt-2 text-sm leading-6 text-slate-500">
+            {errorMessage}
+          </p>
+
+          <button
+            type="button"
+            onClick={() =>
+              void loadNotificationCenter()
+            }
+            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#1F5EA8] px-5 py-3 text-sm font-bold text-white"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Try Again
+          </button>
+        </div>
+      </div>
     );
   }
 
@@ -717,6 +978,26 @@ export default function NotificationCenterPage() {
 
   return (
     <div className="min-h-screen bg-[#F6F8FB] font-sans text-[#0F2745] selection:bg-[#1F5EA8] selection:text-white pb-32">
+      {errorMessage && (
+        <div className="mx-auto max-w-7xl px-4 pt-4 md:px-8">
+          <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs font-semibold text-amber-800">
+              {errorMessage}
+            </p>
+
+            <button
+              type="button"
+              onClick={() =>
+                void loadNotificationCenter(true)
+              }
+              className="inline-flex items-center gap-2 text-xs font-bold text-amber-800"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+              Refresh
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* =====================================================
           HERO
@@ -749,7 +1030,7 @@ export default function NotificationCenterPage() {
             <button
               type="button"
               onClick={
-                handleMarkAllRead
+                () => void handleMarkAllRead()
               }
               className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/10 px-5 py-2.5 text-sm font-medium text-white backdrop-blur-md transition-colors hover:bg-white/20"
             >
@@ -841,7 +1122,7 @@ export default function NotificationCenterPage() {
             TABS
         ==================================================== */}
 
-        <div className="flex w-full space-x-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm md:w-fit">
+        <div className="flex w-full flex-wrap gap-2 rounded-2xl border border-slate-200 bg-white p-1.5 shadow-sm md:w-fit">
           {(
             [
               "inbox",
@@ -968,60 +1249,80 @@ export default function NotificationCenterPage() {
                 )}
 
                 {/* Search and filters */}
-                <div className="flex flex-col items-center gap-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm md:flex-row">
-                  <div className="relative w-full flex-1">
-                    <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(15,39,69,0.045)] sm:p-5">
+                  <div className="space-y-4">
+                    <div className="relative w-full">
+                      <div className="pointer-events-none absolute left-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-xl border border-blue-100 bg-white text-[#1F5EA8] shadow-sm">
+                        <Search className="h-[18px] w-[18px]" />
+                      </div>
 
-                    <input
-                      type="text"
-                      placeholder="Search notifications..."
-                      value={
-                        searchQuery
-                      }
-                      onChange={(
-                        event
-                      ) =>
-                        setSearchQuery(
-                          event.target
-                            .value
-                        )
-                      }
-                      className="w-full rounded-2xl border-none bg-[#F6F8FB] py-3 pl-12 pr-4 text-[#0F2745] outline-none transition-all focus:ring-2 focus:ring-[#1F5EA8]/20"
-                    />
-                  </div>
+                      <input
+                        type="text"
+                        placeholder="Search notifications by title, message, or merchant..."
+                        value={
+                          searchQuery
+                        }
+                        onChange={(
+                          event
+                        ) =>
+                          setSearchQuery(
+                            event.target
+                              .value
+                          )
+                        }
+                        className="h-14 w-full rounded-2xl border border-slate-200 bg-[#F8FAFC] pl-[64px] pr-12 text-sm font-semibold text-[#0F2745] outline-none transition-all placeholder:font-medium placeholder:text-slate-400 hover:border-slate-300 focus:border-[#1F5EA8] focus:bg-white focus:ring-4 focus:ring-[#1F5EA8]/10"
+                      />
 
-                  <div className="flex w-full gap-2 overflow-x-auto pb-2 md:w-auto md:pb-0">
-                    {(
-                      [
-                        "all",
-                        "unread",
-                        "transaction",
-                        "security",
-                        "budget",
-                      ] as const
-                    ).map(
-                      (filter) => (
+                      {searchQuery && (
                         <button
-                          key={
-                            filter
-                          }
                           type="button"
                           onClick={() =>
-                            setFilterType(
-                              filter
+                            setSearchQuery(
+                              ""
                             )
                           }
-                          className={`whitespace-nowrap rounded-xl border px-4 py-2.5 text-sm font-medium capitalize transition-colors ${
-                            filterType ===
-                            filter
-                              ? "border-[#1F5EA8] bg-[#1F5EA8] text-white"
-                              : "border-transparent bg-[#F6F8FB] text-slate-600 hover:bg-slate-100"
-                          }`}
+                          aria-label="Clear search"
+                          className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
                         >
-                          {filter}
+                          <X className="h-4 w-4" />
                         </button>
-                      )
-                    )}
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {(
+                        [
+                          "all",
+                          "unread",
+                          "archived",
+                          "transaction",
+                          "security",
+                          "budget",
+                        ] as const
+                      ).map(
+                        (filter) => (
+                          <button
+                            key={
+                              filter
+                            }
+                            type="button"
+                            onClick={() =>
+                              setFilterType(
+                                filter
+                              )
+                            }
+                            className={`whitespace-nowrap rounded-xl border px-4 py-2.5 text-xs font-extrabold capitalize transition-all ${
+                              filterType ===
+                              filter
+                                ? "border-[#1F5EA8] bg-[#1F5EA8] text-white shadow-[0_6px_16px_rgba(31,94,168,0.18)]"
+                                : "border-slate-200 bg-[#F8FAFC] text-slate-600 hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50 hover:text-[#1F5EA8]"
+                            }`}
+                          >
+                            {filter}
+                          </button>
+                        )
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -1055,7 +1356,7 @@ export default function NotificationCenterPage() {
                               if (
                                 !notification.isRead
                               ) {
-                                handleMarkAsRead(
+                                void handleMarkAsRead(
                                   notification.id
                                 );
                               }
@@ -1167,10 +1468,10 @@ export default function NotificationCenterPage() {
                         icon={
                           <Archive className="h-4 w-4" />
                         }
-                        label="Archived"
+                        label={`Archived (${archivedCount})`}
                         onClick={() =>
                           setFilterType(
-                            "all"
+                            "archived"
                           )
                         }
                       />
@@ -1213,56 +1514,53 @@ export default function NotificationCenterPage() {
                 </div>
 
                 <div className="flex h-64 items-end justify-between gap-2 border-b border-slate-100 pb-2">
-                  {[
-                    40,
-                    65,
-                    30,
-                    80,
-                    45,
-                    90,
-                    50,
-                  ].map(
+                  {notificationActivity.map(
                     (
-                      height,
+                      item,
                       index
-                    ) => (
-                      <div
-                        key={
-                          index
-                        }
-                        className="group flex flex-1 flex-col items-center gap-2"
-                      >
-                        <div className="relative flex h-full w-full items-end justify-center">
-                          <motion.div
-                            initial={{
-                              height: 0,
-                            }}
-                            animate={{
-                              height: `${height}%`,
-                            }}
-                            transition={{
-                              duration:
-                                0.7,
-                              delay:
-                                index *
-                                0.06,
-                              ease: "easeOut",
-                            }}
-                            className="relative w-full max-w-[40px] rounded-t-lg bg-gradient-to-t from-[#1F5EA8] to-cyan-400 opacity-80 transition-opacity group-hover:opacity-100"
-                          >
-                            <div className="absolute -top-8 left-1/2 -translate-x-1/2 rounded-md bg-[#0F2745] px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
-                              {height} Alerts
-                            </div>
-                          </motion.div>
-                        </div>
+                    ) => {
+                      const height =
+                        item.count > 0
+                          ? Math.max(
+                              (item.count /
+                                maxActivityCount) *
+                                100,
+                              8
+                            )
+                          : 3;
 
-                        <span className="text-xs font-medium text-slate-400">
-                          Day{" "}
-                          {index +
-                            1}
-                        </span>
-                      </div>
-                    )
+                      return (
+                        <div
+                          key={item.label}
+                          className="group flex flex-1 flex-col items-center gap-2"
+                        >
+                          <div className="relative flex h-full w-full items-end justify-center">
+                            <motion.div
+                              initial={{
+                                height: 0,
+                              }}
+                              animate={{
+                                height: `${height}%`,
+                              }}
+                              transition={{
+                                duration: 0.7,
+                                delay: index * 0.06,
+                                ease: "easeOut",
+                              }}
+                              className="relative w-full max-w-[40px] rounded-t-lg bg-gradient-to-t from-[#1F5EA8] to-cyan-400 opacity-80 transition-opacity group-hover:opacity-100"
+                            >
+                              <div className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md bg-[#0F2745] px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100">
+                                {item.count} {item.count === 1 ? "Alert" : "Alerts"}
+                              </div>
+                            </motion.div>
+                          </div>
+
+                          <span className="text-xs font-medium text-slate-400">
+                            {item.label}
+                          </span>
+                        </div>
+                      );
+                    }
                   )}
                 </div>
               </div>
@@ -1274,18 +1572,18 @@ export default function NotificationCenterPage() {
                       Top Category
                     </p>
 
-                    <h3 className="mt-2 text-lg font-bold">
-                      Transactions
+                    <h3 className="mt-2 text-lg font-bold capitalize">
+                      {categoryStats.topType}
                     </h3>
 
                     <p className="mt-1 text-sm text-slate-500">
-                      Most of your alerts are transaction updates.
+                      Most of your current notification history is from this category.
                     </p>
                   </div>
 
                   <div className="flex h-16 w-16 items-center justify-center rounded-full border-4 border-slate-100 border-r-[#1F5EA8] border-t-[#1F5EA8]">
                     <span className="text-sm font-bold">
-                      48%
+                      {categoryStats.topPercent}%
                     </span>
                   </div>
                 </div>
@@ -1293,11 +1591,11 @@ export default function NotificationCenterPage() {
                 <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
                   <h3 className="mb-2 flex items-center gap-2 text-lg font-bold">
                     <Zap className="h-5 w-5 text-amber-500" />
-                    Smart Batching Demo
+                    Notification Grouping
                   </h3>
 
                   <p className="mb-4 text-sm text-slate-600">
-                    NovaWallet groups similar notifications to reduce clutter.
+                    Similar notification categories can be filtered together to reduce clutter.
                   </p>
 
                   <button
@@ -1321,7 +1619,7 @@ export default function NotificationCenterPage() {
                       </div>
 
                       <span className="text-sm font-medium">
-                        3 Transaction Updates
+                        {categoryStats.transactionCount} Transaction Updates
                       </span>
                     </div>
 
@@ -1357,7 +1655,7 @@ export default function NotificationCenterPage() {
                   </h2>
 
                   <p className="mb-6 text-sm text-slate-500">
-                    How do you want to receive notifications from NovaWallet?
+                    How do you want to receive notifications from Coffer Wallet?
                   </p>
 
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -1578,6 +1876,33 @@ export default function NotificationCenterPage() {
                         )
                       }
                     />
+
+                    <CategoryToggle
+                      title="System Updates"
+                      desc="Service notices and important product updates."
+                      active={
+                        preferences
+                          .categories
+                          .system
+                      }
+                      onChange={(
+                        value
+                      ) =>
+                        setPreferences(
+                          (
+                            previous
+                          ) => ({
+                            ...previous,
+                            categories:
+                              {
+                                ...previous.categories,
+                                system:
+                                  value,
+                              },
+                          })
+                        )
+                      }
+                    />
                   </div>
                 </div>
 
@@ -1597,7 +1922,29 @@ export default function NotificationCenterPage() {
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPreferences(
+                            (previous) => ({
+                              ...previous,
+                              quietHours: {
+                                ...previous.quietHours,
+                                enabled: !previous.quietHours.enabled,
+                              },
+                            })
+                          )
+                        }
+                        className={`rounded-xl px-3 py-2 text-xs font-bold transition ${
+                          preferences.quietHours.enabled
+                            ? "bg-[#1F5EA8] text-white"
+                            : "border border-slate-200 bg-white text-slate-500"
+                        }`}
+                      >
+                        {preferences.quietHours.enabled ? "Enabled" : "Disabled"}
+                      </button>
+
                       <input
                         type="time"
                         value={
@@ -1708,6 +2055,27 @@ export default function NotificationCenterPage() {
                     )}
                   </div>
                 </div>
+
+                <div className="flex justify-end border-t border-slate-100 pt-6">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void handleSavePreferences()
+                    }
+                    disabled={savingPreferences}
+                    className="inline-flex items-center gap-2 rounded-xl bg-[#1F5EA8] px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-[#173F6D] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {savingPreferences ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4" />
+                    )}
+
+                    {savingPreferences
+                      ? "Saving..."
+                      : "Save Preferences"}
+                  </button>
+                </div>
               </div>
             </motion.div>
           )}
@@ -1750,7 +2118,7 @@ export default function NotificationCenterPage() {
               <button
                 type="button"
                 onClick={() =>
-                  handleBulkAction(
+                  void handleBulkAction(
                     "read"
                   )
                 }
@@ -1763,7 +2131,7 @@ export default function NotificationCenterPage() {
               <button
                 type="button"
                 onClick={() =>
-                  handleBulkAction(
+                  void handleBulkAction(
                     "archive"
                   )
                 }
@@ -1776,7 +2144,7 @@ export default function NotificationCenterPage() {
               <button
                 type="button"
                 onClick={() =>
-                  handleBulkAction(
+                  void handleBulkAction(
                     "delete"
                   )
                 }
@@ -1864,7 +2232,7 @@ export default function NotificationCenterPage() {
                   <button
                     type="button"
                     onClick={() =>
-                      handleArchive(
+                      void handleArchive(
                         drawerNotification.id
                       )
                     }
@@ -1984,6 +2352,19 @@ export default function NotificationCenterPage() {
               </div>
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 28, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.96 }}
+            className="fixed bottom-6 right-6 z-[80] max-w-[calc(100vw-3rem)] rounded-2xl border border-slate-100 bg-white px-5 py-4 text-sm font-semibold text-slate-700 shadow-2xl"
+          >
+            {toast}
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
