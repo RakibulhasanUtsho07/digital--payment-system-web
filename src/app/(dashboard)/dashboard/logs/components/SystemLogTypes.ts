@@ -1,9 +1,28 @@
-export type LogLevel = "TRACE" | "DEBUG" | "INFO" | "NOTICE" | "WARN" | "ERROR" | "CRITICAL";
+export type LogLevel =
+  | "TRACE"
+  | "DEBUG"
+  | "INFO"
+  | "NOTICE"
+  | "WARN"
+  | "ERROR"
+  | "CRITICAL";
 
-export type LogService = 
-  | "API" | "Authentication" | "Database" | "Wallet" | "Transactions" 
-  | "Transfers" | "KYC" | "Notifications" | "Cloudinary" | "AI" 
-  | "Background Jobs" | "System" | "Security" | "Support" | "Revenue";
+export type LogService =
+  | "API"
+  | "Authentication"
+  | "Database"
+  | "Wallet"
+  | "Transactions"
+  | "Transfers"
+  | "KYC"
+  | "Notifications"
+  | "Cloudinary"
+  | "AI"
+  | "Background Jobs"
+  | "System"
+  | "Security"
+  | "Support"
+  | "Revenue";
 
 export interface SystemLog {
   id: string;
@@ -23,6 +42,13 @@ export interface SystemLog {
   method?: string;
   statusCode?: number;
   durationMs?: number;
-  environment: "Development" | "Staging" | "Production";
-  result: "Success" | "Failed" | "Timeout" | "Retried";
+  environment:
+    | "Development"
+    | "Staging"
+    | "Production";
+  result:
+    | "Success"
+    | "Failed"
+    | "Timeout"
+    | "Retried";
 }
