@@ -36,6 +36,11 @@ import {
   Eye
 } from "lucide-react";
 
+import {
+  revenueApi,
+  type RevenueRange,
+} from "@/lib/api/revenueApi";
+
 // ============================================================================
 // TYPES & INTERFACES
 // ============================================================================
@@ -720,204 +725,1112 @@ const RevenueStreamsOrbit: React.FC<StreamsOrbitProps> = ({ onSelectStream }) =>
 // ============================================================================
 
 const FeeOptimizationLab: React.FC = () => {
-  const [transferFee, setTransferFee] = useState<number>(10);
-  const [withdrawalFee, setWithdrawalFee] = useState<number>(18);
-  const [estMonthlyTxns, setEstMonthlyTxns] = useState<number>(150000);
+  const [
+    transferFee,
+    setTransferFee,
+  ] =
+    useState<number>(
+      10
+    );
 
-  // Simulation logic
-  const simulatedTransferRevenue = useMemo(() => transferFee * (estMonthlyTxns * 0.6), [transferFee, estMonthlyTxns]);
-  const simulatedWithdrawalRevenue = useMemo(() => withdrawalFee * (estMonthlyTxns * 0.4), [withdrawalFee, estMonthlyTxns]);
-  const totalSimulated = useMemo(() => simulatedTransferRevenue + simulatedWithdrawalRevenue, [simulatedTransferRevenue, simulatedWithdrawalRevenue]);
-  
-  const baseRevenue = 150000 * 0.6 * 10 + 150000 * 0.4 * 18; // 2,190,000
-  const diff = totalSimulated - baseRevenue;
-  const pctChange = ((diff / baseRevenue) * 100).toFixed(1);
+  const [
+    withdrawalFee,
+    setWithdrawalFee,
+  ] =
+    useState<number>(
+      18
+    );
+
+  const [
+    estMonthlyTxns,
+    setEstMonthlyTxns,
+  ] =
+    useState<number>(
+      150000
+    );
+
+  const [
+    policyLoaded,
+    setPolicyLoaded,
+  ] =
+    useState(
+      false
+    );
+
+  const [
+    simulation,
+    setSimulation,
+  ] =
+    useState<Awaited<
+      ReturnType<
+        typeof revenueApi.simulate
+      >
+    >["simulation"] | null>(
+      null
+    );
+
+  const [
+    isSimulating,
+    setIsSimulating,
+  ] =
+    useState(
+      false
+    );
+
+  const [
+    simulationError,
+    setSimulationError,
+  ] =
+    useState("");
+
+  useEffect(
+    () => {
+      let active =
+        true;
+
+      const loadPolicy =
+        async () => {
+          try {
+            const response =
+              await revenueApi.getFeePolicy();
+
+            if (
+              !active
+            ) {
+              return;
+            }
+
+            setTransferFee(
+              response.policy
+                .transferFeeMinor /
+                100
+            );
+
+            setWithdrawalFee(
+              response.policy
+                .withdrawalFeeMinor /
+                100
+            );
+
+            setEstMonthlyTxns(
+              response.policy
+                .monthlyTxnEstimate
+            );
+
+            setPolicyLoaded(
+              true
+            );
+          } catch (
+            error
+          ) {
+            if (
+              active
+            ) {
+              setSimulationError(
+                error instanceof
+                  Error
+                  ? error.message
+                  : "Unable to load the current fee policy."
+              );
+            }
+          }
+        };
+
+      void loadPolicy();
+
+      return () => {
+        active =
+          false;
+      };
+    },
+    []
+  );
+
+  useEffect(
+    () => {
+      if (
+        !policyLoaded
+      ) {
+        return;
+      }
+
+      let active =
+        true;
+
+      const timer =
+        window.setTimeout(
+          async () => {
+            setIsSimulating(
+              true
+            );
+
+            setSimulationError(
+              ""
+            );
+
+            try {
+              const response =
+                await revenueApi.simulate({
+                  transferFeeMinor:
+                    Math.round(
+                      transferFee *
+                        100
+                    ),
+
+                  withdrawalFeeMinor:
+                    Math.round(
+                      withdrawalFee *
+                        100
+                    ),
+
+                  monthlyTransactions:
+                    estMonthlyTxns,
+                });
+
+              if (
+                active
+              ) {
+                setSimulation(
+                  response.simulation
+                );
+              }
+            } catch (
+              error
+            ) {
+              if (
+                active
+              ) {
+                setSimulationError(
+                  error instanceof
+                    Error
+                    ? error.message
+                    : "Unable to run the revenue simulation."
+                );
+              }
+            } finally {
+              if (
+                active
+              ) {
+                setIsSimulating(
+                  false
+                );
+              }
+            }
+          },
+          280
+        );
+
+      return () => {
+        active =
+          false;
+
+        window.clearTimeout(
+          timer
+        );
+      };
+    },
+    [
+      estMonthlyTxns,
+      policyLoaded,
+      transferFee,
+      withdrawalFee,
+    ]
+  );
+
+  const projectedRevenue =
+    (
+      simulation?.projectedRevenueMinor ??
+      0
+    ) /
+    100;
+
+  const difference =
+    (
+      simulation?.differenceMinor ??
+      0
+    ) /
+    100;
+
+  const transferContribution =
+    (
+      simulation?.transferContributionMinor ??
+      0
+    ) /
+    100;
+
+  const withdrawalContribution =
+    (
+      simulation?.withdrawalContributionMinor ??
+      0
+    ) /
+    100;
 
   return (
-    <div className="bg-[#0F2745] text-white rounded-3xl p-6 md:p-8 border border-slate-800 shadow-xl mb-8">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+    <div className="relative mb-8 overflow-hidden rounded-[30px] border border-[#D6E4F0] bg-gradient-to-br from-white via-[#F7FBFF] to-[#EEF6FC] p-5 shadow-[0_18px_55px_rgba(15,39,69,0.08)] md:p-7">
+      <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-cyan-100/60 blur-3xl" />
+
+      <div className="relative z-10 mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <Sliders className="w-5 h-5 text-cyan-400" />
-            <h3 className="text-xl font-bold text-white">Fee Optimization Lab & Price Simulator</h3>
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#E9F3FB] text-[#1F5EA8]">
+              <Sliders className="h-5 w-5" />
+            </div>
+
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#2A6EA6]">
+                Pricing Intelligence
+              </p>
+
+              <h3 className="mt-0.5 text-xl font-black text-[#0F2745]">
+                Fee Optimization Lab
+              </h3>
+            </div>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Simulate how changes to fixed transfer or withdrawal fees impact projected platform yield.
+
+          <p className="mt-3 max-w-2xl text-xs leading-5 text-slate-500">
+            Test fee changes against the current pricing policy and projected transaction mix without changing production fees.
           </p>
         </div>
-        <span className="px-3 py-1 bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-semibold rounded-full">
-          Simulation Only — Production Unaffected
+
+        <span className="inline-flex w-fit items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-[10px] font-black text-amber-700">
+          <span className="h-2 w-2 rounded-full bg-amber-400" />
+          Simulation only
         </span>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-        {/* Sliders Control Panel */}
-        <div className="lg:col-span-7 space-y-6 bg-[#173F6D]/50 p-6 rounded-2xl border border-slate-700/80">
-          {/* Slider 1: Transfer Fee */}
-          <div>
-            <div className="flex justify-between items-center text-sm font-semibold mb-2">
-              <span className="text-slate-300">P2P Transfer Fee (Fixed)</span>
-              <span className="text-cyan-400 font-mono">৳ {transferFee} / txn</span>
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="25"
-              step="1"
+      <div className="relative z-10 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
+        <div className="rounded-[24px] border border-[#D8E6F1] bg-white/90 p-5 shadow-sm backdrop-blur md:p-6">
+          <div className="space-y-7">
+            <FeeSlider
+              label="P2P Transfer Fee"
               value={transferFee}
-              onChange={(e) => setTransferFee(Number(e.target.value))}
-              className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+              suffix=" / txn"
+              min={0}
+              max={25}
+              step={1}
+              minLabel="৳ 0"
+              currentLabel="Current policy"
+              maxLabel="৳ 25"
+              onChange={
+                setTransferFee
+              }
             />
-            <div className="flex justify-between text-[10px] text-slate-400 mt-1">
-              <span>৳ 0 (Free)</span>
-              <span>৳ 10 (Current)</span>
-              <span>৳ 25</span>
-            </div>
-          </div>
 
-          {/* Slider 2: Withdrawal Fee */}
-          <div>
-            <div className="flex justify-between items-center text-sm font-semibold mb-2">
-              <span className="text-slate-300">ATM Withdrawal Fee (Fixed)</span>
-              <span className="text-cyan-400 font-mono">৳ {withdrawalFee} / txn</span>
-            </div>
-            <input
-              type="range"
-              min="5"
-              max="40"
-              step="1"
+            <FeeSlider
+              label="ATM Withdrawal Fee"
               value={withdrawalFee}
-              onChange={(e) => setWithdrawalFee(Number(e.target.value))}
-              className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-400"
+              suffix=" / txn"
+              min={5}
+              max={40}
+              step={1}
+              minLabel="৳ 5"
+              currentLabel="Current policy"
+              maxLabel="৳ 40"
+              onChange={
+                setWithdrawalFee
+              }
             />
-            <div className="flex justify-between text-[10px] text-slate-400 mt-1">
-              <span>৳ 5</span>
-              <span>৳ 18 (Current)</span>
-              <span>৳ 40</span>
-            </div>
-          </div>
 
-          {/* Slider 3: Transaction Volume Scale */}
-          <div>
-            <div className="flex justify-between items-center text-sm font-semibold mb-2">
-              <span className="text-slate-300">Est. Monthly Transactions</span>
-              <span className="text-cyan-400 font-mono">{estMonthlyTxns.toLocaleString()} txns</span>
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-black text-[#173F6D]">
+                    Estimated Monthly Transactions
+                  </p>
+
+                  <p className="mt-0.5 text-[10px] text-slate-400">
+                    Volume used in the backend projection model
+                  </p>
+                </div>
+
+                <span className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-1.5 font-mono text-xs font-black text-[#1F5EA8]">
+                  {estMonthlyTxns.toLocaleString()} txns
+                </span>
+              </div>
+
+              <input
+                type="range"
+                min="50000"
+                max="300000"
+                step="10000"
+                value={
+                  estMonthlyTxns
+                }
+                onChange={(
+                  event
+                ) =>
+                  setEstMonthlyTxns(
+                    Number(
+                      event.target
+                        .value
+                    )
+                  )
+                }
+                className="h-2 w-full cursor-pointer appearance-none rounded-full bg-[#DCE8F2] accent-[#1F5EA8]"
+              />
+
+              <div className="mt-2 flex justify-between text-[9px] font-semibold text-slate-400">
+                <span>50K</span>
+                <span>150K</span>
+                <span>300K</span>
+              </div>
             </div>
-            <input
-              type="range"
-              min="50000"
-              max="300000"
-              step="10000"
-              value={estMonthlyTxns}
-              onChange={(e) => setEstMonthlyTxns(Number(e.target.value))}
-              className="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-400"
-            />
           </div>
         </div>
 
-        {/* Live Simulation Output */}
-        <div className="lg:col-span-5 bg-[#0F2745] p-6 rounded-2xl border border-slate-700 text-center flex flex-col justify-between h-full">
-          <div>
-            <span className="text-xs text-slate-400 uppercase tracking-widest font-mono">Projected Monthly Yield</span>
-            <div className="text-3xl font-black text-white my-2">৳ {totalSimulated.toLocaleString()}</div>
-            <div className={`text-sm font-bold inline-flex items-center gap-1 px-3 py-1 rounded-full ${diff >= 0 ? 'bg-emerald-950 text-emerald-400 border border-emerald-800' : 'bg-rose-950 text-rose-400 border border-rose-800'}`}>
-              {diff >= 0 ? `+৳ ${diff.toLocaleString()} (${pctChange}%)` : `-৳ ${Math.abs(diff).toLocaleString()} (${pctChange}%)`}
-            </div>
-          </div>
+        <div className="relative overflow-hidden rounded-[24px] border border-[#163B5E] bg-gradient-to-br from-[#0E2945] via-[#123B61] to-[#174E79] p-5 text-white shadow-[0_18px_40px_rgba(15,39,69,0.18)] md:p-6">
+          <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-cyan-300/10 blur-3xl" />
 
-          <div className="mt-6 pt-4 border-t border-slate-800 text-left text-xs text-slate-400 space-y-1.5">
-            <div className="flex justify-between">
-              <span>Transfers Contribution:</span>
-              <span className="text-slate-200 font-mono">৳ {simulatedTransferRevenue.toLocaleString()}</span>
+          <div className="relative z-10">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-100/60">
+                Projected Monthly Yield
+              </span>
+
+              {isSimulating && (
+                <RefreshCcw className="h-4 w-4 animate-spin text-cyan-200" />
+              )}
             </div>
-            <div className="flex justify-between">
-              <span>Withdrawals Contribution:</span>
-              <span className="text-slate-200 font-mono">৳ {simulatedWithdrawalRevenue.toLocaleString()}</span>
+
+            <div className="mt-3 text-3xl font-black tracking-tight text-white">
+              ৳ {projectedRevenue.toLocaleString(
+                undefined,
+                {
+                  maximumFractionDigits:
+                    0,
+                }
+              )}
             </div>
-            <div className="text-[10px] text-cyan-400/80 pt-2 font-mono">
-              * Includes estimated volume elasticity dampening factor of 1.2% per ৳2 fee increase.
+
+            {simulation && (
+              <span
+                className={`mt-3 inline-flex rounded-full border px-3 py-1.5 text-[10px] font-black ${
+                  difference >=
+                  0
+                    ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-200"
+                    : "border-rose-300/20 bg-rose-300/10 text-rose-200"
+                }`}
+              >
+                {difference >=
+                0
+                  ? "+"
+                  : "-"}
+                ৳ {Math.abs(
+                  difference
+                ).toLocaleString(
+                  undefined,
+                  {
+                    maximumFractionDigits:
+                      0,
+                  }
+                )}{" "}
+                ({simulation.percentageChange.toFixed(
+                  1
+                )}%)
+              </span>
+            )}
+
+            <div className="mt-6 space-y-3 border-t border-white/10 pt-5">
+              <ProjectionRow
+                label="Transfers contribution"
+                value={`৳ ${transferContribution.toLocaleString(
+                  undefined,
+                  {
+                    maximumFractionDigits:
+                      0,
+                  }
+                )}`}
+              />
+
+              <ProjectionRow
+                label="Withdrawals contribution"
+                value={`৳ ${withdrawalContribution.toLocaleString(
+                  undefined,
+                  {
+                    maximumFractionDigits:
+                      0,
+                  }
+                )}`}
+              />
+
+              <ProjectionRow
+                label="Transfer mix"
+                value={
+                  simulation
+                    ? `${(
+                        simulation.assumptions.transferShare *
+                        100
+                      ).toFixed(
+                        0
+                      )}%`
+                    : "—"
+                }
+              />
             </div>
+
+            <div className="mt-5 rounded-2xl border border-cyan-200/10 bg-white/5 p-3 text-[10px] leading-5 text-blue-100/60">
+              The backend applies the configured transaction mix and fee-elasticity assumption. This simulation never writes a production fee change.
+            </div>
+
+            {simulationError && (
+              <div className="mt-3 rounded-xl border border-rose-300/15 bg-rose-300/10 p-3 text-[10px] leading-5 text-rose-100">
+                {simulationError}
+              </div>
+            )}
           </div>
         </div>
       </div>
     </div>
   );
 };
+
+function FeeSlider({
+  label,
+  value,
+  suffix,
+  min,
+  max,
+  step,
+  minLabel,
+  currentLabel,
+  maxLabel,
+  onChange,
+}: {
+  label:
+    string;
+  value:
+    number;
+  suffix:
+    string;
+  min:
+    number;
+  max:
+    number;
+  step:
+    number;
+  minLabel:
+    string;
+  currentLabel:
+    string;
+  maxLabel:
+    string;
+  onChange:
+    (
+      value:
+        number
+    ) => void;
+}) {
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between gap-4">
+        <div>
+          <p className="text-sm font-black text-[#173F6D]">
+            {label}
+          </p>
+
+          <p className="mt-0.5 text-[10px] text-slate-400">
+            Simulation input
+          </p>
+        </div>
+
+        <span className="rounded-xl border border-cyan-100 bg-cyan-50 px-3 py-1.5 font-mono text-xs font-black text-[#0F6F91]">
+          ৳ {value}
+          {suffix}
+        </span>
+      </div>
+
+      <input
+        type="range"
+        min={
+          min
+        }
+        max={
+          max
+        }
+        step={
+          step
+        }
+        value={
+          value
+        }
+        onChange={(
+          event
+        ) =>
+          onChange(
+            Number(
+              event.target
+                .value
+            )
+          )
+        }
+        className="h-2 w-full cursor-pointer appearance-none rounded-full bg-[#DCE8F2] accent-[#1F5EA8]"
+      />
+
+      <div className="mt-2 flex justify-between text-[9px] font-semibold text-slate-400">
+        <span>
+          {minLabel}
+        </span>
+
+        <span>
+          {currentLabel}
+        </span>
+
+        <span>
+          {maxLabel}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function ProjectionRow({
+  label,
+  value,
+}: {
+  label:
+    string;
+  value:
+    string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 text-xs">
+      <span className="text-blue-100/55">
+        {label}
+      </span>
+
+      <span className="font-mono font-black text-cyan-100">
+        {value}
+      </span>
+    </div>
+  );
+}
+
 
 // ============================================================================
 // COMPONENT 7: REVENUE LEAKAGE & RECOVERY OPPORTUNITIES
 // ============================================================================
 
 const RevenueLeakageMonitor: React.FC = () => {
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-      {/* Leakage Signals */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm">
-        <div className="flex justify-between items-center mb-5">
-          <div className="flex items-center gap-2">
-            <ShieldAlert className="w-5 h-5 text-rose-500" />
-            <h3 className="text-lg font-bold text-[#0F2745]">Revenue Leakage Monitor</h3>
-          </div>
-          <span className="text-xs bg-rose-50 text-rose-700 font-bold px-2.5 py-1 rounded-full border border-rose-200">
-            Est. Leakage: ৳ 42,800
-          </span>
-        </div>
+  const [
+    range,
+    setRange,
+  ] =
+    useState<RevenueRange>(
+      "30D"
+    );
 
-        <div className="space-y-3">
-          {DEMO_LEAKAGES.map((item) => (
-            <div key={item.id} className="p-4 rounded-2xl bg-[#F6F8FB] border border-slate-200/60 flex justify-between items-center">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-bold text-[#0F2745] text-sm">{item.category}</span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${item.riskLevel === 'High' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
-                    {item.riskLevel} Risk
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500">{item.reason}</p>
-                <div className="text-[11px] text-[#1F5EA8] font-semibold mt-2">{item.action}</div>
+  const [
+    leakage,
+    setLeakage,
+  ] =
+    useState<Awaited<
+      ReturnType<
+        typeof revenueApi.getLeakage
+      >
+    > | null>(
+      null
+    );
+
+  const [
+    contributors,
+    setContributors,
+  ] =
+    useState<Awaited<
+      ReturnType<
+        typeof revenueApi.getContributors
+      >
+    >["contributors"]>(
+      []
+    );
+
+  const [
+    contributorLimit,
+    setContributorLimit,
+  ] =
+    useState(
+      4
+    );
+
+  const [
+    isLoading,
+    setIsLoading,
+  ] =
+    useState(
+      true
+    );
+
+  const [
+    error,
+    setError,
+  ] =
+    useState("");
+
+  const [
+    investigatingCategory,
+    setInvestigatingCategory,
+  ] =
+    useState<
+      string |
+      null
+    >(null);
+
+  const loadRevenueSignals =
+    async () => {
+      setIsLoading(
+        true
+      );
+
+      setError(
+        ""
+      );
+
+      try {
+        const [
+          leakageResponse,
+          contributorsResponse,
+        ] =
+          await Promise.all([
+            revenueApi.getLeakage(
+              range
+            ),
+            revenueApi.getContributors(
+              range,
+              contributorLimit
+            ),
+          ]);
+
+        setLeakage(
+          leakageResponse
+        );
+
+        setContributors(
+          contributorsResponse.contributors
+        );
+      } catch (
+        loadError
+      ) {
+        setError(
+          loadError instanceof
+            Error
+            ? loadError.message
+            : "Unable to load revenue leakage intelligence."
+        );
+      } finally {
+        setIsLoading(
+          false
+        );
+      }
+    };
+
+  useEffect(
+    () => {
+      void loadRevenueSignals();
+    },
+    [
+      contributorLimit,
+      range,
+    ]
+  );
+
+  const startInvestigation =
+    async (
+      category:
+        string
+    ) => {
+      setInvestigatingCategory(
+        category
+      );
+
+      try {
+        await revenueApi.investigateLeakage({
+          category,
+          range,
+          note:
+            "Investigation opened from Revenue Intelligence dashboard.",
+        });
+
+        await loadRevenueSignals();
+      } catch (
+        investigateError
+      ) {
+        setError(
+          investigateError instanceof
+            Error
+            ? investigateError.message
+            : "Unable to start the leakage investigation."
+        );
+      } finally {
+        setInvestigatingCategory(
+          null
+        );
+      }
+    };
+
+  const totalLeakage =
+    (
+      leakage?.totalLeakageMinor ??
+      0
+    ) /
+    100;
+
+  return (
+    <div className="mb-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
+      <div className="relative overflow-hidden rounded-[30px] border border-[#E7D9DE] bg-gradient-to-br from-white via-[#FFF9FA] to-[#F7F4F6] p-5 shadow-[0_16px_45px_rgba(84,44,56,0.06)] md:p-6">
+        <div className="pointer-events-none absolute -left-20 -top-20 h-48 w-48 rounded-full bg-rose-100/55 blur-3xl" />
+
+        <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-rose-50 text-rose-500">
+                <ShieldAlert className="h-4.5 w-4.5" />
               </div>
-              <div className="text-right">
-                <span className="text-base font-black text-rose-600 block">{item.amount}</span>
-                <button className="text-xs font-bold text-[#1F5EA8] hover:underline mt-1">Investigate</button>
+
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.15em] text-rose-400">
+                  Revenue Protection
+                </p>
+
+                <h3 className="mt-0.5 text-lg font-black text-[#0F2745]">
+                  Leakage Monitor
+                </h3>
               </div>
             </div>
-          ))}
+
+            <p className="mt-2 text-[11px] leading-5 text-slate-500">
+              Revenue loss signals derived from reversal, waiver and fee-adjustment events.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={
+                range
+              }
+              onChange={(
+                event
+              ) =>
+                setRange(
+                  event.target
+                    .value as
+                    RevenueRange
+                )
+              }
+              className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-black text-slate-600 outline-none"
+            >
+              <option value="7D">
+                7D
+              </option>
+
+              <option value="30D">
+                30D
+              </option>
+
+              <option value="90D">
+                90D
+              </option>
+
+              <option value="1Y">
+                1Y
+              </option>
+            </select>
+
+            <span className="rounded-full border border-rose-100 bg-white px-3 py-1.5 text-[10px] font-black text-rose-600">
+              Est. ৳ {totalLeakage.toLocaleString(
+                undefined,
+                {
+                  maximumFractionDigits:
+                    0,
+                }
+              )}
+            </span>
+          </div>
+        </div>
+
+        <div className="relative z-10 mt-5 space-y-3">
+          {isLoading ? (
+            <RevenueLoadingState />
+          ) : leakage &&
+            leakage.signals.length >
+              0 ? (
+            leakage.signals.map(
+              (
+                item
+              ) => (
+                <div
+                  key={
+                    item.id
+                  }
+                  className="rounded-[20px] border border-[#E9E0E3] bg-white/90 p-4 transition hover:border-rose-200 hover:shadow-sm"
+                >
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-black text-[#173F6D]">
+                          {item.category}
+                        </span>
+
+                        <LeakageRiskBadge
+                          risk={
+                            item.riskLevel
+                          }
+                        />
+
+                        {item.investigationStatus !==
+                          "none" && (
+                          <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[9px] font-black capitalize text-blue-600">
+                            {item.investigationStatus}
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="mt-1 text-[11px] leading-5 text-slate-500">
+                        {item.reason}
+                      </p>
+
+                      <p className="mt-2 text-[10px] font-black text-[#2A6EA6]">
+                        {item.action}
+                      </p>
+                    </div>
+
+                    <div className="shrink-0 text-left sm:text-right">
+                      <p className="text-lg font-black text-rose-600">
+                        ৳ {(item.amountMinor /
+                          100).toLocaleString(
+                          undefined,
+                          {
+                            maximumFractionDigits:
+                              0,
+                          }
+                        )}
+                      </p>
+
+                      <p className="mt-0.5 text-[9px] text-slate-400">
+                        {item.sourceEventCount.toLocaleString()} source events
+                      </p>
+
+                      <button
+                        type="button"
+                        disabled={
+                          investigatingCategory ===
+                          item.category
+                        }
+                        onClick={() =>
+                          startInvestigation(
+                            item.category
+                          )
+                        }
+                        className="mt-2 text-[10px] font-black text-[#1F5EA8] transition hover:text-[#173F6D] disabled:opacity-50"
+                      >
+                        {investigatingCategory ===
+                        item.category
+                          ? "Opening..."
+                          : item.investigationStatus ===
+                              "none"
+                            ? "Investigate"
+                            : "Review Investigation"}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )
+            )
+          ) : (
+            <RevenueEmptyState
+              text="No leakage events were detected for the selected period."
+            />
+          )}
+
+          {error && (
+            <div className="rounded-2xl border border-rose-100 bg-rose-50 p-3 text-[10px] leading-5 text-rose-600">
+              {error}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Top Revenue Contributors */}
-      <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm">
-        <div className="flex justify-between items-center mb-5">
-          <div className="flex items-center gap-2">
-            <Users className="w-5 h-5 text-[#1F5EA8]" />
-            <h3 className="text-lg font-bold text-[#0F2745]">Top Revenue Contributors</h3>
-          </div>
-          <button className="text-xs font-bold text-[#1F5EA8] hover:underline">View All Accounts</button>
-        </div>
+      <div className="relative overflow-hidden rounded-[30px] border border-[#D5E3EF] bg-gradient-to-br from-white via-[#F9FCFF] to-[#EEF5FA] p-5 shadow-[0_16px_45px_rgba(15,39,69,0.06)] md:p-6">
+        <div className="pointer-events-none absolute -right-20 -top-20 h-48 w-48 rounded-full bg-blue-100/65 blur-3xl" />
 
-        <div className="space-y-3">
-          {DEMO_TOP_USERS.map((usr) => (
-            <div key={usr.id} className="p-3.5 rounded-2xl border border-slate-200/60 hover:bg-[#F6F8FB] transition-all flex justify-between items-center">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-[#0F2745] text-sm">{usr.name}</span>
-                  <span className="text-[10px] font-bold bg-[#173F6D]/10 text-[#173F6D] px-2 py-0.5 rounded">
-                    {usr.type}
-                  </span>
-                </div>
-                <div className="text-xs text-slate-400 mt-0.5">{usr.email} • {usr.transactionsCount} txns</div>
+        <div className="relative z-10 flex items-start justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-blue-50 text-[#1F5EA8]">
+                <Users className="h-4.5 w-4.5" />
               </div>
-              <div className="text-right">
-                <span className="text-sm font-bold text-[#0F2745] block">{usr.feesPaid}</span>
-                <span className="text-xs text-slate-400">Vol: {usr.volume}</span>
+
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.15em] text-[#5C8BB5]">
+                  Contribution Intelligence
+                </p>
+
+                <h3 className="mt-0.5 text-lg font-black text-[#0F2745]">
+                  Top Revenue Contributors
+                </h3>
               </div>
             </div>
-          ))}
+
+            <p className="mt-2 text-[11px] leading-5 text-slate-500">
+              Accounts ranked by captured platform fees for the selected period.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() =>
+              setContributorLimit(
+                (
+                  current
+                ) =>
+                  current ===
+                  4
+                    ? 12
+                    : 4
+              )
+            }
+            className="shrink-0 rounded-xl border border-blue-100 bg-white px-3 py-2 text-[10px] font-black text-[#1F5EA8] transition hover:bg-blue-50"
+          >
+            {contributorLimit ===
+            4
+              ? "View All"
+              : "Show Top 4"}
+          </button>
+        </div>
+
+        <div className="relative z-10 mt-5 max-h-[390px] space-y-3 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {isLoading ? (
+            <RevenueLoadingState />
+          ) : contributors.length >
+            0 ? (
+            contributors.map(
+              (
+                user,
+                index
+              ) => (
+                <motion.div
+                  key={
+                    user.id
+                  }
+                  initial={{
+                    opacity:
+                      0,
+                    y:
+                      8,
+                  }}
+                  animate={{
+                    opacity:
+                      1,
+                    y:
+                      0,
+                  }}
+                  transition={{
+                    delay:
+                      index *
+                      0.035,
+                  }}
+                  className="rounded-[20px] border border-[#DDE8F1] bg-white/90 p-4 transition hover:border-blue-200 hover:shadow-sm"
+                >
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="truncate text-sm font-black text-[#173F6D]">
+                          {user.name}
+                        </span>
+
+                        <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[9px] font-black text-[#1F5EA8]">
+                          {user.type}
+                        </span>
+                      </div>
+
+                      <p className="mt-1 truncate text-[10px] text-slate-400">
+                        {user.email} • {user.transactionsCount.toLocaleString()} txns
+                      </p>
+                    </div>
+
+                    <div className="shrink-0 text-right">
+                      <p className="text-sm font-black text-[#0F2745]">
+                        ৳ {(user.feesPaidMinor /
+                          100).toLocaleString(
+                          undefined,
+                          {
+                            maximumFractionDigits:
+                              0,
+                          }
+                        )}
+                      </p>
+
+                      <p className="mt-1 text-[10px] text-slate-400">
+                        Vol: ৳ {(user.volumeMinor /
+                          100).toLocaleString(
+                          undefined,
+                          {
+                            maximumFractionDigits:
+                              0,
+                          }
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              )
+            )
+          ) : (
+            <RevenueEmptyState
+              text="No contributor revenue events are available for the selected period."
+            />
+          )}
         </div>
       </div>
     </div>
   );
 };
+
+function LeakageRiskBadge({
+  risk,
+}: {
+  risk:
+    | "High"
+    | "Medium"
+    | "Low";
+}) {
+  const tone =
+    risk ===
+    "High"
+      ? "border-rose-100 bg-rose-50 text-rose-600"
+      : risk ===
+          "Medium"
+        ? "border-amber-100 bg-amber-50 text-amber-700"
+        : "border-emerald-100 bg-emerald-50 text-emerald-700";
+
+  return (
+    <span
+      className={`rounded-full border px-2 py-0.5 text-[9px] font-black ${tone}`}
+    >
+      {risk} Risk
+    </span>
+  );
+}
+
+function RevenueLoadingState() {
+  return (
+    <div className="flex min-h-36 items-center justify-center rounded-[20px] border border-dashed border-slate-200 bg-white/60">
+      <RefreshCcw className="h-5 w-5 animate-spin text-[#1F5EA8]" />
+    </div>
+  );
+}
+
+function RevenueEmptyState({
+  text,
+}: {
+  text:
+    string;
+}) {
+  return (
+    <div className="flex min-h-36 items-center justify-center rounded-[20px] border border-dashed border-slate-200 bg-white/60 p-5 text-center text-[11px] leading-5 text-slate-400">
+      {text}
+    </div>
+  );
+}
+
 
 // ============================================================================
 // COMPONENT 8: REVENUE STORY MODE (EXECUTIVE PRESENTATION OVERLAY)
