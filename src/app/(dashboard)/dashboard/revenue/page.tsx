@@ -508,91 +508,232 @@ const RevenueKPIGrid: React.FC<KPIGridProps> = ({ onSelectKPI }) => {
 // ============================================================================
 
 const WhatMovedRevenue: React.FC = () => {
+  const insightTone = (
+    category: RevenueInsight["category"]
+  ) => {
+    if (category === "loss") {
+      return {
+        badge:
+          "border-rose-200 bg-rose-50 text-rose-700",
+        glow: "bg-rose-200/40",
+        bar: "from-rose-400 to-orange-300",
+        iconBg: "bg-rose-50 text-rose-600",
+      };
+    }
+
+    if (category === "opportunity") {
+      return {
+        badge:
+          "border-violet-200 bg-violet-50 text-violet-700",
+        glow: "bg-violet-200/40",
+        bar: "from-violet-400 to-fuchsia-300",
+        iconBg: "bg-violet-50 text-violet-600",
+      };
+    }
+
+    return {
+      badge:
+        "border-emerald-200 bg-emerald-50 text-emerald-700",
+      glow: "bg-cyan-200/40",
+      bar: "from-[#1F5EA8] via-cyan-400 to-emerald-300",
+      iconBg: "bg-blue-50 text-[#1F5EA8]",
+    };
+  };
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-      {/* What Moved Revenue */}
-      <div className="lg:col-span-2 bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm">
-        <div className="flex justify-between items-center mb-5">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-[#1F5EA8]" />
-            <h3 className="text-lg font-bold text-[#0F2745]">What Moved Revenue?</h3>
+    <div className="mb-8 grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <motion.section
+        initial={{ opacity: 0, y: 18 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45 }}
+        className="relative overflow-hidden rounded-[30px] border border-[#D7E3EF] bg-gradient-to-br from-white via-[#F8FBFF] to-[#EEF5FB] p-5 shadow-[0_18px_50px_rgba(15,39,69,0.08)] md:p-6 lg:col-span-2"
+      >
+        <div className="pointer-events-none absolute -right-24 -top-24 h-56 w-56 rounded-full bg-blue-200/35 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 left-1/3 h-48 w-48 rounded-full bg-cyan-200/25 blur-3xl" />
+
+        <div className="relative z-10 mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <motion.div
+              animate={{ rotate: [0, 8, -5, 0] }}
+              transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-blue-100 bg-white text-[#1F5EA8] shadow-sm"
+            >
+              <Sparkles className="h-5 w-5" />
+            </motion.div>
+
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5D88AF]">
+                Revenue Movement Intelligence
+              </p>
+              <h3 className="mt-1 text-xl font-black tracking-tight text-[#0F2745]">
+                What Moved Revenue?
+              </h3>
+              <p className="mt-1 max-w-xl text-xs leading-5 text-slate-500">
+                The strongest signals behind fee growth, savings, and recurring platform yield.
+              </p>
+            </div>
           </div>
-          <span className="text-xs bg-slate-100 text-slate-500 px-2.5 py-1 rounded-full font-mono">
-            Demo-derived insight
+
+          <span className="inline-flex w-fit items-center gap-2 rounded-full border border-blue-100 bg-white px-3 py-1.5 text-[10px] font-black text-[#1F5EA8] shadow-sm">
+            <Activity className="h-3.5 w-3.5" />
+            Signal snapshot
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {DEMO_INSIGHTS.map((insight) => (
-            <div
-              key={insight.id}
-              className="p-4 rounded-2xl bg-[#F6F8FB] border border-slate-200/60 hover:bg-white hover:shadow-sm transition-all"
-            >
-              <div className="flex justify-between items-start mb-2">
-                <span className="font-bold text-[#0F2745] text-sm">{insight.title}</span>
-                <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
-                  {insight.change}
-                </span>
-              </div>
-              <p className="text-xs text-slate-600 mb-3">{insight.reason}</p>
-              <div className="text-xs font-semibold text-[#1F5EA8] flex items-center justify-between pt-2 border-t border-slate-200/50">
-                <span>{insight.impact}</span>
-                <ArrowUpRight className="w-3.5 h-3.5" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
+        <div className="relative z-10 grid grid-cols-1 gap-4 md:grid-cols-2">
+          {DEMO_INSIGHTS.map((insight, index) => {
+            const tone = insightTone(insight.category);
 
-      {/* Revenue Weather & Health Score */}
-      <div className="bg-[#0F2745] text-white rounded-3xl p-6 border border-slate-800 shadow-sm flex flex-col justify-between">
-        <div>
-          <div className="flex justify-between items-center mb-4">
-            <div className="flex items-center gap-2">
-              <Sun className="w-5 h-5 text-amber-400" />
-              <h3 className="text-base font-bold text-white">Revenue Weather</h3>
+            return (
+              <motion.article
+                key={insight.id}
+                initial={{ opacity: 0, y: 14, scale: 0.985 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                transition={{ delay: 0.06 * index, duration: 0.35 }}
+                whileHover={{ y: -4 }}
+                className="group relative overflow-hidden rounded-[22px] border border-[#DCE7F1] bg-white/90 p-4 shadow-[0_8px_24px_rgba(15,39,69,0.04)] backdrop-blur transition-shadow hover:shadow-[0_16px_35px_rgba(15,39,69,0.10)]"
+              >
+                <div className={`pointer-events-none absolute -right-12 -top-12 h-28 w-28 rounded-full ${tone.glow} blur-2xl opacity-0 transition-opacity duration-300 group-hover:opacity-100`} />
+                <div className={`absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r ${tone.bar}`} />
+
+                <div className="relative z-10 flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-start gap-2.5">
+                    <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${tone.iconBg}`}>
+                      {insight.category === "opportunity" ? (
+                        <Zap className="h-4 w-4" />
+                      ) : (
+                        <TrendingUp className="h-4 w-4" />
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-black leading-5 text-[#173F6D]">
+                        {insight.title}
+                      </p>
+                      <p className="mt-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                        {insight.metric}
+                      </p>
+                    </div>
+                  </div>
+
+                  <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-black ${tone.badge}`}>
+                    {insight.change}
+                  </span>
+                </div>
+
+                <p className="relative z-10 mt-3 min-h-10 text-[11px] leading-5 text-slate-500">
+                  {insight.reason}
+                </p>
+
+                <div className="relative z-10 mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+                  <span className="text-[11px] font-black text-[#1F5EA8]">
+                    {insight.impact}
+                  </span>
+                  <span className="flex h-7 w-7 items-center justify-center rounded-full border border-blue-100 bg-blue-50 text-[#1F5EA8] transition-transform group-hover:translate-x-1">
+                    <ArrowUpRight className="h-3.5 w-3.5" />
+                  </span>
+                </div>
+              </motion.article>
+            );
+          })}
+        </div>
+      </motion.section>
+
+      <motion.aside
+        initial={{ opacity: 0, x: 18 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.45, delay: 0.08 }}
+        className="relative flex min-h-[330px] flex-col justify-between overflow-hidden rounded-[30px] border border-[#173F6D] bg-gradient-to-br from-[#0D2947] via-[#123B61] to-[#1A5685] p-6 text-white shadow-[0_20px_55px_rgba(15,39,69,0.18)]"
+      >
+        <div className="pointer-events-none absolute -right-20 -top-24 h-60 w-60 rounded-full bg-cyan-300/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 -left-20 h-60 w-60 rounded-full bg-blue-300/10 blur-3xl" />
+
+        <div className="relative z-10">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-amber-300">
+                <Sun className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-cyan-100/55">
+                  Revenue Health
+                </p>
+                <h3 className="mt-0.5 text-lg font-black">Revenue Weather</h3>
+              </div>
             </div>
-            <span className="text-[10px] text-cyan-300 uppercase tracking-widest bg-[#173F6D] px-2 py-0.5 rounded">
-              Sunny & Stable
+
+            <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2.5 py-1 text-[9px] font-black text-emerald-200">
+              Stable
             </span>
           </div>
 
-          <div className="my-4 flex items-center gap-4">
-            <div className="relative w-20 h-20 flex-shrink-0 flex items-center justify-center">
-              {/* Radial gauge SVG */}
-              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+          <div className="mt-7 flex items-center gap-5">
+            <div className="relative flex h-24 w-24 shrink-0 items-center justify-center">
+              <motion.div
+                className="absolute inset-0 rounded-full border border-cyan-200/15"
+                animate={{ scale: [1, 1.1, 1], opacity: [0.55, 0.15, 0.55] }}
+                transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
+              />
+              <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36">
                 <path
-                  className="text-slate-700"
-                  strokeWidth="3.5"
+                  className="text-white/10"
+                  strokeWidth="3"
                   stroke="currentColor"
                   fill="none"
                   d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                 />
-                <path
-                  className="text-cyan-400"
-                  strokeDasharray="91, 100"
-                  strokeWidth="3.5"
+                <motion.path
+                  className="text-cyan-300"
+                  strokeWidth="3"
                   strokeLinecap="round"
                   stroke="currentColor"
                   fill="none"
+                  initial={{ pathLength: 0 }}
+                  animate={{ pathLength: 0.91 }}
+                  transition={{ duration: 1.1, ease: "easeOut" }}
                   d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
                 />
               </svg>
-              <span className="absolute text-xl font-black text-white">91</span>
+              <div className="absolute text-center">
+                <p className="text-2xl font-black">91</p>
+                <p className="text-[8px] font-black uppercase tracking-wider text-cyan-100/55">score</p>
+              </div>
             </div>
+
             <div>
-              <div className="text-xs text-cyan-300 font-semibold uppercase tracking-wider">Revenue Health Score</div>
-              <div className="text-lg font-bold text-white">Strong Efficiency</div>
-              <div className="text-xs text-slate-300 mt-1">High fee collection yield with controlled refund exposure.</div>
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-cyan-200/70">
+                Strong efficiency
+              </p>
+              <p className="mt-1 text-sm font-bold leading-5 text-white">
+                Growth remains healthy while refund exposure stays controlled.
+              </p>
             </div>
+          </div>
+
+          <div className="mt-6 grid grid-cols-3 gap-2">
+            {[
+              ["Growth", "14.8%"],
+              ["Margin", "8.7%"],
+              ["Refund", "1.2%"],
+            ].map(([label, value], index) => (
+              <motion.div
+                key={label}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.18 + index * 0.06 }}
+                className="rounded-2xl border border-white/10 bg-white/[0.06] p-3"
+              >
+                <p className="text-[8px] font-bold uppercase tracking-wide text-blue-100/45">{label}</p>
+                <p className="mt-1 text-xs font-black text-cyan-100">{value}</p>
+              </motion.div>
+            ))}
           </div>
         </div>
 
-        <div className="pt-4 border-t border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
-          <span>Factors: Growth, Margin, Refund Rate</span>
-          <span className="text-cyan-400 font-semibold">Demo Indicator</span>
+        <div className="relative z-10 mt-6 flex items-center justify-between border-t border-white/10 pt-4 text-[9px] text-blue-100/45">
+          <span>Growth • Margin • Refund Rate</span>
+          <span className="font-black text-cyan-200/80">Live model UI</span>
         </div>
-      </div>
+      </motion.aside>
     </div>
   );
 };
@@ -608,115 +749,319 @@ interface StreamsOrbitProps {
 const RevenueStreamsOrbit: React.FC<StreamsOrbitProps> = ({ onSelectStream }) => {
   const [activeTab, setActiveTab] = useState<"orbit" | "matrix">("orbit");
 
+  const totalRevenue = DEMO_STREAMS.reduce(
+    (sum, stream) => sum + stream.rawAmount,
+    0
+  );
+
+  const matrixPoints = [
+    {
+      label: "Transfers",
+      x: 78,
+      y: 58,
+      size: 88,
+      amount: "34.1%",
+      className: "border-blue-300 bg-blue-500/15 text-blue-700",
+    },
+    {
+      label: "Withdrawals",
+      x: 36,
+      y: 28,
+      size: 78,
+      amount: "25.9%",
+      className: "border-cyan-300 bg-cyan-500/15 text-cyan-700",
+    },
+    {
+      label: "Deposits",
+      x: 61,
+      y: 67,
+      size: 66,
+      amount: "17.1%",
+      className: "border-emerald-300 bg-emerald-500/15 text-emerald-700",
+    },
+    {
+      label: "Service",
+      x: 45,
+      y: 49,
+      size: 60,
+      amount: "14.2%",
+      className: "border-violet-300 bg-violet-500/15 text-violet-700",
+    },
+    {
+      label: "Merchant",
+      x: 70,
+      y: 76,
+      size: 54,
+      amount: "8.7%",
+      className: "border-amber-300 bg-amber-500/15 text-amber-700",
+    },
+  ];
+
   return (
-    <div className="bg-white rounded-3xl p-6 border border-slate-200/80 shadow-sm mb-8">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <div>
-          <h3 className="text-lg font-bold text-[#0F2745]">Revenue Streams & Economics</h3>
-          <p className="text-xs text-slate-500">Explore yield by fee structure, transaction volume, and margins</p>
+    <motion.section
+      initial={{ opacity: 0, y: 18 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.45 }}
+      className="relative mb-8 overflow-hidden rounded-[30px] border border-[#D7E3EF] bg-white p-5 shadow-[0_18px_50px_rgba(15,39,69,0.07)] md:p-6"
+    >
+      <div className="pointer-events-none absolute -right-24 -top-24 h-56 w-56 rounded-full bg-blue-100/55 blur-3xl" />
+
+      <div className="relative z-10 mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-blue-100 bg-blue-50 text-[#1F5EA8]">
+            <Layers className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5D88AF]">
+              Revenue Architecture
+            </p>
+            <h3 className="mt-1 text-xl font-black tracking-tight text-[#0F2745]">
+              Revenue Streams & Economics
+            </h3>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              Explore yield concentration, fee efficiency, and transaction-volume economics.
+            </p>
+          </div>
         </div>
-        <div className="flex bg-[#F6F8FB] p-1 rounded-xl border border-slate-200">
-          <button
-            onClick={() => setActiveTab("orbit")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              activeTab === "orbit" ? "bg-white text-[#0F2745] shadow-sm" : "text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            Revenue Orbit
-          </button>
-          <button
-            onClick={() => setActiveTab("matrix")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              activeTab === "matrix" ? "bg-white text-[#0F2745] shadow-sm" : "text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            Fee Economics Matrix
-          </button>
+
+        <div className="inline-flex w-fit rounded-2xl border border-[#D7E3EF] bg-[#F4F8FC] p-1 shadow-inner">
+          {[
+            ["orbit", "Revenue Orbit"],
+            ["matrix", "Economics Matrix"],
+          ].map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setActiveTab(value as "orbit" | "matrix")}
+              className={`relative rounded-xl px-3.5 py-2 text-[10px] font-black transition-colors sm:text-xs ${
+                activeTab === value
+                  ? "text-[#0F2745]"
+                  : "text-slate-500 hover:text-[#173F6D]"
+              }`}
+            >
+              {activeTab === value && (
+                <motion.span
+                  layoutId="revenue-tab-active"
+                  className="absolute inset-0 rounded-xl border border-blue-100 bg-white shadow-sm"
+                  transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                />
+              )}
+              <span className="relative z-10">{label}</span>
+            </button>
+          ))}
         </div>
       </div>
 
-      {activeTab === "orbit" ? (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-          {/* Orbital Node Display */}
-          <div className="lg:col-span-7 bg-[#0F2745] rounded-2xl p-6 h-80 flex items-center justify-center relative overflow-hidden">
-            <div className="text-center relative z-10">
-              <span className="text-xs text-cyan-300 font-mono uppercase tracking-widest">Total Platform Yield</span>
-              <div className="text-3xl font-black text-white my-1">৳ 1,420,500</div>
-              <span className="text-xs text-slate-400">100% Gross Fee Revenue</span>
-            </div>
+      <AnimatePresence mode="wait">
+        {activeTab === "orbit" ? (
+          <motion.div
+            key="orbit"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.3 }}
+            className="relative z-10 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]"
+          >
+            <div className="relative min-h-[390px] overflow-hidden rounded-[26px] border border-[#173F6D] bg-gradient-to-br from-[#0D2947] via-[#123B61] to-[#164E7A] p-5 text-white shadow-[0_20px_45px_rgba(15,39,69,0.16)]">
+              <div className="pointer-events-none absolute inset-0 opacity-30 [background-image:radial-gradient(circle_at_center,rgba(255,255,255,0.12)_1px,transparent_1px)] [background-size:24px_24px]" />
+              <div className="pointer-events-none absolute left-1/2 top-1/2 h-[250px] w-[250px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-200/15" />
+              <div className="pointer-events-none absolute left-1/2 top-1/2 h-[190px] w-[190px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-blue-200/10" />
 
-            {/* Orbiting Satellites */}
-            {DEMO_STREAMS.map((stream, idx) => {
-              const angles = [0, 72, 144, 216, 288];
-              const angle = angles[idx];
-              const radius = 110;
-              const x = Math.cos((angle * Math.PI) / 180) * radius;
-              const y = Math.sin((angle * Math.PI) / 180) * radius;
-
-              return (
-                <motion.div
-                  key={stream.id}
-                  onClick={() => onSelectStream(stream)}
-                  className="absolute cursor-pointer group"
-                  style={{ left: `calc(50% + ${x}px - 36px)`, top: `calc(50% + ${y}px - 28px)` }}
-                  whileHover={{ scale: 1.1 }}
-                >
-                  <div
-                    className="p-2.5 rounded-xl border border-white/20 backdrop-blur-md shadow-lg flex flex-col items-center justify-center text-center w-20"
-                    style={{ backgroundColor: `${stream.color}33` }}
-                  >
-                    <span className="text-[10px] font-bold text-white truncate w-full">{stream.name}</span>
-                    <span className="text-xs font-black text-cyan-300">{stream.percentage}%</span>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
-
-          {/* List Breakdown */}
-          <div className="lg:col-span-5 space-y-3">
-            {DEMO_STREAMS.map((stream) => (
-              <div
-                key={stream.id}
-                onClick={() => onSelectStream(stream)}
-                className="p-3.5 rounded-2xl border border-slate-200/80 hover:border-[#1F5EA8]/50 hover:bg-[#F6F8FB] transition-all cursor-pointer flex justify-between items-center"
+              <motion.div
+                className="absolute left-1/2 top-1/2 h-[250px] w-[250px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-300/20"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 26, repeat: Infinity, ease: "linear" }}
               >
-                <div className="flex items-center gap-3">
-                  <span className="w-3 h-3 rounded-full" style={{ backgroundColor: stream.color }} />
-                  <div>
-                    <div className="text-sm font-bold text-[#0F2745]">{stream.name}</div>
-                    <div className="text-xs text-slate-400">{stream.percentage}% of total revenue</div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm font-bold text-[#0F2745]">{stream.amount}</div>
-                  <div className="text-xs font-semibold text-emerald-600">{stream.change}</div>
-                </div>
+                <span className="absolute left-1/2 top-[-4px] h-2 w-2 -translate-x-1/2 rounded-full bg-cyan-300 shadow-[0_0_14px_rgba(103,232,249,0.8)]" />
+              </motion.div>
+
+              <div className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 text-center">
+                <motion.div
+                  animate={{ scale: [1, 1.025, 1] }}
+                  transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                  className="rounded-[24px] border border-white/10 bg-white/[0.08] px-6 py-5 backdrop-blur-md shadow-[0_15px_45px_rgba(0,0,0,0.16)]"
+                >
+                  <p className="text-[9px] font-black uppercase tracking-[0.22em] text-cyan-200/70">
+                    Total Platform Yield
+                  </p>
+                  <p className="mt-2 whitespace-nowrap text-3xl font-black tracking-tight text-white">
+                    ৳ {totalRevenue.toLocaleString()}
+                  </p>
+                  <p className="mt-1 text-[10px] text-blue-100/45">
+                    100% gross fee revenue
+                  </p>
+                </motion.div>
               </div>
-            ))}
-          </div>
-        </div>
-      ) : (
-        /* Fee Economics Matrix */
-        <div className="bg-[#F6F8FB] rounded-2xl p-6 border border-slate-200 text-center">
-          <div className="text-xs text-slate-400 font-mono mb-4 uppercase tracking-wider">
-            Y-Axis: Revenue per Transaction | X-Axis: Transaction Volume | Bubble Size: Total Yield
-          </div>
-          <div className="h-64 flex items-center justify-center border-b border-l border-slate-300 relative p-4">
-            <div className="absolute left-6 top-10 p-3 bg-blue-600/10 border border-blue-500/30 rounded-xl text-xs font-bold text-[#1F5EA8]">
-              High Yield / Lower Volume (Withdrawals)
+
+              {DEMO_STREAMS.map((stream, index) => {
+                const positions = [
+                  "left-[66%] top-[29%]",
+                  "left-[58%] top-[70%]",
+                  "left-[22%] top-[60%]",
+                  "left-[20%] top-[24%]",
+                  "left-[48%] top-[8%]",
+                ];
+
+                return (
+                  <motion.button
+                    key={stream.id}
+                    type="button"
+                    onClick={() => onSelectStream(stream)}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{
+                      opacity: 1,
+                      scale: 1,
+                      y: [0, -5, 0],
+                    }}
+                    transition={{
+                      opacity: { delay: 0.08 * index },
+                      scale: { delay: 0.08 * index },
+                      y: {
+                        delay: index * 0.35,
+                        duration: 3.5 + index * 0.2,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                      },
+                    }}
+                    whileHover={{ scale: 1.07 }}
+                    className={`absolute z-20 -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-white/15 bg-white/[0.08] px-3 py-2.5 text-left backdrop-blur-md shadow-lg ${positions[index]}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="h-2.5 w-2.5 rounded-full shadow-[0_0_10px_currentColor]"
+                        style={{ backgroundColor: stream.color }}
+                      />
+                      <span className="max-w-[88px] truncate text-[9px] font-black text-white/75">
+                        {stream.name}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-sm font-black text-cyan-200">
+                      {stream.percentage}%
+                    </div>
+                  </motion.button>
+                );
+              })}
             </div>
-            <div className="absolute right-6 bottom-10 p-3 bg-emerald-600/10 border border-emerald-500/30 rounded-xl text-xs font-bold text-emerald-700">
-              High Volume / Moderate Yield (Transfers)
+
+            <div className="space-y-3">
+              {DEMO_STREAMS.map((stream, index) => (
+                <motion.button
+                  key={stream.id}
+                  type="button"
+                  onClick={() => onSelectStream(stream)}
+                  initial={{ opacity: 0, x: 12 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.05 }}
+                  whileHover={{ x: 3 }}
+                  className="group w-full rounded-[20px] border border-[#DCE7F1] bg-gradient-to-r from-white to-[#F8FBFE] p-4 text-left transition-shadow hover:shadow-[0_12px_28px_rgba(15,39,69,0.08)]"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span
+                        className="h-9 w-1.5 shrink-0 rounded-full"
+                        style={{ backgroundColor: stream.color }}
+                      />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-black text-[#173F6D]">
+                          {stream.name}
+                        </p>
+                        <p className="mt-0.5 text-[10px] text-slate-400">
+                          {stream.percentage}% of platform revenue
+                        </p>
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-sm font-black text-[#0F2745]">{stream.amount}</p>
+                      <p className="mt-0.5 text-[10px] font-black text-emerald-600">{stream.change}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${stream.percentage}%` }}
+                      transition={{ delay: 0.15 + index * 0.05, duration: 0.55 }}
+                      className="h-full rounded-full"
+                      style={{ backgroundColor: stream.color }}
+                    />
+                  </div>
+                </motion.button>
+              ))}
             </div>
-            <div className="flex items-center gap-2 text-slate-500 text-sm font-medium">
-              <BarChart3 className="w-5 h-5 text-[#1F5EA8]" />
-              <span>Interactive Bubble Economics Matrix Rendered</span>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="matrix"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.3 }}
+            className="relative z-10 overflow-hidden rounded-[26px] border border-[#D7E3EF] bg-gradient-to-br from-[#FBFDFF] to-[#F1F6FA] p-4 md:p-6"
+          >
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#5D88AF]">
+                  Interactive economics field
+                </p>
+                <p className="mt-1 text-sm font-black text-[#173F6D]">
+                  Revenue per transaction × transaction volume
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-[9px] font-bold text-slate-400">
+                <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1">X = Volume</span>
+                <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1">Y = Yield / txn</span>
+                <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1">Size = Total yield</span>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
-    </div>
+
+            <div className="relative h-[360px] overflow-hidden rounded-[22px] border border-[#DCE7F1] bg-white">
+              <div className="absolute inset-0 [background-image:linear-gradient(to_right,#EAF0F5_1px,transparent_1px),linear-gradient(to_bottom,#EAF0F5_1px,transparent_1px)] [background-size:48px_48px]" />
+              <div className="absolute bottom-8 left-10 right-5 h-px bg-[#BFD0DE]" />
+              <div className="absolute bottom-8 left-10 top-5 w-px bg-[#BFD0DE]" />
+
+              <span className="absolute bottom-2 right-5 text-[9px] font-black uppercase tracking-wider text-slate-400">
+                Transaction volume →
+              </span>
+              <span className="absolute left-2 top-5 [writing-mode:vertical-rl] rotate-180 text-[9px] font-black uppercase tracking-wider text-slate-400">
+                Revenue / txn →
+              </span>
+
+              {matrixPoints.map((point, index) => (
+                <motion.div
+                  key={point.label}
+                  initial={{ opacity: 0, scale: 0 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{
+                    delay: index * 0.08,
+                    type: "spring",
+                    stiffness: 180,
+                    damping: 16,
+                  }}
+                  whileHover={{ scale: 1.08, zIndex: 30 }}
+                  className={`absolute flex -translate-x-1/2 translate-y-1/2 cursor-default flex-col items-center justify-center rounded-full border text-center shadow-sm backdrop-blur ${point.className}`}
+                  style={{
+                    left: `${point.x}%`,
+                    bottom: `${point.y}%`,
+                    width: point.size,
+                    height: point.size,
+                  }}
+                >
+                  <span className="text-[9px] font-black leading-3">{point.label}</span>
+                  <span className="mt-1 text-xs font-black">{point.amount}</span>
+                </motion.div>
+              ))}
+
+              <div className="absolute bottom-12 left-14 rounded-xl border border-blue-100 bg-white/90 px-3 py-2 text-[9px] font-bold text-[#1F5EA8] shadow-sm backdrop-blur">
+                High yield / lower volume
+              </div>
+              <div className="absolute right-6 top-8 rounded-xl border border-emerald-100 bg-white/90 px-3 py-2 text-[9px] font-bold text-emerald-700 shadow-sm backdrop-blur">
+                High volume / efficient yield
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.section>
   );
 };
 
@@ -725,325 +1070,179 @@ const RevenueStreamsOrbit: React.FC<StreamsOrbitProps> = ({ onSelectStream }) =>
 // ============================================================================
 
 const FeeOptimizationLab: React.FC = () => {
-  const [
-    transferFee,
-    setTransferFee,
-  ] =
-    useState<number>(
-      10
-    );
+  const [transferFee, setTransferFee] = useState<number>(10);
+  const [withdrawalFee, setWithdrawalFee] = useState<number>(18);
+  const [estMonthlyTxns, setEstMonthlyTxns] = useState<number>(150000);
+  const [policyLoaded, setPolicyLoaded] = useState(false);
+  const [simulation, setSimulation] = useState<Awaited<ReturnType<typeof revenueApi.simulate>>["simulation"] | null>(null);
+  const [isSimulating, setIsSimulating] = useState(false);
+  const [simulationError, setSimulationError] = useState("");
 
-  const [
-    withdrawalFee,
-    setWithdrawalFee,
-  ] =
-    useState<number>(
-      18
-    );
+  useEffect(() => {
+    let active = true;
 
-  const [
-    estMonthlyTxns,
-    setEstMonthlyTxns,
-  ] =
-    useState<number>(
-      150000
-    );
+    const loadPolicy = async () => {
+      try {
+        const response = await revenueApi.getFeePolicy();
+        if (!active) return;
 
-  const [
-    policyLoaded,
-    setPolicyLoaded,
-  ] =
-    useState(
-      false
-    );
-
-  const [
-    simulation,
-    setSimulation,
-  ] =
-    useState<Awaited<
-      ReturnType<
-        typeof revenueApi.simulate
-      >
-    >["simulation"] | null>(
-      null
-    );
-
-  const [
-    isSimulating,
-    setIsSimulating,
-  ] =
-    useState(
-      false
-    );
-
-  const [
-    simulationError,
-    setSimulationError,
-  ] =
-    useState("");
-
-  useEffect(
-    () => {
-      let active =
-        true;
-
-      const loadPolicy =
-        async () => {
-          try {
-            const response =
-              await revenueApi.getFeePolicy();
-
-            if (
-              !active
-            ) {
-              return;
-            }
-
-            setTransferFee(
-              response.policy
-                .transferFeeMinor /
-                100
-            );
-
-            setWithdrawalFee(
-              response.policy
-                .withdrawalFeeMinor /
-                100
-            );
-
-            setEstMonthlyTxns(
-              response.policy
-                .monthlyTxnEstimate
-            );
-
-            setPolicyLoaded(
-              true
-            );
-          } catch (
-            error
-          ) {
-            if (
-              active
-            ) {
-              setSimulationError(
-                error instanceof
-                  Error
-                  ? error.message
-                  : "Unable to load the current fee policy."
-              );
-            }
-          }
-        };
-
-      void loadPolicy();
-
-      return () => {
-        active =
-          false;
-      };
-    },
-    []
-  );
-
-  useEffect(
-    () => {
-      if (
-        !policyLoaded
-      ) {
-        return;
+        setTransferFee(response.policy.transferFeeMinor / 100);
+        setWithdrawalFee(response.policy.withdrawalFeeMinor / 100);
+        setEstMonthlyTxns(response.policy.monthlyTxnEstimate);
+        setPolicyLoaded(true);
+      } catch (error) {
+        if (!active) return;
+        setPolicyLoaded(true);
+        setSimulationError(
+          error instanceof Error
+            ? error.message
+            : "Unable to load the current fee policy."
+        );
       }
+    };
 
-      let active =
-        true;
+    void loadPolicy();
 
-      const timer =
-        window.setTimeout(
-          async () => {
-            setIsSimulating(
-              true
-            );
+    return () => {
+      active = false;
+    };
+  }, []);
 
-            setSimulationError(
-              ""
-            );
+  useEffect(() => {
+    if (!policyLoaded) return;
 
-            try {
-              const response =
-                await revenueApi.simulate({
-                  transferFeeMinor:
-                    Math.round(
-                      transferFee *
-                        100
-                    ),
+    let active = true;
+    const timer = window.setTimeout(async () => {
+      setIsSimulating(true);
+      setSimulationError("");
 
-                  withdrawalFeeMinor:
-                    Math.round(
-                      withdrawalFee *
-                        100
-                    ),
+      try {
+        const response = await revenueApi.simulate({
+          transferFeeMinor: Math.round(transferFee * 100),
+          withdrawalFeeMinor: Math.round(withdrawalFee * 100),
+          monthlyTransactions: estMonthlyTxns,
+        });
 
-                  monthlyTransactions:
-                    estMonthlyTxns,
-                });
+        if (active) setSimulation(response.simulation);
+      } catch (error) {
+        if (active) {
+          setSimulationError(
+            error instanceof Error
+              ? error.message
+              : "Unable to run the revenue simulation."
+          );
+        }
+      } finally {
+        if (active) setIsSimulating(false);
+      }
+    }, 280);
 
-              if (
-                active
-              ) {
-                setSimulation(
-                  response.simulation
-                );
-              }
-            } catch (
-              error
-            ) {
-              if (
-                active
-              ) {
-                setSimulationError(
-                  error instanceof
-                    Error
-                    ? error.message
-                    : "Unable to run the revenue simulation."
-                );
-              }
-            } finally {
-              if (
-                active
-              ) {
-                setIsSimulating(
-                  false
-                );
-              }
-            }
-          },
-          280
-        );
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [estMonthlyTxns, policyLoaded, transferFee, withdrawalFee]);
 
-      return () => {
-        active =
-          false;
-
-        window.clearTimeout(
-          timer
-        );
-      };
-    },
-    [
-      estMonthlyTxns,
-      policyLoaded,
-      transferFee,
-      withdrawalFee,
-    ]
-  );
-
-  const projectedRevenue =
-    (
-      simulation?.projectedRevenueMinor ??
-      0
-    ) /
-    100;
-
-  const difference =
-    (
-      simulation?.differenceMinor ??
-      0
-    ) /
-    100;
-
-  const transferContribution =
-    (
-      simulation?.transferContributionMinor ??
-      0
-    ) /
-    100;
-
-  const withdrawalContribution =
-    (
-      simulation?.withdrawalContributionMinor ??
-      0
-    ) /
-    100;
+  const projectedRevenue = (simulation?.projectedRevenueMinor ?? 0) / 100;
+  const difference = (simulation?.differenceMinor ?? 0) / 100;
+  const transferContribution = (simulation?.transferContributionMinor ?? 0) / 100;
+  const withdrawalContribution = (simulation?.withdrawalContributionMinor ?? 0) / 100;
+  const transferMix = simulation ? simulation.assumptions.transferShare * 100 : 0;
 
   return (
-    <div className="relative mb-8 overflow-hidden rounded-[30px] border border-[#D6E4F0] bg-gradient-to-br from-white via-[#F7FBFF] to-[#EEF6FC] p-5 shadow-[0_18px_55px_rgba(15,39,69,0.08)] md:p-7">
-      <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-cyan-100/60 blur-3xl" />
+    <motion.section
+      initial={{ opacity: 0, y: 18 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.45 }}
+      className="relative mb-8 overflow-hidden rounded-[30px] border border-[#D6E4F0] bg-gradient-to-br from-white via-[#F8FBFF] to-[#EEF6FC] p-5 shadow-[0_18px_55px_rgba(15,39,69,0.08)] md:p-7"
+    >
+      <div className="pointer-events-none absolute -right-28 -top-28 h-72 w-72 rounded-full bg-cyan-200/35 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-24 -left-16 h-56 w-56 rounded-full bg-blue-200/25 blur-3xl" />
 
       <div className="relative z-10 mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#E9F3FB] text-[#1F5EA8]">
-              <Sliders className="h-5 w-5" />
-            </div>
+        <div className="flex items-start gap-3">
+          <motion.div
+            animate={{ rotate: [0, 4, -4, 0] }}
+            transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-blue-100 bg-white text-[#1F5EA8] shadow-sm"
+          >
+            <Sliders className="h-5 w-5" />
+          </motion.div>
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5D88AF]">
+              Pricing Intelligence Sandbox
+            </p>
+            <h3 className="mt-1 text-xl font-black tracking-tight text-[#0F2745]">
+              Fee Optimization Lab
+            </h3>
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
+              Test pricing scenarios against the backend projection model without changing production fees.
+            </p>
+          </div>
+        </div>
 
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-[10px] font-black text-amber-700">
+            <span className="h-2 w-2 rounded-full bg-amber-400" />
+            Simulation only
+          </span>
+          <span className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-white px-3 py-1.5 text-[10px] font-black text-[#1F5EA8] shadow-sm">
+            {isSimulating ? <RefreshCcw className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />}
+            {isSimulating ? "Recalculating" : "Model ready"}
+          </span>
+        </div>
+      </div>
+
+      <div className="relative z-10 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.3fr)_minmax(330px,0.7fr)]">
+        <div className="rounded-[26px] border border-[#D8E6F1] bg-white/90 p-5 shadow-[0_10px_30px_rgba(15,39,69,0.04)] backdrop-blur md:p-6">
+          <div className="mb-5 flex items-center justify-between gap-4 border-b border-slate-100 pb-4">
             <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#2A6EA6]">
-                Pricing Intelligence
-              </p>
-
-              <h3 className="mt-0.5 text-xl font-black text-[#0F2745]">
-                Fee Optimization Lab
-              </h3>
+              <p className="text-sm font-black text-[#173F6D]">Scenario Controls</p>
+              <p className="mt-0.5 text-[10px] text-slate-400">Adjust inputs to recalculate projected monthly yield.</p>
+            </div>
+            <div className="hidden rounded-2xl border border-blue-100 bg-blue-50 p-2 text-[#1F5EA8] sm:block">
+              <Zap className="h-4 w-4" />
             </div>
           </div>
 
-          <p className="mt-3 max-w-2xl text-xs leading-5 text-slate-500">
-            Test fee changes against the current pricing policy and projected transaction mix without changing production fees.
-          </p>
-        </div>
-
-        <span className="inline-flex w-fit items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-[10px] font-black text-amber-700">
-          <span className="h-2 w-2 rounded-full bg-amber-400" />
-          Simulation only
-        </span>
-      </div>
-
-      <div className="relative z-10 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
-        <div className="rounded-[24px] border border-[#D8E6F1] bg-white/90 p-5 shadow-sm backdrop-blur md:p-6">
           <div className="space-y-7">
             <FeeSlider
               label="P2P Transfer Fee"
+              description="Fixed fee applied to each simulated P2P transfer"
               value={transferFee}
               suffix=" / txn"
               min={0}
               max={25}
               step={1}
-              minLabel="৳ 0"
-              currentLabel="Current policy"
-              maxLabel="৳ 25"
-              onChange={
-                setTransferFee
-              }
+              minLabel="৳0 Free"
+              currentLabel="Pricing range"
+              maxLabel="৳25"
+              onChange={setTransferFee}
             />
 
             <FeeSlider
               label="ATM Withdrawal Fee"
+              description="Fixed fee applied to each simulated cash-out"
               value={withdrawalFee}
               suffix=" / txn"
               min={5}
               max={40}
               step={1}
-              minLabel="৳ 5"
-              currentLabel="Current policy"
-              maxLabel="৳ 40"
-              onChange={
-                setWithdrawalFee
-              }
+              minLabel="৳5"
+              currentLabel="Pricing range"
+              maxLabel="৳40"
+              onChange={setWithdrawalFee}
             />
 
             <div>
-              <div className="mb-2 flex items-center justify-between gap-4">
+              <div className="mb-3 flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-sm font-black text-[#173F6D]">
-                    Estimated Monthly Transactions
-                  </p>
-
-                  <p className="mt-0.5 text-[10px] text-slate-400">
-                    Volume used in the backend projection model
+                  <p className="text-sm font-black text-[#173F6D]">Estimated Monthly Transactions</p>
+                  <p className="mt-1 text-[10px] leading-4 text-slate-400">
+                    Monthly volume used by the backend projection model.
                   </p>
                 </div>
-
-                <span className="rounded-xl border border-blue-100 bg-blue-50 px-3 py-1.5 font-mono text-xs font-black text-[#1F5EA8]">
+                <span className="shrink-0 rounded-xl border border-blue-100 bg-blue-50 px-3 py-1.5 font-mono text-xs font-black text-[#1F5EA8]">
                   {estMonthlyTxns.toLocaleString()} txns
                 </span>
               </div>
@@ -1053,23 +1252,15 @@ const FeeOptimizationLab: React.FC = () => {
                 min="50000"
                 max="300000"
                 step="10000"
-                value={
-                  estMonthlyTxns
-                }
-                onChange={(
-                  event
-                ) =>
-                  setEstMonthlyTxns(
-                    Number(
-                      event.target
-                        .value
-                    )
-                  )
-                }
-                className="h-2 w-full cursor-pointer appearance-none rounded-full bg-[#DCE8F2] accent-[#1F5EA8]"
+                value={estMonthlyTxns}
+                onChange={(event) => setEstMonthlyTxns(Number(event.target.value))}
+                style={{
+                  background: `linear-gradient(90deg, #1F5EA8 ${((estMonthlyTxns - 50000) / 250000) * 100}%, #DCE8F2 ${((estMonthlyTxns - 50000) / 250000) * 100}%)`,
+                }}
+                className="h-2 w-full cursor-pointer appearance-none rounded-full accent-[#1F5EA8]"
               />
 
-              <div className="mt-2 flex justify-between text-[9px] font-semibold text-slate-400">
+              <div className="mt-2 flex justify-between text-[9px] font-bold text-slate-400">
                 <span>50K</span>
                 <span>150K</span>
                 <span>300K</span>
@@ -1078,114 +1269,102 @@ const FeeOptimizationLab: React.FC = () => {
           </div>
         </div>
 
-        <div className="relative overflow-hidden rounded-[24px] border border-[#163B5E] bg-gradient-to-br from-[#0E2945] via-[#123B61] to-[#174E79] p-5 text-white shadow-[0_18px_40px_rgba(15,39,69,0.18)] md:p-6">
-          <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-cyan-300/10 blur-3xl" />
+        <div className="relative overflow-hidden rounded-[26px] border border-[#173F6D] bg-gradient-to-br from-[#0D2947] via-[#123B61] to-[#18547F] p-5 text-white shadow-[0_20px_45px_rgba(15,39,69,0.18)] md:p-6">
+          <div className="pointer-events-none absolute -right-20 -top-24 h-60 w-60 rounded-full bg-cyan-300/10 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 -left-20 h-60 w-60 rounded-full bg-blue-300/10 blur-3xl" />
 
           <div className="relative z-10">
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-[10px] font-black uppercase tracking-[0.16em] text-cyan-100/60">
-                Projected Monthly Yield
-              </span>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-cyan-100/55">
+                  Projected Monthly Yield
+                </p>
+                <motion.div
+                  key={Math.round(projectedRevenue)}
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-2 text-3xl font-black tracking-tight text-white md:text-4xl"
+                >
+                  ৳ {projectedRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                </motion.div>
+              </div>
 
-              {isSimulating && (
-                <RefreshCcw className="h-4 w-4 animate-spin text-cyan-200" />
-              )}
-            </div>
-
-            <div className="mt-3 text-3xl font-black tracking-tight text-white">
-              ৳ {projectedRevenue.toLocaleString(
-                undefined,
-                {
-                  maximumFractionDigits:
-                    0,
-                }
-              )}
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.07] text-cyan-200">
+                <TrendingUp className="h-5 w-5" />
+              </div>
             </div>
 
             {simulation && (
-              <span
-                className={`mt-3 inline-flex rounded-full border px-3 py-1.5 text-[10px] font-black ${
-                  difference >=
-                  0
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className={`mt-4 inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[10px] font-black ${
+                  difference >= 0
                     ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-200"
                     : "border-rose-300/20 bg-rose-300/10 text-rose-200"
                 }`}
               >
-                {difference >=
-                0
-                  ? "+"
-                  : "-"}
-                ৳ {Math.abs(
-                  difference
-                ).toLocaleString(
-                  undefined,
-                  {
-                    maximumFractionDigits:
-                      0,
-                  }
-                )}{" "}
-                ({simulation.percentageChange.toFixed(
-                  1
-                )}%)
-              </span>
+                {difference >= 0 ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
+                {difference >= 0 ? "+" : "-"}৳ {Math.abs(difference).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                <span className="opacity-70">({simulation.percentageChange.toFixed(1)}%)</span>
+              </motion.div>
             )}
 
-            <div className="mt-6 space-y-3 border-t border-white/10 pt-5">
-              <ProjectionRow
-                label="Transfers contribution"
-                value={`৳ ${transferContribution.toLocaleString(
-                  undefined,
-                  {
-                    maximumFractionDigits:
-                      0,
-                  }
-                )}`}
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <ProjectionMetric
+                label="Transfers"
+                value={`৳ ${transferContribution.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+                detail={`${transferMix.toFixed(0)}% mix`}
               />
-
-              <ProjectionRow
-                label="Withdrawals contribution"
-                value={`৳ ${withdrawalContribution.toLocaleString(
-                  undefined,
-                  {
-                    maximumFractionDigits:
-                      0,
-                  }
-                )}`}
-              />
-
-              <ProjectionRow
-                label="Transfer mix"
-                value={
-                  simulation
-                    ? `${(
-                        simulation.assumptions.transferShare *
-                        100
-                      ).toFixed(
-                        0
-                      )}%`
-                    : "—"
-                }
+              <ProjectionMetric
+                label="Withdrawals"
+                value={`৳ ${withdrawalContribution.toLocaleString(undefined, { maximumFractionDigits: 0 })}`}
+                detail={`${simulation ? (simulation.assumptions.withdrawalShare * 100).toFixed(0) : 0}% mix`}
               />
             </div>
 
-            <div className="mt-5 rounded-2xl border border-cyan-200/10 bg-white/5 p-3 text-[10px] leading-5 text-blue-100/60">
-              The backend applies the configured transaction mix and fee-elasticity assumption. This simulation never writes a production fee change.
+            <div className="mt-5 rounded-[20px] border border-white/10 bg-white/[0.06] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[10px] font-black uppercase tracking-wide text-blue-100/50">Projected contribution mix</span>
+                <span className="text-[10px] font-black text-cyan-200">{transferMix.toFixed(0)} / {(100 - transferMix).toFixed(0)}</span>
+              </div>
+              <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-white/10">
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${transferMix}%` }}
+                  className="h-full bg-cyan-300"
+                />
+                <motion.div
+                  initial={{ width: 0 }}
+                  animate={{ width: `${100 - transferMix}%` }}
+                  className="h-full bg-blue-300/60"
+                />
+              </div>
+            </div>
+
+            <div className="mt-5 flex items-start gap-2 rounded-[18px] border border-cyan-200/10 bg-cyan-100/[0.04] p-3 text-[10px] leading-5 text-blue-100/55">
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-cyan-200/70" />
+              <span>
+                Backend simulation applies current transaction mix and elasticity assumptions. No production pricing is changed.
+              </span>
             </div>
 
             {simulationError && (
-              <div className="mt-3 rounded-xl border border-rose-300/15 bg-rose-300/10 p-3 text-[10px] leading-5 text-rose-100">
-                {simulationError}
+              <div className="mt-3 flex items-start gap-2 rounded-[18px] border border-amber-300/15 bg-amber-300/10 p-3 text-[10px] leading-5 text-amber-100">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span>{simulationError}</span>
               </div>
             )}
           </div>
         </div>
       </div>
-    </div>
+    </motion.section>
   );
 };
 
 function FeeSlider({
   label,
+  description,
   value,
   suffix,
   min,
@@ -1196,641 +1375,461 @@ function FeeSlider({
   maxLabel,
   onChange,
 }: {
-  label:
-    string;
-  value:
-    number;
-  suffix:
-    string;
-  min:
-    number;
-  max:
-    number;
-  step:
-    number;
-  minLabel:
-    string;
-  currentLabel:
-    string;
-  maxLabel:
-    string;
-  onChange:
-    (
-      value:
-        number
-    ) => void;
+  label: string;
+  description: string;
+  value: number;
+  suffix: string;
+  min: number;
+  max: number;
+  step: number;
+  minLabel: string;
+  currentLabel: string;
+  maxLabel: string;
+  onChange: (value: number) => void;
 }) {
+  const progress = ((value - min) / (max - min)) * 100;
+
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between gap-4">
+      <div className="mb-3 flex items-start justify-between gap-4">
         <div>
-          <p className="text-sm font-black text-[#173F6D]">
-            {label}
-          </p>
-
-          <p className="mt-0.5 text-[10px] text-slate-400">
-            Simulation input
-          </p>
+          <p className="text-sm font-black text-[#173F6D]">{label}</p>
+          <p className="mt-1 text-[10px] leading-4 text-slate-400">{description}</p>
         </div>
-
-        <span className="rounded-xl border border-cyan-100 bg-cyan-50 px-3 py-1.5 font-mono text-xs font-black text-[#0F6F91]">
-          ৳ {value}
-          {suffix}
-        </span>
+        <motion.span
+          key={value}
+          initial={{ scale: 0.94, opacity: 0.6 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="shrink-0 rounded-xl border border-cyan-100 bg-cyan-50 px-3 py-1.5 font-mono text-xs font-black text-[#0F6F91]"
+        >
+          ৳ {value}{suffix}
+        </motion.span>
       </div>
 
       <input
         type="range"
-        min={
-          min
-        }
-        max={
-          max
-        }
-        step={
-          step
-        }
-        value={
-          value
-        }
-        onChange={(
-          event
-        ) =>
-          onChange(
-            Number(
-              event.target
-                .value
-            )
-          )
-        }
-        className="h-2 w-full cursor-pointer appearance-none rounded-full bg-[#DCE8F2] accent-[#1F5EA8]"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+        style={{
+          background: `linear-gradient(90deg, #1F5EA8 ${progress}%, #DCE8F2 ${progress}%)`,
+        }}
+        className="h-2 w-full cursor-pointer appearance-none rounded-full accent-[#1F5EA8]"
       />
 
-      <div className="mt-2 flex justify-between text-[9px] font-semibold text-slate-400">
-        <span>
-          {minLabel}
-        </span>
-
-        <span>
-          {currentLabel}
-        </span>
-
-        <span>
-          {maxLabel}
-        </span>
+      <div className="mt-2 flex justify-between text-[9px] font-bold text-slate-400">
+        <span>{minLabel}</span>
+        <span>{currentLabel}</span>
+        <span>{maxLabel}</span>
       </div>
     </div>
   );
 }
 
-function ProjectionRow({
+function ProjectionMetric({
   label,
   value,
+  detail,
 }: {
-  label:
-    string;
-  value:
-    string;
+  label: string;
+  value: string;
+  detail: string;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 text-xs">
-      <span className="text-blue-100/55">
-        {label}
-      </span>
-
-      <span className="font-mono font-black text-cyan-100">
-        {value}
-      </span>
+    <div className="rounded-[18px] border border-white/10 bg-white/[0.06] p-3.5">
+      <p className="text-[9px] font-black uppercase tracking-wide text-blue-100/45">{label}</p>
+      <p className="mt-1.5 text-sm font-black text-cyan-100">{value}</p>
+      <p className="mt-1 text-[9px] text-blue-100/40">{detail}</p>
     </div>
   );
 }
-
 
 // ============================================================================
 // COMPONENT 7: REVENUE LEAKAGE & RECOVERY OPPORTUNITIES
 // ============================================================================
 
 const RevenueLeakageMonitor: React.FC = () => {
-  const [
-    range,
-    setRange,
-  ] =
-    useState<RevenueRange>(
-      "30D"
-    );
+  const [range, setRange] = useState<RevenueRange>("30D");
+  const [leakage, setLeakage] = useState<Awaited<ReturnType<typeof revenueApi.getLeakage>> | null>(null);
+  const [contributors, setContributors] = useState<Awaited<ReturnType<typeof revenueApi.getContributors>>["contributors"]>([]);
+  const [contributorLimit, setContributorLimit] = useState(4);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [investigatingCategory, setInvestigatingCategory] = useState<string | null>(null);
 
-  const [
-    leakage,
-    setLeakage,
-  ] =
-    useState<Awaited<
-      ReturnType<
-        typeof revenueApi.getLeakage
-      >
-    > | null>(
-      null
-    );
+  const loadRevenueSignals = async () => {
+    setIsLoading(true);
+    setError("");
 
-  const [
-    contributors,
-    setContributors,
-  ] =
-    useState<Awaited<
-      ReturnType<
-        typeof revenueApi.getContributors
-      >
-    >["contributors"]>(
-      []
-    );
+    try {
+      const [leakageResponse, contributorsResponse] = await Promise.all([
+        revenueApi.getLeakage(range),
+        revenueApi.getContributors(range, contributorLimit),
+      ]);
 
-  const [
-    contributorLimit,
-    setContributorLimit,
-  ] =
-    useState(
-      4
-    );
-
-  const [
-    isLoading,
-    setIsLoading,
-  ] =
-    useState(
-      true
-    );
-
-  const [
-    error,
-    setError,
-  ] =
-    useState("");
-
-  const [
-    investigatingCategory,
-    setInvestigatingCategory,
-  ] =
-    useState<
-      string |
-      null
-    >(null);
-
-  const loadRevenueSignals =
-    async () => {
-      setIsLoading(
-        true
-      );
-
+      setLeakage(leakageResponse);
+      setContributors(contributorsResponse.contributors);
+    } catch (loadError) {
       setError(
-        ""
+        loadError instanceof Error
+          ? loadError.message
+          : "Unable to load revenue protection intelligence."
       );
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-      try {
-        const [
-          leakageResponse,
-          contributorsResponse,
-        ] =
-          await Promise.all([
-            revenueApi.getLeakage(
-              range
-            ),
-            revenueApi.getContributors(
-              range,
-              contributorLimit
-            ),
-          ]);
+  useEffect(() => {
+    void loadRevenueSignals();
+  }, [contributorLimit, range]);
 
-        setLeakage(
-          leakageResponse
-        );
+  const startInvestigation = async (category: string) => {
+    setInvestigatingCategory(category);
 
-        setContributors(
-          contributorsResponse.contributors
-        );
-      } catch (
-        loadError
-      ) {
-        setError(
-          loadError instanceof
-            Error
-            ? loadError.message
-            : "Unable to load revenue leakage intelligence."
-        );
-      } finally {
-        setIsLoading(
-          false
-        );
-      }
-    };
-
-  useEffect(
-    () => {
-      void loadRevenueSignals();
-    },
-    [
-      contributorLimit,
-      range,
-    ]
-  );
-
-  const startInvestigation =
-    async (
-      category:
-        string
-    ) => {
-      setInvestigatingCategory(
-        category
+    try {
+      await revenueApi.investigateLeakage({
+        category,
+        range,
+        note: "Investigation opened from Revenue Intelligence dashboard.",
+      });
+      await loadRevenueSignals();
+    } catch (investigateError) {
+      setError(
+        investigateError instanceof Error
+          ? investigateError.message
+          : "Unable to start the leakage investigation."
       );
+    } finally {
+      setInvestigatingCategory(null);
+    }
+  };
 
-      try {
-        await revenueApi.investigateLeakage({
-          category,
-          range,
-          note:
-            "Investigation opened from Revenue Intelligence dashboard.",
-        });
-
-        await loadRevenueSignals();
-      } catch (
-        investigateError
-      ) {
-        setError(
-          investigateError instanceof
-            Error
-            ? investigateError.message
-            : "Unable to start the leakage investigation."
-        );
-      } finally {
-        setInvestigatingCategory(
-          null
-        );
-      }
-    };
-
-  const totalLeakage =
-    (
-      leakage?.totalLeakageMinor ??
-      0
-    ) /
-    100;
+  const totalLeakage = (leakage?.totalLeakageMinor ?? 0) / 100;
 
   return (
     <div className="mb-8 grid grid-cols-1 gap-6 xl:grid-cols-2">
-      <div className="relative overflow-hidden rounded-[30px] border border-[#E7D9DE] bg-gradient-to-br from-white via-[#FFF9FA] to-[#F7F4F6] p-5 shadow-[0_16px_45px_rgba(84,44,56,0.06)] md:p-6">
-        <div className="pointer-events-none absolute -left-20 -top-20 h-48 w-48 rounded-full bg-rose-100/55 blur-3xl" />
+      <motion.section
+        initial={{ opacity: 0, x: -14 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.45 }}
+        className="relative overflow-hidden rounded-[30px] border border-[#E4DDE1] bg-gradient-to-br from-white via-[#FFF9FA] to-[#F5F7FA] p-5 shadow-[0_18px_50px_rgba(74,39,51,0.06)] md:p-6"
+      >
+        <div className="pointer-events-none absolute -left-24 -top-24 h-56 w-56 rounded-full bg-rose-200/30 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-28 right-0 h-56 w-56 rounded-full bg-blue-100/40 blur-3xl" />
 
         <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-rose-50 text-rose-500">
-                <ShieldAlert className="h-4.5 w-4.5" />
-              </div>
-
-              <div>
-                <p className="text-[9px] font-black uppercase tracking-[0.15em] text-rose-400">
-                  Revenue Protection
-                </p>
-
-                <h3 className="mt-0.5 text-lg font-black text-[#0F2745]">
-                  Leakage Monitor
-                </h3>
-              </div>
+          <div className="flex items-start gap-3">
+            <motion.div
+              animate={{ scale: [1, 1.06, 1] }}
+              transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-rose-100 bg-white text-rose-500 shadow-sm"
+            >
+              <ShieldAlert className="h-5 w-5" />
+            </motion.div>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-rose-400">
+                Revenue Protection
+              </p>
+              <h3 className="mt-1 text-xl font-black tracking-tight text-[#0F2745]">
+                Leakage Monitor
+              </h3>
+              <p className="mt-1 max-w-md text-xs leading-5 text-slate-500">
+                Detect fee reversals, waivers, and micro-fee losses before they become recurring leakage.
+              </p>
             </div>
-
-            <p className="mt-2 text-[11px] leading-5 text-slate-500">
-              Revenue loss signals derived from reversal, waiver and fee-adjustment events.
-            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <select
-              value={
-                range
-              }
-              onChange={(
-                event
-              ) =>
-                setRange(
-                  event.target
-                    .value as
-                    RevenueRange
-                )
-              }
-              className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-black text-slate-600 outline-none"
+              value={range}
+              onChange={(event) => setRange(event.target.value as RevenueRange)}
+              className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-[10px] font-black text-slate-600 shadow-sm outline-none transition focus:border-[#1F5EA8]"
             >
-              <option value="7D">
-                7D
-              </option>
-
-              <option value="30D">
-                30D
-              </option>
-
-              <option value="90D">
-                90D
-              </option>
-
-              <option value="1Y">
-                1Y
-              </option>
+              <option value="7D">7D</option>
+              <option value="30D">30D</option>
+              <option value="90D">90D</option>
+              <option value="1Y">1Y</option>
             </select>
 
-            <span className="rounded-full border border-rose-100 bg-white px-3 py-1.5 text-[10px] font-black text-rose-600">
-              Est. ৳ {totalLeakage.toLocaleString(
-                undefined,
-                {
-                  maximumFractionDigits:
-                    0,
-                }
-              )}
-            </span>
+            <motion.span
+              key={Math.round(totalLeakage)}
+              initial={{ opacity: 0.5, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="rounded-full border border-rose-100 bg-white px-3 py-1.5 text-[10px] font-black text-rose-600 shadow-sm"
+            >
+              Est. ৳ {totalLeakage.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            </motion.span>
           </div>
         </div>
 
         <div className="relative z-10 mt-5 space-y-3">
           {isLoading ? (
-            <RevenueLoadingState />
-          ) : leakage &&
-            leakage.signals.length >
-              0 ? (
-            leakage.signals.map(
-              (
-                item
-              ) => (
-                <div
-                  key={
-                    item.id
-                  }
-                  className="rounded-[20px] border border-[#E9E0E3] bg-white/90 p-4 transition hover:border-rose-200 hover:shadow-sm"
-                >
-                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm font-black text-[#173F6D]">
-                          {item.category}
+            <RevenueLoadingState label="Scanning revenue leakage signals..." />
+          ) : leakage && leakage.signals.length > 0 ? (
+            leakage.signals.map((item, index) => (
+              <motion.article
+                key={item.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+                whileHover={{ y: -2 }}
+                className="group rounded-[20px] border border-[#E9E0E3] bg-white/90 p-4 shadow-[0_8px_22px_rgba(74,39,51,0.03)] backdrop-blur transition-shadow hover:shadow-[0_14px_30px_rgba(74,39,51,0.08)]"
+              >
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-black text-[#173F6D]">{item.category}</span>
+                      <LeakageRiskBadge risk={item.riskLevel} />
+                      {item.investigationStatus !== "none" && (
+                        <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[9px] font-black capitalize text-blue-600">
+                          {item.investigationStatus}
                         </span>
-
-                        <LeakageRiskBadge
-                          risk={
-                            item.riskLevel
-                          }
-                        />
-
-                        {item.investigationStatus !==
-                          "none" && (
-                          <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[9px] font-black capitalize text-blue-600">
-                            {item.investigationStatus}
-                          </span>
-                        )}
-                      </div>
-
-                      <p className="mt-1 text-[11px] leading-5 text-slate-500">
-                        {item.reason}
-                      </p>
-
-                      <p className="mt-2 text-[10px] font-black text-[#2A6EA6]">
-                        {item.action}
-                      </p>
+                      )}
                     </div>
 
-                    <div className="shrink-0 text-left sm:text-right">
-                      <p className="text-lg font-black text-rose-600">
-                        ৳ {(item.amountMinor /
-                          100).toLocaleString(
-                          undefined,
-                          {
-                            maximumFractionDigits:
-                              0,
-                          }
-                        )}
-                      </p>
-
-                      <p className="mt-0.5 text-[9px] text-slate-400">
-                        {item.sourceEventCount.toLocaleString()} source events
-                      </p>
-
-                      <button
-                        type="button"
-                        disabled={
-                          investigatingCategory ===
-                          item.category
-                        }
-                        onClick={() =>
-                          startInvestigation(
-                            item.category
-                          )
-                        }
-                        className="mt-2 text-[10px] font-black text-[#1F5EA8] transition hover:text-[#173F6D] disabled:opacity-50"
-                      >
-                        {investigatingCategory ===
-                        item.category
-                          ? "Opening..."
-                          : item.investigationStatus ===
-                              "none"
-                            ? "Investigate"
-                            : "Review Investigation"}
-                      </button>
+                    <p className="mt-1 text-[11px] leading-5 text-slate-500">{item.reason}</p>
+                    <div className="mt-2 flex items-center gap-1.5 text-[10px] font-black text-[#2A6EA6]">
+                      <Eye className="h-3.5 w-3.5" />
+                      {item.action}
                     </div>
                   </div>
+
+                  <div className="shrink-0 text-left sm:text-right">
+                    <p className="text-lg font-black text-rose-600">
+                      ৳ {(item.amountMinor / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </p>
+                    <p className="mt-0.5 text-[9px] text-slate-400">
+                      {item.sourceEventCount.toLocaleString()} source events
+                    </p>
+                    <button
+                      type="button"
+                      disabled={investigatingCategory === item.category}
+                      onClick={() => startInvestigation(item.category)}
+                      className="mt-2 inline-flex items-center gap-1.5 text-[10px] font-black text-[#1F5EA8] transition hover:text-[#173F6D] disabled:opacity-50"
+                    >
+                      {investigatingCategory === item.category ? (
+                        <RefreshCcw className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <ChevronRight className="h-3 w-3" />
+                      )}
+                      {investigatingCategory === item.category
+                        ? "Opening..."
+                        : item.investigationStatus === "none"
+                          ? "Investigate"
+                          : "Review investigation"}
+                    </button>
+                  </div>
                 </div>
-              )
-            )
+              </motion.article>
+            ))
           ) : (
             <RevenueEmptyState
-              text="No leakage events were detected for the selected period."
+              icon="shield"
+              title="No leakage detected"
+              text="No revenue leakage events were found for the selected period."
             />
           )}
 
           {error && (
-            <div className="rounded-2xl border border-rose-100 bg-rose-50 p-3 text-[10px] leading-5 text-rose-600">
-              {error}
-            </div>
+            <RevenueDataNotice
+              message={error}
+              onRetry={() => void loadRevenueSignals()}
+            />
           )}
         </div>
-      </div>
+      </motion.section>
 
-      <div className="relative overflow-hidden rounded-[30px] border border-[#D5E3EF] bg-gradient-to-br from-white via-[#F9FCFF] to-[#EEF5FA] p-5 shadow-[0_16px_45px_rgba(15,39,69,0.06)] md:p-6">
-        <div className="pointer-events-none absolute -right-20 -top-20 h-48 w-48 rounded-full bg-blue-100/65 blur-3xl" />
+      <motion.section
+        initial={{ opacity: 0, x: 14 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.45, delay: 0.05 }}
+        className="relative overflow-hidden rounded-[30px] border border-[#D5E3EF] bg-gradient-to-br from-white via-[#F8FBFF] to-[#EDF5FB] p-5 shadow-[0_18px_50px_rgba(15,39,69,0.07)] md:p-6"
+      >
+        <div className="pointer-events-none absolute -right-24 -top-24 h-56 w-56 rounded-full bg-blue-200/40 blur-3xl" />
 
         <div className="relative z-10 flex items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-blue-50 text-[#1F5EA8]">
-                <Users className="h-4.5 w-4.5" />
-              </div>
-
-              <div>
-                <p className="text-[9px] font-black uppercase tracking-[0.15em] text-[#5C8BB5]">
-                  Contribution Intelligence
-                </p>
-
-                <h3 className="mt-0.5 text-lg font-black text-[#0F2745]">
-                  Top Revenue Contributors
-                </h3>
-              </div>
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-blue-100 bg-white text-[#1F5EA8] shadow-sm">
+              <Users className="h-5 w-5" />
             </div>
-
-            <p className="mt-2 text-[11px] leading-5 text-slate-500">
-              Accounts ranked by captured platform fees for the selected period.
-            </p>
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#5D88AF]">
+                Contribution Intelligence
+              </p>
+              <h3 className="mt-1 text-xl font-black tracking-tight text-[#0F2745]">
+                Top Revenue Contributors
+              </h3>
+              <p className="mt-1 max-w-md text-xs leading-5 text-slate-500">
+                Accounts ranked by captured platform fees during the selected period.
+              </p>
+            </div>
           </div>
 
           <button
             type="button"
-            onClick={() =>
-              setContributorLimit(
-                (
-                  current
-                ) =>
-                  current ===
-                  4
-                    ? 12
-                    : 4
-              )
-            }
-            className="shrink-0 rounded-xl border border-blue-100 bg-white px-3 py-2 text-[10px] font-black text-[#1F5EA8] transition hover:bg-blue-50"
+            onClick={() => setContributorLimit((current) => (current === 4 ? 12 : 4))}
+            className="shrink-0 rounded-xl border border-blue-100 bg-white px-3 py-2 text-[10px] font-black text-[#1F5EA8] shadow-sm transition hover:-translate-y-0.5 hover:bg-blue-50"
           >
-            {contributorLimit ===
-            4
-              ? "View All"
-              : "Show Top 4"}
+            {contributorLimit === 4 ? "View All" : "Top 4"}
           </button>
         </div>
 
-        <div className="relative z-10 mt-5 max-h-[390px] space-y-3 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="relative z-10 mt-5 max-h-[430px] space-y-3 overflow-y-auto pr-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {isLoading ? (
-            <RevenueLoadingState />
-          ) : contributors.length >
-            0 ? (
-            contributors.map(
-              (
-                user,
-                index
-              ) => (
-                <motion.div
-                  key={
-                    user.id
-                  }
-                  initial={{
-                    opacity:
-                      0,
-                    y:
-                      8,
-                  }}
-                  animate={{
-                    opacity:
-                      1,
-                    y:
-                      0,
-                  }}
-                  transition={{
-                    delay:
-                      index *
-                      0.035,
-                  }}
-                  className="rounded-[20px] border border-[#DDE8F1] bg-white/90 p-4 transition hover:border-blue-200 hover:shadow-sm"
+            <RevenueLoadingState label="Ranking revenue contributors..." />
+          ) : contributors.length > 0 ? (
+            contributors.map((user, index) => {
+              const maxFees = Math.max(...contributors.map((item) => item.feesPaidMinor), 1);
+              const share = (user.feesPaidMinor / maxFees) * 100;
+
+              return (
+                <motion.article
+                  key={user.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: index * 0.045 }}
+                  whileHover={{ x: 3 }}
+                  className="group rounded-[20px] border border-[#DDE8F1] bg-white/90 p-4 shadow-[0_8px_22px_rgba(15,39,69,0.03)] transition-shadow hover:shadow-[0_14px_30px_rgba(15,39,69,0.08)]"
                 >
                   <div className="flex items-center justify-between gap-4">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="truncate text-sm font-black text-[#173F6D]">
-                          {user.name}
-                        </span>
-
-                        <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[9px] font-black text-[#1F5EA8]">
-                          {user.type}
-                        </span>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border text-xs font-black ${
+                        index === 0
+                          ? "border-amber-200 bg-amber-50 text-amber-700"
+                          : index === 1
+                            ? "border-slate-200 bg-slate-50 text-slate-600"
+                            : "border-blue-100 bg-blue-50 text-[#1F5EA8]"
+                      }`}>
+                        #{index + 1}
                       </div>
 
-                      <p className="mt-1 truncate text-[10px] text-slate-400">
-                        {user.email} • {user.transactionsCount.toLocaleString()} txns
-                      </p>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="truncate text-sm font-black text-[#173F6D]">{user.name}</span>
+                          <span className="rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[9px] font-black text-[#1F5EA8]">
+                            {user.type}
+                          </span>
+                        </div>
+                        <p className="mt-1 truncate text-[10px] text-slate-400">
+                          {user.email} • {user.transactionsCount.toLocaleString()} txns
+                        </p>
+                      </div>
                     </div>
 
                     <div className="shrink-0 text-right">
                       <p className="text-sm font-black text-[#0F2745]">
-                        ৳ {(user.feesPaidMinor /
-                          100).toLocaleString(
-                          undefined,
-                          {
-                            maximumFractionDigits:
-                              0,
-                          }
-                        )}
+                        ৳ {(user.feesPaidMinor / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                       </p>
-
                       <p className="mt-1 text-[10px] text-slate-400">
-                        Vol: ৳ {(user.volumeMinor /
-                          100).toLocaleString(
-                          undefined,
-                          {
-                            maximumFractionDigits:
-                              0,
-                          }
-                        )}
+                        Vol ৳ {(user.volumeMinor / 100).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                       </p>
                     </div>
                   </div>
-                </motion.div>
-              )
-            )
+
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[#EDF3F8]">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${share}%` }}
+                      transition={{ delay: 0.12 + index * 0.04, duration: 0.55 }}
+                      className="h-full rounded-full bg-gradient-to-r from-[#1F5EA8] via-[#2F83C5] to-cyan-400"
+                    />
+                  </div>
+                </motion.article>
+              );
+            })
           ) : (
             <RevenueEmptyState
-              text="No contributor revenue events are available for the selected period."
+              icon="users"
+              title="No contributor data yet"
+              text="No captured contributor revenue events are available for this period."
             />
           )}
         </div>
-      </div>
+      </motion.section>
     </div>
   );
 };
 
-function LeakageRiskBadge({
-  risk,
-}: {
-  risk:
-    | "High"
-    | "Medium"
-    | "Low";
-}) {
+function LeakageRiskBadge({ risk }: { risk: "High" | "Medium" | "Low" }) {
   const tone =
-    risk ===
-    "High"
+    risk === "High"
       ? "border-rose-100 bg-rose-50 text-rose-600"
-      : risk ===
-          "Medium"
+      : risk === "Medium"
         ? "border-amber-100 bg-amber-50 text-amber-700"
         : "border-emerald-100 bg-emerald-50 text-emerald-700";
 
   return (
-    <span
-      className={`rounded-full border px-2 py-0.5 text-[9px] font-black ${tone}`}
-    >
+    <span className={`rounded-full border px-2 py-0.5 text-[9px] font-black ${tone}`}>
       {risk} Risk
     </span>
   );
 }
 
-function RevenueLoadingState() {
+function RevenueLoadingState({ label }: { label: string }) {
   return (
-    <div className="flex min-h-36 items-center justify-center rounded-[20px] border border-dashed border-slate-200 bg-white/60">
-      <RefreshCcw className="h-5 w-5 animate-spin text-[#1F5EA8]" />
+    <div className="flex min-h-40 flex-col items-center justify-center rounded-[22px] border border-dashed border-[#D7E3EF] bg-white/60 p-6 text-center">
+      <motion.div
+        animate={{ rotate: 360 }}
+        transition={{ duration: 1.1, repeat: Infinity, ease: "linear" }}
+        className="flex h-10 w-10 items-center justify-center rounded-2xl border border-blue-100 bg-blue-50 text-[#1F5EA8]"
+      >
+        <RefreshCcw className="h-4 w-4" />
+      </motion.div>
+      <p className="mt-3 text-[10px] font-bold text-slate-400">{label}</p>
     </div>
   );
 }
 
 function RevenueEmptyState({
+  icon,
+  title,
   text,
 }: {
-  text:
-    string;
+  icon: "shield" | "users";
+  title: string;
+  text: string;
 }) {
   return (
-    <div className="flex min-h-36 items-center justify-center rounded-[20px] border border-dashed border-slate-200 bg-white/60 p-5 text-center text-[11px] leading-5 text-slate-400">
-      {text}
+    <div className="flex min-h-40 flex-col items-center justify-center rounded-[22px] border border-dashed border-[#D7E3EF] bg-white/65 p-6 text-center">
+      <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-blue-100 bg-blue-50 text-[#1F5EA8]">
+        {icon === "shield" ? <ShieldAlert className="h-5 w-5" /> : <Users className="h-5 w-5" />}
+      </div>
+      <p className="mt-3 text-sm font-black text-[#173F6D]">{title}</p>
+      <p className="mt-1 max-w-sm text-[10px] leading-5 text-slate-400">{text}</p>
     </div>
   );
 }
 
+function RevenueDataNotice({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-3 rounded-[18px] border border-amber-200 bg-amber-50/80 p-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 items-start gap-2">
+        <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+        <div className="min-w-0">
+          <p className="text-[10px] font-black text-amber-800">Revenue data source unavailable</p>
+          <p className="mt-0.5 truncate text-[9px] text-amber-700/70">{message}</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        onClick={onRetry}
+        className="inline-flex w-fit items-center gap-1.5 rounded-xl border border-amber-200 bg-white px-3 py-1.5 text-[9px] font-black text-amber-700 shadow-sm"
+      >
+        <RefreshCcw className="h-3 w-3" />
+        Retry
+      </button>
+    </div>
+  );
+}
 
 // ============================================================================
 // COMPONENT 8: REVENUE STORY MODE (EXECUTIVE PRESENTATION OVERLAY)
