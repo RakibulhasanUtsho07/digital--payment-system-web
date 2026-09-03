@@ -45,6 +45,7 @@ export default function UsersPage() {
     toggleSort,
     createUser,
     updateUser,
+    deleteUser,
     refresh,
     tryLoadRealProfile,
   } = useUsers();
@@ -206,6 +207,11 @@ export default function UsersPage() {
             onToggle={toggleUser}
             onToggleAll={toggleAll}
             onOpenUser={handleOpenUser}
+            onEditUser={handleOpenUser}
+            onSuspendUser={(user) => setSuspendUser(user)}
+            onDeleteUser={(user) => {
+              void deleteUser(user.id);
+            }}
             onSort={toggleSort as any}
             onPageChange={setPage}
             onPageSizeChange={updatePageSize}
@@ -243,12 +249,11 @@ export default function UsersPage() {
       />
 
       <SuspendUserModal
-        open={suspendUser !== null}
         user={suspendUser}
         onClose={() => setSuspendUser(null)}
-        onConfirm={(id, status) => {
+        onConfirm={(id) => {
           updateUser(id, {
-            status,
+            status: "suspended",
             walletStatus: "frozen",
           });
           setSuspendUser(null);
