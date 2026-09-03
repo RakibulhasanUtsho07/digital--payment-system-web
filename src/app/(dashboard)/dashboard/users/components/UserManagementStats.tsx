@@ -1,5 +1,7 @@
 "use client";
 
+import React from "react";
+import { motion } from "framer-motion";
 import {
   Activity,
   AlertTriangle,
@@ -7,205 +9,143 @@ import {
   TrendingUp,
   UserCheck,
   Users,
+  type LucideIcon,
 } from "lucide-react";
-import { motion } from "framer-motion";
 
-import type {
-  UserStats,
-} from "./UserManagementTypes";
+import type { UserStats } from "./UserManagementTypes";
 
-const statMeta = [
+interface UserManagementStatsProps {
+  stats: UserStats;
+}
+
+interface StatItemConfig {
+  key: keyof UserStats;
+  label: string;
+  note: string;
+  icon: LucideIcon;
+  color: string;
+  soft: string;
+}
+
+const STAT_ITEMS: readonly StatItemConfig[] = [
   {
     key: "totalUsers",
-    title: "Total Users",
+    label: "Total users",
+    note: "All registered accounts",
     icon: Users,
-    note: "+8.4% this month",
-    tone: "blue",
+    color: "#3B82F6",
+    soft: "bg-blue-50 text-blue-600",
   },
   {
     key: "activeUsers",
-    title: "Active Users",
+    label: "Active users",
+    note: "Currently enabled",
     icon: Activity,
-    note: "87% of user base",
-    tone: "emerald",
+    color: "#10B981",
+    soft: "bg-emerald-50 text-emerald-600",
   },
   {
     key: "pendingKyc",
-    title: "Pending KYC",
-    icon: UserCheck,
+    label: "Pending KYC",
     note: "Requires attention",
-    tone: "amber",
+    icon: UserCheck,
+    color: "#F59E0B",
+    soft: "bg-amber-50 text-amber-600",
   },
   {
     key: "suspended",
-    title: "Suspended",
-    icon: ShieldAlert,
+    label: "Suspended",
     note: "Account restrictions",
-    tone: "rose",
+    icon: ShieldAlert,
+    color: "#F43F5E",
+    soft: "bg-rose-50 text-rose-600",
   },
   {
     key: "highRisk",
-    title: "High Risk",
-    icon: AlertTriangle,
+    label: "High risk",
     note: "Review recommended",
-    tone: "orange",
+    icon: AlertTriangle,
+    color: "#F97316",
+    soft: "bg-orange-50 text-orange-600",
   },
   {
     key: "newThisWeek",
-    title: "New This Week",
-    icon: TrendingUp,
+    label: "New this week",
     note: "Fresh registrations",
-    tone: "cyan",
+    icon: TrendingUp,
+    color: "#06B6D4",
+    soft: "bg-cyan-50 text-cyan-600",
   },
 ] as const;
 
-type StatTone =
-  | "blue"
-  | "emerald"
-  | "amber"
-  | "rose"
-  | "orange"
-  | "cyan";
-
-const toneMap: Record<
-  StatTone,
-  string
-> = {
-  blue:
-    "bg-blue-50 text-blue-600",
-  emerald:
-    "bg-emerald-50 text-emerald-600",
-  amber:
-    "bg-amber-50 text-amber-600",
-  rose:
-    "bg-rose-50 text-rose-600",
-  orange:
-    "bg-orange-50 text-orange-600",
-  cyan:
-    "bg-cyan-50 text-cyan-600",
-};
-
 export default function UserManagementStats({
   stats,
-}: {
-  stats: UserStats;
-}) {
+}: UserManagementStatsProps) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-      {statMeta.map(
-        (item, index) => {
-          const Icon =
-            item.icon;
+    <section
+      aria-label="User statistics"
+      className="grid grid-cols-2 gap-3 md:grid-cols-3 2xl:grid-cols-6"
+    >
+      {STAT_ITEMS.map((item, index) => {
+        const Icon = item.icon;
+        const value = stats[item.key];
 
-          const value =
-            stats[
-              item.key
-            ];
+        return (
+          <motion.article
+            key={item.key}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: index * 0.05 }}
+            whileHover={{ y: -3 }}
+            className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_8px_25px_rgba(15,23,42,.04)] sm:p-5"
+          >
+            {/* Header Icon & Status Badge */}
+            <div className="flex items-center justify-between gap-2">
+              <span
+                className={`flex h-10 w-10 items-center justify-center rounded-xl ${item.soft}`}
+              >
+                <Icon className="h-4 w-4" />
+              </span>
+              {index === 0 && (
+                <span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-extrabold text-emerald-700">
+                  Live
+                </span>
+              )}
+            </div>
 
-          return (
-            <motion.div
-              key={
-                item.key
-              }
-              initial={{
-                opacity: 0,
-                y: 12,
-              }}
-              animate={{
-                opacity: 1,
-                y: 0,
-              }}
-              transition={{
-                delay:
-                  index *
-                  0.05,
-              }}
-              whileHover={{
-                y: -3,
-              }}
-              className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_8px_25px_rgba(15,23,42,0.035)]"
+            {/* Label, Value & Note */}
+            <p className="mt-4 truncate text-[10px] font-extrabold uppercase tracking-[.12em] text-slate-400">
+              {item.label}
+            </p>
+            <p className="mt-1 text-2xl font-black tracking-tight text-[#0F2745]">
+              {value.toLocaleString()}
+            </p>
+            <p className="mt-1 truncate text-[10px] text-slate-400">
+              {item.note}
+            </p>
+
+            {/* Animated Micro Bar Chart */}
+            <div
+              className="mt-4 flex h-7 items-end gap-1"
+              aria-hidden="true"
             >
-              <div className="flex items-center justify-between gap-3">
-                <div
-                  className={`flex h-10 w-10 items-center justify-center rounded-xl ${toneMap[item.tone]}`}
-                >
-                  <Icon className="h-4 w-4" />
-                </div>
-
-                {index === 0 && (
-                  <span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-bold text-emerald-700">
-                    Growing
-                  </span>
-                )}
-              </div>
-
-              <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
-                {item.title}
-              </p>
-
-              <p className="mt-1 text-2xl font-black tracking-tight text-[#0F2745]">
-                {value.toLocaleString()}
-              </p>
-
-              <p className="mt-2 text-[10px] leading-4 text-slate-400">
-                {item.note}
-              </p>
-
-              <div className="mt-4 flex items-end gap-1">
-                {[12, 19, 15, 24, 18, 30, 26].map(
-                  (
-                    height,
-                    barIndex
-                  ) => (
-                    <motion.span
-                      key={
-                        barIndex
-                      }
-                      initial={{
-                        height: 0,
-                      }}
-                      animate={{
-                        height,
-                      }}
-                      transition={{
-                        duration:
-                          0.35,
-                        delay:
-                          index *
-                            0.05 +
-                          barIndex *
-                            0.03,
-                      }}
-                      className={`w-full rounded-full ${toneMap[item.tone].split(" ")[0].replace("bg-", "bg-")}`}
-                      style={{
-                        background:
-                          item.tone ===
-                          "emerald"
-                            ? "#10B981"
-                            : item.tone ===
-                              "amber"
-                            ? "#F59E0B"
-                            : item.tone ===
-                              "rose"
-                            ? "#F43F5E"
-                            : item.tone ===
-                              "orange"
-                            ? "#F97316"
-                            : item.tone ===
-                              "cyan"
-                            ? "#06B6D4"
-                            : "#3B82F6",
-                        opacity:
-                          0.35,
-                      }}
-                    />
-                  )
-                )}
-              </div>
-            </motion.div>
-          );
-        }
-      )}
-    </div>
+              {[12, 20, 15, 25, 18, 30, 24].map((height, barIndex) => (
+                <motion.span
+                  key={barIndex}
+                  initial={{ height: 0 }}
+                  animate={{ height }}
+                  transition={{ delay: index * 0.05 + barIndex * 0.025 }}
+                  className="min-w-0 flex-1 rounded-full"
+                  style={{
+                    backgroundColor: item.color,
+                    opacity: 0.34,
+                  }}
+                />
+              ))}
+            </div>
+          </motion.article>
+        );
+      })}
+    </section>
   );
 }

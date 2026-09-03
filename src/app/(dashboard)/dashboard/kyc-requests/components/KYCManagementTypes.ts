@@ -20,6 +20,7 @@ export type VerificationResult =
   | "Needs Review";
 
 export type RiskLevel =
+  | "Unknown"
   | "Low"
   | "Medium"
   | "High"
@@ -35,20 +36,38 @@ export type SLAStatus =
   | "Due Soon"
   | "Overdue";
 
-export type ReviewTab =
-  | "overview"
-  | "documents"
-  | "verification"
-  | "risk"
-  | "applicant"
-  | "activity"
-  | "notes"
-  | "decision";
-
 export interface VerificationCheck {
   label: string;
   status: "Pass" | "Fail" | "Review";
   reason?: string;
+}
+
+export type KYCAIRecommendation =
+  | "likely_clear"
+  | "manual_review"
+  | "likely_reject";
+
+export type KYCAIReviewStatus =
+  | "not_run"
+  | "processing"
+  | "completed"
+  | "failed";
+
+export interface KYCAIReview {
+  id?: string;
+  kycId: string;
+  status: KYCAIReviewStatus;
+  recommendation: KYCAIRecommendation;
+  confidence: number;
+  riskLevel: RiskLevel;
+  summary: string;
+  reasons: string[];
+  missingSignals: string[];
+  provider?: string;
+  model?: string;
+  triggeredBy?: "automatic_submission" | "admin_rerun";
+  reviewedAt?: string;
+  errorMessage?: string;
 }
 
 export interface KYCRequest {
@@ -84,4 +103,24 @@ export interface KYCRequest {
   rejectionReason?: string;
   verificationChecks: VerificationCheck[];
   notes: KYCNote[];
+}
+
+export interface KYCPrivateDocuments {
+  frontUrl?: string;
+  backUrl?: string;
+  selfieUrl?: string;
+}
+
+export interface KYCOverviewData {
+  pending: number;
+  underReview: number;
+  approvedToday: number;
+  rejectedToday: number;
+  highRisk: number;
+  averageReviewMinutes: number | null;
+  totalSubmitted: number;
+  verified: number;
+  rejected: number;
+  aiReviewed: number;
+  needsManualReview: number;
 }
