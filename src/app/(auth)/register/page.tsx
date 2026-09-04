@@ -31,7 +31,8 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-import { apiClient } from "@/lib/api/client";
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000/api")
+  .replace(/\/$/, "");
 
 /* =========================================================
    TYPES
@@ -101,6 +102,9 @@ export default function RegisterPage() {
   ] = useState<string | null>(
     null
   );
+
+  const [profileImageFile, setProfileImageFile] =
+    useState<File | null>(null);
 
   const [
     imageName,
@@ -193,6 +197,8 @@ export default function RegisterPage() {
     setProfileImage(
       previewUrl
     );
+
+    setProfileImageFile(file);
 
     setImageName(
       file.name
@@ -316,28 +322,31 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      /*
-       * Current backend registration endpoint
-       * accepts JSON.
-       *
-       * Do NOT send FormData until backend
-       * has multer/file upload support.
-       */
+      const formData = new FormData();
+      formData.append("name", fullName);
+      formData.append("email", cleanEmail);
+      formData.append("phone", cleanPhone);
+      formData.append("password", password);
 
-      const data =
-        await apiClient<RegisterResponse>(
-          "/auth/register",
-          {
-            method: "POST",
+      if (profileImageFile) {
+        formData.append("profileImage", profileImageFile);
+      }
 
-            body: JSON.stringify({
-              name: fullName,
-              email: cleanEmail,
-              phone: cleanPhone,
-              password,
-            }),
-          }
+      const response = await fetch(`${API_BASE}/auth/register`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+
+      const data = (await response.json().catch(() => null)) as
+        | RegisterResponse
+        | null;
+
+      if (!response.ok || !data) {
+        throw new Error(
+          data?.message ?? `Registration failed with status ${response.status}.`
         );
+      }
 
       if (
         !data.success ||

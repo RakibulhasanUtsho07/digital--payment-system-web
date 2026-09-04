@@ -1,197 +1,605 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
-import { ArrowRight, ArrowUpRight, BarChart3, Globe2, ShieldCheck, Zap } from "lucide-react";
-import type { Feature } from "./Types";
+import { useEffect, useRef } from "react";
+import { motion } from "framer-motion";
+import { gsap } from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+import {
+  ArrowRight,
+  BarChart3,
+  Clock3,
+  FileCheck2,
+  Send,
+  ShieldCheck,
+} from "lucide-react";
 
-const FEATURES: Feature[] = [
+if (typeof window !== "undefined") {
+  gsap.registerPlugin(ScrollTrigger);
+}
+
+const features = [
   {
-    icon: Zap,
-    title: "Instant Money Settlement",
+    icon: Send,
+    step: "01",
+    title: "Clear wallet transfers",
     description:
-      "Transfer money globally with zero latency. Direct settlement into local bank accounts within seconds.",
-    tag: "Real-time",
+      "Review the recipient, amount and transfer note before confirming a payment.",
+    detail:
+      "A guided review step keeps the most important information close to the final action.",
+    tag: "Send & receive",
+    tone: "bg-[#ded3ff]",
+  },
+  {
+    icon: Clock3,
+    step: "02",
+    title: "Visible transaction status",
+    description:
+      "Completed, pending and failed states remain easy to identify in your activity history.",
+    detail:
+      "Clear timestamps and status labels make every wallet movement easier to follow.",
+    tag: "Live status",
+    tone: "bg-[#ccf3e5]",
   },
   {
     icon: ShieldCheck,
-    title: "Bank-Grade Encryption",
+    step: "03",
+    title: "Verification-aware controls",
     description:
-      "256-bit SSL encryption and AI fraud detection keep every single micro-transaction 100% secure.",
-    tag: "PCI-DSS Level 1",
-  },
-  {
-    icon: Globe2,
-    title: "Multi-Currency Gateway",
-    description:
-      "Accept 130+ currencies with real-time exchange rates and transparent low transaction fees.",
-    tag: "Global Access",
+      "KYC status and protected actions stay connected, so the next required step is clear.",
+    detail:
+      "Users can see whether verification is ready, pending or needs another action.",
+    tag: "KYC journey",
+    tone: "bg-[#ffe5be]",
   },
   {
     icon: BarChart3,
-    title: "Smart Business Analytics",
+    step: "04",
+    title: "Useful wallet insights",
     description:
-      "Comprehensive financial insights, dynamic graphs, and downloadable monthly revenue reports.",
-    tag: "AI Powered",
+      "Balance, recent activity and account controls sit together in one focused dashboard.",
+    detail:
+      "A readable overview helps people understand their wallet without jumping between screens.",
+    tag: "Dashboard",
+    tone: "bg-[#d4e5ff]",
   },
 ];
 
 export function FeatureHighlights({
   rootRef,
-  visible,
 }: {
   rootRef: React.RefObject<HTMLDivElement | null>;
-  visible: boolean;
+  visible?: boolean;
 }) {
   return (
-    /* Top padding pt-0 এ সেট করা হয়েছে extra gap সরানোর জন্য */
-    <div ref={rootRef} className="w-full px-2 sm:px-6 lg:px-8 pt-0 pb-6 sm:pb-10">
-      {/* Header mb-6 sm:mb-10 করা হয়েছে */}
-      <div className={`text-center max-w-3xl mx-auto mb-6 sm:mb-10 lg:mb-12 space-y-3 sm:space-y-4 reveal ${visible ? "in" : ""}`}>
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/20 bg-primary/10 text-primary text-[11px] sm:text-xs font-semibold uppercase tracking-wider">
-          <Zap className="w-3.5 h-3.5 shrink-0" />
-          Next-Gen Payment Experience
-        </div>
-
-        <h2 className="text-2xl sm:text-4xl md:text-5xl font-extrabold tracking-tight leading-tight">
-          Designed for{" "}
-          <span className="bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-            lightning-fast
-          </span>{" "}
-          transactions
-        </h2>
-
-        <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-          Empower your digital finance with cutting-edge tools built for seamless payments, robust
-          security, and global scalability.
-        </p>
-      </div>
-
-      <FeatureStepper features={FEATURES} visible={visible} />
-    </div>
-  );
-}
-
-function FeatureStepper({ features, visible }: { features: Feature[]; visible: boolean }): ReactNode {
-  const [active, setActive] = useState(0);
-  const [paused, setPaused] = useState(false);
-  const AUTO_MS = 4200;
-
-  useEffect(() => {
-    if (paused || !visible) return;
-    const id = window.setInterval(() => {
-      setActive((prev) => (prev + 1) % features.length);
-    }, AUTO_MS);
-    return () => window.clearInterval(id);
-  }, [paused, visible, features.length]);
-
-  const handleSelect = (i: number) => {
-    setActive(i);
-    setPaused(true);
-    window.setTimeout(() => setPaused(false), 8000);
-  };
-
-  return (
-    <div
-      className={`grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 items-stretch max-w-6xl mx-auto reveal ${visible ? "in" : ""}`}
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
+    <section
+      id="features"
+      ref={rootRef}
+      className="scroll-mt-24 px-5 py-24 sm:px-8 lg:px-12 lg:py-32"
     >
-      {/* Left: Interactive Step Navigation List */}
-      <div className="space-y-2.5 sm:space-y-3.5 order-2 lg:order-1 flex flex-col justify-center">
-        {features.map((feature, i) => {
-          const isActive = i === active;
-          return (
-            <button
-              key={i}
-              type="button"
-              onClick={() => handleSelect(i)}
-              className={`relative w-full flex items-center justify-between gap-3 sm:gap-4 px-4 py-3 sm:px-6 sm:py-4 rounded-xl sm:rounded-2xl text-left overflow-hidden transition-all duration-300 ${
-                isActive
-                  ? "bg-primary text-primary-foreground shadow-lg scale-[1.01] sm:scale-[1.02]"
-                  : "bg-card border border-border/70 text-foreground hover:border-primary/40 active:scale-[0.99]"
-              }`}
-            >
-              <div className="min-w-0 flex-1">
-                <div className={`text-[10px] sm:text-[11px] font-semibold mb-0.5 sm:mb-1 ${isActive ? "opacity-80" : "text-muted-foreground"}`}>
-                  Step 0{i + 1}
-                </div>
-                <div className="font-semibold text-xs sm:text-sm md:text-base truncate">{feature.title}</div>
-              </div>
-
-              {isActive ? (
-                <ArrowRight className="w-4 h-4 shrink-0 ml-2" />
-              ) : (
-                <ArrowUpRight className="w-4 h-4 shrink-0 ml-2 text-muted-foreground" />
-              )}
-
-              {isActive && !paused && (
-                <span
-                  key={active}
-                  className="step-progress-fill absolute left-0 bottom-0 h-0.5 sm:h-1 bg-primary-foreground/80"
-                  style={{ animationDuration: `${AUTO_MS}ms` }}
-                />
-              )}
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Right: Responsive Filmstrip Visual Panel */}
-      <div className="order-1 lg:order-2 relative min-h-[300px] h-[320px] sm:h-[350px] lg:h-auto lg:min-h-[380px] rounded-2xl sm:rounded-3xl border border-border/80 bg-card overflow-hidden shadow-xl">
-        {features.map((feature, i) => {
-          const Icon = feature.icon;
-          const offset = (i - active) * 100;
-          return (
-            <div
-              key={i}
-              className="slide-panel-item absolute inset-0 p-5 sm:p-8 lg:p-10 flex flex-col justify-between transition-all duration-500 ease-out"
-              style={{
-                transform: `translateX(${offset}%)`,
-                opacity: i === active ? 1 : 0,
-                pointerEvents: i === active ? "auto" : "none",
-              }}
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div
-                  key={i === active ? `active-${active}` : i}
-                  className={`w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-primary/10 text-primary flex items-center justify-center shrink-0 ${
-                    i === active ? "icon-pop" : ""
-                  }`}
-                >
-                  <Icon className="w-6 h-6 sm:w-7 sm:h-7" />
-                </div>
-                <span className="text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-md sm:rounded-lg bg-muted text-muted-foreground border border-border shrink-0">
-                  {feature.tag}
-                </span>
-              </div>
-
-              <div className="my-auto py-4">
-                <h3 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 sm:mb-3 leading-tight">{feature.title}</h3>
-                <p className="text-muted-foreground text-xs sm:text-sm lg:text-base leading-relaxed max-w-md">
-                  {feature.description}
-                </p>
-              </div>
-
-              <div className="h-4" />
-            </div>
-          );
-        })}
-
-        {/* Bottom Indicator Dots */}
-        <div className="absolute bottom-4 right-5 sm:bottom-5 sm:right-6 flex items-center gap-1.5 z-10">
-          {features.map((_, i) => (
-            <button
-              key={i}
-              type="button"
-              onClick={() => handleSelect(i)}
-              aria-label={`Go to slide ${i + 1}`}
-              className={`h-1.5 rounded-full transition-all duration-300 ${
-                i === active ? "w-5 sm:w-6 bg-primary" : "w-1.5 bg-border hover:bg-muted-foreground/50"
-              }`}
+      <div className="mx-auto max-w-[1440px]">
+        <div className="grid gap-14 sm:grid-cols-2 xl:gap-16">
+          {features.map((feature, index) => (
+            <FeatureVisual
+              key={feature.title}
+              feature={feature}
+              index={index}
             />
           ))}
         </div>
       </div>
+    </section>
+  );
+}
+
+function FeatureVisual({
+  feature,
+  index,
+}: {
+  feature: (typeof features)[number];
+  index: number;
+}) {
+  const Icon = feature.icon;
+
+  const cardRef = useRef<HTMLElement>(null);
+  const circleRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const card = cardRef.current;
+    const circle = circleRef.current;
+    const content = contentRef.current;
+
+    if (!card || !circle || !content) return;
+
+    gsap.registerPlugin(ScrollTrigger);
+
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+
+    if (prefersReducedMotion) {
+      gsap.set(card, { clearProps: "all" });
+      gsap.set(content.children, { clearProps: "all" });
+      return;
+    }
+
+    const media = gsap.matchMedia();
+
+    const context = gsap.context(() => {
+      media.add("(min-width: 768px)", () => {
+        gsap.fromTo(
+          card,
+          {
+            autoAlpha: 0,
+            y: 120,
+            scale: 0.94,
+          },
+          {
+            autoAlpha: 1,
+            y: 0,
+            scale: 1,
+            duration: 1,
+            ease: "power3.out",
+            scrollTrigger: {
+              trigger: card,
+              start: "top 86%",
+              toggleActions: "play none none reverse",
+              invalidateOnRefresh: true,
+            },
+          }
+        );
+
+        gsap.fromTo(
+          content.children,
+          {
+            autoAlpha: 0,
+            y: 32,
+          },
+          {
+            autoAlpha: 1,
+            y: 0,
+            duration: 0.7,
+            stagger: 0.1,
+            ease: "power3.out",
+            scrollTrigger: {
+              trigger: card,
+              start: "top 72%",
+              toggleActions: "play none none reverse",
+            },
+          }
+        );
+
+        gsap.fromTo(
+          circle,
+          {
+            rotate: -35,
+            scale: 0.8,
+          },
+          {
+            rotate: 120,
+            scale: 1.12,
+            ease: "none",
+            scrollTrigger: {
+              trigger: card,
+              start: "top bottom",
+              end: "bottom top",
+              scrub: 1,
+              invalidateOnRefresh: true,
+            },
+          }
+        );
+      });
+
+      media.add("(max-width: 767px)", () => {
+        gsap.fromTo(
+          card,
+          {
+            autoAlpha: 0,
+            y: 55,
+          },
+          {
+            autoAlpha: 1,
+            y: 0,
+            duration: 0.75,
+            ease: "power3.out",
+            scrollTrigger: {
+              trigger: card,
+              start: "top 90%",
+              toggleActions: "play none none reverse",
+            },
+          }
+        );
+      });
+    }, card);
+
+    const refreshFrame = window.requestAnimationFrame(() => {
+      ScrollTrigger.refresh();
+    });
+
+    return () => {
+      window.cancelAnimationFrame(refreshFrame);
+      media.revert();
+      context.revert();
+    };
+  }, [index]);
+
+  return (
+    <article
+      ref={cardRef}
+      className={`group relative min-h-[680px] overflow-hidden rounded-[34px] border border-[#120d25]/10 p-8 shadow-[0_30px_90px_rgba(18,13,37,.09)] transition-shadow duration-500 hover:shadow-[0_40px_120px_rgba(18,13,37,.18)] xl:p-11 ${feature.tone}`}
+    >
+      <div
+        ref={circleRef}
+        aria-hidden="true"
+        className="absolute -right-28 -top-28 h-80 w-80 rounded-full border-[62px] border-white/35"
+      />
+
+      <div
+        ref={contentRef}
+        className="relative z-10 flex min-h-[590px] flex-col"
+      >
+        <div className="flex items-center justify-between">
+          <motion.span
+            whileHover={{
+              rotate: -8,
+              scale: 1.08,
+            }}
+            transition={{
+              type: "spring",
+              stiffness: 350,
+              damping: 18,
+            }}
+            className="grid h-14 w-14 place-items-center rounded-[20px] bg-white/75 shadow-sm backdrop-blur"
+          >
+            <Icon className="h-6 w-6" />
+          </motion.span>
+
+          <span className="rounded-full border border-[#120d25]/10 bg-white/55 px-3 py-1 text-[10px] font-black uppercase tracking-wider">
+            {feature.tag}
+          </span>
+        </div>
+
+        <div className="my-auto max-w-xl py-10">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#120d25]/40">
+            0{index + 1} / 04
+          </p>
+
+          <h3 className="mt-4 text-4xl font-black leading-[.98] tracking-[-0.055em] xl:text-5xl">
+            {feature.title}
+          </h3>
+
+          <p className="mt-5 text-sm leading-7 text-[#120d25]/60 xl:text-base">
+            {feature.detail}
+          </p>
+        </div>
+
+        <MockupStack feature={feature} index={index} />
+      </div>
+    </article>
+  );
+}
+
+function MockupStack({
+  feature,
+  index,
+}: {
+  feature: (typeof features)[number];
+  index: number;
+}) {
+  const stackRef = useRef<HTMLDivElement>(null);
+  const backRef = useRef<HTMLDivElement>(null);
+  const frontInnerRef = useRef<HTMLDivElement>(null);
+
+  const Icon = feature.icon;
+
+  useEffect(() => {
+    const stack = stackRef.current;
+    const back = backRef.current;
+    const front = frontInnerRef.current;
+
+    if (!stack || !back || !front) return;
+
+    const prefersReducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)"
+    ).matches;
+
+    if (prefersReducedMotion) return;
+
+    gsap.registerPlugin(ScrollTrigger);
+
+    const media = gsap.matchMedia();
+
+    const context = gsap.context(() => {
+      media.add("(min-width: 768px)", () => {
+        const timeline = gsap.timeline({
+          defaults: {
+            ease: "none",
+          },
+          scrollTrigger: {
+            trigger: stack,
+            start: "top 92%",
+            end: "bottom 12%",
+            scrub: 0.85,
+            invalidateOnRefresh: true,
+          },
+        });
+
+        timeline
+          .fromTo(
+            back,
+            {
+              y: 54,
+              rotate: -2.5,
+              scale: 0.96,
+            },
+            {
+              y: -28,
+              rotate: 0,
+              scale: 1,
+            },
+            0
+          )
+          .fromTo(
+            front,
+            {
+              y: 170,
+              rotate: 5,
+            },
+            {
+              y: -58,
+              rotate: -1,
+            },
+            0
+          );
+      });
+
+      media.add("(max-width: 767px)", () => {
+        gsap.fromTo(
+          front,
+          {
+            y: 95,
+          },
+          {
+            y: -20,
+            ease: "none",
+            scrollTrigger: {
+              trigger: stack,
+              start: "top bottom",
+              end: "bottom top",
+              scrub: 0.65,
+              invalidateOnRefresh: true,
+            },
+          }
+        );
+      });
+    }, stack);
+
+    const refreshFrame = window.requestAnimationFrame(() => {
+      ScrollTrigger.refresh();
+    });
+
+    return () => {
+      window.cancelAnimationFrame(refreshFrame);
+      media.revert();
+      context.revert();
+    };
+  }, [index]);
+
+  return (
+    <div
+      ref={stackRef}
+      className="relative mt-2 h-[300px] sm:h-[340px]"
+    >
+      <div
+        ref={backRef}
+        className="absolute left-0 top-0 w-[72%] will-change-transform"
+      >
+        <WalletMockup active={index} />
+      </div>
+
+      <motion.div
+        initial={{
+          opacity: 0,
+          scale: 0.9,
+        }}
+        whileInView={{
+          opacity: 1,
+          scale: 1,
+        }}
+        viewport={{
+          once: true,
+          amount: 0.4,
+        }}
+        transition={{
+          duration: 0.8,
+          delay: 0.15,
+          ease: [0.22, 1, 0.36, 1],
+        }}
+        whileHover={{
+          scale: 1.05,
+          transition: {
+            duration: 0.3,
+          },
+        }}
+        className="absolute -bottom-4 -right-2 w-[46%]"
+      >
+        <div
+          ref={frontInnerRef}
+          className="rounded-[22px] border border-white/70 bg-white/85 p-4 shadow-[0_20px_55px_rgba(18,13,37,.18)] backdrop-blur-xl will-change-transform"
+        >
+          <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#120d25]/5">
+            <Icon className="h-5 w-5" />
+          </span>
+
+          <p className="mt-3 text-[10px] font-black uppercase tracking-wider text-[#120d25]/45">
+            {feature.tag}
+          </p>
+
+          <p className="mt-1 text-xs font-black leading-tight">
+            Step {feature.step}
+          </p>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+function WalletMockup({ active }: { active: number }) {
+  if (active === 0) {
+    return (
+      <MockupShell label="Transfer review">
+        <div className="grid grid-cols-2 gap-3">
+          <MiniField label="Recipient" value="Nusrat Jahan" />
+
+          <MiniField
+            label="Amount"
+            value="BDT 1,250"
+            align="right"
+          />
+        </div>
+
+        <div className="mt-3 flex items-center justify-between rounded-2xl bg-[#120d25] p-4 text-white">
+          <span className="text-xs font-bold">
+            Ready to confirm
+          </span>
+
+          <ArrowRight className="h-4 w-4" />
+        </div>
+      </MockupShell>
+    );
+  }
+
+  if (active === 1) {
+    const statuses = [
+      {
+        status: "Completed",
+        amount: "4,500",
+      },
+      {
+        status: "Pending",
+        amount: "1,250",
+      },
+      {
+        status: "Completed",
+        amount: "780",
+      },
+    ];
+
+    return (
+      <MockupShell label="Recent activity">
+        {statuses.map((item, statusIndex) => (
+          <div
+            key={`${item.status}-${statusIndex}`}
+            className="flex items-center justify-between border-b border-[#120d25]/10 py-2.5 last:border-0"
+          >
+            <span className="flex items-center gap-2 text-xs font-bold">
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  item.status === "Pending"
+                    ? "bg-amber-400"
+                    : "bg-emerald-400"
+                }`}
+              />
+
+              {item.status}
+            </span>
+
+            <span className="text-xs font-black">
+              BDT {item.amount}
+            </span>
+          </div>
+        ))}
+      </MockupShell>
+    );
+  }
+
+  if (active === 2) {
+    return (
+      <MockupShell label="Identity verification">
+        <div className="flex items-center gap-3 rounded-2xl bg-white/70 p-4">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-amber-100 text-amber-700">
+            <FileCheck2 className="h-5 w-5" />
+          </span>
+
+          <div>
+            <p className="text-sm font-black">
+              Documents submitted
+            </p>
+
+            <p className="text-[10px] text-[#120d25]/45">
+              Review is currently pending
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/60">
+          <div className="h-full w-[68%] rounded-full bg-amber-400" />
+        </div>
+      </MockupShell>
+    );
+  }
+
+  return (
+    <MockupShell label="Wallet overview">
+      <div className="flex h-24 items-end gap-2">
+        {[38, 62, 45, 76, 54, 92, 70].map(
+          (height, barIndex) => (
+            <span
+              key={`${height}-${barIndex}`}
+              style={{
+                height: `${height}%`,
+              }}
+              className="flex-1 rounded-t-lg bg-violet-600/75"
+            />
+          )
+        )}
+      </div>
+    </MockupShell>
+  );
+}
+
+function MockupShell({
+  children,
+  label,
+}: {
+  children: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <div className="rounded-[26px] border border-white/70 bg-white/75 p-5 shadow-[0_24px_60px_rgba(18,13,37,.14)] backdrop-blur-xl">
+      <div className="mb-4 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.16em] text-[#120d25]/40">
+        <span>{label}</span>
+
+        <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_0_5px_rgba(52,211,153,.14)]" />
+      </div>
+
+      {children}
+    </div>
+  );
+}
+
+function MiniField({
+  label,
+  value,
+  align = "left",
+}: {
+  label: string;
+  value: string;
+  align?: "left" | "right";
+}) {
+  return (
+    <div
+      className={`rounded-2xl bg-white/70 p-4 ${
+        align === "right" ? "text-right" : ""
+      }`}
+    >
+      <p className="text-[10px] text-[#120d25]/45">
+        {label}
+      </p>
+
+      <p className="mt-1 text-sm font-black">
+        {value}
+      </p>
     </div>
   );
 }

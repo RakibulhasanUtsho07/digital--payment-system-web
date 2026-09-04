@@ -81,6 +81,18 @@ export default function DashboardLayout({
     useState(true);
 
   const [
+    errorMessage,
+    setErrorMessage,
+  ] =
+    useState("");
+
+  const [
+    retryKey,
+    setRetryKey,
+  ] =
+    useState(0);
+
+  const [
     mobileMenuOpen,
     setMobileMenuOpen,
   ] =
@@ -100,9 +112,17 @@ export default function DashboardLayout({
             true
           );
 
+          setErrorMessage(
+            ""
+          );
+
           const response =
-            await apiClient<ProfileResponse>(
-              "/users/profile"
+            await withTimeout(
+              apiClient<ProfileResponse>(
+                "/users/profile"
+              ),
+              12_000,
+              "Profile request timed out. Check that the backend is running on port 5000."
             );
 
           if (!mounted) {
@@ -155,29 +175,55 @@ export default function DashboardLayout({
             return;
           }
 
+          const message =
+            error instanceof Error
+              ? error.message
+              : "Unable to verify your account.";
+
+          setErrorMessage(
+            message
+          );
+
+          const normalizedMessage =
+            message.toLowerCase();
+
+          const isAuthenticationError =
+            normalizedMessage.includes("unauthorized") ||
+            normalizedMessage.includes("not authorized") ||
+            normalizedMessage.includes("authentication") ||
+            normalizedMessage.includes("invalid token") ||
+            normalizedMessage.includes("token failed") ||
+            normalizedMessage.includes("401");
+
           /* ===============================================
              CLEAR OLD CLIENT METADATA
           =============================================== */
 
-          localStorage.removeItem(
-            "auth_user"
-          );
+          if (isAuthenticationError) {
+            localStorage.removeItem(
+              "auth_user"
+            );
 
-          localStorage.removeItem(
-            "is_authenticated"
-          );
+            localStorage.removeItem(
+              "is_authenticated"
+            );
 
-          localStorage.removeItem(
-            "token"
-          );
+            localStorage.removeItem(
+              "token"
+            );
 
-          /* ===============================================
-             NOT AUTHENTICATED
-          =============================================== */
+            localStorage.removeItem(
+              "digital_wallet_token"
+            );
 
-          router.replace(
-            "/login"
-          );
+            /* ===============================================
+               NOT AUTHENTICATED
+            =============================================== */
+
+            router.replace(
+              "/login"
+            );
+          }
         } finally {
           if (mounted) {
             setLoading(
@@ -192,7 +238,7 @@ export default function DashboardLayout({
     return () => {
       mounted = false;
     };
-  }, [router]);
+  }, [router, retryKey]);
 
   /* =========================================================
      MOBILE SIDEBAR
@@ -354,6 +400,38 @@ export default function DashboardLayout({
               and permissions...
             </p>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* =========================================================
+     AUTH LOAD ERROR
+  ========================================================= */
+
+  if (errorMessage) {
+    return (
+      <div className="flex min-h-dvh w-full items-center justify-center bg-[#F4F7FB] px-4">
+        <div className="w-full max-w-md rounded-3xl border border-red-200 bg-white p-7 text-center shadow-sm">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-xl font-black text-red-600">
+            !
+          </div>
+
+          <h2 className="mt-4 text-xl font-extrabold text-slate-900">
+            Unable to verify account
+          </h2>
+
+          <p className="mt-2 text-sm leading-6 text-slate-500">
+            {errorMessage}
+          </p>
+
+          <button
+            type="button"
+            onClick={() => setRetryKey((current) => current + 1)}
+            className="mt-6 rounded-xl bg-[#1F5EA8] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#17466F]"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );
@@ -545,4 +623,27 @@ export default function DashboardLayout({
       </div>
     </div>
   );
+}
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = globalThis.setTimeout(() => {
+      reject(new Error(message));
+    }, timeoutMs);
+
+    promise.then(
+      (value) => {
+        globalThis.clearTimeout(timer);
+        resolve(value);
+      },
+      (error) => {
+        globalThis.clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
 }
