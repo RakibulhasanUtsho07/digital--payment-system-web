@@ -9,11 +9,7 @@ export type TicketStatus =
   | "Escalated"
   | "Resolved";
 
-export type TicketPriority =
-  | "Low"
-  | "Normal"
-  | "High"
-  | "Urgent";
+export type TicketPriority = "Low" | "Normal" | "High" | "Urgent";
 
 export type TicketCategory =
   | "Transfer"
@@ -54,10 +50,7 @@ export interface SupportTicketSummary {
   priority: TicketPriority;
   status: TicketStatus;
   waitingOn: "admin" | "customer" | "none";
-  assignee: {
-    id: string | null;
-    name: string;
-  };
+  assignee: { id: string | null; name: string };
   slaMinutes: number;
   slaBreached: boolean;
   lastActivityAt: string;
@@ -81,8 +74,7 @@ export interface SupportActivity {
   createdAt: string;
 }
 
-export interface SupportTicketDetail
-  extends SupportTicketSummary {
+export interface SupportTicketDetail extends SupportTicketSummary {
   description: string;
   relatedReference: string;
   tags: string[];
@@ -119,25 +111,28 @@ export interface CreateSupportTicketInput {
   tags?: string[];
 }
 
+const API_BASE = (
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api"
+).replace(/\/$/, "");
+
 const buildQuery = (
   values: Record<string, string | number | undefined>
-) => {
+): string => {
   const params = new URLSearchParams();
 
   Object.entries(values).forEach(([key, value]) => {
-    if (
-      value === undefined ||
-      value === "" ||
-      value === "All"
-    ) {
-      return;
-    }
-
+    if (value === undefined || value === "" || value === "All") return;
     params.set(key, String(value));
   });
 
   const query = params.toString();
   return query ? `?${query}` : "";
+};
+
+type TicketResponse = {
+  success: boolean;
+  message: string;
+  ticket: SupportTicketDetail;
 };
 
 export const supportApi = {
@@ -173,32 +168,17 @@ export const supportApi = {
   getAdmins: () =>
     apiClient<{
       success: boolean;
-      admins: Array<{
-        id: string;
-        name: string;
-      }>;
+      admins: Array<{ id: string; name: string }>;
     }>("/admin/support/admins"),
 
   getTicket: (ticketId: string) =>
-    apiClient<{
-      success: boolean;
-      ticket: SupportTicketDetail;
-    }>(
-      `/admin/support/tickets/${encodeURIComponent(
-        ticketId
-      )}`
+    apiClient<{ success: boolean; ticket: SupportTicketDetail }>(
+      `/admin/support/tickets/${encodeURIComponent(ticketId)}`
     ),
 
   createTicket: (payload: CreateSupportTicketInput) =>
-    apiClient<{
-      success: boolean;
-      message: string;
-      ticket: SupportTicketDetail;
-    }>("/admin/support/tickets", {
+    apiClient<TicketResponse>("/admin/support/tickets", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
       body: JSON.stringify(payload),
     }),
 
@@ -212,145 +192,68 @@ export const supportApi = {
       tags: string[];
     }>
   ) =>
-    apiClient<{
-      success: boolean;
-      message: string;
-      ticket: SupportTicketDetail;
-    }>(
-      `/admin/support/tickets/${encodeURIComponent(
-        ticketId
-      )}`,
-      {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      }
+    apiClient<TicketResponse>(
+      `/admin/support/tickets/${encodeURIComponent(ticketId)}`,
+      { method: "PATCH", body: JSON.stringify(payload) }
     ),
 
-  addReply: (
-    ticketId: string,
-    body: string
-  ) =>
-    apiClient<{
-      success: boolean;
-      message: string;
-      ticket: SupportTicketDetail;
-    }>(
-      `/admin/support/tickets/${encodeURIComponent(
-        ticketId
-      )}/messages`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ body }),
-      }
+  addReply: (ticketId: string, body: string) =>
+    apiClient<TicketResponse>(
+      `/admin/support/tickets/${encodeURIComponent(ticketId)}/messages`,
+      { method: "POST", body: JSON.stringify({ body }) }
     ),
 
-  addInternalNote: (
-    ticketId: string,
-    body: string
-  ) =>
-    apiClient<{
-      success: boolean;
-      message: string;
-      ticket: SupportTicketDetail;
-    }>(
-      `/admin/support/tickets/${encodeURIComponent(
-        ticketId
-      )}/notes`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ body }),
-      }
+  addInternalNote: (ticketId: string, body: string) =>
+    apiClient<TicketResponse>(
+      `/admin/support/tickets/${encodeURIComponent(ticketId)}/notes`,
+      { method: "POST", body: JSON.stringify({ body }) }
     ),
 
-  escalate: (
-    ticketId: string,
-    reason: string
-  ) =>
-    apiClient<{
-      success: boolean;
-      message: string;
-      ticket: SupportTicketDetail;
-    }>(
-      `/admin/support/tickets/${encodeURIComponent(
-        ticketId
-      )}/escalate`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ reason }),
-      }
+  escalate: (ticketId: string, reason: string) =>
+    apiClient<TicketResponse>(
+      `/admin/support/tickets/${encodeURIComponent(ticketId)}/escalate`,
+      { method: "POST", body: JSON.stringify({ reason }) }
     ),
 
-  resolve: (
-    ticketId: string,
-    resolution: string
-  ) =>
-    apiClient<{
-      success: boolean;
-      message: string;
-      ticket: SupportTicketDetail;
-    }>(
-      `/admin/support/tickets/${encodeURIComponent(
-        ticketId
-      )}/resolve`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ resolution }),
-      }
+  resolve: (ticketId: string, resolution: string) =>
+    apiClient<TicketResponse>(
+      `/admin/support/tickets/${encodeURIComponent(ticketId)}/resolve`,
+      { method: "POST", body: JSON.stringify({ resolution }) }
     ),
 
   async downloadExport(query: TicketListQuery = {}) {
-    const baseUrl =
-      process.env.NEXT_PUBLIC_API_URL ||
-      "http://localhost:5000/api";
-
     const response = await fetch(
-      `${baseUrl}/admin/support/export${buildQuery({
+      `${API_BASE}/admin/support/export${buildQuery({
         search: query.search,
         status: query.status,
         priority: query.priority,
         category: query.category,
         sla: query.sla,
       })}`,
-      {
-        credentials: "include",
-        cache: "no-store",
-      }
+      { credentials: "include", cache: "no-store" }
     );
 
     if (!response.ok) {
-      throw new Error(
-        "Unable to export support tickets."
-      );
+      let message = "Unable to export support tickets.";
+      try {
+        const data = (await response.json()) as { message?: string };
+        if (data.message) message = data.message;
+      } catch {
+        // Keep the safe fallback message for non-JSON responses.
+      }
+      throw new Error(message);
     }
 
     const blob = await response.blob();
     const url = window.URL.createObjectURL(blob);
     const anchor = document.createElement("a");
-
     anchor.href = url;
     anchor.download = `support-tickets-${new Date()
       .toISOString()
       .slice(0, 10)}.csv`;
-
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
-
     window.URL.revokeObjectURL(url);
   },
 };

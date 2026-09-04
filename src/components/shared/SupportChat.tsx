@@ -42,7 +42,7 @@ interface CreateSupportTicketResponse {
   message: string;
   ticket: {
     ticketNumber: string;
-    status: "open";
+    status: "Open";
     createdAt: string;
   };
 }
@@ -62,7 +62,7 @@ const initialMessages: ChatMessage[] = [
   {
     id: 1,
     sender: "support",
-    text: "Hi! Tell us what went wrong and choose the closest topic below. We’ll use this information to create a support request.",
+    text: "Hi! Choose the closest topic, describe what happened, and enter the email connected to your Coffer account.",
   },
 ];
 
@@ -100,10 +100,13 @@ export default function SupportChat() {
   }, [normalizedMessage]);
 
   const emailError = useMemo(() => {
-    if (!normalizedEmail) return "";
+    if (!normalizedEmail) {
+      return "Enter the email connected to your Coffer account.";
+    }
+
     return EMAIL_PATTERN.test(normalizedEmail)
       ? ""
-      : "Enter a valid email address or leave it blank.";
+      : "Enter a valid account email address.";
   }, [normalizedEmail]);
 
   const formValid = Boolean(category && !messageError && !emailError);
@@ -413,18 +416,20 @@ export default function SupportChat() {
 
                 <div>
                   <label htmlFor="support-email" className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
-                    Reply email <span className="font-medium normal-case tracking-normal text-slate-400">(optional)</span>
+                    Coffer account email
                   </label>
                   <input
                     id="support-email"
                     type="email"
+                    required
                     inputMode="email"
                     autoComplete="email"
                     value={email}
                     onBlur={() => setEmailTouched(true)}
                     onChange={(event) => setEmail(event.target.value)}
-                    placeholder="you@example.com"
+                    placeholder="account@example.com"
                     aria-invalid={emailTouched && Boolean(emailError)}
+                    aria-describedby="support-email-error"
                     className={`mt-2 h-11 w-full rounded-xl border bg-slate-50 px-3.5 text-xs text-slate-800 outline-none transition placeholder:text-slate-400 focus:bg-white focus:ring-4 ${
                       emailTouched && emailError
                         ? "border-red-300 focus:border-red-400 focus:ring-red-100"
@@ -433,7 +438,7 @@ export default function SupportChat() {
                   />
 
                   {emailTouched && emailError && (
-                    <p className="mt-1 text-[10px] font-semibold text-red-600">
+                    <p id="support-email-error" className="mt-1 text-[10px] font-semibold text-red-600">
                       {emailError}
                     </p>
                   )}
