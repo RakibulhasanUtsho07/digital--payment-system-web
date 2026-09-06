@@ -23,7 +23,6 @@ import {
   ArrowLeftRight,
   Bell,
   ChevronDown,
-  CircleUserRound,
   Command,
   FileCheck2,
   LayoutDashboard,
@@ -50,6 +49,7 @@ interface TopNavbarProps {
   userName: string;
   userEmail?: string;
   userRole: UserRole;
+  avatarUrl?: string;
 }
 
 interface SearchItem {
@@ -201,6 +201,59 @@ const pageTitles: Record<
 };
 
 /* =========================================================
+   AVATAR
+========================================================= */
+
+const getInitials = (name: string) => {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+};
+
+function ProfileAvatar({
+  avatarUrl,
+  name,
+  containerClassName,
+  textClassName = "text-[13px]",
+}: {
+  avatarUrl?: string;
+  name: string;
+  containerClassName: string;
+  textClassName?: string;
+}) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const showImage = Boolean(avatarUrl) && !imageFailed;
+
+  if (showImage) {
+    return (
+      <div
+        className={`${containerClassName} overflow-hidden bg-[#F1F5F8]`}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={avatarUrl}
+          alt={name}
+          referrerPolicy="no-referrer"
+          onError={() => setImageFailed(true)}
+          className="h-full w-full object-cover"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className={`${containerClassName} bg-gradient-to-br from-[#51B7FF] via-[#2C86D5] to-[#175590] font-black tracking-tight text-white ${textClassName}`}
+    >
+      {getInitials(name)}
+    </div>
+  );
+}
+
+/* =========================================================
    COMPONENT
 ========================================================= */
 
@@ -209,6 +262,7 @@ export default function TopNavbar({
   userName,
   userEmail = "",
   userRole,
+  avatarUrl,
 }: TopNavbarProps) {
   const router =
     useRouter();
@@ -974,31 +1028,21 @@ export default function TopNavbar({
                   hover:shadow-[0_7px_20px_rgba(31,94,168,0.07)]
                 "
               >
-                <div
-                  className="
+                <ProfileAvatar
+                  avatarUrl={avatarUrl}
+                  name={userName}
+                  containerClassName="
                     flex
                     h-[34px]
                     w-[34px]
                     shrink-0
                     items-center
                     justify-center
-
                     rounded-[11px]
-
-                    bg-[#155485]
-
-                    text-white
-
                     shadow-[0_4px_12px_rgba(21,84,133,0.18)]
                   "
-                >
-                  <CircleUserRound
-                    className="
-                      h-[17px]
-                      w-[17px]
-                    "
-                  />
-                </div>
+                  textClassName="text-[13px]"
+                />
 
                 <div
                   className="
@@ -1142,29 +1186,20 @@ export default function TopNavbar({
                             gap-3
                           "
                         >
-                          <div
-                            className="
+                          <ProfileAvatar
+                            avatarUrl={avatarUrl}
+                            name={userName}
+                            containerClassName="
                               flex
                               h-9
                               w-9
                               shrink-0
                               items-center
                               justify-center
-
                               rounded-[11px]
-
-                              bg-[#155485]
-
-                              text-white
                             "
-                          >
-                            <CircleUserRound
-                              className="
-                                h-[17px]
-                                w-[17px]
-                              "
-                            />
-                          </div>
+                            textClassName="text-[12px]"
+                          />
 
                           <div
                             className="
