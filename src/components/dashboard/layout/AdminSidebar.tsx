@@ -118,11 +118,17 @@ export default function AdminSidebar({
         min-h-0
         flex-col
         overflow-hidden
+
         border-r
-        border-white/[0.05]
-        bg-[#08111D]
-        text-slate-300
-        shadow-[15px_0_50px_rgba(2,8,18,0.16)]
+        border-sidebar-border
+
+        bg-sidebar
+        text-sidebar-foreground
+
+        shadow-[15px_0_50px_rgba(2,8,18,0.08)]
+
+        transition-colors
+        duration-300
       "
     >
       {/* =====================================================
@@ -138,9 +144,13 @@ export default function AdminSidebar({
           h-60
           w-60
           rounded-full
-          bg-indigo-500/[0.07]
           blur-[90px]
         "
+        style={{
+          background:
+            "var(--dashboard-primary)",
+          opacity: 0.07,
+        }}
       />
 
       <div
@@ -152,9 +162,13 @@ export default function AdminSidebar({
           h-60
           w-60
           rounded-full
-          bg-violet-500/[0.045]
           blur-[90px]
         "
+        style={{
+          background:
+            "var(--dashboard-primary)",
+          opacity: 0.045,
+        }}
       />
 
       {/* =====================================================
@@ -169,8 +183,10 @@ export default function AdminSidebar({
           h-[76px]
           shrink-0
           items-center
+
           border-b
-          border-white/[0.06]
+          border-sidebar-border
+
           px-5
         "
       >
@@ -201,15 +217,14 @@ export default function AdminSidebar({
               overflow-hidden
               rounded-[14px]
 
-              bg-gradient-to-br
-              from-[#6675FF]
-              via-[#5558DE]
-              to-[#733BC7]
-
               text-white
 
               shadow-[0_10px_30px_rgba(99,80,220,0.24)]
             "
+            style={{
+              background:
+                "linear-gradient(135deg, var(--dashboard-primary), color-mix(in srgb, var(--dashboard-primary) 60%, #6d28d9))",
+            }}
           >
             <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent" />
 
@@ -217,7 +232,7 @@ export default function AdminSidebar({
           </motion.div>
 
           <div className="min-w-0">
-            <h1 className="truncate text-[18px] font-black tracking-[-0.03em] text-white">
+            <h1 className="truncate text-[18px] font-black tracking-[-0.03em] text-sidebar-foreground">
               Admin Panel
             </h1>
 
@@ -227,12 +242,26 @@ export default function AdminSidebar({
                   h-1.5
                   w-1.5
                   rounded-full
-                  bg-indigo-400
                   shadow-[0_0_9px_rgba(129,140,248,0.9)]
                 "
+                style={{
+                  background:
+                    "var(--dashboard-primary)",
+                }}
               />
 
-              <span className="text-[8px] font-extrabold uppercase tracking-[0.22em] text-indigo-400">
+              <span
+                className="
+                  text-[8px]
+                  font-extrabold
+                  uppercase
+                  tracking-[0.22em]
+                "
+                style={{
+                  color:
+                    "var(--dashboard-primary)",
+                }}
+              >
                 System Control
               </span>
             </div>
@@ -272,7 +301,7 @@ export default function AdminSidebar({
               font-extrabold
               uppercase
               tracking-[0.18em]
-              text-slate-600
+              text-muted-foreground
             "
           >
             Management
@@ -286,7 +315,8 @@ export default function AdminSidebar({
 
               const active =
                 item.href === "/dashboard"
-                  ? pathname === "/dashboard"
+                  ? pathname ===
+                    "/dashboard"
                   : pathname.startsWith(
                       item.href
                     );
@@ -317,7 +347,7 @@ export default function AdminSidebar({
                 >
                   <Link
                     href={item.href}
-                    className={`
+                    className="
                       group
                       relative
 
@@ -336,17 +366,18 @@ export default function AdminSidebar({
                       text-[13px]
                       font-bold
 
-                      transition-colors
+                      transition-all
                       duration-300
-
-                      ${
-                        active
-                          ? "text-white"
-                          : "text-[#8393A7] hover:text-slate-100"
-                      }
-                    `}
+                    "
+                    style={{
+                      color: active
+                        ? "var(--dashboard-primary)"
+                        : "var(--muted-foreground)",
+                    }}
                   >
-                    {/* Active background */}
+                    {/* =================================================
+                        ACTIVE BACKGROUND
+                    ================================================== */}
 
                     {active && (
                       <motion.span
@@ -361,21 +392,21 @@ export default function AdminSidebar({
                           inset-0
 
                           rounded-[14px]
-
-                          border
-                          border-indigo-400/15
-
-                          bg-gradient-to-r
-                          from-[#1B2340]
-                          via-[#151D34]
-                          to-[#10192B]
-
-                          shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]
                         "
+                        style={{
+                          background:
+                            "var(--dashboard-primary-soft)",
+                          border:
+                            "1px solid var(--border)",
+                          boxShadow:
+                            "inset 0 1px 0 rgba(255,255,255,0.035)",
+                        }}
                       />
                     )}
 
-                    {/* Hover background */}
+                    {/* =================================================
+                        HOVER BACKGROUND
+                    ================================================== */}
 
                     {!active && (
                       <span
@@ -385,7 +416,7 @@ export default function AdminSidebar({
 
                           rounded-[14px]
 
-                          bg-white/[0.035]
+                          bg-foreground/[0.035]
 
                           opacity-0
 
@@ -397,7 +428,9 @@ export default function AdminSidebar({
                       />
                     )}
 
-                    {/* Active left glow */}
+                    {/* =================================================
+                        ACTIVE LEFT GLOW
+                    ================================================== */}
 
                     {active && (
                       <motion.span
@@ -413,21 +446,25 @@ export default function AdminSidebar({
                           -translate-y-1/2
 
                           rounded-r-full
-
-                          bg-indigo-400
-
-                          shadow-[0_0_15px_rgba(129,140,248,0.8)]
                         "
+                        style={{
+                          background:
+                            "var(--dashboard-primary)",
+                          boxShadow:
+                            "0 0 15px color-mix(in srgb, var(--dashboard-primary) 70%, transparent)",
+                        }}
                       />
                     )}
 
-                    {/* Icon */}
+                    {/* =================================================
+                        ICON
+                    ================================================== */}
 
                     <motion.span
                       whileHover={{
                         scale: 1.08,
                       }}
-                      className={`
+                      className="
                         relative
                         z-10
 
@@ -442,16 +479,27 @@ export default function AdminSidebar({
 
                         transition-all
                         duration-300
+                      "
+                      style={{
+                        background: active
+                          ? "var(--dashboard-primary-soft)"
+                          : "transparent",
 
-                        ${
-                          active
-                            ? "bg-indigo-500/15 text-indigo-300 shadow-[0_5px_16px_rgba(79,70,229,0.13)]"
-                            : "bg-transparent text-[#62758C] group-hover:bg-white/[0.045] group-hover:text-[#B6C4D3]"
-                        }
-                      `}
+                        color: active
+                          ? "var(--dashboard-primary)"
+                          : "var(--muted-foreground)",
+
+                        boxShadow: active
+                          ? "0 5px 16px color-mix(in srgb, var(--dashboard-primary) 12%, transparent)"
+                          : "none",
+                      }}
                     >
                       <Icon className="h-[18px] w-[18px]" />
                     </motion.span>
+
+                    {/* =================================================
+                        LABEL
+                    ================================================== */}
 
                     <span
                       className="
@@ -465,6 +513,10 @@ export default function AdminSidebar({
                       {item.label}
                     </span>
 
+                    {/* =================================================
+                        ACTIVE ARROW
+                    ================================================== */}
+
                     {active && (
                       <motion.span
                         initial={{
@@ -477,7 +529,13 @@ export default function AdminSidebar({
                         }}
                         className="relative z-10"
                       >
-                        <ChevronRight className="h-4 w-4 text-indigo-300" />
+                        <ChevronRight
+                          className="h-4 w-4"
+                          style={{
+                            color:
+                              "var(--dashboard-primary)",
+                          }}
+                        />
                       </motion.span>
                     )}
                   </Link>
@@ -501,9 +559,9 @@ export default function AdminSidebar({
           shrink-0
 
           border-t
-          border-white/[0.06]
+          border-sidebar-border
 
-          bg-[#060D16]/95
+          bg-sidebar
 
           p-3.5
 
@@ -534,13 +592,16 @@ export default function AdminSidebar({
 
             text-[13px]
             font-bold
-            text-[#78899D]
 
             transition-all
             duration-300
 
-            hover:text-rose-300
+            hover:text-rose-500
           "
+          style={{
+            color:
+              "var(--muted-foreground)",
+          }}
         >
           <span
             className="
@@ -573,8 +634,6 @@ export default function AdminSidebar({
 
               rounded-[11px]
 
-              text-[#67798F]
-
               transition-all
               duration-300
 
@@ -582,6 +641,10 @@ export default function AdminSidebar({
               group-hover:bg-rose-500/10
               group-hover:text-rose-400
             "
+            style={{
+              color:
+                "var(--muted-foreground)",
+            }}
           >
             <LogOut className="h-[18px] w-[18px]" />
           </span>

@@ -61,6 +61,51 @@ interface SearchItem {
 }
 
 /* =========================================================
+   FIXED COFFER BRAND PALETTE
+
+   Background stays theme-controlled (bg-card, var(--border),
+   etc. below). Only TEXT, labels, and icons use these colors,
+   so the reading experience matches the reference image's
+   navy -> indigo -> violet tone without changing the page's
+   light/dark background behavior.
+========================================================= */
+
+const BRAND = {
+  midnight: "#0f0c1b",
+  indigo: "#130f26",
+  violet: "#2e1f4f",
+  purple: "#3b2368",
+  highlight: "#5b3a8f",
+} as const;
+
+const BRAND_GRADIENT = `
+  linear-gradient(
+    135deg,
+    ${BRAND.midnight} 0%,
+    ${BRAND.indigo} 38%,
+    ${BRAND.violet} 68%,
+    ${BRAND.purple} 100%
+  )
+`;
+
+const BRAND_SOFT = `
+  linear-gradient(
+    135deg,
+    rgba(46, 31, 79, 0.10),
+    rgba(59, 35, 104, 0.12)
+  )
+`;
+
+/*
+ * Text colors derived from the same brand hue, at strengths
+ * that stay readable on the existing light theme background.
+ */
+const TEXT_STRONG = BRAND.violet;
+const TEXT_MUTED = "rgba(46, 31, 79, 0.6)";
+const TEXT_FAINT = "rgba(46, 31, 79, 0.4)";
+const ACCENT = BRAND.highlight;
+
+/* =========================================================
    SEARCH ITEMS
 ========================================================= */
 
@@ -71,7 +116,6 @@ const searchItems: SearchItem[] = [
     href: "/dashboard",
     icon: LayoutDashboard,
   },
-
   {
     id: "wallet",
     title: "Wallet",
@@ -79,7 +123,6 @@ const searchItems: SearchItem[] = [
     icon: WalletCards,
     roles: ["user"],
   },
-
   {
     id: "transactions",
     title: "Transactions",
@@ -87,7 +130,6 @@ const searchItems: SearchItem[] = [
     icon: ArrowLeftRight,
     roles: ["user"],
   },
-
   {
     id: "all-transactions",
     title: "System Transactions",
@@ -95,7 +137,6 @@ const searchItems: SearchItem[] = [
     icon: ArrowLeftRight,
     roles: ["admin"],
   },
-
   {
     id: "users",
     title: "User Management",
@@ -103,7 +144,6 @@ const searchItems: SearchItem[] = [
     icon: Users,
     roles: ["admin"],
   },
-
   {
     id: "kyc",
     title: "KYC Verification",
@@ -111,7 +151,6 @@ const searchItems: SearchItem[] = [
     icon: FileCheck2,
     roles: ["user"],
   },
-
   {
     id: "kyc-requests",
     title: "KYC Approvals",
@@ -119,7 +158,6 @@ const searchItems: SearchItem[] = [
     icon: ShieldCheck,
     roles: ["admin"],
   },
-
   {
     id: "analytics",
     title: "Analytics & Reports",
@@ -127,7 +165,6 @@ const searchItems: SearchItem[] = [
     icon: Activity,
     roles: ["admin"],
   },
-
   {
     id: "logs",
     title: "System Logs",
@@ -135,7 +172,6 @@ const searchItems: SearchItem[] = [
     icon: Activity,
     roles: ["admin"],
   },
-
   {
     id: "receipts",
     title: "Receipts",
@@ -143,7 +179,6 @@ const searchItems: SearchItem[] = [
     icon: ReceiptText,
     roles: ["user"],
   },
-
   {
     id: "settings",
     title: "Settings",
@@ -156,62 +191,53 @@ const searchItems: SearchItem[] = [
    PAGE TITLES
 ========================================================= */
 
-const pageTitles: Record<
-  string,
-  string
-> = {
-  "/dashboard":
-    "Dashboard Overview",
-
-  "/dashboard/wallet":
-    "Wallet",
-
-  "/dashboard/transactions":
-    "Transactions",
-
-  "/dashboard/all-transactions":
-    "System Transactions",
-
-  "/dashboard/users":
-    "User Management",
-
-  "/dashboard/kyc":
-    "KYC Verification",
-
-  "/dashboard/kyc-requests":
-    "KYC Management",
-
-  "/dashboard/analytics":
-    "Analytics & Reports",
-
-  "/dashboard/insights":
-    "AI Insights",
-
-  "/dashboard/logs":
-    "System Logs",
-
-  "/dashboard/receipts":
-    "Receipts",
-
-  "/dashboard/notifications":
-    "Notifications",
-
-  "/dashboard/settings":
-    "Settings",
+const pageTitles: Record<string, string> = {
+  "/dashboard": "Dashboard Overview",
+  "/dashboard/wallet": "Wallet",
+  "/dashboard/transactions": "Transactions",
+  "/dashboard/all-transactions": "System Transactions",
+  "/dashboard/users": "User Management",
+  "/dashboard/kyc": "KYC Verification",
+  "/dashboard/kyc-requests": "KYC Management",
+  "/dashboard/analytics": "Analytics & Reports",
+  "/dashboard/insights": "AI Insights",
+  "/dashboard/logs": "System Logs",
+  "/dashboard/receipts": "Receipts",
+  "/dashboard/notifications": "Notifications",
+  "/dashboard/settings": "Settings",
 };
 
 /* =========================================================
-   AVATAR
+   AVATAR HELPERS
 ========================================================= */
 
-const getInitials = (name: string) => {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
+const getInitials = (
+  name: string
+): string => {
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
 
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  if (parts.length === 0) {
+    return "?";
+  }
 
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  if (parts.length === 1) {
+    return parts[0]
+      .slice(0, 2)
+      .toUpperCase();
+  }
+
+  return (
+    parts[0][0] +
+    parts[parts.length - 1][0]
+  ).toUpperCase();
 };
+
+/* =========================================================
+   PROFILE AVATAR
+========================================================= */
 
 function ProfileAvatar({
   avatarUrl,
@@ -224,32 +250,75 @@ function ProfileAvatar({
   containerClassName: string;
   textClassName?: string;
 }) {
-  const [imageFailed, setImageFailed] = useState(false);
-  const showImage = Boolean(avatarUrl) && !imageFailed;
+  const [
+    imageFailed,
+    setImageFailed,
+  ] = useState(false);
+
+  const showImage =
+    Boolean(avatarUrl) &&
+    !imageFailed;
 
   if (showImage) {
     return (
       <div
-        className={`${containerClassName} overflow-hidden bg-[#F1F5F8]`}
+        className={`
+          relative
+          ${containerClassName}
+          overflow-hidden
+          border
+          border-border
+          bg-muted
+        `}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={avatarUrl}
           alt={name}
           referrerPolicy="no-referrer"
-          onError={() => setImageFailed(true)}
-          className="h-full w-full object-cover"
+          onError={() =>
+            setImageFailed(true)
+          }
+          className="
+            h-full
+            w-full
+            object-cover
+          "
         />
       </div>
     );
   }
 
   return (
-    <div
-      className={`${containerClassName} bg-gradient-to-br from-[#51B7FF] via-[#2C86D5] to-[#175590] font-black tracking-tight text-white ${textClassName}`}
+    <motion.div
+      initial={{
+        opacity: 0,
+        scale: 0.94,
+      }}
+      animate={{
+        opacity: 1,
+        scale: 1,
+      }}
+      transition={{
+        duration: 0.2,
+      }}
+      className={`
+        ${containerClassName}
+        ${textClassName}
+
+        font-black
+        tracking-tight
+        text-white
+      `}
+      style={{
+        background:
+          BRAND_GRADIENT,
+        boxShadow:
+          `0 6px 18px rgba(59,35,104,0.30)`,
+      }}
     >
       {getInitials(name)}
-    </div>
+    </motion.div>
   );
 }
 
@@ -290,26 +359,26 @@ export default function TopNavbar({
     setProfileOpen,
   ] = useState(false);
 
-  /* =========================================================
+  /* =======================================================
      PAGE TITLE
-  ========================================================== */
+  ======================================================= */
 
   const currentPageTitle =
-    pageTitles[pathname] ||
+    pageTitles[pathname] ??
     "Dashboard";
 
-  /* =========================================================
-     ROLE LABEL
-  ========================================================== */
+  /* =======================================================
+     ROLE
+  ======================================================= */
 
   const roleLabel =
     userRole === "admin"
       ? "Administrator"
       : "Wallet User";
 
-  /* =========================================================
-     SEARCH RESULTS
-  ========================================================== */
+  /* =======================================================
+     SEARCH FILTER
+  ======================================================= */
 
   const filteredItems =
     useMemo(() => {
@@ -345,40 +414,51 @@ export default function TopNavbar({
       userRole,
     ]);
 
-  /* =========================================================
+  /* =======================================================
      SEARCH OPEN
-  ========================================================== */
+  ======================================================= */
 
   const openSearch = () => {
-    setSearchOpen(true);
-    setProfileOpen(false);
+    setSearchOpen(
+      true
+    );
+
+    setProfileOpen(
+      false
+    );
   };
 
-  /* =========================================================
+  /* =======================================================
      SEARCH CLOSE
-  ========================================================== */
+  ======================================================= */
 
   const closeSearch = () => {
-    setSearchOpen(false);
-    setSearchQuery("");
+    setSearchOpen(
+      false
+    );
+
+    setSearchQuery(
+      ""
+    );
   };
 
-  /* =========================================================
+  /* =======================================================
      NAVIGATE
-  ========================================================== */
+  ======================================================= */
 
-  const navigateTo =
-    (href: string) => {
-      closeSearch();
+  const navigateTo = (
+    href: string
+  ) => {
+    closeSearch();
 
-      router.push(
-        href
-      );
-    };
+    router.push(
+      href
+    );
+  };
 
-  /* =========================================================
+  /* =======================================================
      KEYBOARD
-  ========================================================== */
+  ======================================================= */
 
   useEffect(() => {
     const handleKeyDown =
@@ -400,16 +480,26 @@ export default function TopNavbar({
               !current
           );
 
-          setProfileOpen(false);
+          setProfileOpen(
+            false
+          );
         }
 
         if (
           event.key ===
           "Escape"
         ) {
-          setSearchOpen(false);
-          setSearchQuery("");
-          setProfileOpen(false);
+          setSearchOpen(
+            false
+          );
+
+          setSearchQuery(
+            ""
+          );
+
+          setProfileOpen(
+            false
+          );
         }
       };
 
@@ -426,9 +516,9 @@ export default function TopNavbar({
     };
   }, []);
 
-  /* =========================================================
+  /* =======================================================
      AUTO FOCUS
-  ========================================================== */
+  ======================================================= */
 
   useEffect(() => {
     if (!searchOpen) {
@@ -443,18 +533,17 @@ export default function TopNavbar({
         100
       );
 
-    return () => {
+    return () =>
       window.clearTimeout(
         timer
       );
-    };
   }, [
     searchOpen,
   ]);
 
-  /* =========================================================
+  /* =======================================================
      UI
-  ========================================================== */
+  ======================================================= */
 
   return (
     <>
@@ -491,13 +580,18 @@ export default function TopNavbar({
           items-center
 
           border-b
-          border-[#E5ECF4]
+          border-border
 
-          bg-white/95
+          bg-card/95
+
+          text-card-foreground
 
           px-4
 
           backdrop-blur-xl
+
+          transition-colors
+          duration-300
 
           sm:px-5
           lg:px-7
@@ -510,12 +604,11 @@ export default function TopNavbar({
             min-w-0
             items-center
             gap-4
-
             xl:gap-6
           "
         >
           {/* =================================================
-              LEFT
+              LEFT / PAGE INFO
           ================================================== */}
 
           <div
@@ -525,7 +618,6 @@ export default function TopNavbar({
               shrink-0
               items-center
               gap-3
-
               lg:w-[190px]
               xl:w-[210px]
             "
@@ -534,10 +626,11 @@ export default function TopNavbar({
 
             <motion.button
               type="button"
-              aria-label="Open sidebar"
-              onClick={
-                onMenuClick
-              }
+              aria-label="Open menu"
+              onClick={onMenuClick}
+              whileHover={{
+                scale: 1.03,
+              }}
               whileTap={{
                 scale: 0.92,
               }}
@@ -548,63 +641,46 @@ export default function TopNavbar({
                 shrink-0
                 items-center
                 justify-center
-
                 rounded-xl
-
                 border
-                border-[#DDE6EF]
-
-                bg-white
-
-                text-[#52677D]
-
-                shadow-[0_3px_10px_rgba(15,39,69,0.04)]
-
+                border-border
+                bg-card
+                shadow-sm
                 transition-all
-
-                hover:border-[#BAD3EA]
-                hover:bg-[#F4F9FE]
-                hover:text-[#1F5EA8]
-
+                hover:bg-muted
                 lg:hidden
               "
             >
               <Menu
-                className="
-                  h-[18px]
-                  w-[18px]
-                "
+                className="h-[18px] w-[18px]"
+                style={{
+                  color: TEXT_STRONG,
+                }}
               />
             </motion.button>
 
             {/* PAGE INFO */}
 
-            <div
-              className="
-                min-w-0
-              "
-            >
+            <div className="min-w-0">
               <div
                 className="
                   hidden
                   items-center
                   gap-2
-
                   sm:flex
                 "
               >
                 <span
                   className="
                     whitespace-nowrap
-
                     text-[9px]
                     font-extrabold
                     uppercase
-
                     tracking-[0.17em]
-
-                    text-[#8798AC]
                   "
+                  style={{
+                    color: TEXT_MUTED,
+                  }}
                 >
                   Digital Wallet
                 </span>
@@ -614,25 +690,26 @@ export default function TopNavbar({
                     h-1
                     w-1
                     shrink-0
-
                     rounded-full
-
-                    bg-[#CBD7E2]
                   "
+                  style={{
+                    background:
+                      BRAND.purple,
+                  }}
                 />
 
                 <span
                   className="
                     whitespace-nowrap
-
                     text-[9px]
                     font-extrabold
                     uppercase
-
                     tracking-[0.17em]
-
-                    text-[#226AB0]
                   "
+                  style={{
+                    color:
+                      ACCENT,
+                  }}
                 >
                   {userRole ===
                   "admin"
@@ -644,20 +721,19 @@ export default function TopNavbar({
               <h1
                 className="
                   mt-[3px]
-
                   truncate
-
                   text-[15px]
                   font-extrabold
-
                   tracking-[-0.025em]
-
-                  text-[#122F49]
-
                   sm:text-[16px]
                 "
+                style={{
+                  color: TEXT_STRONG,
+                }}
               >
-                {currentPageTitle}
+                {
+                  currentPageTitle
+                }
               </h1>
             </div>
           </div>
@@ -672,7 +748,6 @@ export default function TopNavbar({
               min-w-0
               flex-1
               justify-center
-
               md:flex
             "
           >
@@ -681,12 +756,14 @@ export default function TopNavbar({
               onClick={
                 openSearch
               }
+              whileHover={{
+                y: -1,
+              }}
               whileTap={{
                 scale: 0.995,
               }}
               className="
                 group
-
                 flex
                 h-[44px]
                 w-full
@@ -697,25 +774,24 @@ export default function TopNavbar({
                 rounded-[16px]
 
                 border
-                border-[#DFE8F1]
+                border-border
 
-                bg-[#F8FAFC]
+                bg-muted/40
 
                 px-3
 
                 text-left
 
-                shadow-[0_3px_14px_rgba(20,48,78,0.035)]
+                shadow-sm
 
                 transition-all
                 duration-200
 
-                hover:border-[#C6DBEF]
-                hover:bg-white
-
-                hover:shadow-[0_8px_25px_rgba(31,94,168,0.07)]
+                hover:bg-card
               "
             >
+              {/* Search icon */}
+
               <span
                 className="
                   flex
@@ -728,24 +804,24 @@ export default function TopNavbar({
                   rounded-[11px]
 
                   border
-                  border-[#E5EBF1]
+                  border-border
 
-                  bg-white
+                  bg-card
 
-                  text-[#8293A6]
-
-                  shadow-[0_2px_6px_rgba(15,39,69,0.04)]
+                  shadow-sm
 
                   transition
-
-                  group-hover:text-[#1F5EA8]
                 "
               >
                 <Search
                   className="
                     h-[16px]
                     w-[16px]
+                    transition-colors
                   "
+                  style={{
+                    color: ACCENT,
+                  }}
                 />
               </span>
 
@@ -757,9 +833,10 @@ export default function TopNavbar({
 
                   text-[12px]
                   font-medium
-
-                  text-[#91A0B1]
                 "
+                style={{
+                  color: TEXT_MUTED,
+                }}
               >
                 Search transactions,
                 users, wallet,
@@ -776,9 +853,9 @@ export default function TopNavbar({
                   rounded-[8px]
 
                   border
-                  border-[#E0E7EE]
+                  border-border
 
-                  bg-white
+                  bg-card
 
                   px-2
                   py-1
@@ -786,18 +863,13 @@ export default function TopNavbar({
                   text-[9px]
                   font-bold
 
-                  text-[#8B9AAC]
-
                   shadow-sm
                 "
+                style={{
+                  color: TEXT_MUTED,
+                }}
               >
-                <Command
-                  className="
-                    h-3
-                    w-3
-                  "
-                />
-
+                <Command className="h-3 w-3" />
                 K
               </span>
             </motion.button>
@@ -810,7 +882,6 @@ export default function TopNavbar({
           <div
             className="
               ml-auto
-
               flex
               shrink-0
               items-center
@@ -825,6 +896,9 @@ export default function TopNavbar({
               onClick={
                 openSearch
               }
+              whileHover={{
+                scale: 1.03,
+              }}
               whileTap={{
                 scale: 0.92,
               }}
@@ -838,16 +912,15 @@ export default function TopNavbar({
                 rounded-xl
 
                 border
-                border-[#DDE6EF]
+                border-border
 
-                bg-white
+                bg-card
 
-                text-[#61768B]
+                shadow-sm
 
                 transition-all
 
-                hover:border-[#BDD5EA]
-                hover:text-[#1F5EA8]
+                hover:bg-muted
 
                 md:hidden
               "
@@ -857,13 +930,15 @@ export default function TopNavbar({
                   h-[17px]
                   w-[17px]
                 "
+                style={{
+                  color: ACCENT,
+                }}
               />
             </motion.button>
 
-            {/* ===============================================
+            {/* =================================================
                 AI INSIGHTS
-                NO ICON
-            =============================================== */}
+            ================================================== */}
 
             <motion.button
               type="button"
@@ -872,46 +947,73 @@ export default function TopNavbar({
                   "/dashboard/insights"
                 )
               }
+              whileHover={{
+                y: -2,
+              }}
               whileTap={{
                 scale: 0.96,
               }}
               className="
+                relative
                 hidden
                 h-10
                 items-center
                 justify-center
 
+                overflow-hidden
+
                 rounded-[13px]
 
                 border
-                border-[#CCE2F7]
-
-                bg-[#F0F7FE]
 
                 px-4
 
                 text-[10px]
                 font-extrabold
 
-                text-[#2168A8]
-
-                shadow-[0_3px_12px_rgba(31,94,168,0.035)]
+                shadow-sm
 
                 transition-all
                 duration-200
 
-                hover:border-[#B6D5F2]
-                hover:bg-[#E8F4FF]
-
                 sm:flex
               "
+              style={{
+                background:
+                  BRAND_SOFT,
+
+                borderColor:
+                  "rgba(59,35,104,0.18)",
+
+                color:
+                  ACCENT,
+              }}
             >
-              AI Insights
+              <span
+                className="
+                  pointer-events-none
+                  absolute
+                  inset-0
+                "
+                style={{
+                  background:
+                    "linear-gradient(135deg, rgba(255,255,255,.08), transparent)",
+                }}
+              />
+
+              <span
+                className="
+                  relative
+                  z-10
+                "
+              >
+                AI Insights
+              </span>
             </motion.button>
 
-            {/* ===============================================
+            {/* =================================================
                 NOTIFICATION
-            =============================================== */}
+            ================================================== */}
 
             <motion.button
               type="button"
@@ -921,6 +1023,9 @@ export default function TopNavbar({
                   "/dashboard/notifications"
                 )
               }
+              whileHover={{
+                y: -1,
+              }}
               whileTap={{
                 scale: 0.92,
               }}
@@ -936,20 +1041,16 @@ export default function TopNavbar({
                 rounded-[13px]
 
                 border
-                border-[#DDE6EF]
+                border-border
 
-                bg-white
+                bg-card
 
-                text-[#60758A]
-
-                shadow-[0_3px_10px_rgba(15,39,69,0.035)]
+                shadow-sm
 
                 transition-all
                 duration-200
 
-                hover:border-[#BDD5EA]
-                hover:bg-[#F8FBFE]
-                hover:text-[#1F5EA8]
+                hover:bg-muted
               "
             >
               <Bell
@@ -957,6 +1058,9 @@ export default function TopNavbar({
                   h-[16px]
                   w-[16px]
                 "
+                style={{
+                  color: ACCENT,
+                }}
               />
 
               <span
@@ -964,29 +1068,23 @@ export default function TopNavbar({
                   absolute
                   right-[8px]
                   top-[7px]
-
                   h-[6px]
                   w-[6px]
-
                   rounded-full
-
                   bg-rose-500
-
-                  ring-2
-                  ring-white
                 "
+                style={{
+                  boxShadow:
+                    "0 0 0 2px var(--card)",
+                }}
               />
             </motion.button>
 
-            {/* ===============================================
+            {/* =================================================
                 PROFILE
-            =============================================== */}
+            ================================================== */}
 
-            <div
-              className="
-                relative
-              "
-            >
+            <div className="relative">
               <motion.button
                 type="button"
                 onClick={() => {
@@ -998,6 +1096,9 @@ export default function TopNavbar({
                   setSearchOpen(
                     false
                   );
+                }}
+                whileHover={{
+                  y: -1,
                 }}
                 whileTap={{
                   scale: 0.98,
@@ -1011,26 +1112,28 @@ export default function TopNavbar({
                   rounded-[15px]
 
                   border
-                  border-[#DDE6EF]
+                  border-border
 
-                  bg-white
+                  bg-card
 
                   p-[5px]
                   pr-2.5
 
-                  shadow-[0_3px_12px_rgba(15,39,69,0.045)]
+                  shadow-sm
 
                   transition-all
                   duration-200
 
-                  hover:border-[#BCD3E8]
-
-                  hover:shadow-[0_7px_20px_rgba(31,94,168,0.07)]
+                  hover:bg-muted
                 "
               >
                 <ProfileAvatar
-                  avatarUrl={avatarUrl}
-                  name={userName}
+                  avatarUrl={
+                    avatarUrl
+                  }
+                  name={
+                    userName
+                  }
                   containerClassName="
                     flex
                     h-[34px]
@@ -1039,7 +1142,6 @@ export default function TopNavbar({
                     items-center
                     justify-center
                     rounded-[11px]
-                    shadow-[0_4px_12px_rgba(21,84,133,0.18)]
                   "
                   textClassName="text-[13px]"
                 />
@@ -1049,37 +1151,39 @@ export default function TopNavbar({
                     hidden
                     max-w-[120px]
                     text-left
-
                     lg:block
                   "
                 >
                   <p
                     className="
                       truncate
-
                       text-[10px]
                       font-extrabold
-
-                      text-[#263C52]
                     "
+                    style={{
+                      color: TEXT_STRONG,
+                    }}
                   >
-                    {userName}
+                    {
+                      userName
+                    }
                   </p>
 
                   <p
                     className="
                       mt-[1px]
-
                       text-[7.5px]
                       font-extrabold
                       uppercase
-
                       tracking-[0.08em]
-
-                      text-[#9AA8B7]
                     "
+                    style={{
+                      color: TEXT_FAINT,
+                    }}
                   >
-                    {roleLabel}
+                    {
+                      roleLabel
+                    }
                   </p>
                 </div>
 
@@ -1088,12 +1192,8 @@ export default function TopNavbar({
                     hidden
                     h-[14px]
                     w-[14px]
-
-                    text-[#93A2B2]
-
                     transition-transform
                     duration-200
-
                     lg:block
 
                     ${
@@ -1102,12 +1202,15 @@ export default function TopNavbar({
                         : ""
                     }
                   `}
+                  style={{
+                    color: TEXT_FAINT,
+                  }}
                 />
               </motion.button>
 
-              {/* =============================================
+              {/* =================================================
                   PROFILE DROPDOWN
-              ============================================== */}
+              ================================================== */}
 
               <AnimatePresence>
                 {profileOpen && (
@@ -1124,7 +1227,6 @@ export default function TopNavbar({
                         fixed
                         inset-0
                         z-40
-
                         cursor-default
                       "
                     />
@@ -1146,49 +1248,47 @@ export default function TopNavbar({
                         scale: 0.98,
                       }}
                       transition={{
-                        duration: 0.16,
+                        duration:
+                          0.16,
                       }}
                       className="
                         absolute
                         right-0
                         top-[52px]
                         z-50
-
                         w-[240px]
-
                         overflow-hidden
-
                         rounded-[18px]
-
                         border
-                        border-[#E2EAF2]
-
-                        bg-white
-
+                        border-border
+                        bg-card
                         p-2
-
-                        shadow-[0_22px_60px_rgba(15,39,69,0.16)]
+                        shadow-2xl
                       "
                     >
+                      {/* USER INFO */}
+
                       <div
                         className="
                           rounded-[14px]
-
-                          bg-[#F6F9FC]
-
                           p-3
                         "
+                        style={{
+                          background:
+                            BRAND_SOFT,
+
+                          border:
+                            "1px solid rgba(59,35,104,0.14)",
+                        }}
                       >
-                        <div
-                          className="
-                            flex
-                            items-center
-                            gap-3
-                          "
-                        >
+                        <div className="flex items-center gap-3">
                           <ProfileAvatar
-                            avatarUrl={avatarUrl}
-                            name={userName}
+                            avatarUrl={
+                              avatarUrl
+                            }
+                            name={
+                              userName
+                            }
                             containerClassName="
                               flex
                               h-9
@@ -1201,22 +1301,20 @@ export default function TopNavbar({
                             textClassName="text-[12px]"
                           />
 
-                          <div
-                            className="
-                              min-w-0
-                            "
-                          >
+                          <div className="min-w-0">
                             <p
                               className="
                                 truncate
-
                                 text-[11px]
                                 font-extrabold
-
-                                text-[#18324A]
                               "
+                              style={{
+                                color: TEXT_STRONG,
+                              }}
                             >
-                              {userName}
+                              {
+                                userName
+                              }
                             </p>
 
                             {userEmail && (
@@ -1224,11 +1322,11 @@ export default function TopNavbar({
                                 className="
                                   mt-0.5
                                   truncate
-
                                   text-[9px]
-
-                                  text-[#8797A8]
                                 "
+                                style={{
+                                  color: TEXT_MUTED,
+                                }}
                               >
                                 {
                                   userEmail
@@ -1239,21 +1337,25 @@ export default function TopNavbar({
                             <p
                               className="
                                 mt-1
-
                                 text-[8px]
                                 font-extrabold
                                 uppercase
-
                                 tracking-[0.1em]
-
-                                text-[#2A72B5]
                               "
+                              style={{
+                                color:
+                                  ACCENT,
+                              }}
                             >
-                              {roleLabel}
+                              {
+                                roleLabel
+                              }
                             </p>
                           </div>
                         </div>
                       </div>
+
+                      {/* SETTINGS */}
 
                       <button
                         type="button"
@@ -1280,22 +1382,27 @@ export default function TopNavbar({
                           py-2.5
 
                           text-left
+
                           text-[11px]
                           font-bold
 
-                          text-[#53687C]
-
                           transition
 
-                          hover:bg-[#F4F8FC]
-                          hover:text-[#1F5EA8]
+                          hover:bg-muted
                         "
+                        style={{
+                          color: TEXT_MUTED,
+                        }}
                       >
                         <Settings
                           className="
                             h-[15px]
                             w-[15px]
                           "
+                          style={{
+                            color:
+                              ACCENT,
+                          }}
                         />
 
                         Account Settings
@@ -1310,7 +1417,7 @@ export default function TopNavbar({
       </motion.header>
 
       {/* =====================================================
-          SIMPLE SEARCH MODAL
+          SEARCH MODAL
       ====================================================== */}
 
       <AnimatePresence>
@@ -1337,7 +1444,7 @@ export default function TopNavbar({
               items-start
               justify-center
 
-              bg-[#09192A]/40
+              bg-black/40
 
               px-3
               pt-[12vh]
@@ -1379,6 +1486,7 @@ export default function TopNavbar({
                 event.stopPropagation()
               }
               className="
+                relative
                 w-full
                 max-w-[600px]
 
@@ -1387,16 +1495,34 @@ export default function TopNavbar({
                 rounded-[22px]
 
                 border
-                border-[#DFE8F1]
+                border-border
 
-                bg-white
+                bg-card
 
-                shadow-[0_30px_90px_rgba(8,27,45,0.24)]
+                shadow-2xl
               "
+              style={{
+                boxShadow:
+                  "0 30px 90px rgba(15,12,27,0.30)",
+              }}
             >
-              {/* =============================================
-                  SEARCH FIELD
-              ============================================== */}
+              {/* TOP BRAND LINE */}
+
+              <span
+                className="
+                  pointer-events-none
+                  absolute
+                  inset-x-10
+                  top-0
+                  h-px
+                "
+                style={{
+                  background:
+                    BRAND_GRADIENT,
+                }}
+              />
+
+              {/* SEARCH FIELD */}
 
               <div
                 className="
@@ -1405,7 +1531,7 @@ export default function TopNavbar({
                   gap-3
 
                   border-b
-                  border-[#E8EEF4]
+                  border-border
 
                   px-4
                   py-3.5
@@ -1418,9 +1544,10 @@ export default function TopNavbar({
                     h-[18px]
                     w-[18px]
                     shrink-0
-
-                    text-[#6C8095]
                   "
+                  style={{
+                    color: ACCENT,
+                  }}
                 />
 
                 <input
@@ -1450,17 +1577,17 @@ export default function TopNavbar({
                     text-[14px]
                     font-semibold
 
-                    text-[#18324A]
-
                     outline-none
 
                     placeholder:font-medium
-                    placeholder:text-[#9BA9B8]
                   "
+                  style={{
+                    color: TEXT_STRONG,
+                  }}
                 />
 
                 {searchQuery && (
-                  <button
+                  <motion.button
                     type="button"
                     aria-label="Clear search"
                     onClick={() =>
@@ -1468,6 +1595,10 @@ export default function TopNavbar({
                         ""
                       )
                     }
+                    whileTap={{
+                      scale:
+                        0.9,
+                    }}
                     className="
                       flex
                       h-8
@@ -1475,15 +1606,9 @@ export default function TopNavbar({
                       shrink-0
                       items-center
                       justify-center
-
                       rounded-lg
-
-                      text-[#8696A7]
-
                       transition
-
-                      hover:bg-[#F1F5F9]
-                      hover:text-[#334155]
+                      hover:bg-muted
                     "
                   >
                     <X
@@ -1491,36 +1616,29 @@ export default function TopNavbar({
                         h-[15px]
                         w-[15px]
                       "
+                      style={{
+                        color:
+                          ACCENT,
+                      }}
                     />
-                  </button>
+                  </motion.button>
                 )}
               </div>
 
-              {/* =============================================
-                  RESULT LIST
-              ============================================== */}
+              {/* RESULT LIST */}
 
               <div
                 className="
                   max-h-[360px]
                   overflow-y-auto
-
                   p-2.5
 
                   [scrollbar-width:thin]
-
-                  [&::-webkit-scrollbar]:w-1
-                  [&::-webkit-scrollbar-thumb]:rounded-full
-                  [&::-webkit-scrollbar-thumb]:bg-[#DCE5ED]
                 "
               >
                 {filteredItems.length >
                 0 ? (
-                  <div
-                    className="
-                      space-y-1
-                    "
-                  >
+                  <div className="space-y-1">
                     {filteredItems.map(
                       (
                         item,
@@ -1550,19 +1668,20 @@ export default function TopNavbar({
                             transition={{
                               duration:
                                 0.18,
-
                               delay:
                                 index *
                                 0.015,
+                            }}
+                            whileHover={{
+                              x: 2,
                             }}
                             onClick={() =>
                               navigateTo(
                                 item.href
                               )
                             }
-                            className={`
+                            className="
                               group
-
                               flex
                               w-full
                               items-center
@@ -1578,15 +1697,23 @@ export default function TopNavbar({
                               transition-all
                               duration-150
 
-                              ${
+                              hover:bg-muted
+                            "
+                            style={{
+                              background:
                                 active
-                                  ? "bg-[#EEF6FD]"
-                                  : "hover:bg-[#F5F8FB]"
-                              }
-                            `}
+                                  ? BRAND_SOFT
+                                  : undefined,
+                            }}
                           >
-                            <span
-                              className={`
+                            {/* ICON */}
+
+                            <motion.span
+                              whileHover={{
+                                scale:
+                                  1.05,
+                              }}
+                              className="
                                 flex
                                 h-9
                                 w-9
@@ -1595,15 +1722,23 @@ export default function TopNavbar({
                                 justify-center
 
                                 rounded-[10px]
-
-                                transition
-
-                                ${
+                              "
+                              style={{
+                                background:
                                   active
-                                    ? "bg-[#1F5EA8] text-white"
-                                    : "bg-[#F1F5F8] text-[#667A8F] group-hover:bg-white group-hover:text-[#1F5EA8]"
-                                }
-                              `}
+                                    ? BRAND_GRADIENT
+                                    : "var(--muted)",
+
+                                color:
+                                  active
+                                    ? "#ffffff"
+                                    : TEXT_MUTED,
+
+                                boxShadow:
+                                  active
+                                    ? "0 7px 18px rgba(59,35,104,0.25)"
+                                    : undefined,
+                              }}
                             >
                               <Icon
                                 className="
@@ -1611,50 +1746,61 @@ export default function TopNavbar({
                                   w-[16px]
                                 "
                               />
-                            </span>
+                            </motion.span>
+
+                            {/* TITLE */}
 
                             <span
-                              className={`
+                              className="
                                 truncate
-
                                 text-[12px]
                                 font-bold
-
-                                ${
+                              "
+                              style={{
+                                color:
                                   active
-                                    ? "text-[#1F5EA8]"
-                                    : "text-[#31485D]"
-                                }
-                              `}
+                                    ? ACCENT
+                                    : TEXT_STRONG,
+                              }}
                             >
                               {
                                 item.title
                               }
                             </span>
 
+                            {/* CURRENT */}
+
                             {active && (
-                              <span
+                              <motion.span
+                                initial={{
+                                  opacity: 0,
+                                  scale:
+                                    0.8,
+                                }}
+                                animate={{
+                                  opacity: 1,
+                                  scale: 1,
+                                }}
                                 className="
                                   ml-auto
-
                                   rounded-full
-
-                                  bg-[#DCEEFF]
-
                                   px-2
                                   py-0.5
-
                                   text-[8px]
                                   font-extrabold
                                   uppercase
-
                                   tracking-wider
-
-                                  text-[#1F5EA8]
                                 "
+                                style={{
+                                  background:
+                                    "rgba(46,31,79,0.10)",
+
+                                  color:
+                                    ACCENT,
+                                }}
                               >
                                 Current
-                              </span>
+                              </motion.span>
                             )}
                           </motion.button>
                         );
@@ -1662,16 +1808,22 @@ export default function TopNavbar({
                     )}
                   </div>
                 ) : (
-                  <div
+                  <motion.div
+                    initial={{
+                      opacity: 0,
+                      y: 6,
+                    }}
+                    animate={{
+                      opacity: 1,
+                      y: 0,
+                    }}
                     className="
                       flex
                       min-h-[170px]
                       flex-col
                       items-center
                       justify-center
-
                       px-5
-
                       text-center
                     "
                   >
@@ -1682,13 +1834,15 @@ export default function TopNavbar({
                         w-11
                         items-center
                         justify-center
-
                         rounded-xl
-
-                        bg-[#F1F5F8]
-
-                        text-[#8494A5]
                       "
+                      style={{
+                        background:
+                          BRAND_SOFT,
+
+                        color:
+                          ACCENT,
+                      }}
                     >
                       <Search
                         className="
@@ -1701,12 +1855,12 @@ export default function TopNavbar({
                     <p
                       className="
                         mt-3
-
                         text-[13px]
                         font-extrabold
-
-                        text-[#243B51]
                       "
+                      style={{
+                        color: TEXT_STRONG,
+                      }}
                     >
                       No results found
                     </p>
@@ -1714,15 +1868,15 @@ export default function TopNavbar({
                     <p
                       className="
                         mt-1
-
                         text-[10px]
-
-                        text-[#8B99A9]
                       "
+                      style={{
+                        color: TEXT_MUTED,
+                      }}
                     >
                       Try another keyword.
                     </p>
-                  </div>
+                  </motion.div>
                 )}
               </div>
             </motion.div>

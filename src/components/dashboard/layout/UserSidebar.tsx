@@ -3,6 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+
 import {
   LayoutDashboard,
   WalletCards,
@@ -21,6 +22,30 @@ import {
 } from "lucide-react";
 
 import { motion } from "framer-motion";
+
+/* =========================================================
+   FIXED COFFER BRAND PALETTE
+
+   Background stays theme-controlled (bg-sidebar,
+   var(--sidebar-border), etc. below). Only TEXT, labels, and
+   icons use these colors, so the reading experience matches
+   the reference image's navy -> indigo -> violet tone
+   without changing the page's light/dark background
+   behavior.
+========================================================= */
+
+const BRAND = {
+  midnight: "#0f0c1b",
+  indigo: "#130f26",
+  violet: "#2e1f4f",
+  purple: "#3b2368",
+  highlight: "#5b3a8f",
+} as const;
+
+const TEXT_STRONG = BRAND.violet;
+const TEXT_MUTED = "rgba(46, 31, 79, 0.6)";
+const TEXT_FAINT = "rgba(46, 31, 79, 0.4)";
+const ACCENT = BRAND.highlight;
 
 /* =========================================================
    NAVIGATION
@@ -107,35 +132,44 @@ export default function UserSidebar({
   const pathname = usePathname();
 
   return (
-<motion.aside
-  initial={{
-    opacity: 0,
-    x: -20,
-  }}
-  animate={{
-    opacity: 1,
-    x: 0,
-  }}
-  transition={{
-    duration: 0.45,
-    ease: [0.22, 1, 0.36, 1],
-  }}
-  className="
-    relative
-    flex
-    h-dvh
-    min-h-dvh
-    w-full
-    flex-col
-    overflow-hidden
-    border-r
-    border-white/[0.05]
-    bg-[#08111D]
-    text-slate-300
-  "
->
+    <motion.aside
+      initial={{
+        opacity: 0,
+        x: -20,
+      }}
+      animate={{
+        opacity: 1,
+        x: 0,
+      }}
+      transition={{
+        duration: 0.45,
+        ease: [0.22, 1, 0.36, 1],
+      }}
+      className="
+        relative
+        flex
+        h-dvh
+        min-h-dvh
+        w-full
+        flex-col
+        overflow-hidden
+
+        border-r
+        border-sidebar-border
+
+        bg-sidebar
+        text-sidebar-foreground
+
+        transition-colors
+        duration-300
+      "
+      style={{
+        boxShadow:
+          "10px 0 45px rgba(15, 12, 27, 0.10)",
+      }}
+    >
       {/* =====================================================
-          BACKGROUND EFFECTS
+          AMBIENT BACKGROUND
       ====================================================== */}
 
       <div
@@ -143,13 +177,17 @@ export default function UserSidebar({
           pointer-events-none
           absolute
           -left-24
-          top-20
-          h-56
-          w-56
+          top-12
+          h-64
+          w-64
           rounded-full
-          bg-blue-500/[0.06]
-          blur-[80px]
+          blur-[100px]
         "
+        style={{
+          background:
+            "var(--dashboard-primary)",
+          opacity: 0.10,
+        }}
       />
 
       <div
@@ -158,12 +196,16 @@ export default function UserSidebar({
           absolute
           -right-24
           bottom-24
-          h-52
-          w-52
+          h-64
+          w-64
           rounded-full
-          bg-cyan-400/[0.04]
-          blur-[80px]
+          blur-[100px]
         "
+        style={{
+          background:
+            "var(--dashboard-primary-violet)",
+          opacity: 0.10,
+        }}
       />
 
       {/* =====================================================
@@ -173,20 +215,30 @@ export default function UserSidebar({
       <div
         className="
           relative
-          z-10
+          z-20
           flex
           h-[76px]
           shrink-0
           items-center
           border-b
-          border-white/[0.06]
+          border-sidebar-border
           px-5
         "
       >
         <Link
           href="/dashboard"
-          className="group flex items-center gap-3"
+          className="
+            group
+            flex
+            min-w-0
+            items-center
+            gap-3
+          "
         >
+          {/* =================================================
+              COFFER ICON
+          ================================================== */}
+
           <motion.div
             whileHover={{
               scale: 1.06,
@@ -202,35 +254,132 @@ export default function UserSidebar({
             }}
             className="
               relative
+              z-20
               flex
               h-11
               w-11
+              shrink-0
               items-center
               justify-center
               overflow-hidden
               rounded-[14px]
-              bg-gradient-to-br
-              from-[#51B7FF]
-              via-[#2C86D5]
-              to-[#175590]
               text-white
-              shadow-[0_10px_30px_rgba(46,139,220,0.22)]
             "
-          >
-            <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent" />
+            style={{
+              /*
+               * Exact brand direction:
+               * Midnight blue → deep indigo → violet
+               */
+              background:
+                "linear-gradient(135deg, #0f0c1b 0%, #130f26 42%, #2e1f4f 72%, #3b2368 100%)",
 
-            <WalletCards className="relative z-10 h-[21px] w-[21px]" />
+              boxShadow:
+                "0 12px 30px rgba(59,35,104,0.35)",
+            }}
+          >
+            {/* soft glass highlight */}
+
+            <span
+              className="
+                pointer-events-none
+                absolute
+                inset-0
+                z-0
+              "
+              style={{
+                background:
+                  "radial-gradient(circle at 80% 85%, rgba(109,63,214,0.45), transparent 45%)",
+              }}
+            />
+
+            {/* top shine */}
+
+            <span
+              className="
+                pointer-events-none
+                absolute
+                inset-x-0
+                top-0
+                h-1/2
+                z-0
+              "
+              style={{
+                background:
+                  "linear-gradient(to bottom, rgba(255,255,255,0.16), transparent)",
+              }}
+            />
+
+            {/* ACTUAL COFFER ICON */}
+
+            <WalletCards
+              className="
+                relative
+                z-20
+                h-[21px]
+                w-[21px]
+                shrink-0
+              "
+              strokeWidth={2.2}
+            />
           </motion.div>
 
+          {/* =================================================
+              BRAND TEXT
+          ================================================== */}
+
           <div className="min-w-0">
-            <h1 className="truncate text-[18px] font-black tracking-[-0.03em] text-white">
+            <h1
+              className="
+                truncate
+                text-[18px]
+                font-black
+                tracking-[-0.03em]
+              "
+              style={{
+                color: TEXT_STRONG,
+              }}
+            >
               Coffer
             </h1>
 
             <div className="mt-0.5 flex items-center gap-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#4EA3E3] shadow-[0_0_8px_rgba(78,163,227,0.9)]" />
+              <motion.span
+                animate={{
+                  opacity: [
+                    0.55,
+                    1,
+                    0.55,
+                  ],
+                  scale: [
+                    0.9,
+                    1,
+                    0.9,
+                  ],
+                }}
+                transition={{
+                  duration: 2.6,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+                className="h-1.5 w-1.5 rounded-full"
+                style={{
+                  background: ACCENT,
+                  boxShadow:
+                    "0 0 10px rgba(91,58,143,0.65)",
+                }}
+              />
 
-              <span className="text-[8px] font-extrabold uppercase tracking-[0.22em] text-[#62B5EF]">
+              <span
+                className="
+                  text-[8px]
+                  font-extrabold
+                  uppercase
+                  tracking-[0.22em]
+                "
+                style={{
+                  color: ACCENT,
+                }}
+              >
                 User Portal
               </span>
             </div>
@@ -239,7 +388,7 @@ export default function UserSidebar({
       </div>
 
       {/* =====================================================
-          SCROLLABLE NAVIGATION
+          NAVIGATION
       ====================================================== */}
 
       <div
@@ -250,16 +399,16 @@ export default function UserSidebar({
           flex-1
           overflow-y-auto
           overscroll-contain
-          scroll-smooth
           px-3.5
           py-5
 
           [scrollbar-width:none]
           [-ms-overflow-style:none]
-
           [&::-webkit-scrollbar]:hidden
         "
       >
+        {/* MENU TITLE */}
+
         <div className="px-2.5">
           <p
             className="
@@ -268,28 +417,40 @@ export default function UserSidebar({
               font-extrabold
               uppercase
               tracking-[0.18em]
-              text-slate-600
             "
+            style={{
+              color: TEXT_FAINT,
+            }}
           >
             Main Menu
           </p>
         </div>
 
+        {/* NAV */}
+
         <nav className="space-y-1 pb-4">
           {navItems.map(
-            (item, index) => {
-              const Icon = item.icon;
+            (
+              item,
+              index
+            ) => {
+              const Icon =
+                item.icon;
 
               const active =
-                item.href === "/dashboard"
-                  ? pathname === "/dashboard"
+                item.href ===
+                "/dashboard"
+                  ? pathname ===
+                    "/dashboard"
                   : pathname.startsWith(
                       item.href
                     );
 
               return (
                 <motion.div
-                  key={item.href}
+                  key={
+                    item.href
+                  }
                   initial={{
                     opacity: 0,
                     x: -10,
@@ -302,7 +463,8 @@ export default function UserSidebar({
                     duration: 0.32,
                     delay:
                       0.04 +
-                      index * 0.025,
+                      index *
+                        0.025,
                     ease: [
                       0.22,
                       1,
@@ -312,8 +474,10 @@ export default function UserSidebar({
                   }}
                 >
                   <Link
-                    href={item.href}
-                    className={`
+                    href={
+                      item.href
+                    }
+                    className="
                       group
                       relative
                       flex
@@ -324,21 +488,18 @@ export default function UserSidebar({
                       rounded-[14px]
                       px-2.5
                       py-1.5
-
                       text-[13px]
                       font-bold
-
-                      transition-colors
+                      transition-all
                       duration-300
-
-                      ${
-                        active
-                          ? "text-white"
-                          : "text-[#8393A7] hover:text-slate-100"
-                      }
-                    `}
+                    "
+                    style={{
+                      color: active
+                        ? ACCENT
+                        : TEXT_MUTED,
+                    }}
                   >
-                    {/* Active animated background */}
+                    {/* ACTIVE BACKGROUND */}
 
                     {active && (
                       <motion.span
@@ -352,18 +513,18 @@ export default function UserSidebar({
                           absolute
                           inset-0
                           rounded-[14px]
-                          border
-                          border-[#3C8FD4]/20
-                          bg-gradient-to-r
-                          from-[#142A44]
-                          via-[#11243B]
-                          to-[#0E1D30]
-                          shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]
                         "
+                        style={{
+                          background:
+                            "var(--dashboard-gradient-soft)",
+
+                          border:
+                            "1px solid rgba(109,63,214,0.18)",
+                        }}
                       />
                     )}
 
-                    {/* Hover background */}
+                    {/* HOVER BACKGROUND */}
 
                     {!active && (
                       <span
@@ -371,16 +532,19 @@ export default function UserSidebar({
                           absolute
                           inset-0
                           rounded-[14px]
-                          bg-white/[0.035]
                           opacity-0
-                          transition-opacity
+                          transition-all
                           duration-300
                           group-hover:opacity-100
                         "
+                        style={{
+                          background:
+                            "linear-gradient(90deg, rgba(46,31,79,0.08), rgba(59,35,104,0.10))",
+                        }}
                       />
                     )}
 
-                    {/* Active side light */}
+                    {/* ACTIVE LEFT LINE */}
 
                     {active && (
                       <motion.span
@@ -393,19 +557,29 @@ export default function UserSidebar({
                           w-[3px]
                           -translate-y-1/2
                           rounded-r-full
-                          bg-[#56B4F2]
-                          shadow-[0_0_14px_rgba(86,180,242,0.75)]
                         "
+                        style={{
+                          background:
+                            "var(--dashboard-gradient)",
+
+                          boxShadow:
+                            "0 0 15px rgba(109,63,214,0.55)",
+                        }}
                       />
                     )}
 
-                    {/* Icon */}
+                    {/* ICON */}
 
                     <motion.span
                       whileHover={{
                         scale: 1.08,
                       }}
-                      className={`
+                      transition={{
+                        type: "spring",
+                        stiffness: 350,
+                        damping: 20,
+                      }}
+                      className="
                         relative
                         z-10
                         flex
@@ -415,19 +589,30 @@ export default function UserSidebar({
                         items-center
                         justify-center
                         rounded-[11px]
-
                         transition-all
                         duration-300
+                      "
+                      style={{
+                        background: active
+                          ? "var(--dashboard-primary-soft)"
+                          : "transparent",
 
-                        ${
-                          active
-                            ? "bg-[#1A3B61] text-[#62B9F2] shadow-[0_5px_15px_rgba(18,67,110,0.28)]"
-                            : "bg-transparent text-[#62758C] group-hover:bg-white/[0.045] group-hover:text-[#B6C4D3]"
-                        }
-                      `}
+                        color: active
+                          ? ACCENT
+                          : TEXT_MUTED,
+                      }}
                     >
-                      <Icon className="h-[18px] w-[18px]" />
+                      <Icon
+                        className="h-[18px] w-[18px]"
+                        strokeWidth={
+                          active
+                            ? 2.2
+                            : 1.9
+                        }
+                      />
                     </motion.span>
+
+                    {/* LABEL */}
 
                     <span
                       className="
@@ -438,8 +623,12 @@ export default function UserSidebar({
                         truncate
                       "
                     >
-                      {item.label}
+                      {
+                        item.label
+                      }
                     </span>
+
+                    {/* ACTIVE ARROW */}
 
                     {active && (
                       <motion.span
@@ -453,7 +642,12 @@ export default function UserSidebar({
                         }}
                         className="relative z-10"
                       >
-                        <ChevronRight className="h-4 w-4 text-[#58ADE6]" />
+                        <ChevronRight
+                          className="h-4 w-4"
+                          style={{
+                            color: ACCENT,
+                          }}
+                        />
                       </motion.span>
                     )}
                   </Link>
@@ -462,10 +656,6 @@ export default function UserSidebar({
             }
           )}
         </nav>
-
-        {/* bottom breathing room */}
-
-        <div className="h-4" />
       </div>
 
       {/* =====================================================
@@ -478,15 +668,18 @@ export default function UserSidebar({
           z-20
           shrink-0
           border-t
-          border-white/[0.06]
-          bg-[#060D16]/95
+          border-sidebar-border
+          bg-sidebar
           p-3.5
-          backdrop-blur-xl
+          transition-colors
+          duration-300
         "
       >
         <motion.button
           type="button"
-          onClick={onLogout}
+          onClick={
+            onLogout
+          }
           whileTap={{
             scale: 0.98,
           }}
@@ -501,16 +694,15 @@ export default function UserSidebar({
             rounded-[14px]
             px-2.5
             py-2
-
             text-[13px]
             font-bold
-            text-[#78899D]
-
             transition-all
             duration-300
-
-            hover:text-rose-300
+            hover:text-rose-500
           "
+          style={{
+            color: TEXT_MUTED,
+          }}
         >
           <span
             className="
@@ -535,18 +727,20 @@ export default function UserSidebar({
               items-center
               justify-center
               rounded-[11px]
-
-              text-[#67798F]
-
               transition-all
               duration-300
-
               group-hover:scale-105
               group-hover:bg-rose-500/10
               group-hover:text-rose-400
             "
+            style={{
+              color: TEXT_MUTED,
+            }}
           >
-            <LogOut className="h-[18px] w-[18px]" />
+            <LogOut
+              className="h-[18px] w-[18px]"
+              strokeWidth={2}
+            />
           </span>
 
           <span className="relative z-10">
