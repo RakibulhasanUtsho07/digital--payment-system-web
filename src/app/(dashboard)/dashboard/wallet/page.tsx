@@ -8,8 +8,10 @@ import {
   type ElementType,
   type FormEvent,
 } from "react";
+
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+
 import {
   AlertCircle,
   ArrowDownLeft,
@@ -31,11 +33,13 @@ import {
   getMyWallet,
   type WalletData,
 } from "@/lib/api/walletApi";
+
 import {
   depositFunds,
   withdrawFunds,
   type FundsResponse,
 } from "@/lib/api/fundsApi";
+
 import { apiClient } from "@/lib/api/client";
 
 import PremiumWalletCard from "./components/PremiumWalletCard";
@@ -44,9 +48,7 @@ import PremiumWalletCard from "./components/PremiumWalletCard";
    TYPES
 ========================================================= */
 
-type FundsAction =
-  | "deposit"
-  | "withdraw";
+type FundsAction = "deposit" | "withdraw";
 
 type IdempotencyState = {
   fingerprint: string;
@@ -63,9 +65,11 @@ type KYCStatus =
 interface KYCStatusResponse {
   success: boolean;
   message?: string;
+
   kyc?: {
     status?: KYCStatus;
   };
+
   userKycStatus?:
     | "not_started"
     | "pending"
@@ -80,47 +84,47 @@ interface KYCStatusResponse {
 export default function WalletPage() {
   const router = useRouter();
 
-  const [wallet, setWallet] =
-    useState<WalletData | null>(null);
+  /* =======================================================
+     WALLET
+  ======================================================== */
 
-  const [loading, setLoading] =
-    useState(true);
+  const [wallet, setWallet] = useState<WalletData | null>(null);
 
-  const [refreshing, setRefreshing] =
-    useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const [errorMessage, setErrorMessage] =
-    useState("");
+  const [refreshing, setRefreshing] = useState(false);
+
+  const [errorMessage, setErrorMessage] = useState("");
+
+  /* =======================================================
+     KYC
+  ======================================================== */
 
   const [kycStatus, setKycStatus] =
     useState<KYCStatus | null>(null);
 
-  const [kycLoading, setKycLoading] =
-    useState(true);
+  const [kycLoading, setKycLoading] = useState(true);
 
-  const [kycError, setKycError] =
-    useState("");
+  const [kycError, setKycError] = useState("");
 
-  const [kycGuardOpen, setKycGuardOpen] =
-    useState(false);
+  const [kycGuardOpen, setKycGuardOpen] = useState(false);
+
+  /* =======================================================
+     FUNDS
+  ======================================================== */
 
   const [fundsAction, setFundsAction] =
     useState<FundsAction | null>(null);
 
-  const [fundsAmount, setFundsAmount] =
-    useState("");
+  const [fundsAmount, setFundsAmount] = useState("");
 
-  const [fundsReference, setFundsReference] =
-    useState("");
+  const [fundsReference, setFundsReference] = useState("");
 
-  const [fundsSubmitting, setFundsSubmitting] =
-    useState(false);
+  const [fundsSubmitting, setFundsSubmitting] = useState(false);
 
-  const [fundsError, setFundsError] =
-    useState("");
+  const [fundsError, setFundsError] = useState("");
 
-  const [fundsSuccess, setFundsSuccess] =
-    useState("");
+  const [fundsSuccess, setFundsSuccess] = useState("");
 
   const [lastFundsResponse, setLastFundsResponse] =
     useState<FundsResponse | null>(null);
@@ -143,13 +147,9 @@ export default function WalletPage() {
 
         setErrorMessage("");
 
-        const response =
-          await getMyWallet();
+        const response = await getMyWallet();
 
-        if (
-          !response.success ||
-          !response.wallet
-        ) {
+        if (!response.success || !response.wallet) {
           throw new Error(
             response.message ||
               "Unable to load wallet information."
@@ -158,10 +158,7 @@ export default function WalletPage() {
 
         setWallet(response.wallet);
       } catch (error) {
-        console.error(
-          "Wallet loading error:",
-          error
-        );
+        console.error("Wallet loading error:", error);
 
         setErrorMessage(
           error instanceof Error
@@ -176,66 +173,72 @@ export default function WalletPage() {
     []
   );
 
-  const loadKYCStatus =
-    useCallback(
-      async () => {
-        try {
-          setKycLoading(true);
-          setKycError("");
+  /* =========================================================
+     LOAD KYC STATUS
+  ========================================================== */
 
-          const response =
-            await apiClient<KYCStatusResponse>(
-              "/kyc/status"
-            );
+  const loadKYCStatus = useCallback(async () => {
+    try {
+      setKycLoading(true);
+      setKycError("");
 
-          if (!response?.success) {
-            throw new Error(
-              response?.message ||
-                "Unable to verify KYC status."
-            );
-          }
+      const response =
+        await apiClient<KYCStatusResponse>("/kyc/status");
 
-          const status =
-            response.kyc?.status ||
-            response.userKycStatus ||
-            "not_started";
+      if (!response?.success) {
+        throw new Error(
+          response?.message ||
+            "Unable to verify KYC status."
+        );
+      }
 
-          setKycStatus(status);
-        } catch (error) {
-          console.error(
-            "KYC status loading error:",
-            error
-          );
+      const status =
+        response.kyc?.status ||
+        response.userKycStatus ||
+        "not_started";
 
-          setKycStatus(null);
+      setKycStatus(status);
+    } catch (error) {
+      console.error(
+        "KYC status loading error:",
+        error
+      );
 
-          setKycError(
-            error instanceof Error
-              ? error.message
-              : "Unable to verify KYC status."
-          );
-        } finally {
-          setKycLoading(false);
-        }
-      },
-      []
-    );
+      setKycStatus(null);
+
+      setKycError(
+        error instanceof Error
+          ? error.message
+          : "Unable to verify KYC status."
+      );
+    } finally {
+      setKycLoading(false);
+    }
+  }, []);
+
+  /* =========================================================
+     INITIAL LOAD
+  ========================================================== */
 
   useEffect(() => {
     void loadWallet();
     void loadKYCStatus();
-  }, [
-    loadWallet,
-    loadKYCStatus,
-  ]);
+  }, [loadWallet, loadKYCStatus]);
 
-  const refreshWalletPage =
-    async () => {
-      await Promise.allSettled([
-        loadWallet(true),
-        loadKYCStatus(),
-      ]);
-    };
+  /* =========================================================
+     REFRESH
+  ========================================================== */
+
+  const refreshWalletPage = async () => {
+    await Promise.allSettled([
+      loadWallet(true),
+      loadKYCStatus(),
+    ]);
+  };
+
+  /* =========================================================
+     KYC GUARD
+  ========================================================== */
 
   const requireVerifiedKYC = (
     onVerified: () => void
@@ -252,28 +255,20 @@ export default function WalletPage() {
     setKycGuardOpen(true);
   };
 
-  const openProtectedRoute = (
-    href: string
-  ) => {
-    requireVerifiedKYC(
-      () => router.push(href)
-    );
+  const openProtectedRoute = (href: string) => {
+    requireVerifiedKYC(() => router.push(href));
   };
 
   /* =========================================================
      FUNDS MODAL
   ========================================================== */
 
-  const openFundsModal = (
-    action: FundsAction
-  ) => {
+  const openFundsModal = (action: FundsAction) => {
     if (action === "withdraw") {
-      requireVerifiedKYC(
-        () =>
-          openFundsModalUnsafe(
-            "withdraw"
-          )
+      requireVerifiedKYC(() =>
+        openFundsModalUnsafe("withdraw")
       );
+
       return;
     }
 
@@ -305,6 +300,10 @@ export default function WalletPage() {
     setLastFundsResponse(null);
     idempotencyRef.current = null;
   };
+
+  /* =========================================================
+     IDEMPOTENCY KEY
+  ========================================================== */
 
   const getOrCreateIdempotencyKey = (
     action: FundsAction,
@@ -343,6 +342,10 @@ export default function WalletPage() {
     return key;
   };
 
+  /* =========================================================
+     FUNDS SUBMIT
+  ========================================================== */
+
   const handleFundsSubmit = async (
     event: FormEvent<HTMLFormElement>
   ) => {
@@ -356,22 +359,17 @@ export default function WalletPage() {
     setFundsSuccess("");
     setLastFundsResponse(null);
 
-    const rawAmount =
-      fundsAmount.trim();
+    const rawAmount = fundsAmount.trim();
 
-    if (
-      !/^\d+(?:\.\d{1,2})?$/.test(
-        rawAmount
-      )
-    ) {
+    if (!/^\d+(?:\.\d{1,2})?$/.test(rawAmount)) {
       setFundsError(
         "Enter a valid amount with up to 2 decimal places."
       );
+
       return;
     }
 
-    const numericAmount =
-      Number(rawAmount);
+    const numericAmount = Number(rawAmount);
 
     const minorUnits = Math.round(
       numericAmount * 100
@@ -385,30 +383,30 @@ export default function WalletPage() {
       setFundsError(
         "Amount must be greater than 0."
       );
+
       return;
     }
 
-    const normalizedAmount =
-      minorUnits / 100;
+    const normalizedAmount = minorUnits / 100;
 
     if (
       fundsAction === "withdraw" &&
-      normalizedAmount >
-        Number(wallet.balance || 0)
+      normalizedAmount > Number(wallet.balance || 0)
     ) {
       setFundsError(
         "Insufficient wallet balance."
       );
+
       return;
     }
 
-    const reference =
-      fundsReference.trim();
+    const reference = fundsReference.trim();
 
     if (reference.length > 160) {
       setFundsError(
         "Reference must be 160 characters or fewer."
       );
+
       return;
     }
 
@@ -426,14 +424,12 @@ export default function WalletPage() {
         fundsAction === "deposit"
           ? await depositFunds({
               amount: normalizedAmount,
-              reference:
-                reference || undefined,
+              reference: reference || undefined,
               idempotencyKey,
             })
           : await withdrawFunds({
               amount: normalizedAmount,
-              reference:
-                reference || undefined,
+              reference: reference || undefined,
               idempotencyKey,
             });
 
@@ -451,10 +447,8 @@ export default function WalletPage() {
         current
           ? {
               ...current,
-              balance:
-                response.wallet.balance,
-              updatedAt:
-                new Date().toISOString(),
+              balance: response.wallet.balance,
+              updatedAt: new Date().toISOString(),
             }
           : current
       );
@@ -482,9 +476,6 @@ export default function WalletPage() {
           ? error.message
           : "Unable to process the request."
       );
-
-      // Keep the same idempotency key after a failed/network
-      // response so retrying the same request cannot duplicate it.
     } finally {
       setFundsSubmitting(false);
     }
@@ -498,16 +489,18 @@ export default function WalletPage() {
     return (
       <div className="flex min-h-[70vh] items-center justify-center px-4">
         <div className="flex flex-col items-center gap-4 text-center">
-          <div className="relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-[18px] bg-gradient-to-br from-[#102D4E] to-[#1F5EA8] text-white shadow-[0_14px_35px_rgba(31,94,168,0.22)]">
+          <div className="relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-[18px] bg-gradient-to-br from-[#4C1D95] to-[#6D28D9] text-white shadow-[0_14px_35px_rgba(109,40,217,0.24)]">
             <div className="absolute inset-0 bg-gradient-to-br from-white/15 to-transparent" />
+
             <Loader2 className="relative h-6 w-6 animate-spin" />
           </div>
 
           <div>
-            <p className="text-sm font-extrabold text-slate-800">
+            <p className="text-sm font-extrabold text-slate-900">
               Loading your wallet
             </p>
-            <p className="mt-1 text-xs text-slate-400">
+
+            <p className="mt-1 text-xs text-slate-500">
               Syncing your latest balance and wallet information...
             </p>
           </div>
@@ -539,10 +532,8 @@ export default function WalletPage() {
 
           <button
             type="button"
-            onClick={() =>
-              void loadWallet()
-            }
-            className="mt-6 inline-flex h-11 items-center justify-center gap-2 rounded-[14px] bg-[#1F5EA8] px-5 text-xs font-extrabold text-white transition hover:bg-[#184E8D]"
+            onClick={() => void loadWallet()}
+            className="mt-6 inline-flex h-11 items-center justify-center gap-2 rounded-[14px] bg-[#5B21B6] px-5 text-xs font-extrabold text-white transition hover:bg-[#4C1D95]"
           >
             <RefreshCw className="h-4 w-4" />
             Try Again
@@ -552,54 +543,70 @@ export default function WalletPage() {
     );
   }
 
-  const balance =
-    Number(wallet.balance) || 0;
+  /* =========================================================
+     BALANCE
+  ========================================================== */
+
+  const balance = Number(wallet.balance) || 0;
 
   const formattedBalance =
     formatCurrency(balance);
 
+  /* =========================================================
+     MAIN UI
+  ========================================================== */
+
   return (
     <>
       <main className="space-y-6 pb-10">
-        {/* HEADER */}
-        <section className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-[#F0F7FF] px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#1F5EA8]">
-              <WalletCards className="h-3.5 w-3.5" />
-              Digital Wallet
+        {/* ===================================================
+            HEADER
+        ==================================================== */}
+
+        <section className="rounded-[26px] border border-indigo-100 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.035)] sm:p-6">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.16em] text-indigo-700">
+                <WalletCards className="h-3.5 w-3.5" />
+                Digital Wallet
+              </div>
+
+              <h1 className="text-2xl font-black tracking-[-0.035em] text-indigo-950 sm:text-3xl">
+                My Wallet
+              </h1>
+
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                Monitor your balance, add or withdraw funds and access secure payment actions from one place.
+              </p>
             </div>
 
-            <h1 className="text-2xl font-black tracking-[-0.035em] text-[#102A43] sm:text-3xl">
-              My Wallet
-            </h1>
-
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-[#718296]">
-              Monitor your balance, add or withdraw funds and access secure payment actions from one place.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={() =>
-              void refreshWalletPage()
-            }
-            disabled={refreshing}
-            className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-[14px] border border-[#DCE6EF] bg-white px-4 text-xs font-bold text-[#566C80] shadow-[0_6px_20px_rgba(15,23,42,0.04)] transition hover:border-blue-200 hover:bg-blue-50 hover:text-[#1F5EA8] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <RefreshCw
-              className={
-                refreshing
-                  ? "h-4 w-4 animate-spin"
-                  : "h-4 w-4"
+            <button
+              type="button"
+              onClick={() =>
+                void refreshWalletPage()
               }
-            />
-            {refreshing
-              ? "Syncing..."
-              : "Refresh"}
-          </button>
+              disabled={refreshing}
+              className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-[14px] border border-indigo-100 bg-white px-4 text-xs font-bold text-indigo-700 shadow-[0_6px_20px_rgba(79,70,229,0.06)] transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <RefreshCw
+                className={
+                  refreshing
+                    ? "h-4 w-4 animate-spin"
+                    : "h-4 w-4"
+                }
+              />
+
+              {refreshing
+                ? "Syncing..."
+                : "Refresh"}
+            </button>
+          </div>
         </section>
 
-        {/* WALLET CARD */}
+        {/* ===================================================
+            PREMIUM WALLET CARD
+        ==================================================== */}
+
         <PremiumWalletCard
           walletId={wallet._id}
           balance={balance}
@@ -607,13 +614,16 @@ export default function WalletPage() {
           kycLoading={kycLoading}
         />
 
-        {/* QUICK ACTIONS */}
+        {/* ===================================================
+            QUICK ACTIONS
+        ==================================================== */}
+
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <WalletActionButton
             icon={Plus}
             title="Add Money"
             description="Top up your wallet balance"
-            iconClass="bg-emerald-50 text-emerald-600"
+            iconClass="bg-violet-50 text-violet-600"
             onClick={() =>
               openFundsModal("deposit")
             }
@@ -627,7 +637,7 @@ export default function WalletPage() {
                 ? "Withdraw from wallet balance"
                 : "KYC verification required"
             }
-            iconClass="bg-rose-50 text-rose-600"
+            iconClass="bg-fuchsia-50 text-fuchsia-600"
             onClick={() =>
               openFundsModal("withdraw")
             }
@@ -645,7 +655,7 @@ export default function WalletPage() {
                 ? "Transfer funds securely"
                 : "KYC verification required"
             }
-            iconClass="bg-blue-50 text-blue-600"
+            iconClass="bg-indigo-50 text-indigo-600"
             onClick={() =>
               openProtectedRoute(
                 "/dashboard/send"
@@ -658,7 +668,7 @@ export default function WalletPage() {
             icon={ArrowDownLeft}
             title="Receive Money"
             description="Share QR or payment request"
-            iconClass="bg-cyan-50 text-cyan-600"
+            iconClass="bg-indigo-50 text-indigo-600"
           />
 
           <WalletAction
@@ -674,111 +684,255 @@ export default function WalletPage() {
             icon={ShieldCheck}
             title="KYC Verification"
             description="Secure your account"
-            iconClass="bg-amber-50 text-amber-600"
+            iconClass="bg-purple-50 text-purple-600"
           />
         </section>
 
-        {/* WALLET INFORMATION */}
-        <section className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
-          <div className="rounded-[26px] border border-[#DFE8F1] bg-white p-5 shadow-[0_12px_40px_rgba(15,23,42,0.045)] sm:p-6">
-            <div className="mb-6 flex items-center justify-between gap-4">
-              <div>
-                <p className="text-[9px] font-extrabold uppercase tracking-[0.17em] text-[#1F5EA8]">
-                  Account
-                </p>
-                <h2 className="mt-1.5 text-lg font-extrabold tracking-[-0.02em] text-[#18324A]">
-                  Wallet Information
-                </h2>
+        {/* ===================================================
+            REDESIGNED WALLET INFORMATION
+        ==================================================== */}
+
+        <section className="grid gap-6 xl:grid-cols-[1.45fr_0.75fr]">
+          {/* =================================================
+              WALLET INFORMATION
+          ================================================== */}
+
+          <div className="relative overflow-hidden rounded-[28px] border border-indigo-100 bg-white shadow-[0_16px_50px_rgba(15,23,42,0.05)]">
+            {/* Decorative background */}
+            <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-indigo-100/60 blur-3xl" />
+
+            <div className="relative p-5 sm:p-7">
+              {/* Header */}
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-[0_10px_22px_rgba(79,70,229,0.22)]">
+                    <WalletCards className="h-5 w-5" />
+                  </div>
+
+                  <div>
+                    <p className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-indigo-500">
+                      Account overview
+                    </p>
+
+                    <h2 className="mt-1 text-xl font-black tracking-[-0.03em] text-slate-950">
+                      Wallet Information
+                    </h2>
+
+                    <p className="mt-1 text-xs text-slate-500">
+                      Your wallet details and current account status.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5">
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                  </span>
+
+                  <span className="text-[10px] font-extrabold text-emerald-700">
+                    Active Wallet
+                  </span>
+                </div>
               </div>
 
-              <div className="flex h-10 w-10 items-center justify-center rounded-[13px] bg-[#EEF6FD] text-[#1F5EA8]">
-                <WalletCards className="h-[18px] w-[18px]" />
+              {/* Balance Highlight */}
+              <div className="relative mt-6 overflow-hidden rounded-[22px] border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-violet-50 p-5 sm:p-6">
+                <div className="pointer-events-none absolute -bottom-20 -right-10 h-40 w-40 rounded-full bg-violet-300/15 blur-3xl" />
+
+                <div className="relative">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                      <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-indigo-500">
+                        Available Balance
+                      </p>
+
+                      <div className="mt-2 flex flex-wrap items-baseline gap-2">
+                        <span className="text-3xl font-black tracking-[-0.04em] text-indigo-950 sm:text-4xl">
+                          {formattedBalance}
+                        </span>
+
+                        <span className="text-xs font-bold text-slate-400">
+                          BDT
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex h-11 w-11 items-center justify-center rounded-[14px] border border-indigo-100 bg-white text-indigo-600 shadow-sm">
+                      <Banknote className="h-5 w-5" />
+                    </div>
+                  </div>
+
+                  <div className="mt-5 h-px bg-indigo-100" />
+
+                  <div className="mt-4 flex flex-col gap-2 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+                    <span>
+                      Your current wallet balance
+                    </span>
+
+                    <span className="font-semibold text-indigo-600">
+                      Updated {formatDate(wallet.updatedAt)}
+                    </span>
+                  </div>
+                </div>
               </div>
-            </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <InfoCard
-                label="Wallet Balance"
-                value={formattedBalance}
-              />
+              {/* Detail Grid */}
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                <ModernInfoItem
+                  label="Wallet Owner ID"
+                  value={wallet.userId}
+                  icon={ShieldCheck}
+                />
 
-              <InfoCard
-                label="Currency"
-                value="Bangladeshi Taka (BDT)"
-              />
+                <ModernInfoItem
+                  label="Currency"
+                  value="Bangladeshi Taka (BDT)"
+                  icon={Banknote}
+                />
 
-              <InfoCard
-                label="Wallet Owner ID"
-                value={wallet.userId}
-              />
+                <ModernInfoItem
+                  label="Created"
+                  value={formatDate(
+                    wallet.createdAt
+                  )}
+                  icon={CreditCard}
+                />
 
-              <InfoCard
-                label="Wallet Status"
-                value="Active"
-                valueClass="text-emerald-600"
-              />
-
-              <InfoCard
-                label="Created"
-                value={formatDate(
-                  wallet.createdAt
-                )}
-              />
-
-              <InfoCard
-                label="Last Updated"
-                value={formatDate(
-                  wallet.updatedAt
-                )}
-              />
+                <ModernInfoItem
+                  label="Last Updated"
+                  value={formatDate(
+                    wallet.updatedAt
+                  )}
+                  icon={RefreshCw}
+                />
+              </div>
             </div>
           </div>
 
-          {/* SECURITY */}
-          <div className="relative overflow-hidden rounded-[26px] border border-[#DDEAF4] bg-gradient-to-br from-[#F2F9FF] via-white to-[#EFFAF7] p-5 shadow-[0_12px_40px_rgba(15,23,42,0.04)] sm:p-6">
-            <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-blue-400/10 blur-3xl" />
+          {/* =================================================
+              SECURITY CARD
+          ================================================== */}
 
-            <div className="relative z-10">
-              <div className="flex h-11 w-11 items-center justify-center rounded-[15px] border border-emerald-100 bg-white text-emerald-600 shadow-sm">
-                <ShieldCheck className="h-5 w-5" />
+          <div className="relative overflow-hidden rounded-[28px] border border-indigo-100 bg-gradient-to-br from-indigo-950 via-indigo-900 to-violet-900 p-5 text-white shadow-[0_18px_50px_rgba(30,27,75,0.16)] sm:p-7">
+            {/* Glow elements */}
+            <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-violet-400/20 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-24 -left-10 h-44 w-44 rounded-full bg-indigo-400/10 blur-3xl" />
+
+            <div className="relative flex h-full flex-col">
+              {/* Top */}
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-[16px] border border-white/10 bg-white/10 text-indigo-100 backdrop-blur-sm">
+                  <ShieldCheck className="h-6 w-6" />
+                </div>
+
+                <div className="rounded-full border border-white/10 bg-white/10 px-3 py-1.5">
+                  <span className="text-[9px] font-extrabold uppercase tracking-[0.15em] text-indigo-100">
+                    Protected
+                  </span>
+                </div>
               </div>
 
-              <h2 className="mt-5 text-lg font-extrabold tracking-[-0.02em] text-[#18324A]">
-                Secure Wallet
-              </h2>
+              <div className="mt-7">
+                <p className="text-[9px] font-extrabold uppercase tracking-[0.18em] text-indigo-200">
+                  Wallet security
+                </p>
 
-              <p className="mt-2 text-xs leading-5 text-[#687D91]">
-                {getWalletKYCMessage(
-                  kycStatus,
-                  kycLoading,
-                  kycError
-                )}
-              </p>
+                <h2 className="mt-2 text-2xl font-black tracking-[-0.03em] text-white">
+                  Secure Wallet
+                </h2>
 
-              <Link
-                href="/dashboard/kyc"
-                className="group mt-5 inline-flex h-10 items-center gap-2 rounded-[13px] border border-blue-100 bg-white px-4 text-[11px] font-extrabold text-[#1F5EA8] shadow-sm transition hover:border-blue-200 hover:bg-blue-50"
-              >
-                Verification Center
-                <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-              </Link>
+                <p className="mt-3 text-xs leading-6 text-indigo-100/75">
+                  {getWalletKYCMessage(
+                    kycStatus,
+                    kycLoading,
+                    kycError
+                  )}
+                </p>
+              </div>
+
+              {/* Status */}
+              <div className="mt-6 rounded-[20px] border border-white/10 bg-white/[0.06] p-4 backdrop-blur-sm">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={[
+                      "flex h-10 w-10 items-center justify-center rounded-[13px]",
+                      kycStatus === "verified"
+                        ? "bg-emerald-400/15 text-emerald-300"
+                        : "bg-amber-400/15 text-amber-300",
+                    ].join(" ")}
+                  >
+                    <ShieldCheck className="h-4 w-4" />
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-extrabold uppercase tracking-[0.14em] text-indigo-200">
+                      Verification status
+                    </p>
+
+                    <p className="mt-1 truncate text-sm font-extrabold text-white">
+                      {kycLoading
+                        ? "Checking..."
+                        : kycStatus === "verified"
+                        ? "Identity Verified"
+                        : kycStatus ===
+                          "under_review"
+                        ? "Under Review"
+                        : kycStatus === "pending"
+                        ? "Pending Verification"
+                        : kycStatus ===
+                          "rejected"
+                        ? "Needs Resubmission"
+                        : "Verification Required"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Features */}
+              <div className="mt-5 space-y-3">
+                <SecurityPoint text="Protected financial actions" />
+
+                <SecurityPoint text="Backend verification enabled" />
+
+                <SecurityPoint text="Secure wallet activity monitoring" />
+              </div>
+
+              <div className="mt-auto pt-7">
+                <Link
+                  href="/dashboard/kyc"
+                  className="group flex h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-white px-4 text-xs font-extrabold text-indigo-950 shadow-[0_10px_30px_rgba(0,0,0,0.15)] transition hover:bg-indigo-50"
+                >
+                  Verification Center
+
+                  <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                </Link>
+
+                <p className="mt-3 text-center text-[9px] leading-4 text-indigo-200/55">
+                  Your protected wallet actions remain secured by backend verification.
+                </p>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* FOOTER NOTE */}
-        <section className="rounded-[26px] border border-[#DFE8F1] bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.035)] sm:p-6">
+        {/* ===================================================
+            FOOTER NOTE
+        ==================================================== */}
+
+        <section className="rounded-[26px] border border-indigo-100 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.035)] sm:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-blue-50 text-[#1F5EA8]">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-indigo-50 text-indigo-600">
                 <WalletCards className="h-5 w-5" />
               </div>
 
               <div>
-                <p className="text-sm font-extrabold text-[#18324A]">
+                <p className="text-sm font-extrabold text-indigo-950">
                   Your money, one secure place.
                 </p>
-                <p className="mt-1 text-xs leading-5 text-[#77899B]">
+
+                <p className="mt-1 text-xs leading-5 text-slate-600">
                   Add, withdraw, send, receive and track your digital payments through your Coffer wallet.
                 </p>
               </div>
@@ -786,33 +940,38 @@ export default function WalletPage() {
 
             <Link
               href="/dashboard/transactions"
-              className="group inline-flex items-center gap-1.5 text-xs font-bold text-[#1F5EA8]"
+              className="group inline-flex items-center gap-1.5 text-xs font-bold text-indigo-700"
             >
               View transaction history
+
               <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
             </Link>
           </div>
         </section>
       </main>
 
+      {/* =====================================================
+          KYC MODAL
+      ====================================================== */}
+
       <KYCGuardModal
         open={kycGuardOpen}
         status={kycStatus}
         loading={kycLoading}
         errorMessage={kycError}
-        onRetry={() =>
-          void loadKYCStatus()
-        }
+        onRetry={() => void loadKYCStatus()}
         onClose={() =>
           setKycGuardOpen(false)
         }
         onGoToKYC={() => {
           setKycGuardOpen(false);
-          router.push(
-            "/dashboard/kyc"
-          );
+          router.push("/dashboard/kyc");
         }}
       />
+
+      {/* =====================================================
+          FUNDS MODAL
+      ====================================================== */}
 
       {fundsAction && (
         <FundsModal
@@ -827,14 +986,68 @@ export default function WalletPage() {
             lastFundsResponse?.transaction?._id
           }
           onAmountChange={setFundsAmount}
-          onReferenceChange={
-            setFundsReference
-          }
+          onReferenceChange={setFundsReference}
           onClose={closeFundsModal}
           onSubmit={handleFundsSubmit}
         />
       )}
     </>
+  );
+}
+
+/* =========================================================
+   MODERN INFO ITEM
+========================================================= */
+
+function ModernInfoItem({
+  label,
+  value,
+  icon: Icon,
+}: {
+  label: string;
+  value: string;
+  icon: ElementType;
+}) {
+  return (
+    <div className="group rounded-[19px] border border-slate-200 bg-slate-50/70 p-4 transition duration-300 hover:border-indigo-200 hover:bg-indigo-50/40">
+      <div className="flex items-start gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-white text-indigo-600 shadow-sm ring-1 ring-slate-100 transition group-hover:bg-indigo-50">
+          <Icon className="h-4 w-4" />
+        </div>
+
+        <div className="min-w-0">
+          <p className="text-[9px] font-extrabold uppercase tracking-[0.14em] text-slate-400">
+            {label}
+          </p>
+
+          <p className="mt-1.5 break-all text-[12px] font-bold leading-5 text-slate-800">
+            {value}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   SECURITY POINT
+========================================================= */
+
+function SecurityPoint({
+  text,
+}: {
+  text: string;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-400/10 text-emerald-300">
+        <CheckCircle2 className="h-3.5 w-3.5" />
+      </div>
+
+      <span className="text-[11px] font-semibold text-indigo-100/80">
+        {text}
+      </span>
+    </div>
   );
 }
 
@@ -863,8 +1076,7 @@ function KYCGuardModal({
     return null;
   }
 
-  const content =
-    getWalletKYCContent(status);
+  const content = getWalletKYCContent(status);
 
   return (
     <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
@@ -876,11 +1088,11 @@ function KYCGuardModal({
       />
 
       <div className="relative z-10 w-full max-w-md overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-2xl">
-        <div className="relative overflow-hidden border-b border-[#E7EEF5] bg-gradient-to-br from-[#F7FBFF] to-white p-6">
-          <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-blue-300/15 blur-3xl" />
+        <div className="relative overflow-hidden border-b border-indigo-100 bg-gradient-to-br from-indigo-50 to-white p-6">
+          <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-violet-300/15 blur-3xl" />
 
           <div className="relative flex items-start justify-between gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-[16px] border border-blue-100 bg-white text-[#1F5EA8] shadow-sm">
+            <div className="flex h-12 w-12 items-center justify-center rounded-[16px] border border-indigo-100 bg-white text-indigo-600 shadow-sm">
               {loading ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
@@ -897,11 +1109,11 @@ function KYCGuardModal({
             </button>
           </div>
 
-          <p className="relative mt-5 text-[9px] font-black uppercase tracking-[0.16em] text-[#1F5EA8]">
+          <p className="relative mt-5 text-[9px] font-black uppercase tracking-[0.16em] text-indigo-600">
             Identity verification
           </p>
 
-          <h2 className="relative mt-1.5 text-xl font-black tracking-[-0.02em] text-[#18324A]">
+          <h2 className="relative mt-1.5 text-xl font-black tracking-[-0.02em] text-indigo-950">
             {loading
               ? "Checking KYC status"
               : errorMessage
@@ -909,7 +1121,7 @@ function KYCGuardModal({
               : content.title}
           </h2>
 
-          <p className="relative mt-2 text-xs leading-5 text-[#718296]">
+          <p className="relative mt-2 text-xs leading-5 text-slate-600">
             {loading
               ? "Please wait while we confirm your current verification status."
               : errorMessage ||
@@ -922,7 +1134,7 @@ function KYCGuardModal({
             <button
               type="button"
               onClick={onRetry}
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-[#1F5EA8] text-xs font-extrabold text-white transition hover:bg-[#184E8D]"
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-indigo-700 text-xs font-extrabold text-white transition hover:bg-indigo-800"
             >
               <RefreshCw className="h-4 w-4" />
               Check Again
@@ -940,10 +1152,12 @@ function KYCGuardModal({
               type="button"
               onClick={onGoToKYC}
               disabled={loading}
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-[#1F5EA8] text-xs font-extrabold text-white transition hover:bg-[#184E8D] disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-indigo-700 text-xs font-extrabold text-white transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <ShieldCheck className="h-4 w-4" />
+
               {content.cta}
+
               <ChevronRight className="h-4 w-4" />
             </button>
           )}
@@ -956,6 +1170,10 @@ function KYCGuardModal({
     </div>
   );
 }
+
+/* =========================================================
+   KYC CONTENT
+========================================================= */
 
 function getWalletKYCContent(
   status: KYCStatus | null
@@ -1001,6 +1219,10 @@ function getWalletKYCContent(
   }
 }
 
+/* =========================================================
+   KYC MESSAGE
+========================================================= */
+
 function getWalletKYCMessage(
   status: KYCStatus | null,
   loading: boolean,
@@ -1014,9 +1236,7 @@ function getWalletKYCMessage(
     return "We could not confirm your KYC status. Protected financial actions remain locked until verification can be checked.";
   }
 
-  return getWalletKYCContent(
-    status
-  ).description;
+  return getWalletKYCContent(status).description;
 }
 
 /* =========================================================
@@ -1052,8 +1272,7 @@ function FundsModal({
     event: FormEvent<HTMLFormElement>
   ) => void;
 }) {
-  const isDeposit =
-    action === "deposit";
+  const isDeposit = action === "deposit";
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
@@ -1066,11 +1285,17 @@ function FundsModal({
 
       <div className="relative z-10 w-full max-w-md overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-2xl">
         <div
-          className={`relative overflow-hidden p-6 text-white ${
-            isDeposit
-              ? "bg-gradient-to-br from-[#0F6A55] via-[#14806A] to-[#1B9C7F]"
-              : "bg-gradient-to-br from-[#7C233A] via-[#A33650] to-[#C94A64]"
-          }`}
+          className={`
+            relative
+            overflow-hidden
+            p-6
+            text-white
+            ${
+              isDeposit
+                ? "bg-gradient-to-br from-violet-800 via-violet-700 to-indigo-600"
+                : "bg-gradient-to-br from-fuchsia-900 via-fuchsia-700 to-violet-700"
+            }
+          `}
         >
           <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-white/10 blur-3xl" />
 
@@ -1079,11 +1304,13 @@ function FundsModal({
               <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-white/65">
                 Wallet Funds
               </p>
+
               <h2 className="mt-1 text-xl font-black">
                 {isDeposit
                   ? "Add Money"
                   : "Withdraw Money"}
               </h2>
+
               <p className="mt-2 text-xs leading-5 text-white/70">
                 {isDeposit
                   ? "Add funds to your Coffer wallet."
@@ -1125,6 +1352,7 @@ function FundsModal({
                   <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-slate-400">
                     Transaction ID
                   </p>
+
                   <p className="mt-1 break-all font-mono text-[11px] font-bold text-slate-700">
                     {transactionId}
                   </p>
@@ -1141,14 +1369,19 @@ function FundsModal({
             </div>
           ) : (
             <>
-              <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
+              {/* AVAILABLE BALANCE */}
+
+              <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4">
                 <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-slate-400">
                   Available Balance
                 </p>
-                <p className="mt-1 text-lg font-black text-slate-900">
+
+                <p className="mt-1 text-lg font-black text-indigo-950">
                   {formatCurrency(balance)}
                 </p>
               </div>
+
+              {/* AMOUNT */}
 
               <div className="mt-5">
                 <label className="text-xs font-bold text-slate-700">
@@ -1157,6 +1390,7 @@ function FundsModal({
 
                 <div className="relative mt-2">
                   <Banknote className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+
                   <input
                     type="number"
                     min="0.01"
@@ -1177,22 +1411,23 @@ function FundsModal({
                           "+",
                           "e",
                           "E",
-                        ].includes(
-                          event.key
-                        )
+                        ].includes(event.key)
                       ) {
                         event.preventDefault();
                       }
                     }}
                     placeholder="0.00"
-                    className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-4 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-[#1F5EA8] focus:ring-4 focus:ring-blue-500/10"
+                    className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-4 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
                   />
                 </div>
               </div>
 
+              {/* REFERENCE */}
+
               <div className="mt-4">
                 <label className="text-xs font-bold text-slate-700">
                   Reference
+
                   <span className="ml-1 font-medium text-slate-400">
                     (optional)
                   </span>
@@ -1208,7 +1443,7 @@ function FundsModal({
                     )
                   }
                   placeholder="Example: Monthly top-up"
-                  className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-[#1F5EA8] focus:ring-4 focus:ring-blue-500/10"
+                  className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
                 />
 
                 <p className="mt-1 text-right text-[10px] text-slate-400">
@@ -1216,23 +1451,44 @@ function FundsModal({
                 </p>
               </div>
 
+              {/* ERROR */}
+
               {errorMessage && (
                 <div className="mt-4 flex items-start gap-3 rounded-2xl border border-rose-100 bg-rose-50 p-4">
                   <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
+
                   <p className="text-xs font-medium leading-5 text-rose-700">
                     {errorMessage}
                   </p>
                 </div>
               )}
 
+              {/* SUBMIT */}
+
               <button
                 type="submit"
                 disabled={submitting}
-                className={`mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                  isDeposit
-                    ? "bg-emerald-600 hover:bg-emerald-700"
-                    : "bg-rose-600 hover:bg-rose-700"
-                }`}
+                className={`
+                  mt-6
+                  flex
+                  h-12
+                  w-full
+                  items-center
+                  justify-center
+                  gap-2
+                  rounded-xl
+                  text-sm
+                  font-bold
+                  text-white
+                  transition
+                  disabled:cursor-not-allowed
+                  disabled:opacity-60
+                  ${
+                    isDeposit
+                      ? "bg-violet-700 hover:bg-violet-800"
+                      : "bg-fuchsia-700 hover:bg-fuchsia-800"
+                  }
+                `}
               >
                 {submitting ? (
                   <>
@@ -1283,23 +1539,31 @@ function WalletAction({
   return (
     <Link
       href={href}
-      className="group rounded-[23px] border border-[#E1E9F0] bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.035)] transition duration-300 hover:-translate-y-1 hover:border-blue-100 hover:shadow-[0_18px_40px_rgba(15,23,42,0.07)]"
+      className="group rounded-[23px] border border-indigo-100 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.035)] transition duration-300 hover:-translate-y-1 hover:border-violet-200 hover:shadow-[0_18px_40px_rgba(15,23,42,0.07)]"
     >
       <div className="flex items-start justify-between gap-3">
         <div
-          className={`flex h-11 w-11 items-center justify-center rounded-[14px] ${iconClass}`}
+          className={`
+            flex
+            h-11
+            w-11
+            items-center
+            justify-center
+            rounded-[14px]
+            ${iconClass}
+          `}
         >
           <Icon className="h-5 w-5" />
         </div>
 
-        <ChevronRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[#1F5EA8]" />
+        <ChevronRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-indigo-600" />
       </div>
 
-      <h3 className="mt-5 text-sm font-extrabold text-[#18324A]">
+      <h3 className="mt-5 text-sm font-extrabold text-indigo-950">
         {title}
       </h3>
 
-      <p className="mt-1 text-[11px] leading-5 text-[#8A9AAA]">
+      <p className="mt-1 text-[11px] leading-5 text-slate-500">
         {description}
       </p>
     </Link>
@@ -1327,23 +1591,31 @@ function WalletActionButton({
     <button
       type="button"
       onClick={onClick}
-      className="group rounded-[23px] border border-[#E1E9F0] bg-white p-5 text-left shadow-[0_10px_30px_rgba(15,23,42,0.035)] transition duration-300 hover:-translate-y-1 hover:border-blue-100 hover:shadow-[0_18px_40px_rgba(15,23,42,0.07)]"
+      className="group rounded-[23px] border border-indigo-100 bg-white p-5 text-left shadow-[0_10px_30px_rgba(15,23,42,0.035)] transition duration-300 hover:-translate-y-1 hover:border-violet-200 hover:shadow-[0_18px_40px_rgba(15,23,42,0.07)]"
     >
       <div className="flex items-start justify-between gap-3">
         <div
-          className={`flex h-11 w-11 items-center justify-center rounded-[14px] ${iconClass}`}
+          className={`
+            flex
+            h-11
+            w-11
+            items-center
+            justify-center
+            rounded-[14px]
+            ${iconClass}
+          `}
         >
           <Icon className="h-5 w-5" />
         </div>
 
-        <ChevronRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[#1F5EA8]" />
+        <ChevronRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-indigo-600" />
       </div>
 
-      <h3 className="mt-5 text-sm font-extrabold text-[#18324A]">
+      <h3 className="mt-5 text-sm font-extrabold text-indigo-950">
         {title}
       </h3>
 
-      <p className="mt-1 text-[11px] leading-5 text-[#8A9AAA]">
+      <p className="mt-1 text-[11px] leading-5 text-slate-500">
         {description}
       </p>
     </button>
@@ -1351,47 +1623,24 @@ function WalletActionButton({
 }
 
 /* =========================================================
-   INFO CARD
-========================================================= */
-
-function InfoCard({
-  label,
-  value,
-  valueClass = "text-[#18324A]",
-}: {
-  label: string;
-  value: string;
-  valueClass?: string;
-}) {
-  return (
-    <div className="rounded-[17px] border border-[#EDF1F5] bg-[#F8FAFC] p-4">
-      <p className="text-[9px] font-extrabold uppercase tracking-[0.14em] text-[#95A3B1]">
-        {label}
-      </p>
-
-      <p
-        className={`mt-2 break-all text-sm font-bold transition ${valueClass}`}
-      >
-        {value}
-      </p>
-    </div>
-  );
-}
-
-/* =========================================================
-   CURRENCY / DATE
+   CURRENCY
 ========================================================= */
 
 function formatCurrency(
   amount: number
 ): string {
-  return `৳ ${Number(
-    amount || 0
-  ).toLocaleString("en-BD", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })}`;
+  return `৳ ${Number(amount || 0).toLocaleString(
+    "en-BD",
+    {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }
+  )}`;
 }
+
+/* =========================================================
+   DATE
+========================================================= */
 
 function formatDate(
   value?: string
@@ -1402,24 +1651,15 @@ function formatDate(
 
   const date = new Date(value);
 
-  if (
-    Number.isNaN(
-      date.getTime()
-    )
-  ) {
+  if (Number.isNaN(date.getTime())) {
     return "N/A";
   }
 
-  return date.toLocaleString(
-    "en-BD",
-    {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }
-  );
+  return date.toLocaleString("en-BD", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
-
-

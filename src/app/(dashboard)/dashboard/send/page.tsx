@@ -480,7 +480,7 @@ export default function SendMoneyPage() {
   }
 
   return (
-    <main className="relative mx-auto w-full max-w-[1420px] pb-10">
+    <main className="relative mx-auto w-full max-w-[1420px] bg-transparent pb-10 text-foreground">
       {/* ambient page glows */}
       <div className="pointer-events-none absolute -left-40 top-20 h-[420px] w-[420px] rounded-full bg-[#77C8FF]/10 blur-[120px]" />
       <div className="pointer-events-none absolute right-0 top-[420px] h-[360px] w-[360px] rounded-full bg-[#60A5FA]/10 blur-[110px]" />
@@ -489,7 +489,7 @@ export default function SendMoneyPage() {
           HEADER + BALANCE
       ====================================================== */}
 
-      <section className="relative z-10 grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px] xl:items-stretch">
+      <section className="relative z-10 grid gap-5 xl:grid-cols-[minmax(0,1fr)_350px] xl:items-start">
         <TransferHeroCard />
 
         <BalanceRevealCard
@@ -504,22 +504,22 @@ export default function SendMoneyPage() {
           MAIN WORKSPACE
       ====================================================== */}
 
-      <section className="relative z-10 mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_350px]">
+      <section className="relative z-10 mt-5 grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_350px]">
         {/* TRANSFER PANEL */}
 
         <motion.div
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55, delay: 0.05 }}
-          className="overflow-hidden rounded-[30px] border border-[#DFE9F2] bg-white shadow-[0_22px_65px_rgba(15,39,69,0.07)]"
+          className="overflow-hidden rounded-[30px] border border-border bg-card text-card-foreground shadow-[var(--dashboard-shadow)]"
         >
-          <div className="border-b border-[#EDF2F6] bg-gradient-to-r from-[#FBFDFF] to-[#F6FAFE] px-5 py-5 sm:px-7">
+          <div className="border-b border-border bg-muted/50 px-5 py-5 sm:px-7">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#2B78BA]">
                   Payment workspace
                 </p>
-                <h2 className="mt-1.5 text-xl font-black tracking-[-0.025em] text-[#17344D]">
+                <h2 className="mt-1.5 text-xl font-black tracking-[-0.025em] text-card-foreground">
                   {step === 1
                     ? "Transfer details"
                     : step === 2
@@ -576,7 +576,7 @@ export default function SendMoneyPage() {
                           placeholder="e.g. 01XXXXXXXXX or name@email.com"
                           value={recipient}
                           onChange={(event) => setRecipient(event.target.value)}
-                          className="h-[58px] w-full rounded-[16px] border border-[#DCE6EF] bg-[#F8FAFC] pl-12 pr-4 text-sm font-semibold text-[#243D54] outline-none transition placeholder:font-medium placeholder:text-[#9DABBA] hover:border-[#CAD8E6] focus:border-[#3D8DD2] focus:bg-white focus:ring-4 focus:ring-blue-500/[0.07]"
+                          className="h-[58px] w-full rounded-[16px] border border-input bg-background pl-12 pr-4 text-sm font-semibold text-foreground outline-none transition placeholder:font-medium placeholder:text-muted-foreground hover:border-primary/40 focus:border-primary focus:bg-background focus:ring-4 focus:ring-primary/10"
                         />
                       </div>
                     </FormField>
@@ -602,9 +602,9 @@ export default function SendMoneyPage() {
                               event.preventDefault();
                             }
                           }}
-                          className="h-[58px] w-full rounded-[16px] border border-[#DCE6EF] bg-[#F8FAFC] pl-12 pr-16 text-[21px] font-black tracking-[-0.02em] text-[#17344D] outline-none transition placeholder:text-[#C2CDD8] hover:border-[#CAD8E6] focus:border-[#3D8DD2] focus:bg-white focus:ring-4 focus:ring-blue-500/[0.07]"
+                          className="h-[58px] w-full rounded-[16px] border border-input bg-background pl-12 pr-16 text-[21px] font-black tracking-[-0.02em] text-foreground outline-none transition placeholder:text-muted-foreground hover:border-primary/40 focus:border-primary focus:bg-background focus:ring-4 focus:ring-primary/10"
                         />
-                        <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 rounded-lg bg-white px-2 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-[#6E8396] shadow-sm">
+                        <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 rounded-lg border border-border bg-card px-2 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-muted-foreground shadow-sm">
                           BDT
                         </span>
                       </div>
@@ -613,11 +613,11 @@ export default function SendMoneyPage() {
 
                   <div>
                     <div className="mb-2 flex items-center justify-between">
-                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#71869A]">
+                      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
                         Quick amounts
                       </p>
                       {balance !== null && (
-                        <p className="text-[10px] font-semibold text-[#98A7B6]">
+                        <p className="text-[10px] font-semibold text-muted-foreground">
                           Limited by available balance
                         </p>
                       )}
@@ -641,8 +641,8 @@ export default function SendMoneyPage() {
                               disabled
                                 ? "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300"
                                 : active
-                                ? "border-[#3E8FD9] bg-[#EEF7FF] text-[#1F6FB4] shadow-[0_7px_18px_rgba(31,111,180,0.09)]"
-                                : "border-[#E1E8EF] bg-white text-[#60768A] hover:border-[#BFD7EB] hover:bg-[#F7FBFF] hover:text-[#1F6FB4]"
+                                ? "border-primary bg-primary/10 text-primary shadow-[0_7px_18px_rgba(31,111,180,0.09)]"
+                                : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
                             }`}
                           >
                             ৳ {quickAmount.toLocaleString("en-BD")}
@@ -665,7 +665,7 @@ export default function SendMoneyPage() {
                         placeholder="Add a short note for this payment"
                         value={note}
                         onChange={(event) => setNote(event.target.value)}
-                        className="h-[56px] w-full rounded-[16px] border border-[#DCE6EF] bg-[#F8FAFC] pl-12 pr-4 text-sm font-semibold text-[#243D54] outline-none transition placeholder:font-medium placeholder:text-[#9DABBA] hover:border-[#CAD8E6] focus:border-[#3D8DD2] focus:bg-white focus:ring-4 focus:ring-blue-500/[0.07]"
+                        className="h-[56px] w-full rounded-[16px] border border-input bg-background pl-12 pr-4 text-sm font-semibold text-foreground outline-none transition placeholder:font-medium placeholder:text-muted-foreground hover:border-primary/40 focus:border-primary focus:bg-background focus:ring-4 focus:ring-primary/10"
                       />
                     </div>
                   </FormField>
@@ -675,7 +675,7 @@ export default function SendMoneyPage() {
                     onClick={handleNext}
                     disabled={!recipient.trim() || !amount}
                     whileTap={{ scale: 0.988 }}
-                    className="group relative flex h-[58px] w-full items-center justify-center gap-2 overflow-hidden rounded-[17px] bg-gradient-to-r from-[#15558F] via-[#1F6FB4] to-[#2C8DD2] text-sm font-black text-white shadow-[0_15px_35px_rgba(31,111,180,0.22)] transition hover:shadow-[0_18px_42px_rgba(31,111,180,0.28)] disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none"
+                    className="group relative flex h-[58px] w-full items-center justify-center gap-2 overflow-hidden rounded-[17px] bg-primary text-primary-foreground text-sm font-black shadow-[0_15px_35px_rgba(31,111,180,0.22)] transition hover:brightness-105 hover:shadow-[0_18px_42px_rgba(31,111,180,0.28)] disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none"
                   >
                     <motion.span
                       aria-hidden
@@ -686,6 +686,8 @@ export default function SendMoneyPage() {
                     <span className="relative">Review payment</span>
                     <ArrowRight className="relative h-[18px] w-[18px] transition-transform group-hover:translate-x-1" />
                   </motion.button>
+
+                  <TransferInfoStrip />
                 </motion.div>
               )}
 
@@ -703,18 +705,18 @@ export default function SendMoneyPage() {
                   <button
                     type="button"
                     onClick={() => goToStep(1)}
-                    className="group inline-flex items-center gap-1.5 text-xs font-black text-[#6B7F92] transition hover:text-[#1F6FB4]"
+                    className="group inline-flex items-center gap-1.5 text-xs font-black text-muted-foreground transition hover:text-primary"
                   >
                     <ChevronLeft className="h-4 w-4 transition-transform group-hover:-translate-x-0.5" />
                     Edit details
                   </button>
 
-                  <div className="overflow-hidden rounded-[24px] border border-[#DCE8F2] bg-gradient-to-br from-[#F8FCFF] to-[#EFF7FD]">
-                    <div className="border-b border-white bg-white/65 p-5 text-center sm:p-6">
-                      <p className="text-[9px] font-black uppercase tracking-[0.17em] text-[#6F8498]">
+                  <div className="overflow-hidden rounded-[24px] border border-border bg-muted/40">
+                    <div className="border-b border-border bg-card/80 p-5 text-center sm:p-6">
+                      <p className="text-[9px] font-black uppercase tracking-[0.17em] text-muted-foreground">
                         You are sending
                       </p>
-                      <h3 className="mt-2 text-4xl font-black tracking-[-0.05em] text-[#102A43]">
+                      <h3 className="mt-2 text-4xl font-black tracking-[-0.05em] text-card-foreground">
                         {formatCurrency(numericAmount)}
                       </h3>
                     </div>
@@ -733,17 +735,17 @@ export default function SendMoneyPage() {
                     </div>
                   </div>
 
-                  <div className="rounded-[22px] border border-[#E0E8F0] bg-white p-5 sm:p-6">
+                  <div className="rounded-[22px] border border-border bg-card p-5 sm:p-6">
                     <div className="text-center">
-                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[16px] bg-[#EEF7FF] text-[#1F6FB4]">
+                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[16px] bg-primary/10 text-primary">
                         <LockKeyhole className="h-5 w-5" />
                       </div>
 
-                      <h3 className="mt-3 text-sm font-black text-[#17344D]">
+                      <h3 className="mt-3 text-sm font-black text-card-foreground">
                         Confirm with your login password
                       </h3>
 
-                      <p className="mt-1 text-[11px] leading-5 text-[#8798A8]">
+                      <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
                         Re-enter your account password to authorize this transfer.
                       </p>
                     </div>
@@ -766,7 +768,7 @@ export default function SendMoneyPage() {
                           }
                         }}
                         placeholder="Enter your login password"
-                        className="h-[58px] w-full rounded-[16px] border border-[#DCE6EF] bg-[#F8FAFC] px-4 pr-12 text-sm font-semibold text-[#243D54] outline-none transition placeholder:font-medium placeholder:text-[#9DABBA] hover:border-[#CAD8E6] focus:border-[#3D8DD2] focus:bg-white focus:ring-4 focus:ring-blue-500/[0.07]"
+                        className="h-[58px] w-full rounded-[16px] border border-input bg-background px-4 pr-12 text-sm font-semibold text-foreground outline-none transition placeholder:font-medium placeholder:text-muted-foreground hover:border-primary/40 focus:border-primary focus:bg-background focus:ring-4 focus:ring-primary/10"
                       />
 
                       <button
@@ -783,9 +785,9 @@ export default function SendMoneyPage() {
                       </button>
                     </div>
 
-                    <div className="mt-3 flex items-start gap-2 rounded-[13px] bg-[#F7FAFD] px-3 py-2.5">
+                    <div className="mt-3 flex items-start gap-2 rounded-[13px] bg-muted/60 px-3 py-2.5">
                       <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
-                      <p className="text-[10px] font-medium leading-5 text-[#7A8D9F]">
+                      <p className="text-[10px] font-medium leading-5 text-muted-foreground">
                         Your password is sent only to the secure backend over HTTPS for verification and is never stored in the transaction.
                       </p>
                     </div>
@@ -798,7 +800,7 @@ export default function SendMoneyPage() {
                     }}
                     disabled={!password.trim() || isLoading}
                     whileTap={{ scale: 0.988 }}
-                    className="flex h-[58px] w-full items-center justify-center gap-2 rounded-[17px] bg-gradient-to-r from-[#0F5D9E] to-[#278AD7] text-sm font-black text-white shadow-[0_14px_34px_rgba(31,112,189,0.22)] transition disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none"
+                    className="flex h-[58px] w-full items-center justify-center gap-2 rounded-[17px] bg-primary text-primary-foreground text-sm font-black shadow-[0_14px_34px_rgba(31,112,189,0.22)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none"
                   >
                     {isLoading ? (
                       <>
@@ -852,21 +854,21 @@ export default function SendMoneyPage() {
 
                   <p className="mt-2 max-w-md text-sm leading-6 text-[#74879A]">
                     {formatCurrency(numericAmount)} was sent to{" "}
-                    <span className="font-black text-[#17344D]">{recipient}</span>.
+                    <span className="font-black text-card-foreground">{recipient}</span>.
                   </p>
 
                   <div className="mt-8 grid w-full max-w-md grid-cols-1 gap-3 sm:grid-cols-2">
                     <button
                       type="button"
                       onClick={handleReset}
-                      className="h-12 rounded-[14px] border border-[#DCE6EF] bg-white text-xs font-black text-[#61768A] transition hover:border-blue-200 hover:bg-blue-50 hover:text-[#1F6FB4]"
+                      className="h-12 rounded-[14px] border border-border bg-background text-xs font-black text-muted-foreground transition hover:border-primary/30 hover:bg-primary/5 hover:text-primary"
                     >
                       Send another
                     </button>
 
                     <Link
                       href="/dashboard"
-                      className="flex h-12 items-center justify-center rounded-[14px] bg-[#1F6FB4] text-xs font-black text-white transition hover:bg-[#195E98]"
+                      className="flex h-12 items-center justify-center rounded-[14px] bg-primary text-xs font-black text-primary-foreground transition hover:brightness-105"
                     >
                       Back to dashboard
                     </Link>
@@ -885,13 +887,13 @@ export default function SendMoneyPage() {
           transition={{ duration: 0.55, delay: 0.12 }}
           className="space-y-5 xl:sticky xl:top-[100px]"
         >
-          <div className="rounded-[26px] border border-[#E1EAF2] bg-white p-5 shadow-[0_16px_46px_rgba(15,39,69,0.05)]">
+          <div className="rounded-[26px] border border-border bg-card p-5 text-card-foreground shadow-[var(--dashboard-shadow)]">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="flex h-10 w-10 items-center justify-center rounded-[13px] bg-[#EEF7FF] text-[#1F6FB4]">
+                <div className="flex h-10 w-10 items-center justify-center rounded-[13px] bg-primary/10 text-primary">
                   <Clock3 className="h-[18px] w-[18px]" />
                 </div>
-                <h3 className="mt-4 text-sm font-black text-[#17344D]">
+                <h3 className="mt-4 text-sm font-black text-card-foreground">
                   Recent recipients
                 </h3>
                 <p className="mt-1 text-[10px] leading-5 text-[#8B9AAA]">
@@ -941,29 +943,62 @@ export default function SendMoneyPage() {
 
           <PaymentHistoryDrawer history={paymentHistory} />
 
-          <div className="relative overflow-hidden rounded-[26px] bg-gradient-to-br from-[#0A2A49] via-[#164E82] to-[#2078B7] p-6 text-white shadow-[0_22px_50px_rgba(20,78,130,0.22)]">
-            <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full border border-white/10" />
-            <div className="pointer-events-none absolute -bottom-20 -left-10 h-44 w-44 rounded-full bg-sky-300/10 blur-[50px]" />
+          <motion.div
+            whileHover={{ y: -3 }}
+            className="relative overflow-hidden rounded-[26px] border border-white/10 bg-gradient-to-br from-[#14072F] via-[#24104F] to-[#44208F] p-6 text-white shadow-[0_22px_55px_rgba(43,18,92,0.30)]"
+          >
+            <motion.div
+              animate={{ scale: [1, 1.08, 1], opacity: [0.12, 0.22, 0.12] }}
+              transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut" }}
+              className="pointer-events-none absolute -right-14 -top-14 h-44 w-44 rounded-full bg-fuchsia-300/20 blur-[55px]"
+            />
+            <div className="pointer-events-none absolute -bottom-24 -left-12 h-48 w-48 rounded-full bg-violet-300/15 blur-[60px]" />
+            <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white/30 to-transparent" />
 
-            <div className="relative flex h-11 w-11 items-center justify-center rounded-[14px] border border-white/10 bg-white/10 backdrop-blur">
-              <ShieldCheck className="h-5 w-5 text-[#BFE8FF]" />
+            <div className="relative flex items-start justify-between gap-4">
+              <motion.div
+                animate={{ y: [0, -3, 0], rotate: [0, -3, 3, 0] }}
+                transition={{ duration: 4.4, repeat: Infinity, ease: "easeInOut" }}
+                className="flex h-11 w-11 items-center justify-center rounded-[14px] border border-white/10 bg-white/10 text-[#BFE8FF] shadow-[0_10px_24px_rgba(0,0,0,0.10)] backdrop-blur"
+              >
+                <ShieldCheck className="h-5 w-5" />
+              </motion.div>
+
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/15 bg-emerald-400/10 px-2.5 py-1.5 text-[9px] font-black text-emerald-200">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-300" />
+                Protected
+              </span>
             </div>
 
-            <h3 className="relative mt-5 text-base font-black">
+            <h3 className="relative mt-5 text-base font-black tracking-[-0.02em]">
               Payment protection
             </h3>
 
-            <p className="relative mt-2 text-xs font-medium leading-6 text-blue-100/90">
-              Review the recipient and amount before authorizing. Never share your account password.
+            <p className="relative mt-2 text-xs font-medium leading-6 text-white/75">
+              Review the recipient and amount before authorizing. Your password is used only for secure verification and is never stored in the transaction.
             </p>
 
-            <div className="relative mt-5 flex items-center gap-2 rounded-[13px] border border-white/10 bg-white/[0.07] px-3 py-2.5">
-              <LockKeyhole className="h-3.5 w-3.5 text-sky-200" />
-              <span className="text-[9px] font-black uppercase tracking-[0.14em] text-blue-100">
-                Secure confirmation flow
-              </span>
+            <div className="relative mt-5 grid grid-cols-2 gap-2.5">
+              <ProtectionItem
+                icon={LockKeyhole}
+                label="Authorization"
+                value="Password verified"
+              />
+              <ProtectionItem
+                icon={Fingerprint}
+                label="Payment safety"
+                value="Retry protected"
+              />
             </div>
-          </div>
+
+            <div className="relative mt-4 h-1 overflow-hidden rounded-full bg-white/10">
+              <motion.div
+                className="absolute inset-y-0 left-0 w-1/3 rounded-full bg-gradient-to-r from-cyan-300/0 via-cyan-200/80 to-white/0"
+                animate={{ x: ["-120%", "320%"] }}
+                transition={{ duration: 2.8, repeat: Infinity, repeatDelay: 1.2, ease: "easeInOut" }}
+              />
+            </div>
+          </motion.div>
         </motion.aside>
       </section>
     </main>
@@ -982,11 +1017,11 @@ function KYCCheckingState() {
         animate={{ opacity: 1, y: 0 }}
         className="w-full rounded-[30px] border border-[#DFE8F1] bg-white p-8 text-center shadow-[0_22px_65px_rgba(15,39,69,0.07)]"
       >
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-[#EEF7FF] text-[#1F6FB4]">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-primary/10 text-primary">
           <Loader2 className="h-6 w-6 animate-spin" />
         </div>
 
-        <h1 className="mt-5 text-xl font-black text-[#17344D]">
+        <h1 className="mt-5 text-xl font-black text-card-foreground">
           Checking verification
         </h1>
 
@@ -1045,7 +1080,7 @@ function KYCRequiredState({
             Protected financial action
           </div>
 
-          <h1 className="mt-5 text-2xl font-black tracking-[-0.03em] text-[#17344D]">
+          <h1 className="mt-5 text-2xl font-black tracking-[-0.03em] text-card-foreground">
             {errorMessage
               ? "Verification check unavailable"
               : content.title}
@@ -1132,116 +1167,202 @@ function getKYCGuardContent(
 
 function TransferHeroCard() {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: -12 }}
+    <motion.section
+      initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="group relative min-h-[220px] overflow-hidden rounded-[30px] border border-[#D9E7F2] bg-[linear-gradient(135deg,#FFFFFF_0%,#F8FBFF_48%,#F1F8FE_100%)] p-6 shadow-[0_24px_70px_rgba(15,61,103,0.08)] sm:p-7 lg:p-8"
+      transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+      className="group relative isolate min-h-[250px] overflow-hidden rounded-[30px] border border-border bg-card p-5 text-card-foreground shadow-[var(--dashboard-shadow)] sm:p-7 lg:p-8"
     >
-      <div className="pointer-events-none absolute -left-20 -top-24 h-64 w-64 rounded-full bg-sky-300/10 blur-[70px]" />
-      <div className="pointer-events-none absolute -bottom-24 right-[18%] h-56 w-56 rounded-full bg-blue-400/10 blur-[80px]" />
-      <div className="pointer-events-none absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-[#78BEEA]/45 to-transparent" />
+      <div className="pointer-events-none absolute -left-24 -top-28 h-72 w-72 rounded-full bg-primary/10 blur-[85px]" />
+      <div className="pointer-events-none absolute -bottom-28 right-[16%] h-64 w-64 rounded-full bg-primary/10 blur-[90px]" />
+      <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
 
-      <div className="relative z-10 grid h-full items-center gap-7 md:grid-cols-[minmax(0,1fr)_190px] lg:grid-cols-[minmax(0,1fr)_210px]">
+      <motion.div
+        aria-hidden
+        animate={{ x: [0, 18, 0], opacity: [0.15, 0.45, 0.15] }}
+        transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+        className="pointer-events-none absolute right-[31%] top-8 h-2 w-2 rounded-full bg-primary shadow-[0_0_18px_rgba(59,130,246,0.35)]"
+      />
+
+      <div className="relative z-10 grid h-full items-center gap-7 md:grid-cols-[minmax(0,1fr)_205px] lg:grid-cols-[minmax(0,1fr)_220px]">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-2 rounded-full border border-[#CFE7F7] bg-white/90 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-[#1769AA] shadow-[0_6px_18px_rgba(23,105,170,0.06)]">
-              <Sparkles className="h-3.5 w-3.5" />
+          <motion.div
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.08 }}
+            className="flex flex-wrap items-center gap-2"
+          >
+            <span className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/80 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-primary shadow-[0_8px_22px_rgba(23,105,170,0.06)]">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Send className="h-3 w-3" />
+              </span>
               Secure transfer
             </span>
 
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50/80 px-2.5 py-1.5 text-[9px] font-black text-emerald-600">
+            <motion.span
+              animate={{ scale: [1, 1.04, 1] }}
+              transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+              className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/70 bg-emerald-50/80 px-2.5 py-1.5 text-[9px] font-black text-emerald-600 dark:border-emerald-800/50 dark:bg-emerald-950/30 dark:text-emerald-300"
+            >
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.10)]" />
               Protected
-            </span>
-          </div>
+            </motion.span>
+          </motion.div>
 
-          <h1 className="mt-4 max-w-[560px] text-[32px] font-black leading-[1.04] tracking-[-0.055em] text-[#0E2A43] sm:text-[38px] lg:text-[41px]">
+          <motion.h1
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.12 }}
+            className="mt-4 max-w-[610px] text-[34px] font-black leading-[0.98] tracking-[-0.055em] text-card-foreground sm:text-[40px] lg:text-[43px]"
+          >
             Send money with
-            <span className="relative ml-2 inline-block text-[#1E70B5]">
+            <span className="relative ml-2 inline-block bg-gradient-to-r from-primary via-primary to-cyan-400 bg-clip-text text-transparent">
               confidence.
               <motion.span
                 aria-hidden
-                className="absolute -bottom-1 left-0 h-[3px] w-full rounded-full bg-gradient-to-r from-[#1F77BA] via-[#61C3EA] to-transparent"
-                initial={{ scaleX: 0, originX: 0 }}
-                animate={{ scaleX: 1 }}
-                transition={{ delay: 0.45, duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+                className="absolute -bottom-1 left-0 h-[3px] w-full origin-left rounded-full bg-gradient-to-r from-primary via-cyan-400 to-transparent"
+                initial={{ scaleX: 0, opacity: 0 }}
+                animate={{ scaleX: 1, opacity: 1 }}
+                transition={{ delay: 0.45, duration: 0.75, ease: [0.16, 1, 0.3, 1] }}
               />
             </span>
-          </h1>
+          </motion.h1>
 
-          <p className="mt-3 max-w-xl text-[13px] font-medium leading-6 text-[#6B8297] sm:text-sm">
+          <motion.p
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, delay: 0.18 }}
+            className="mt-3 max-w-xl text-[13px] font-medium leading-6 text-muted-foreground sm:text-sm"
+          >
             A guided Coffer transfer flow with review, password confirmation,
             encrypted transaction data, and duplicate-payment protection.
-          </p>
+          </motion.p>
 
-          <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] font-bold text-[#6F879B]">
-            <span className="inline-flex items-center gap-1.5">
-              <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-              Protected session
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <Fingerprint className="h-3.5 w-3.5 text-[#2B80C5]" />
-              Retry-safe payment
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <CheckCircle2 className="h-3.5 w-3.5 text-[#2B80C5]" />
-              Review before send
-            </span>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, delay: 0.24 }}
+            className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2"
+          >
+            <FeaturePill icon={ShieldCheck} text="Protected session" tone="green" />
+            <FeaturePill icon={Fingerprint} text="Retry-safe payment" tone="blue" />
+            <FeaturePill icon={CheckCircle2} text="Review before send" tone="blue" />
+          </motion.div>
         </div>
 
-        <div className="relative hidden h-[168px] md:block">
+        <div className="relative hidden h-[178px] md:block">
           <motion.div
-            animate={{ y: [0, -5, 0] }}
-            transition={{ duration: 4.6, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute inset-0 overflow-hidden rounded-[24px] border border-[#D7E8F5] bg-white/80 p-4 shadow-[0_18px_42px_rgba(31,111,180,0.10)] backdrop-blur-xl"
+            initial={{ opacity: 0, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.16 }}
+            className="absolute inset-0 overflow-hidden rounded-[24px] border border-border bg-background/80 p-4 shadow-[var(--dashboard-shadow)] backdrop-blur-xl"
           >
-            <div className="absolute -right-10 -top-10 h-28 w-28 rounded-full bg-[#63C7EE]/15 blur-[34px]" />
+            <motion.div
+              animate={{ x: [0, 10, 0], y: [0, -4, 0] }}
+              transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+              className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-primary/10 blur-[35px]"
+            />
 
             <div className="relative flex items-center justify-between">
-              <div className="flex h-10 w-10 items-center justify-center rounded-[13px] bg-gradient-to-br from-[#155E9D] to-[#38A7DE] text-white shadow-[0_8px_20px_rgba(31,111,180,0.22)]">
-                <WalletCards className="h-[18px] w-[18px]" />
-              </div>
-
+              <FlowIcon icon={WalletCards} active />
               <motion.div
                 animate={{ x: [0, 5, 0] }}
-                transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#D9E9F5] bg-[#F4FAFF] text-[#1F72B5]"
+                transition={{ duration: 2.1, repeat: Infinity, ease: "easeInOut" }}
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background text-primary"
               >
-                <ArrowUpRight className="h-4 w-4" />
+                <ArrowRight className="h-4 w-4" />
               </motion.div>
-
-              <div className="flex h-10 w-10 items-center justify-center rounded-[13px] border border-emerald-100 bg-emerald-50 text-emerald-600">
-                <CheckCircle2 className="h-[18px] w-[18px]" />
-              </div>
+              <FlowIcon icon={CheckCircle2} success />
             </div>
 
-            <div className="relative mt-4 h-1.5 overflow-hidden rounded-full bg-[#E8F2F9]">
+            <div className="relative mt-4 h-1.5 overflow-hidden rounded-full bg-muted">
               <motion.div
-                className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-[#1E70B5] to-[#65C9EC]"
-                animate={{ width: ["18%", "100%", "18%"] }}
-                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute inset-y-0 left-0 rounded-full bg-primary"
+                animate={{ width: ["12%", "100%", "12%"] }}
+                transition={{ duration: 4.2, repeat: Infinity, ease: "easeInOut" }}
               />
             </div>
 
             <div className="relative mt-4 grid grid-cols-2 gap-2">
-              <div className="rounded-[12px] bg-[#F4F9FD] px-3 py-2.5">
-                <p className="text-[8px] font-black uppercase tracking-[0.12em] text-[#90A3B4]">Authorize</p>
-                <p className="mt-1 text-[10px] font-black text-[#29475F]">Password check</p>
-              </div>
-              <div className="rounded-[12px] bg-[#F4F9FD] px-3 py-2.5">
-                <p className="text-[8px] font-black uppercase tracking-[0.12em] text-[#90A3B4]">Protection</p>
-                <p className="mt-1 flex items-center gap-1 text-[10px] font-black text-[#29475F]">
-                  <Zap className="h-3 w-3 text-amber-500" />
-                  Duplicate safe
-                </p>
-              </div>
+              <FlowMiniCard label="Authorize" value="Password check" />
+              <FlowMiniCard label="Protection" value="Duplicate safe" icon={Zap} />
             </div>
           </motion.div>
         </div>
       </div>
+    </motion.section>
+  );
+}
+
+function FeaturePill({
+  icon: Icon,
+  text,
+  tone,
+}: {
+  icon: ElementType;
+  text: string;
+  tone: "green" | "blue";
+}) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 text-[10px] font-bold ${
+        tone === "green" ? "text-emerald-600 dark:text-emerald-300" : "text-muted-foreground"
+      }`}
+    >
+      <Icon
+        className={`h-3.5 w-3.5 ${
+          tone === "green" ? "text-emerald-500" : "text-primary"
+        }`}
+      />
+      {text}
+    </span>
+  );
+}
+
+function FlowIcon({
+  icon: Icon,
+  active = false,
+  success = false,
+}: {
+  icon: ElementType;
+  active?: boolean;
+  success?: boolean;
+}) {
+  return (
+    <motion.div
+      whileHover={{ scale: 1.04 }}
+      className={`flex h-10 w-10 items-center justify-center rounded-[13px] border ${
+        success
+          ? "border-emerald-200 bg-emerald-50 text-emerald-600 dark:border-emerald-800/50 dark:bg-emerald-950/30 dark:text-emerald-300"
+          : active
+            ? "border-transparent bg-primary text-white shadow-[0_8px_20px_rgba(31,111,180,0.20)]"
+            : "border-[#DCEAF5] bg-[#F7FBFE] text-[#2B80C5]"
+      }`}
+    >
+      <Icon className="h-[18px] w-[18px]" />
     </motion.div>
+  );
+}
+
+function FlowMiniCard({
+  label,
+  value,
+  icon: Icon,
+}: {
+  label: string;
+  value: string;
+  icon?: ElementType;
+}) {
+  return (
+    <div className="rounded-[12px] bg-muted/60 px-3 py-2.5">
+      <p className="text-[8px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-1 flex items-center gap-1 text-[10px] font-black text-card-foreground">
+        {Icon && <Icon className="h-3 w-3 text-amber-500" />}
+        {value}
+      </p>
+    </div>
   );
 }
 
@@ -1264,42 +1385,48 @@ function BalanceRevealCard({
     <motion.button
       type="button"
       onClick={onToggle}
-      whileHover={{ y: -3 }}
+      whileHover={{ y: -4 }}
       whileTap={{ scale: 0.992 }}
       aria-label={showBalance ? "Hide balance" : "Reveal balance"}
-      className="group relative min-h-[220px] w-full overflow-hidden rounded-[30px] border border-white/10 bg-gradient-to-br from-[#07192C] via-[#0B365C] to-[#176DA7] p-6 text-left text-white shadow-[0_26px_65px_rgba(13,65,105,0.24)] sm:p-7"
+      className="group relative min-h-[250px] w-full overflow-hidden rounded-[30px] border border-white/10 bg-gradient-to-br from-[#14072F] via-[#24104F] to-[#44208F] p-5 text-left text-white shadow-[0_26px_70px_rgba(43,18,92,0.30)] sm:p-7"
     >
       <motion.div
-        className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#62D4FF]/20 blur-[80px]"
-        animate={{ x: [0, 18, 0], y: [0, 12, 0], scale: [1, 1.08, 1] }}
-        transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
+        className="pointer-events-none absolute -right-28 -top-24 h-80 w-80 rounded-full bg-[#62D4FF]/18 blur-[85px]"
+        animate={{ x: [0, 18, 0], y: [0, 14, 0], scale: [1, 1.08, 1] }}
+        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
       />
-      <div className="pointer-events-none absolute -bottom-28 left-10 h-64 w-64 rounded-full bg-blue-500/20 blur-[90px]" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/35 to-transparent" />
+
+      <div className="pointer-events-none absolute -bottom-32 left-0 h-64 w-64 rounded-full bg-[#2A93D1]/18 blur-[90px]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
 
       <div className="relative z-10 flex h-full flex-col justify-between">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-[14px] border border-white/10 bg-white/10 backdrop-blur">
-              <WalletCards className="h-5 w-5 text-[#9BE8FF]" />
-            </div>
+            <motion.div
+              whileHover={{ rotate: 4, scale: 1.04 }}
+              className="flex h-11 w-11 items-center justify-center rounded-[14px] border border-white/10 bg-white/10 text-[#A8ECFF] shadow-[0_10px_26px_rgba(0,0,0,0.10)] backdrop-blur"
+            >
+              <WalletCards className="h-5 w-5" />
+            </motion.div>
+
             <div>
-              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#9DDBFF]">
+              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#A8E6FF]">
                 Available balance
               </p>
-              <p className="mt-1 text-[11px] font-semibold text-white/50">
+              <p className="mt-1 text-[11px] font-semibold text-white/65">
                 Coffer wallet · BDT
               </p>
             </div>
           </div>
 
-          <div className="flex h-9 w-9 items-center justify-center rounded-[12px] border border-white/10 bg-white/10 text-[#C6F1FF] backdrop-blur">
+          <div className="flex h-9 w-9 items-center justify-center rounded-[12px] border border-white/10 bg-white/10 text-[#C9F2FF] backdrop-blur">
             <AnimatePresence mode="wait" initial={false}>
               <motion.span
                 key={showBalance ? "eye" : "eye-off"}
-                initial={{ opacity: 0, scale: 0.6, rotate: -45 }}
+                initial={{ opacity: 0, scale: 0.6, rotate: -35 }}
                 animate={{ opacity: 1, scale: 1, rotate: 0 }}
-                exit={{ opacity: 0, scale: 0.6, rotate: 45 }}
+                exit={{ opacity: 0, scale: 0.6, rotate: 35 }}
+                transition={{ duration: 0.2 }}
                 className="flex"
               >
                 {showBalance ? (
@@ -1314,37 +1441,37 @@ function BalanceRevealCard({
 
         <div className="mt-7">
           {balanceLoading ? (
-            <div className="flex h-[64px] items-center gap-3">
+            <div className="flex h-[72px] items-center gap-3 rounded-[18px] border border-white/10 bg-white/[0.05] px-4">
               <Loader2 className="h-5 w-5 animate-spin text-[#9BE8FF]" />
               <span className="text-xs font-bold text-white/60">Syncing balance...</span>
             </div>
           ) : (
-            <div className="relative h-[68px] overflow-hidden rounded-[18px]">
+            <div className="relative min-h-[92px] overflow-hidden rounded-[18px]">
               <AnimatePresence mode="wait" initial={false}>
                 {showBalance ? (
                   <motion.div
                     key="revealed"
-                    initial={{ opacity: 0, y: 30, filter: "blur(12px)" }}
+                    initial={{ opacity: 0, y: 24, filter: "blur(12px)" }}
                     animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                    exit={{ opacity: 0, y: -26, filter: "blur(12px)" }}
-                    transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
+                    exit={{ opacity: 0, y: -24, filter: "blur(12px)" }}
+                    transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
                     className="flex h-full items-center"
                   >
-                    <span className="bg-gradient-to-r from-white via-[#E8FAFF] to-[#91E3FF] bg-clip-text text-[38px] font-black tracking-[-0.05em] text-transparent sm:text-[46px]">
+                    <span className="inline-block max-w-full whitespace-nowrap bg-gradient-to-r from-white via-[#F3E8FF] to-[#C4B5FD] bg-clip-text text-[32px] font-black leading-none tracking-[-0.045em] text-transparent sm:text-[40px] lg:text-[44px]">
                       {formattedBalance}
                     </span>
                   </motion.div>
                 ) : (
                   <motion.div
                     key="hidden"
-                    initial={{ opacity: 0, y: -18 }}
+                    initial={{ opacity: 0, y: -14 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 18 }}
-                    className="absolute inset-0 flex items-center overflow-hidden rounded-[18px] border border-white/10 bg-[#06182A]/35 px-4 backdrop-blur-xl"
+                    exit={{ opacity: 0, y: 14 }}
+                    className="absolute inset-0 flex items-center overflow-hidden rounded-[18px] border border-white/10 bg-[#160A36]/45 px-4 backdrop-blur-xl"
                   >
                     <motion.div
                       className="absolute inset-y-0 -left-24 w-24 bg-gradient-to-r from-transparent via-white/12 to-transparent"
-                      animate={{ x: [0, 520] }}
+                      animate={{ x: [0, 540] }}
                       transition={{ duration: 2.8, repeat: Infinity, repeatDelay: 0.8 }}
                     />
 
@@ -1381,13 +1508,49 @@ function BalanceRevealCard({
               {showBalance ? "Tap again to hide" : "Privacy mode is active"}
             </span>
 
-            <span className="rounded-full border border-emerald-300/15 bg-emerald-400/10 px-2.5 py-1 text-[9px] font-black text-emerald-200">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/15 bg-emerald-400/10 px-2.5 py-1 text-[9px] font-black text-emerald-200">
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-300" />
               Wallet active
             </span>
           </div>
         </div>
       </div>
     </motion.button>
+  );
+}
+
+/* =========================================================
+   PAYMENT PROTECTION ITEM
+========================================================= */
+
+function ProtectionItem({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: ElementType;
+  label: string;
+  value: string;
+}) {
+  return (
+    <motion.div
+      whileHover={{ y: -1 }}
+      className="rounded-[14px] border border-white/10 bg-white/[0.07] px-3 py-3 backdrop-blur"
+    >
+      <div className="flex items-center gap-2">
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-[#BFE8FF]">
+          <Icon className="h-3.5 w-3.5" />
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-[8px] font-black uppercase tracking-[0.11em] text-white/50">
+            {label}
+          </p>
+          <p className="mt-0.5 truncate text-[10px] font-black text-white/85">
+            {value}
+          </p>
+        </div>
+      </div>
+    </motion.div>
   );
 }
 
@@ -1408,12 +1571,12 @@ function PaymentHistoryDrawer({
           className="group flex w-full items-center justify-between gap-4 rounded-[22px] border border-[#DEE8F1] bg-white p-4 text-left shadow-[0_12px_38px_rgba(15,39,69,0.045)] transition hover:-translate-y-0.5 hover:border-[#C9DDED] hover:shadow-[0_18px_44px_rgba(15,39,69,0.07)]"
         >
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-[#EEF7FF] text-[#1F6FB4]">
+            <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-primary/10 text-primary">
               <History className="h-[19px] w-[19px]" />
             </div>
             <div>
               <p className="text-xs font-black text-[#213E57]">Payment history</p>
-              <p className="mt-0.5 text-[9px] font-semibold text-[#91A0AF]">
+              <p className="mt-0.5 text-[9px] font-semibold text-muted-foreground">
                 {history.length > 0
                   ? `${history.length} confirmed payment${history.length > 1 ? "s" : ""}`
                   : "View recent payment activity"}
@@ -1430,11 +1593,11 @@ function PaymentHistoryDrawer({
       >
         <SheetHeader className="sticky top-0 z-20 border-b border-[#E6EDF3] bg-white/95 px-5 py-5 text-left backdrop-blur sm:px-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-[#EEF7FF] text-[#1F6FB4]">
+            <div className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-primary/10 text-primary">
               <ReceiptText className="h-5 w-5" />
             </div>
             <div>
-              <SheetTitle className="text-base font-black tracking-[-0.02em] text-[#17344D]">
+              <SheetTitle className="text-base font-black tracking-[-0.02em] text-card-foreground">
                 Payment history
               </SheetTitle>
               <SheetDescription className="mt-1 text-[10px] leading-5 text-[#8597A7]">
@@ -1471,7 +1634,7 @@ function PaymentHistoryDrawer({
                     </div>
 
                     <div className="text-right">
-                      <p className="text-sm font-black text-[#17344D]">
+                      <p className="text-sm font-black text-card-foreground">
                         -{formatCurrency(item.amount)}
                       </p>
                       <span className="mt-1 inline-flex rounded-full bg-emerald-50 px-2 py-1 text-[8px] font-black uppercase tracking-[0.1em] text-emerald-600">
@@ -1493,7 +1656,7 @@ function PaymentHistoryDrawer({
               <div className="flex h-16 w-16 items-center justify-center rounded-[22px] border border-[#DDE8F1] bg-white text-[#7E9AB2] shadow-sm">
                 <History className="h-7 w-7" />
               </div>
-              <h3 className="mt-5 text-sm font-black text-[#17344D]">
+              <h3 className="mt-5 text-sm font-black text-card-foreground">
                 No payments yet
               </h3>
               <p className="mt-2 max-w-xs text-[11px] leading-6 text-[#8C9CAB]">
@@ -1504,6 +1667,80 @@ function PaymentHistoryDrawer({
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+/* =========================================================
+   TRANSFER INFO STRIP
+========================================================= */
+
+function TransferInfoStrip() {
+  const items = [
+    {
+      icon: CheckCircle2,
+      title: "Review before sending",
+      text: "Recipient and amount are confirmed on the next step.",
+    },
+    {
+      icon: ShieldCheck,
+      title: "Secure authorization",
+      text: "Your password is used only to verify this payment.",
+    },
+    {
+      icon: Fingerprint,
+      title: "Retry-safe",
+      text: "Duplicate payment protection keeps retries safe.",
+    },
+  ];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: 0.12 }}
+      className="rounded-[22px] border border-border bg-muted/40 p-4 sm:p-5"
+    >
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-primary">
+            Before you send
+          </p>
+          <h3 className="mt-1 text-sm font-black text-card-foreground">
+            A safer transfer, step by step
+          </h3>
+        </div>
+        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[9px] font-black text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-300">
+          Protected flow
+        </span>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-3">
+        {items.map((item, index) => {
+          const Icon = item.icon;
+
+          return (
+            <motion.div
+              key={item.title}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.18 + index * 0.05 }}
+              whileHover={{ y: -2 }}
+              className="rounded-[16px] border border-border bg-background/70 p-3"
+            >
+              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Icon className="h-4 w-4" />
+              </div>
+              <p className="mt-3 text-[10px] font-black text-card-foreground">
+                {item.title}
+              </p>
+              <p className="mt-1 text-[9px] leading-4 text-muted-foreground">
+                {item.text}
+              </p>
+            </motion.div>
+          );
+        })}
+      </div>
+    </motion.div>
   );
 }
 
@@ -1525,11 +1762,11 @@ function FormField({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-3">
-        <label htmlFor={htmlFor} className="text-xs font-black text-[#304A62]">
+        <label htmlFor={htmlFor} className="text-xs font-black text-card-foreground">
           {label}
         </label>
         {hint && (
-          <span className="text-[9px] font-semibold text-[#98A6B5]">{hint}</span>
+          <span className="text-[9px] font-semibold text-muted-foreground">{hint}</span>
         )}
       </div>
       {children}
@@ -1543,7 +1780,7 @@ function FormField({
 
 function ProgressSteps({ step }: { step: 1 | 2 | 3 }) {
   return (
-    <div className="flex items-center gap-2 rounded-[14px] border border-[#E0E9F1] bg-white p-1.5 shadow-sm">
+    <div className="flex items-center gap-2 rounded-[14px] border border-border bg-card p-1.5 shadow-sm">
       <ProgressPill number={1} label="Details" active={step >= 1} current={step === 1} />
       <ChevronRight className="h-3.5 w-3.5 text-slate-300" />
       <ProgressPill number={2} label="Verify" active={step >= 2} current={step === 2} />
@@ -1565,19 +1802,19 @@ function ProgressPill({
   return (
     <div
       className={`flex items-center gap-2 rounded-[10px] px-2.5 py-2 transition ${
-        current ? "bg-[#EEF7FF]" : ""
+        current ? "bg-primary/10" : ""
       }`}
     >
       <span
         className={`flex h-6 w-6 items-center justify-center rounded-[8px] text-[9px] font-black ${
-          active ? "bg-[#1F6FB4] text-white" : "bg-slate-100 text-slate-400"
+          active ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
         }`}
       >
         {number}
       </span>
       <span
         className={`hidden text-[9px] font-black sm:inline ${
-          active ? "text-[#35546E]" : "text-slate-400"
+          active ? "text-card-foreground" : "text-muted-foreground"
         }`}
       >
         {label}
@@ -1600,16 +1837,16 @@ function ReviewItem({
   value: string;
 }) {
   return (
-    <div className="rounded-[16px] border border-white bg-white/80 p-4 shadow-sm backdrop-blur">
+    <div className="rounded-[16px] border border-border bg-background/80 p-4 shadow-sm backdrop-blur">
       <div className="flex items-start gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-[#EEF7FF] text-[#1F6FB4]">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-primary/10 text-primary">
           <Icon className="h-4 w-4" />
         </div>
         <div className="min-w-0">
-          <p className="text-[8px] font-black uppercase tracking-[0.13em] text-[#91A0AF]">
+          <p className="text-[8px] font-black uppercase tracking-[0.13em] text-muted-foreground">
             {label}
           </p>
-          <p className="mt-1 break-all text-xs font-black leading-5 text-[#2B455C]">
+          <p className="mt-1 break-all text-xs font-black leading-5 text-card-foreground">
             {value}
           </p>
         </div>

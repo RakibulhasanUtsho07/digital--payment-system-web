@@ -4,7 +4,9 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
+  type ElementType,
 } from "react";
 
 import {
@@ -72,7 +74,7 @@ interface Transaction {
     | null;
 
   direction?:
-    TransactionDirection;
+    | TransactionDirection;
 
   amount: number;
 
@@ -116,7 +118,7 @@ interface TransactionView {
   amount: string;
   date: string;
   isCredit: boolean;
-  icon: typeof ArrowDownLeft;
+  icon: ElementType;
   iconClass: string;
   amountClass: string;
   transaction: Transaction;
@@ -127,10 +129,12 @@ interface TransactionView {
 ========================================================= */
 
 export default function TransactionsPage() {
-  const [
-    transactions,
-    setTransactions,
-  ] = useState<Transaction[]>([]);
+  /* =======================================================
+     DATA
+  ======================================================== */
+
+  const [transactions, setTransactions] =
+    useState<Transaction[]>([]);
 
   const [loading, setLoading] =
     useState(true);
@@ -138,35 +142,49 @@ export default function TransactionsPage() {
   const [refreshing, setRefreshing] =
     useState(false);
 
-  const [
-    errorMessage,
-    setErrorMessage,
-  ] = useState("");
+  const [errorMessage, setErrorMessage] =
+    useState("");
+
+  /* =======================================================
+     FILTERS
+  ======================================================== */
 
   const [search, setSearch] =
     useState("");
 
-  const [
-    typeFilter,
-    setTypeFilter,
-  ] = useState<TypeFilter>("ALL");
+  const [typeFilter, setTypeFilter] =
+    useState<TypeFilter>("ALL");
 
-  const [
-    statusFilter,
-    setStatusFilter,
-  ] = useState<StatusFilter>("ALL");
+  const [statusFilter, setStatusFilter] =
+    useState<StatusFilter>("ALL");
+
+  const [typeOpen, setTypeOpen] =
+    useState(false);
+
+  const [statusOpen, setStatusOpen] =
+    useState(false);
+
+  const typeDropdownRef =
+    useRef<HTMLDivElement | null>(null);
+
+  const statusDropdownRef =
+    useRef<HTMLDivElement | null>(null);
+
+  /* =======================================================
+     DETAILS
+  ======================================================== */
 
   const [
     selectedTransaction,
     setSelectedTransaction,
-  ] = useState<Transaction | null>(
-    null
-  );
+  ] =
+    useState<Transaction | null>(null);
 
   const [
     loadingTransactionId,
     setLoadingTransactionId,
-  ] = useState<string | null>(null);
+  ] =
+    useState<string | null>(null);
 
   /* =========================================================
      LOAD TRANSACTIONS
@@ -226,9 +244,56 @@ export default function TransactionsPage() {
       []
     );
 
+  /* =========================================================
+     INITIAL LOAD
+  ========================================================== */
+
   useEffect(() => {
     void loadTransactions(true);
   }, [loadTransactions]);
+
+  /* =========================================================
+     OUTSIDE CLICK FOR DROPDOWNS
+  ========================================================== */
+
+  useEffect(() => {
+    const handleOutsideClick = (
+      event: MouseEvent
+    ) => {
+      const target =
+        event.target as Node;
+
+      if (
+        typeDropdownRef.current &&
+        !typeDropdownRef.current.contains(
+          target
+        )
+      ) {
+        setTypeOpen(false);
+      }
+
+      if (
+        statusDropdownRef.current &&
+        !statusDropdownRef.current.contains(
+          target
+        )
+      ) {
+        setStatusOpen(false);
+      }
+    };
+
+    document.addEventListener(
+      "mousedown",
+      handleOutsideClick
+    );
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        handleOutsideClick
+      );
+    };
+  }, []);
 
   /* =========================================================
      LOAD SINGLE TRANSACTION DETAILS
@@ -320,9 +385,15 @@ export default function TransactionsPage() {
 
           const matchesSearch =
             query.length === 0 ||
-            senderName.includes(query) ||
-            receiverName.includes(query) ||
-            reference.includes(query) ||
+            senderName.includes(
+              query
+            ) ||
+            receiverName.includes(
+              query
+            ) ||
+            reference.includes(
+              query
+            ) ||
             type.includes(query);
 
           const matchesType =
@@ -353,52 +424,50 @@ export default function TransactionsPage() {
      SUMMARY
   ========================================================== */
 
-  const summary = useMemo(() => {
-    const completed =
-      transactions.filter(
-        (transaction) =>
-          transaction.status ===
-          "COMPLETED"
-      );
+  const summary =
+    useMemo(() => {
+      const completed =
+        transactions.filter(
+          (transaction) =>
+            transaction.status ===
+            "COMPLETED"
+        );
 
-    const pending =
-      transactions.filter(
-        (transaction) =>
-          transaction.status ===
-          "PENDING"
-      ).length;
+      const pending =
+        transactions.filter(
+          (transaction) =>
+            transaction.status ===
+            "PENDING"
+        ).length;
 
-    const failed =
-      transactions.filter(
-        (transaction) =>
-          transaction.status ===
-          "FAILED"
-      ).length;
+      const failed =
+        transactions.filter(
+          (transaction) =>
+            transaction.status ===
+            "FAILED"
+        ).length;
 
-    const volume =
-      completed.reduce(
-        (
-          total,
-          transaction
-        ) =>
-          total +
-          normalizeAmount(
-            transaction.amount
-          ),
-        0
-      );
+      const volume =
+        completed.reduce(
+          (
+            total,
+            transaction
+          ) =>
+            total +
+            normalizeAmount(
+              transaction.amount
+            ),
+          0
+        );
 
-    return {
-      completed:
-        completed.length,
-
-      pending,
-
-      failed,
-
-      volume,
-    };
-  }, [transactions]);
+      return {
+        completed:
+          completed.length,
+        pending,
+        failed,
+        volume,
+      };
+    }, [transactions]);
 
   /* =========================================================
      VIEW MODEL
@@ -424,6 +493,8 @@ export default function TransactionsPage() {
     setSearch("");
     setTypeFilter("ALL");
     setStatusFilter("ALL");
+    setTypeOpen(false);
+    setStatusOpen(false);
   };
 
   const hasFilters =
@@ -439,12 +510,14 @@ export default function TransactionsPage() {
     return (
       <div className="flex min-h-[70vh] items-center justify-center px-4">
         <div className="flex flex-col items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#1F5EA8] text-white shadow-lg shadow-blue-500/20">
-            <Loader2 className="h-6 w-6 animate-spin" />
+          <div className="relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-[18px] bg-gradient-to-br from-[#173F63] to-[#2B78BA] text-white shadow-[0_14px_35px_rgba(43,120,186,0.22)]">
+            <div className="absolute inset-0 bg-gradient-to-br from-white/15 to-transparent" />
+
+            <Loader2 className="relative h-6 w-6 animate-spin" />
           </div>
 
           <div className="text-center">
-            <p className="text-sm font-bold text-slate-800">
+            <p className="text-sm font-black text-slate-800">
               Loading transactions
             </p>
 
@@ -463,60 +536,122 @@ export default function TransactionsPage() {
 
   return (
     <main className="space-y-6 pb-10">
-      {/* =====================================================
-          HEADER
-      ====================================================== */}
+      {/* ===================================================
+          PREMIUM HEADER
+      ==================================================== */}
 
-      <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_10px_35px_rgba(15,23,42,0.04)] sm:p-8">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#1F5EA8]">
-              <CreditCard className="h-3.5 w-3.5" />
+      <section className="relative overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_16px_50px_rgba(15,23,42,0.055)]">
+        {/* Glows */}
+        <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-blue-400/10 blur-3xl" />
 
-              Wallet Activity
+        <div className="pointer-events-none absolute -bottom-28 -left-10 h-56 w-56 rounded-full bg-indigo-400/10 blur-3xl" />
+
+        {/* Decorative dots */}
+        <div className="pointer-events-none absolute right-8 top-8 hidden opacity-50 sm:block">
+          <div className="grid grid-cols-5 gap-2">
+            {Array.from({
+              length: 25,
+            }).map(
+              (_, index) => (
+                <span
+                  key={index}
+                  className="h-1 w-1 rounded-full bg-blue-300"
+                />
+              )
+            )}
+          </div>
+        </div>
+
+        <div className="relative px-5 py-6 sm:px-7 sm:py-7 lg:px-8 lg:py-8">
+          <div className="flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between">
+            {/* LEFT */}
+            <div className="min-w-0">
+              <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3.5 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-[#1F5EA8] shadow-sm">
+                <span className="flex h-5 w-5 items-center justify-center rounded-md bg-white text-[#1F5EA8] shadow-sm">
+                  <CreditCard className="h-3 w-3" />
+                </span>
+
+                Wallet Activity
+              </div>
+
+              <h1 className="mt-4 text-[2rem] font-black tracking-[-0.045em] text-slate-950 sm:text-[2.4rem] lg:text-[2.6rem]">
+                Transactions
+              </h1>
+
+              <p className="mt-2 max-w-2xl text-[13px] leading-6 text-slate-500 sm:text-sm">
+                Review your incoming and
+                outgoing payments,
+                transaction status,
+                references, and complete
+                wallet activity history.
+              </p>
+
+              <div className="mt-5 flex flex-wrap items-center gap-2.5">
+                <HeaderPill
+                  icon={ArrowDownLeft}
+                  label="Incoming"
+                  iconClass="bg-emerald-50 text-emerald-600"
+                />
+
+                <HeaderPill
+                  icon={ArrowUpRight}
+                  label="Outgoing"
+                  iconClass="bg-blue-50 text-blue-600"
+                />
+
+                <HeaderPill
+                  icon={ShieldCheck}
+                  label="Secure Records"
+                  iconClass="bg-violet-50 text-violet-600"
+                />
+              </div>
             </div>
 
-            <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
-              Transactions
-            </h1>
+            {/* RIGHT */}
+            <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center lg:flex-col lg:items-end">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 shadow-sm lg:text-right">
+                <p className="text-[9px] font-extrabold uppercase tracking-[0.16em] text-slate-400">
+                  Total Records
+                </p>
 
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-              Review your incoming and outgoing payments,
-              transaction status, references, and activity history.
-            </p>
+                <p className="mt-1 text-xl font-black tracking-tight text-slate-900">
+                  {transactions.length}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  void loadTransactions(
+                    false
+                  )
+                }
+                disabled={refreshing}
+                className="group inline-flex h-11 items-center justify-center gap-2 rounded-[14px] border border-slate-200 bg-white px-4 text-xs font-extrabold text-slate-700 shadow-[0_5px_18px_rgba(15,23,42,0.05)] transition duration-300 hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50 hover:text-[#1F5EA8] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <RefreshCw
+                  className={
+                    refreshing
+                      ? "h-4 w-4 animate-spin"
+                      : "h-4 w-4 transition-transform duration-300 group-hover:rotate-180"
+                  }
+                />
+
+                {refreshing
+                  ? "Refreshing..."
+                  : "Refresh"}
+              </button>
+            </div>
           </div>
-
-          <button
-            type="button"
-            onClick={() =>
-              void loadTransactions(
-                false
-              )
-            }
-            disabled={refreshing}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-xs font-bold text-slate-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-[#1F5EA8] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <RefreshCw
-              className={
-                refreshing
-                  ? "h-4 w-4 animate-spin"
-                  : "h-4 w-4"
-              }
-            />
-
-            {refreshing
-              ? "Refreshing..."
-              : "Refresh"}
-          </button>
         </div>
       </section>
 
-      {/* =====================================================
+      {/* ===================================================
           ERROR
-      ====================================================== */}
+      ==================================================== */}
 
       {errorMessage && (
-        <section className="rounded-2xl border border-red-200 bg-red-50 p-4">
+        <section className="rounded-[20px] border border-red-200 bg-red-50 p-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm font-bold text-red-800">
@@ -543,9 +678,9 @@ export default function TransactionsPage() {
         </section>
       )}
 
-      {/* =====================================================
+      {/* ===================================================
           SUMMARY
-      ====================================================== */}
+      ==================================================== */}
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
@@ -589,159 +724,221 @@ export default function TransactionsPage() {
         />
       </section>
 
-      {/* =====================================================
-          FILTERS
-      ====================================================== */}
+      {/* ===================================================
+          PREMIUM FILTERS
+      ==================================================== */}
 
-      <section className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.04)] sm:p-6">
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between gap-3">
+      <section className="relative z-30 rounded-[28px] border border-slate-200 bg-white shadow-[0_14px_45px_rgba(15,23,42,0.05)]">
+        <div className="relative p-5 sm:p-6">
+          {/* Header */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-                Filters
-              </p>
+              <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.17em] text-[#1F5EA8]">
+                <Filter className="h-3 w-3" />
+                Smart Filters
+              </div>
 
-              <h2 className="mt-1 text-lg font-extrabold text-slate-900">
+              <h2 className="mt-2 text-lg font-black tracking-[-0.025em] text-slate-950 sm:text-xl">
                 Find a transaction
               </h2>
+
+              <p className="mt-1 text-[11px] leading-5 text-slate-400">
+                Search and refine your wallet
+                activity by type or status.
+              </p>
             </div>
 
-            {hasFilters && (
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="text-xs font-bold text-[#1F5EA8] hover:underline"
-              >
-                Clear all
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={clearFilters}
+              className={`inline-flex h-9 items-center justify-center gap-1.5 self-start rounded-xl px-3 text-[10px] font-extrabold transition sm:self-auto ${
+                hasFilters
+                  ? "bg-blue-50 text-[#1F5EA8] hover:bg-blue-100"
+                  : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+              }`}
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Clear all
+            </button>
           </div>
 
-          <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto]">
+          {/* Controls */}
+          <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px_180px]">
             {/* SEARCH */}
-
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <div className="group relative">
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-[17px] w-[17px] -translate-y-1/2 text-slate-400 transition group-focus-within:text-[#1F5EA8]" />
 
               <input
                 type="text"
                 value={search}
                 onChange={(event) =>
                   setSearch(
-                    event.target.value
+                    event.target
+                      .value
                   )
                 }
                 placeholder="Search by name, reference or type..."
                 aria-label="Search transactions"
-                className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-10 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-[#1F5EA8] focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+                className="h-12 w-full rounded-[15px] border border-slate-200 bg-slate-50 pl-11 pr-11 text-xs font-semibold text-slate-900 outline-none transition duration-200 placeholder:text-slate-400 hover:border-slate-300 focus:border-[#4A90C8] focus:bg-white focus:ring-4 focus:ring-blue-500/10"
               />
 
-              {search && (
+              {search ? (
                 <button
                   type="button"
                   onClick={() =>
                     setSearch("")
                   }
                   aria-label="Clear search"
-                  className="absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                  className="absolute right-2.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-[10px] text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
                 >
                   <X className="h-4 w-4" />
                 </button>
+              ) : (
+                <div className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-lg bg-white px-2 py-1 text-[8px] font-bold text-slate-400 ring-1 ring-slate-200 sm:block">
+                  SEARCH
+                </div>
               )}
             </div>
 
             {/* TYPE */}
-
-            <div className="relative">
-              <Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-
-              <select
-                value={typeFilter}
-                onChange={(event) =>
-                  setTypeFilter(
-                    event.target
-                      .value as TypeFilter
-                  )
-                }
-                aria-label="Filter by type"
-                className="h-11 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-9 text-xs font-bold text-slate-700 outline-none transition focus:border-[#1F5EA8] focus:bg-white sm:min-w-[150px]"
-              >
-                <option value="ALL">
-                  All Types
-                </option>
-
-                <option value="TRANSFER">
-                  Transfer
-                </option>
-
-                <option value="DEPOSIT">
-                  Deposit
-                </option>
-
-                <option value="WITHDRAW">
-                  Withdraw
-                </option>
-              </select>
-
-              <ChevronRight className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 rotate-90 text-slate-400" />
-            </div>
+            <CustomTypeDropdown
+              value={typeFilter}
+              open={typeOpen}
+              dropdownRef={
+                typeDropdownRef
+              }
+              onToggle={() => {
+                setTypeOpen(
+                  (value) =>
+                    !value
+                );
+                setStatusOpen(false);
+              }}
+              onChange={(
+                value
+              ) => {
+                setTypeFilter(
+                  value
+                );
+                setTypeOpen(
+                  false
+                );
+              }}
+            />
 
             {/* STATUS */}
+            <CustomStatusDropdown
+              value={statusFilter}
+              open={statusOpen}
+              dropdownRef={
+                statusDropdownRef
+              }
+              onToggle={() => {
+                setStatusOpen(
+                  (value) =>
+                    !value
+                );
+                setTypeOpen(false);
+              }}
+              onChange={(
+                value
+              ) => {
+                setStatusFilter(
+                  value
+                );
+                setStatusOpen(
+                  false
+                );
+              }}
+            />
+          </div>
 
-            <div className="relative">
-              <select
-                value={statusFilter}
-                onChange={(event) =>
-                  setStatusFilter(
-                    event.target
-                      .value as StatusFilter
-                  )
-                }
-                aria-label="Filter by status"
-                className="h-11 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 px-4 pr-9 text-xs font-bold text-slate-700 outline-none transition focus:border-[#1F5EA8] focus:bg-white sm:min-w-[150px]"
-              >
-                <option value="ALL">
-                  All Statuses
-                </option>
+          {/* Active filters */}
+          <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
+              {hasFilters ? (
+                <>
+                  <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                    Active:
+                  </span>
 
-                <option value="COMPLETED">
-                  Completed
-                </option>
+                  {search && (
+                    <span className="inline-flex max-w-[260px] items-center gap-1.5 truncate rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-[9px] font-bold text-[#1F5EA8]">
+                      Search:{" "}
+                      {search}
+                    </span>
+                  )}
 
-                <option value="PENDING">
-                  Pending
-                </option>
+                  {typeFilter !==
+                    "ALL" && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-100 bg-violet-50 px-2.5 py-1.5 text-[9px] font-bold text-violet-700">
+                      {
+                        getTypeFilterLabel(
+                          typeFilter
+                        )
+                      }
+                    </span>
+                  )}
 
-                <option value="FAILED">
-                  Failed
-                </option>
-              </select>
+                  {statusFilter !==
+                    "ALL" && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1.5 text-[9px] font-bold text-emerald-700">
+                      {
+                        getStatusFilterLabel(
+                          statusFilter
+                        )
+                      }
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span className="text-[10px] text-slate-400">
+                  Showing all transaction
+                  activity
+                </span>
+              )}
+            </div>
 
-              <ChevronRight className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 rotate-90 text-slate-400" />
+            <div className="inline-flex w-fit items-center gap-2 rounded-full bg-slate-50 px-3 py-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#1F5EA8]" />
+
+              <span className="text-[9px] font-extrabold text-slate-500">
+                {
+                  filteredTransactions.length
+                }{" "}
+                result
+                {filteredTransactions.length ===
+                1
+                  ? ""
+                  : "s"}
+              </span>
             </div>
           </div>
         </div>
       </section>
 
-      {/* =====================================================
-          TRANSACTION LIST
-      ====================================================== */}
+      {/* ===================================================
+          TRANSACTION HISTORY
+      ==================================================== */}
 
-      <section className="overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-[0_10px_35px_rgba(15,23,42,0.04)]">
+      <section className="relative z-10 overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_14px_45px_rgba(15,23,42,0.045)]">
         <div className="border-b border-slate-100 px-5 py-5 sm:px-6">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+              <p className="text-[9px] font-black uppercase tracking-[0.17em] text-[#2B78BA]">
                 History
               </p>
 
-              <h2 className="mt-1 text-lg font-extrabold text-slate-900">
+              <h2 className="mt-1 text-lg font-black tracking-[-0.025em] text-slate-950">
                 Transaction History
               </h2>
             </div>
 
-            <span className="rounded-full bg-slate-100 px-3 py-1.5 text-[10px] font-bold text-slate-600">
-              {filteredTransactions.length} shown
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[10px] font-bold text-slate-600">
+              {
+                filteredTransactions.length
+              }{" "}
+              shown
             </span>
           </div>
         </div>
@@ -775,9 +972,9 @@ export default function TransactionsPage() {
         )}
       </section>
 
-      {/* =====================================================
-          MODAL
-      ====================================================== */}
+      {/* ===================================================
+          TRANSACTION MODAL
+      ==================================================== */}
 
       {selectedTransaction && (
         <TransactionModal
@@ -796,6 +993,311 @@ export default function TransactionsPage() {
 }
 
 /* =========================================================
+   HEADER PILL
+========================================================= */
+
+function HeaderPill({
+  icon: Icon,
+  label,
+  iconClass,
+}: {
+  icon: ElementType;
+  label: string;
+  iconClass: string;
+}) {
+  return (
+    <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2">
+      <span
+        className={`flex h-5 w-5 items-center justify-center rounded-full ${iconClass}`}
+      >
+        <Icon className="h-3 w-3" />
+      </span>
+
+      <span className="text-[10px] font-bold text-slate-600">
+        {label}
+      </span>
+    </div>
+  );
+}
+
+/* =========================================================
+   CUSTOM TYPE DROPDOWN
+========================================================= */
+
+function CustomTypeDropdown({
+  value,
+  open,
+  dropdownRef,
+  onToggle,
+  onChange,
+}: {
+  value: TypeFilter;
+  open: boolean;
+  dropdownRef: React.RefObject<HTMLDivElement | null>;
+  onToggle: () => void;
+  onChange: (value: TypeFilter) => void;
+}) {
+  const options: TypeFilter[] = [
+    "ALL",
+    "TRANSFER",
+    "DEPOSIT",
+    "WITHDRAW",
+  ];
+
+  return (
+    <div
+      ref={dropdownRef}
+      className="relative"
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        className={`flex h-12 w-full items-center justify-between rounded-[15px] border bg-slate-50 px-3.5 transition duration-200 ${
+          open
+            ? "border-[#4A90C8] bg-white ring-4 ring-blue-500/10"
+            : "border-slate-200 hover:border-slate-300"
+        }`}
+      >
+        <span className="flex items-center gap-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-white text-[#1F5EA8] shadow-sm ring-1 ring-slate-100">
+            <CreditCard className="h-3.5 w-3.5" />
+          </span>
+
+          <span className="text-left">
+            <span className="block text-[8px] font-extrabold uppercase tracking-[0.13em] text-slate-400">
+              Type
+            </span>
+
+            <span className="mt-0.5 block text-[11px] font-extrabold text-slate-800">
+              {getTypeFilterLabel(
+                value
+              )}
+            </span>
+          </span>
+        </span>
+
+        <ChevronRight
+          className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${
+            open
+              ? "-rotate-90 text-[#1F5EA8]"
+              : "rotate-90"
+          }`}
+        />
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          className="absolute left-0 top-[calc(100%+8px)] z-[90] w-full min-w-[205px] overflow-hidden rounded-[18px] border border-slate-200 bg-white p-1.5 shadow-[0_20px_55px_rgba(15,23,42,0.15)]"
+        >
+          <div className="px-2.5 pb-1.5 pt-2">
+            <p className="text-[8px] font-black uppercase tracking-[0.14em] text-slate-400">
+              Transaction Type
+            </p>
+          </div>
+
+          {options.map(
+            (option) => {
+              const active =
+                value ===
+                option;
+
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  role="option"
+                  aria-selected={
+                    active
+                  }
+                  onClick={() =>
+                    onChange(
+                      option
+                    )
+                  }
+                  className={`flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left transition ${
+                    active
+                      ? "bg-blue-50 text-[#1F5EA8]"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                  }`}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <span
+                      className={`flex h-7 w-7 items-center justify-center rounded-[9px] ${
+                        active
+                          ? "bg-white text-[#1F5EA8] shadow-sm"
+                          : "bg-slate-100 text-slate-400"
+                      }`}
+                    >
+                      {getTypeFilterIcon(
+                        option
+                      )}
+                    </span>
+
+                    <span className="text-[11px] font-bold">
+                      {getTypeFilterLabel(
+                        option
+                      )}
+                    </span>
+                  </span>
+
+                  {active && (
+                    <CheckCircle2 className="h-4 w-4 text-[#1F5EA8]" />
+                  )}
+                </button>
+              );
+            }
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* =========================================================
+   CUSTOM STATUS DROPDOWN
+========================================================= */
+
+function CustomStatusDropdown({
+  value,
+  open,
+  dropdownRef,
+  onToggle,
+  onChange,
+}: {
+  value: StatusFilter;
+  open: boolean;
+  dropdownRef: React.RefObject<HTMLDivElement | null>;
+  onToggle: () => void;
+  onChange: (
+    value: StatusFilter
+  ) => void;
+}) {
+  const options: StatusFilter[] = [
+    "ALL",
+    "COMPLETED",
+    "PENDING",
+    "FAILED",
+  ];
+
+  return (
+    <div
+      ref={dropdownRef}
+      className="relative"
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        className={`flex h-12 w-full items-center justify-between rounded-[15px] border bg-slate-50 px-3.5 transition duration-200 ${
+          open
+            ? "border-[#4A90C8] bg-white ring-4 ring-blue-500/10"
+            : "border-slate-200 hover:border-slate-300"
+        }`}
+      >
+        <span className="flex items-center gap-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-white text-slate-500 shadow-sm ring-1 ring-slate-100">
+            <ShieldCheck className="h-3.5 w-3.5" />
+          </span>
+
+          <span className="text-left">
+            <span className="block text-[8px] font-extrabold uppercase tracking-[0.13em] text-slate-400">
+              Status
+            </span>
+
+            <span className="mt-0.5 block text-[11px] font-extrabold text-slate-800">
+              {getStatusFilterLabel(
+                value
+              )}
+            </span>
+          </span>
+        </span>
+
+        <ChevronRight
+          className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${
+            open
+              ? "-rotate-90 text-[#1F5EA8]"
+              : "rotate-90"
+          }`}
+        />
+      </button>
+
+      {open && (
+        <div
+          role="listbox"
+          className="absolute right-0 top-[calc(100%+8px)] z-[90] w-full min-w-[205px] overflow-hidden rounded-[18px] border border-slate-200 bg-white p-1.5 shadow-[0_20px_55px_rgba(15,23,42,0.15)]"
+        >
+          <div className="px-2.5 pb-1.5 pt-2">
+            <p className="text-[8px] font-black uppercase tracking-[0.14em] text-slate-400">
+              Transaction Status
+            </p>
+          </div>
+
+          {options.map(
+            (option) => {
+              const active =
+                value ===
+                option;
+
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  role="option"
+                  aria-selected={
+                    active
+                  }
+                  onClick={() =>
+                    onChange(
+                      option
+                    )
+                  }
+                  className={`flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left transition ${
+                    active
+                      ? "bg-blue-50 text-[#1F5EA8]"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                  }`}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <span
+                      className={`h-2.5 w-2.5 rounded-full ${
+                        option ===
+                        "COMPLETED"
+                          ? "bg-emerald-500"
+                          : option ===
+                            "PENDING"
+                          ? "bg-amber-500"
+                          : option ===
+                            "FAILED"
+                          ? "bg-rose-500"
+                          : "bg-slate-400"
+                      }`}
+                    />
+
+                    <span className="text-[11px] font-bold">
+                      {getStatusFilterLabel(
+                        option
+                      )}
+                    </span>
+                  </span>
+
+                  {active && (
+                    <CheckCircle2 className="h-4 w-4 text-[#1F5EA8]" />
+                  )}
+                </button>
+              );
+            }
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* =========================================================
    SUMMARY CARD
 ========================================================= */
 
@@ -809,14 +1311,14 @@ function SummaryCard({
   title: string;
   value: string;
   subtitle: string;
-  icon: React.ElementType;
+  icon: ElementType;
   iconClass: string;
 }) {
   return (
-    <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
+    <div className="group rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.04)] transition duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_18px_45px_rgba(15,23,42,0.07)]">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-400">
+          <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
             {title}
           </p>
 
@@ -830,7 +1332,7 @@ function SummaryCard({
         </div>
 
         <div
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${iconClass}`}
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] ${iconClass}`}
         >
           <Icon className="h-5 w-5" />
         </div>
@@ -852,31 +1354,29 @@ function TransactionRow({
   onView: () => void;
   loading: boolean;
 }) {
-  const Icon =
-    item.icon;
+  const Icon = item.icon;
 
   return (
-    <div className="flex flex-col gap-4 p-4 transition hover:bg-slate-50 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+    <div className="group flex flex-col gap-4 p-4 transition hover:bg-slate-50/80 sm:flex-row sm:items-center sm:justify-between sm:p-5">
       <div className="flex min-w-0 items-center gap-3">
         <div
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${item.iconClass}`}
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] transition-transform duration-300 group-hover:scale-105 ${item.iconClass}`}
         >
           <Icon className="h-5 w-5" />
         </div>
 
         <div className="min-w-0">
-          <p className="truncate text-sm font-bold text-slate-900">
+          <p className="truncate text-sm font-extrabold text-slate-900">
             {item.title}
           </p>
 
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-400">
             <span className="inline-flex items-center gap-1">
               <Clock3 className="h-3.5 w-3.5" />
-
               {item.date}
             </span>
 
-            <span>
+            <span className="truncate">
               {item.subtitle}
             </span>
           </div>
@@ -884,11 +1384,20 @@ function TransactionRow({
       </div>
 
       <div className="flex items-center justify-between gap-4 sm:justify-end">
-        <p
-          className={`text-sm font-black ${item.amountClass}`}
-        >
-          {item.amount}
-        </p>
+        <div className="text-right">
+          <p
+            className={`text-sm font-black ${item.amountClass}`}
+          >
+            {item.amount}
+          </p>
+
+          <StatusBadge
+            status={
+              item.transaction
+                .status
+            }
+          />
+        </div>
 
         <button
           type="button"
@@ -947,7 +1456,8 @@ function createTransactionView(
   let subtitle =
     "Wallet activity";
 
-  let icon =
+  let icon:
+    | ElementType =
     isCredit
       ? ArrowDownLeft
       : ArrowUpRight;
@@ -1003,11 +1513,9 @@ function createTransactionView(
   if (isTransfer) {
     const counterparty =
       transaction.counterparty ||
-      (
-        direction === "IN"
-          ? transaction.senderId
-          : transaction.receiverId
-      );
+      (direction === "IN"
+        ? transaction.senderId
+        : transaction.receiverId);
 
     const counterpartyName =
       getUserName(
@@ -1041,8 +1549,7 @@ function createTransactionView(
   }
 
   return {
-    id:
-      transaction._id,
+    id: transaction._id,
 
     title,
 
@@ -1056,10 +1563,9 @@ function createTransactionView(
       transaction.amount
     )}`,
 
-    date:
-      formatDate(
-        transaction.createdAt
-      ),
+    date: formatDate(
+      transaction.createdAt
+    ),
 
     isCredit,
 
@@ -1126,10 +1632,8 @@ function TransactionModal({
   transaction: Transaction;
   onClose: () => void;
 }) {
-  const [
-    copied,
-    setCopied,
-  ] = useState(false);
+  const [copied, setCopied] =
+    useState(false);
 
   const typeLabel =
     transaction.type ===
@@ -1142,26 +1646,28 @@ function TransactionModal({
 
   const direction =
     transaction.direction ||
-    (
-      transaction.type === "DEPOSIT"
-        ? "IN"
-        : "OUT"
-    );
+    (transaction.type ===
+    "DEPOSIT"
+      ? "IN"
+      : "OUT");
 
   const counterparty =
     transaction.counterparty ||
-    (
-      transaction.type === "TRANSFER"
-        ? direction === "IN"
-          ? transaction.senderId
-          : transaction.receiverId
-        : null
-    );
+    (transaction.type ===
+    "TRANSFER"
+      ? direction === "IN"
+        ? transaction.senderId
+        : transaction.receiverId
+      : null);
 
   const receiptNumber =
     `COFFER-${transaction._id
       .slice(-10)
       .toUpperCase()}`;
+
+  /* =======================================================
+     COPY
+  ======================================================== */
 
   const handleCopyId =
     async () => {
@@ -1170,9 +1676,7 @@ function TransactionModal({
           transaction._id
         );
 
-        setCopied(
-          true
-        );
+        setCopied(true);
 
         window.setTimeout(
           () =>
@@ -1188,6 +1692,10 @@ function TransactionModal({
         );
       }
     };
+
+  /* =======================================================
+     PRINT
+  ======================================================== */
 
   const handlePrint =
     () => {
@@ -1223,6 +1731,10 @@ function TransactionModal({
       );
     };
 
+  /* =======================================================
+     DOWNLOAD
+  ======================================================== */
+
   const handleDownload =
     () => {
       const html =
@@ -1235,8 +1747,7 @@ function TransactionModal({
         new Blob(
           [html],
           {
-            type:
-              "text/html;charset=utf-8",
+            type: "text/html;charset=utf-8",
           }
         );
 
@@ -1250,8 +1761,7 @@ function TransactionModal({
           "a"
         );
 
-      link.href =
-        url;
+      link.href = url;
 
       link.download =
         `coffer-receipt-${transaction._id}.html`;
@@ -1279,7 +1789,7 @@ function TransactionModal({
       />
 
       <div className="relative z-10 max-h-[92vh] w-full max-w-[590px] overflow-y-auto rounded-[30px] border border-slate-200 bg-white shadow-[0_28px_90px_rgba(15,23,42,0.24)]">
-        {/* RECEIPT HEADER */}
+        {/* HEADER */}
         <div className="relative overflow-hidden border-b border-slate-100 bg-[linear-gradient(135deg,#F8FCFF_0%,#FFFFFF_58%,#F1F8FE_100%)] p-6 sm:p-7">
           <div className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-blue-400/10 blur-[70px]" />
 
@@ -1310,7 +1820,7 @@ function TransactionModal({
               aria-label="Close"
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
             >
-              <X className="h-4.5 w-4.5" />
+              <X className="h-4 w-4" />
             </button>
           </div>
         </div>
@@ -1319,15 +1829,17 @@ function TransactionModal({
           {/* AMOUNT */}
           <div className="rounded-[24px] border border-[#E4ECF3] bg-[#F8FBFD] p-5 text-center">
             <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-[13px] bg-white text-[#1F5EA8] shadow-sm">
-              {direction === "IN" ? (
-                <ArrowDownLeft className="h-4.5 w-4.5" />
+              {direction ===
+              "IN" ? (
+                <ArrowDownLeft className="h-4 w-4" />
               ) : (
-                <ArrowUpRight className="h-4.5 w-4.5" />
+                <ArrowUpRight className="h-4 w-4" />
               )}
             </div>
 
             <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-              {direction === "IN"
+              {direction ===
+              "IN"
                 ? "Money received"
                 : "Money sent"}
             </p>
@@ -1347,17 +1859,21 @@ function TransactionModal({
             </div>
           </div>
 
-          {/* VERIFIED RECEIPT */}
+          {/* VERIFIED */}
           <div className="mt-5 flex items-start gap-3 rounded-[18px] border border-emerald-100 bg-emerald-50/70 px-4 py-3">
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
 
             <div>
               <p className="text-[11px] font-extrabold text-emerald-800">
-                Secure transaction record
+                Secure transaction
+                record
               </p>
 
               <p className="mt-0.5 text-[10px] leading-4 text-emerald-700/75">
-                Receipt details are loaded from your authenticated transaction record.
+                Receipt details are
+                loaded from your
+                authenticated transaction
+                record.
               </p>
             </div>
           </div>
@@ -1373,15 +1889,14 @@ function TransactionModal({
 
             <DetailRow
               label="Type"
-              value={
-                typeLabel
-              }
+              value={typeLabel}
             />
 
             <DetailRow
               label="Direction"
               value={
-                direction === "IN"
+                direction ===
+                "IN"
                   ? "Incoming"
                   : "Outgoing"
               }
@@ -1430,7 +1945,7 @@ function TransactionModal({
             )}
           </div>
 
-          {/* ID COPY */}
+          {/* COPY */}
           <button
             type="button"
             onClick={() =>
@@ -1470,7 +1985,9 @@ function TransactionModal({
 
             <button
               type="button"
-              onClick={handleDownload}
+              onClick={
+                handleDownload
+              }
               className="inline-flex h-11 items-center justify-center gap-2 rounded-[14px] border border-slate-200 bg-white px-4 text-xs font-extrabold text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-[#1F5EA8]"
             >
               <Download className="h-4 w-4" />
@@ -1479,7 +1996,9 @@ function TransactionModal({
           </div>
 
           <p className="mt-4 text-center text-[9px] leading-4 text-slate-400">
-            Use “Print / Save PDF” to save a PDF copy from your browser.
+            Use “Print / Save PDF”
+            to save a PDF copy from
+            your browser.
           </p>
         </div>
       </div>
@@ -1527,7 +2046,7 @@ function StatusBadge({
 
   return (
     <span
-      className={`rounded-full px-2.5 py-1 text-[9px] font-bold ${current.className}`}
+      className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-[8px] font-black ${current.className}`}
     >
       {current.label}
     </span>
@@ -1589,7 +2108,7 @@ function getUserDisplay(
 ): string {
   if (
     typeof user ===
-    "object" &&
+      "object" &&
     user !== null
   ) {
     if (
@@ -1607,6 +2126,72 @@ function getUserDisplay(
   }
 
   return user;
+}
+
+/* =========================================================
+   FILTER HELPERS
+========================================================= */
+
+function getTypeFilterLabel(
+  type: TypeFilter
+): string {
+  switch (type) {
+    case "TRANSFER":
+      return "Transfer";
+
+    case "DEPOSIT":
+      return "Deposit";
+
+    case "WITHDRAW":
+      return "Withdraw";
+
+    default:
+      return "All Types";
+  }
+}
+
+function getStatusFilterLabel(
+  status: StatusFilter
+): string {
+  switch (status) {
+    case "COMPLETED":
+      return "Completed";
+
+    case "PENDING":
+      return "Pending";
+
+    case "FAILED":
+      return "Failed";
+
+    default:
+      return "All Statuses";
+  }
+}
+
+function getTypeFilterIcon(
+  type: TypeFilter
+) {
+  switch (type) {
+    case "TRANSFER":
+      return (
+        <ArrowUpRight className="h-3.5 w-3.5" />
+      );
+
+    case "DEPOSIT":
+      return (
+        <ArrowDownLeft className="h-3.5 w-3.5" />
+      );
+
+    case "WITHDRAW":
+      return (
+        <ArrowUpRight className="h-3.5 w-3.5" />
+      );
+
+    default:
+      return (
+        <CreditCard className="h-3.5 w-3.5" />
+      );
+  }
 }
 
 /* =========================================================
@@ -1654,21 +2239,20 @@ function buildReceiptHtml(
 
   const direction =
     transaction.direction ||
-    (
-      transaction.type === "DEPOSIT"
-        ? "IN"
-        : "OUT"
-    );
+    (transaction.type ===
+    "DEPOSIT"
+      ? "IN"
+      : "OUT");
 
   const counterparty =
     transaction.counterparty ||
-    (
-      transaction.type === "TRANSFER"
-        ? direction === "IN"
-          ? transaction.senderId
-          : transaction.receiverId
-        : null
-    );
+    (transaction.type ===
+    "TRANSFER"
+      ? direction ===
+        "IN"
+        ? transaction.senderId
+        : transaction.receiverId
+      : null);
 
   const counterpartyText =
     counterparty
@@ -1706,7 +2290,8 @@ function buildReceiptHtml(
       "Currency",
       transaction.currency,
     ],
-    ...(transaction.type === "TRANSFER"
+    ...(transaction.type ===
+    "TRANSFER"
       ? [
           [
             "Counterparty",
@@ -1750,13 +2335,18 @@ function buildReceiptHtml(
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+
   <meta
     name="viewport"
     content="width=device-width, initial-scale=1"
   />
-  <title>Coffer Receipt ${escapeHtml(
-    receiptNumber
-  )}</title>
+
+  <title>
+    Coffer Receipt ${escapeHtml(
+      receiptNumber
+    )}
+  </title>
+
   <style>
     * {
       box-sizing: border-box;
@@ -1889,26 +2479,44 @@ function buildReceiptHtml(
     }
   </style>
 </head>
+
 <body>
   <main class="receipt">
+
     <header class="header">
-      <p class="eyebrow">Coffer secure receipt</p>
-      <h1>Transaction Receipt</h1>
-      <div class="receipt-no">${escapeHtml(
-        receiptNumber
-      )}</div>
+      <p class="eyebrow">
+        Coffer secure receipt
+      </p>
+
+      <h1>
+        Transaction Receipt
+      </h1>
+
+      <div class="receipt-no">
+        ${escapeHtml(
+          receiptNumber
+        )}
+      </div>
     </header>
 
     <section class="amount">
-      <small>Transaction amount</small>
-      <strong>${escapeHtml(
-        formatCurrency(
-          transaction.amount
-        )
-      )}</strong>
-      <div class="status">${escapeHtml(
-        transaction.status
-      )}</div>
+      <small>
+        Transaction amount
+      </small>
+
+      <strong>
+        ${escapeHtml(
+          formatCurrency(
+            transaction.amount
+          )
+        )}
+      </strong>
+
+      <div class="status">
+        ${escapeHtml(
+          transaction.status
+        )}
+      </div>
     </section>
 
     <table>
@@ -1918,9 +2526,11 @@ function buildReceiptHtml(
     </table>
 
     <footer class="footer">
-      This receipt was generated from your authenticated Coffer transaction record.
-      Sensitive account information is masked.
+      This receipt was generated from
+      your authenticated Coffer
+      transaction record.
     </footer>
+
   </main>
 </body>
 </html>`;
