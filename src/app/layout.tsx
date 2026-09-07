@@ -1,7 +1,14 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Inter } from "next/font/google";
+import {
+  Geist,
+  Geist_Mono,
+  Inter,
+} from "next/font/google";
+
 import "./globals.css";
+
 import { cn } from "@/lib/utils";
+import { ThemeProvider } from "@/context/ThemeContext";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -32,6 +39,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={cn(
         "h-full",
         "antialiased",
@@ -41,8 +49,10 @@ export default function RootLayout({
         "font-sans"
       )}
     >
-      <body className="min-h-full bg-[#F4F7FB]">
-        {children}
+      <body className="min-h-full bg-background text-foreground">
+        <ThemeProvider>
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

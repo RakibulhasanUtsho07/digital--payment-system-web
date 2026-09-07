@@ -3,14 +3,17 @@
 @import "shadcn/tailwind.css";
 
 @tailwind utilities;
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
   --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
+
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -19,27 +22,37 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
+
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
+
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
+
   --color-destructive: var(--destructive);
+
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
+
   --color-muted-foreground: var(--muted-foreground);
   --color-muted: var(--muted);
+
   --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary: var(--secondary);
+
   --color-primary-foreground: var(--primary-foreground);
   --color-primary: var(--primary);
+
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
+
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -49,36 +62,47 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-:root {
-  /* Page canvas — matches the #F1F3ED used by the Navbar/Hero sections,
-     so any component styled with bg-background (like PaymentFeatures)
-     sits on the same tone instead of shadcn's default white. */
+/* =========================================================
+   LIGHT THEME
+========================================================= */
+
+:root,
+[data-theme="light"] {
   --background: oklch(0.961 0.0082 121.63);
   --foreground: oklch(0.145 0 0);
-  /* Card surfaces stay white — this already matched the white cards used
-     in the Hero (balance preview, slideshow), so it's left as-is. */
+
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
+
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
+
   --primary: oklch(0.4829 0.1345 255.08);
   --primary-foreground: oklch(0.985 0 0);
+
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
+
   --muted: oklch(0.97 0 0);
   --muted-foreground: oklch(0.556 0 0);
+
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
+
   --destructive: oklch(0.577 0.245 27.325);
+
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+
   --radius: 0.625rem;
+
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -87,50 +111,304 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* Custom UI tokens */
+
+  --dashboard-primary: #2563eb;
+  --dashboard-primary-soft: #eff6ff;
+  --dashboard-success: #10b981;
+  --dashboard-danger: #ef4444;
+  --dashboard-warning: #f59e0b;
+
+  --dashboard-surface-soft: #f8fafc;
+
+  --dashboard-shadow:
+    0 12px 35px rgba(15, 23, 42, 0.06);
 }
 
-.dark {
+/* =========================================================
+   DARK THEME
+========================================================= */
+
+[data-theme="dark"] {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
+
   --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
+
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
+
+  --primary: oklch(0.65 0.18 255);
+  --primary-foreground: oklch(0.15 0 0);
+
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
+
   --muted: oklch(0.269 0 0);
   --muted-foreground: oklch(0.708 0 0);
+
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
+
   --destructive: oklch(0.704 0.191 22.216);
+
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
+
+  --chart-1: oklch(0.7 0.18 255);
+  --chart-2: oklch(0.65 0.16 190);
+  --chart-3: oklch(0.72 0.16 150);
+  --chart-4: oklch(0.7 0.17 300);
+  --chart-5: oklch(0.7 0.18 25);
+
   --sidebar: oklch(0.205 0 0);
   --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary: oklch(0.65 0.18 255);
   --sidebar-primary-foreground: oklch(0.985 0 0);
   --sidebar-accent: oklch(0.269 0 0);
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  --dashboard-primary: #60a5fa;
+  --dashboard-primary-soft: #172554;
+  --dashboard-success: #34d399;
+  --dashboard-danger: #fb7185;
+  --dashboard-warning: #fbbf24;
+
+  --dashboard-surface-soft: #172033;
+
+  --dashboard-shadow:
+    0 16px 45px rgba(0, 0, 0, 0.28);
 }
+
+/* =========================================================
+   EYE CARE THEME
+========================================================= */
+
+[data-theme="eye-care"] {
+  --background: #f2eee3;
+  --foreground: #28352f;
+
+  --card: #fbf8ef;
+  --card-foreground: #28352f;
+
+  --popover: #fbf8ef;
+  --popover-foreground: #28352f;
+
+  --primary: #4f7c69;
+  --primary-foreground: #ffffff;
+
+  --secondary: #e7e8dd;
+  --secondary-foreground: #35463d;
+
+  --muted: #e9e8de;
+  --muted-foreground: #68766f;
+
+  --accent: #e7eee8;
+  --accent-foreground: #355143;
+
+  --destructive: #bd6969;
+
+  --border: #dfe1d5;
+  --input: #dfe1d5;
+  --ring: #6b907e;
+
+  --chart-1: #4f7c69;
+  --chart-2: #709783;
+  --chart-3: #8ca98f;
+  --chart-4: #b49767;
+  --chart-5: #9b7560;
+
+  --sidebar: #f8f5ec;
+  --sidebar-foreground: #28352f;
+  --sidebar-primary: #4f7c69;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e9efe9;
+  --sidebar-accent-foreground: #355143;
+  --sidebar-border: #dfe1d5;
+  --sidebar-ring: #6b907e;
+
+  --dashboard-primary: #4f7c69;
+  --dashboard-primary-soft: #e7f0e9;
+  --dashboard-success: #5f9278;
+  --dashboard-danger: #bd6969;
+  --dashboard-warning: #ad8651;
+
+  --dashboard-surface-soft: #f5f2e9;
+
+  --dashboard-shadow:
+    0 12px 32px rgba(67, 81, 71, 0.07);
+}
+
+/* =========================================================
+   OCEAN THEME
+========================================================= */
+
+[data-theme="ocean"] {
+  --background: #eaf5f7;
+  --foreground: #123047;
+
+  --card: #ffffff;
+  --card-foreground: #123047;
+
+  --popover: #ffffff;
+  --popover-foreground: #123047;
+
+  --primary: #0789a8;
+  --primary-foreground: #ffffff;
+
+  --secondary: #e0f0f4;
+  --secondary-foreground: #16435b;
+
+  --muted: #e7f1f4;
+  --muted-foreground: #5c7584;
+
+  --accent: #def4f5;
+  --accent-foreground: #145567;
+
+  --destructive: #dc7272;
+
+  --border: #d5e6eb;
+  --input: #d5e6eb;
+  --ring: #3ba8be;
+
+  --chart-1: #0789a8;
+  --chart-2: #19a5b8;
+  --chart-3: #46b5a7;
+  --chart-4: #4a83ba;
+  --chart-5: #6d79c5;
+
+  --sidebar: #f5fbfc;
+  --sidebar-foreground: #123047;
+  --sidebar-primary: #0789a8;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e0f3f5;
+  --sidebar-accent-foreground: #145567;
+  --sidebar-border: #d5e6eb;
+  --sidebar-ring: #3ba8be;
+
+  --dashboard-primary: #0789a8;
+  --dashboard-primary-soft: #e6f8fa;
+  --dashboard-success: #0f9f83;
+  --dashboard-danger: #dc7272;
+  --dashboard-warning: #d4964b;
+
+  --dashboard-surface-soft: #f3fafb;
+
+  --dashboard-shadow:
+    0 12px 35px rgba(8, 137, 168, 0.08);
+}
+
+/* =========================================================
+   FOREST THEME
+========================================================= */
+
+[data-theme="forest"] {
+  --background: #eaf1ec;
+  --foreground: #183126;
+
+  --card: #fcfefc;
+  --card-foreground: #183126;
+
+  --popover: #fcfefc;
+  --popover-foreground: #183126;
+
+  --primary: #2f7d5a;
+  --primary-foreground: #ffffff;
+
+  --secondary: #e1ece4;
+  --secondary-foreground: #244a38;
+
+  --muted: #e7eee9;
+  --muted-foreground: #60766a;
+
+  --accent: #e2f0e7;
+  --accent-foreground: #25543d;
+
+  --destructive: #cb6c6c;
+
+  --border: #d4e0d7;
+  --input: #d4e0d7;
+  --ring: #63a27f;
+
+  --chart-1: #2f7d5a;
+  --chart-2: #4b936e;
+  --chart-3: #69a780;
+  --chart-4: #8ca56d;
+  --chart-5: #ad8860;
+
+  --sidebar: #f3f8f4;
+  --sidebar-foreground: #183126;
+  --sidebar-primary: #2f7d5a;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e4f0e7;
+  --sidebar-accent-foreground: #25543d;
+  --sidebar-border: #d4e0d7;
+  --sidebar-ring: #63a27f;
+
+  --dashboard-primary: #2f7d5a;
+  --dashboard-primary-soft: #e8f4ec;
+  --dashboard-success: #43956a;
+  --dashboard-danger: #cb6c6c;
+  --dashboard-warning: #b68752;
+
+  --dashboard-surface-soft: #f2f7f3;
+
+  --dashboard-shadow:
+    0 12px 35px rgba(39, 82, 58, 0.07);
+}
+
+/* =========================================================
+   GLOBAL BASE
+========================================================= */
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
+
   html {
     @apply font-sans;
+    background: var(--background);
+    color: var(--foreground);
+
+    transition:
+      background-color 300ms ease,
+      color 300ms ease;
   }
+
+  body {
+    @apply bg-background text-foreground;
+
+    min-height: 100vh;
+
+    transition:
+      background-color 300ms ease,
+      color 300ms ease;
+  }
+
+  button,
+  a,
+  input,
+  textarea,
+  select {
+    transition:
+      background-color 250ms ease,
+      border-color 250ms ease,
+      color 250ms ease,
+      box-shadow 250ms ease;
+  }
+}
+
+/* =========================================================
+   THEME TRANSITION
+========================================================= */
+
+::selection {
+  background: var(--primary);
+  color: var(--primary-foreground);
 }

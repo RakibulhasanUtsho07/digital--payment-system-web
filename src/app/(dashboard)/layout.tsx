@@ -5,17 +5,13 @@ import React, {
   useState,
 } from "react";
 
-import {
-  useRouter,
-} from "next/navigation";
+import { useRouter } from "next/navigation";
 
 import UserSidebar from "@/components/dashboard/layout/UserSidebar";
 import AdminSidebar from "@/components/dashboard/layout/AdminSidebar";
 import TopNavbar from "@/components/dashboard/layout/TopNavbar";
 
-import {
-  apiClient,
-} from "@/lib/api/client";
+import { apiClient } from "@/lib/api/client";
 
 /* =========================================================
    TYPES
@@ -37,11 +33,8 @@ interface CurrentUser {
   name: string;
   email: string;
   phone?: string;
-
   role: UserRole;
-
-  kycStatus:
-    KYCStatus;
+  kycStatus: KYCStatus;
 }
 
 interface ProfileResponse {
@@ -56,51 +49,34 @@ interface ProfileResponse {
 export default function DashboardLayout({
   children,
 }: {
-  children:
-    React.ReactNode;
+  children: React.ReactNode;
 }) {
-  const router =
-    useRouter();
+  const router = useRouter();
 
-  /* =========================================================
-     USER
-  ========================================================== */
+  const [user, setUser] =
+    useState<CurrentUser | null>(null);
 
-  const [
-    user,
-    setUser,
-  ] =
-    useState<CurrentUser | null>(
-      null
-    );
-
-  const [
-    loading,
-    setLoading,
-  ] =
+  const [loading, setLoading] =
     useState(true);
 
   const [
     errorMessage,
     setErrorMessage,
-  ] =
-    useState("");
+  ] = useState("");
 
   const [
     retryKey,
     setRetryKey,
-  ] =
-    useState(0);
+  ] = useState(0);
 
   const [
     mobileMenuOpen,
     setMobileMenuOpen,
-  ] =
-    useState(false);
+  ] = useState(false);
 
-  /* =========================================================
-     LOAD AUTHENTICATED USER FROM BACKEND
-  ========================================================== */
+  /* =======================================================
+     LOAD USER
+  ======================================================= */
 
   useEffect(() => {
     let mounted = true;
@@ -108,13 +84,8 @@ export default function DashboardLayout({
     const loadCurrentUser =
       async () => {
         try {
-          setLoading(
-            true
-          );
-
-          setErrorMessage(
-            ""
-          );
+          setLoading(true);
+          setErrorMessage("");
 
           const response =
             await withTimeout(
@@ -138,21 +109,9 @@ export default function DashboardLayout({
             );
           }
 
-          /* ===============================================
-             BACKEND IS SOURCE OF TRUTH
-          =============================================== */
-
           setUser(
             response.user
           );
-
-          /* ===============================================
-             OPTIONAL:
-             Keep localStorage user metadata synced.
-
-             Authentication itself still comes from
-             HttpOnly cookie.
-          =============================================== */
 
           localStorage.setItem(
             "auth_user",
@@ -188,18 +147,28 @@ export default function DashboardLayout({
             message.toLowerCase();
 
           const isAuthenticationError =
-            normalizedMessage.includes("unauthorized") ||
-            normalizedMessage.includes("not authorized") ||
-            normalizedMessage.includes("authentication") ||
-            normalizedMessage.includes("invalid token") ||
-            normalizedMessage.includes("token failed") ||
-            normalizedMessage.includes("401");
+            normalizedMessage.includes(
+              "unauthorized"
+            ) ||
+            normalizedMessage.includes(
+              "not authorized"
+            ) ||
+            normalizedMessage.includes(
+              "authentication"
+            ) ||
+            normalizedMessage.includes(
+              "invalid token"
+            ) ||
+            normalizedMessage.includes(
+              "token failed"
+            ) ||
+            normalizedMessage.includes(
+              "401"
+            );
 
-          /* ===============================================
-             CLEAR OLD CLIENT METADATA
-          =============================================== */
-
-          if (isAuthenticationError) {
+          if (
+            isAuthenticationError
+          ) {
             localStorage.removeItem(
               "auth_user"
             );
@@ -216,19 +185,13 @@ export default function DashboardLayout({
               "digital_wallet_token"
             );
 
-            /* ===============================================
-               NOT AUTHENTICATED
-            =============================================== */
-
             router.replace(
               "/login"
             );
           }
         } finally {
           if (mounted) {
-            setLoading(
-              false
-            );
+            setLoading(false);
           }
         }
       };
@@ -238,30 +201,29 @@ export default function DashboardLayout({
     return () => {
       mounted = false;
     };
-  }, [router, retryKey]);
+  }, [
+    router,
+    retryKey,
+  ]);
 
-  /* =========================================================
+  /* =======================================================
      MOBILE SIDEBAR
-  ========================================================== */
+  ======================================================= */
 
-  const closeMobileMenu =
-    () => {
-      setMobileMenuOpen(
-        false
-      );
-    };
+  const closeMobileMenu = () => {
+    setMobileMenuOpen(false);
+  };
 
-  const toggleMobileMenu =
-    () => {
-      setMobileMenuOpen(
-        (current) =>
-          !current
-      );
-    };
+  const toggleMobileMenu = () => {
+    setMobileMenuOpen(
+      (current) =>
+        !current
+    );
+  };
 
-  /* =========================================================
+  /* =======================================================
      LOGOUT
-  ========================================================== */
+  ======================================================= */
 
   const handleLogout =
     async () => {
@@ -269,8 +231,7 @@ export default function DashboardLayout({
         await apiClient(
           "/auth/logout",
           {
-            method:
-              "POST",
+            method: "POST",
           }
         );
       } catch (error) {
@@ -279,10 +240,6 @@ export default function DashboardLayout({
           error
         );
       } finally {
-        /* ===============================================
-           CLEAR CLIENT METADATA
-        =============================================== */
-
         localStorage.removeItem(
           "auth_user"
         );
@@ -295,9 +252,11 @@ export default function DashboardLayout({
           "token"
         );
 
-        setUser(
-          null
+        localStorage.removeItem(
+          "digital_wallet_token"
         );
+
+        setUser(null);
 
         closeMobileMenu();
 
@@ -309,9 +268,9 @@ export default function DashboardLayout({
       }
     };
 
-  /* =========================================================
+  /* =======================================================
      LOADING
-  ========================================================== */
+  ======================================================= */
 
   if (loading) {
     return (
@@ -320,48 +279,36 @@ export default function DashboardLayout({
           flex
           min-h-dvh
           w-full
-
           items-center
           justify-center
-
-          bg-[#F4F7FB]
+          bg-background
+          text-foreground
         "
       >
-        <div
-          className="
-            flex
-            flex-col
-            items-center
-            gap-4
-          "
-        >
-          {/* ICON */}
-
+        <div className="flex flex-col items-center gap-4">
           <div
             className="
               flex
               h-14
               w-14
-
               items-center
               justify-center
-
               rounded-2xl
-
-              bg-[#1F5EA8]
-
-              shadow-[0_16px_35px_rgba(31,94,168,0.22)]
+              shadow-lg
             "
+            style={{
+              background:
+                "var(--dashboard-primary)",
+              boxShadow:
+                "var(--dashboard-shadow)",
+            }}
           >
             <div
               className="
                 h-6
                 w-6
-
                 animate-spin
-
                 rounded-full
-
                 border-2
                 border-white/30
                 border-t-white
@@ -369,35 +316,13 @@ export default function DashboardLayout({
             />
           </div>
 
-          {/* TEXT */}
-
-          <div
-            className="
-              text-center
-            "
-          >
-            <p
-              className="
-                text-sm
-                font-bold
-
-                text-[#162A43]
-              "
-            >
+          <div className="text-center">
+            <p className="text-sm font-bold text-foreground">
               Loading dashboard
             </p>
 
-            <p
-              className="
-                mt-1
-
-                text-xs
-
-                text-slate-400
-              "
-            >
-              Checking your account
-              and permissions...
+            <p className="mt-1 text-xs text-muted-foreground">
+              Checking your account and permissions...
             </p>
           </div>
         </div>
@@ -405,30 +330,86 @@ export default function DashboardLayout({
     );
   }
 
-  /* =========================================================
-     AUTH LOAD ERROR
-  ========================================================= */
+  /* =======================================================
+     AUTH ERROR
+  ======================================================= */
 
   if (errorMessage) {
     return (
-      <div className="flex min-h-dvh w-full items-center justify-center bg-[#F4F7FB] px-4">
-        <div className="w-full max-w-md rounded-3xl border border-red-200 bg-white p-7 text-center shadow-sm">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-xl font-black text-red-600">
+      <div
+        className="
+          flex
+          min-h-dvh
+          w-full
+          items-center
+          justify-center
+          bg-background
+          px-4
+          text-foreground
+        "
+      >
+        <div
+          className="
+            w-full
+            max-w-md
+            rounded-3xl
+            border
+            border-border
+            bg-card
+            p-7
+            text-center
+            shadow-sm
+          "
+        >
+          <div
+            className="
+              mx-auto
+              flex
+              h-14
+              w-14
+              items-center
+              justify-center
+              rounded-2xl
+              bg-red-50
+              text-xl
+              font-black
+              text-red-600
+            "
+          >
             !
           </div>
 
-          <h2 className="mt-4 text-xl font-extrabold text-slate-900">
+          <h2 className="mt-4 text-xl font-extrabold text-card-foreground">
             Unable to verify account
           </h2>
 
-          <p className="mt-2 text-sm leading-6 text-slate-500">
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
             {errorMessage}
           </p>
 
           <button
             type="button"
-            onClick={() => setRetryKey((current) => current + 1)}
-            className="mt-6 rounded-xl bg-[#1F5EA8] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#17466F]"
+            onClick={() =>
+              setRetryKey(
+                (current) =>
+                  current + 1
+              )
+            }
+            className="
+              mt-6
+              rounded-xl
+              px-5
+              py-3
+              text-sm
+              font-bold
+              text-white
+              transition
+              hover:opacity-90
+            "
+            style={{
+              background:
+                "var(--dashboard-primary)",
+            }}
           >
             Try Again
           </button>
@@ -437,24 +418,9 @@ export default function DashboardLayout({
     );
   }
 
-  /* =========================================================
-     USER MISSING
-  ========================================================== */
-
   if (!user) {
     return null;
   }
-
-  /* =========================================================
-     ROLE FROM BACKEND
-  ========================================================== */
-
-  const userRole =
-    user.role;
-
-  /* =========================================================
-     UI
-  ========================================================== */
 
   return (
     <div
@@ -462,43 +428,37 @@ export default function DashboardLayout({
         flex
         min-h-dvh
         w-full
-
-        bg-[#F4F7FB]
-
-        text-[#162A43]
+        bg-background
+        text-foreground
+        transition-colors
+        duration-300
       "
     >
-      {/* =====================================================
+      {/* ===================================================
           MOBILE BACKDROP
-      ====================================================== */}
+      =================================================== */}
 
       {mobileMenuOpen && (
         <button
           type="button"
-
           aria-label="Close sidebar"
-
           onClick={
             closeMobileMenu
           }
-
           className="
             fixed
             inset-0
             z-40
-
-            bg-[#07182A]/50
-
+            bg-black/40
             backdrop-blur-[4px]
-
             lg:hidden
           "
         />
       )}
 
-      {/* =====================================================
+      {/* ===================================================
           SIDEBAR
-      ====================================================== */}
+      =================================================== */}
 
       <aside
         className={`
@@ -506,25 +466,18 @@ export default function DashboardLayout({
           inset-y-0
           left-0
           z-50
-
           h-dvh
           w-[280px]
           shrink-0
-
           overflow-hidden
-
           transform
-
           transition-transform
           duration-300
-
           ease-[cubic-bezier(0.22,1,0.36,1)]
-
           lg:sticky
           lg:top-0
           lg:z-40
           lg:translate-x-0
-
           ${
             mobileMenuOpen
               ? "translate-x-0"
@@ -532,11 +485,7 @@ export default function DashboardLayout({
           }
         `}
       >
-        {/* ===============================================
-            ROLE COMES DIRECTLY FROM BACKEND
-        =============================================== */}
-
-        {userRole ===
+        {user.role ===
         "admin" ? (
           <AdminSidebar
             onLogout={
@@ -552,9 +501,9 @@ export default function DashboardLayout({
         )}
       </aside>
 
-      {/* =====================================================
+      {/* ===================================================
           RIGHT SIDE
-      ====================================================== */}
+      =================================================== */}
 
       <div
         className="
@@ -563,47 +512,41 @@ export default function DashboardLayout({
           min-w-0
           flex-1
           flex-col
+          bg-background
         "
       >
-        {/* ===================================================
-            TOP NAVBAR
-        ==================================================== */}
-
         <TopNavbar
           onMenuClick={
             toggleMobileMenu
           }
-
           userName={
             user.name ||
             "My Account"
           }
-
           userEmail={
-            user.email ||
-            ""
+            user.email || ""
           }
-
           userRole={
             user.role
           }
         />
 
-        {/* ===================================================
+        {/* =================================================
             PAGE CONTENT
-        ==================================================== */}
+
+            IMPORTANT:
+            No hard-coded #F4F7FB here.
+        ================================================== */}
 
         <main
           className="
             min-h-0
             flex-1
-
             overflow-x-hidden
-
-            bg-[#F4F7FB]
-
+            bg-background
             p-4
-
+            transition-colors
+            duration-300
             sm:p-5
             md:p-6
             lg:p-7
@@ -625,25 +568,48 @@ export default function DashboardLayout({
   );
 }
 
+/* =========================================================
+   TIMEOUT
+========================================================= */
+
 function withTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,
   message: string
 ): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = globalThis.setTimeout(() => {
-      reject(new Error(message));
-    }, timeoutMs);
+  return new Promise<T>(
+    (
+      resolve,
+      reject
+    ) => {
+      const timer =
+        globalThis.setTimeout(
+          () => {
+            reject(
+              new Error(
+                message
+              )
+            );
+          },
+          timeoutMs
+        );
 
-    promise.then(
-      (value) => {
-        globalThis.clearTimeout(timer);
-        resolve(value);
-      },
-      (error) => {
-        globalThis.clearTimeout(timer);
-        reject(error);
-      }
-    );
-  });
+      promise.then(
+        (value) => {
+          globalThis.clearTimeout(
+            timer
+          );
+
+          resolve(value);
+        },
+        (error) => {
+          globalThis.clearTimeout(
+            timer
+          );
+
+          reject(error);
+        }
+      );
+    }
+  );
 }
