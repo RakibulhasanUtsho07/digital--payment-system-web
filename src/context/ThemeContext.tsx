@@ -23,6 +23,7 @@ export type ThemeMode =
 
 interface ThemeContextValue {
   theme: ThemeMode;
+
   setTheme: (
     theme: ThemeMode
   ) => Promise<void>;
@@ -80,19 +81,11 @@ function applyTheme(
   const root =
     document.documentElement;
 
-  /*
-   * CSS variables
-   * [data-theme="..."]
-   */
   root.setAttribute(
     "data-theme",
     theme
   );
 
-  /*
-   * Keep Tailwind dark:
-   * utilities working.
-   */
   root.classList.toggle(
     "dark",
     theme === "dark"
@@ -108,16 +101,16 @@ export function ThemeProvider({
 }: {
   children: ReactNode;
 }) {
-  const [theme, setThemeState] =
+  const [
+    theme,
+    setThemeState,
+  ] =
     useState<ThemeMode>(
       DEFAULT_THEME
     );
 
-  const [mounted, setMounted] =
-    useState(false);
-
   /* =======================================================
-     INITIAL THEME LOAD
+     INITIAL LOAD
   ======================================================= */
 
   useEffect(() => {
@@ -125,17 +118,19 @@ export function ThemeProvider({
 
     const loadTheme =
       async () => {
-        /*
-         * 1. Load cached theme first.
-         * This makes the UI feel instant.
-         */
+        /* -----------------------------------------------
+           LOCAL CACHE FIRST
+        ------------------------------------------------ */
+
         const localTheme =
           window.localStorage.getItem(
             THEME_STORAGE_KEY
           );
 
         if (
-          isThemeMode(localTheme)
+          isThemeMode(
+            localTheme
+          )
         ) {
           setThemeState(
             localTheme
@@ -150,21 +145,24 @@ export function ThemeProvider({
           );
         }
 
-        setMounted(true);
+        /* -----------------------------------------------
+           BACKEND SOURCE OF TRUTH
+        ------------------------------------------------ */
 
-        /*
-         * 2. Ask backend for the
-         * real saved user preference.
-         */
         try {
           const response =
             await apiClient<{
               success: boolean;
+
               preferences?: {
+                appearance?: {
+                  theme?: ThemeMode;
+                };
+
                 theme?: ThemeMode;
               };
             }>(
-              "/users/preferences"
+              "/settings"
             );
 
           if (
@@ -176,6 +174,9 @@ export function ThemeProvider({
 
           const serverTheme =
             response.preferences
+              ?.appearance
+              ?.theme ??
+            response.preferences
               ?.theme;
 
           if (
@@ -186,10 +187,6 @@ export function ThemeProvider({
             return;
           }
 
-          /*
-           * Backend is the source
-           * of truth.
-           */
           setThemeState(
             serverTheme
           );
@@ -198,21 +195,15 @@ export function ThemeProvider({
             serverTheme
           );
 
-          /*
-           * Keep local cache
-           * synchronized.
-           */
           window.localStorage.setItem(
             THEME_STORAGE_KEY,
             serverTheme
           );
-        } catch (error) {
-          /*
-           * If backend is unavailable,
-           * keep cached/local theme.
-           */
+        } catch (
+          error
+        ) {
           console.error(
-            "Failed to load user theme:",
+            "Failed to load theme:",
             error
           );
         }
@@ -229,109 +220,107 @@ export function ThemeProvider({
      CHANGE THEME
   ======================================================= */
 
-  const setTheme = async (
-    nextTheme: ThemeMode
-  ) => {
-    /*
-     * Ignore invalid values.
-     */
-    if (
-      !isThemeMode(
-        nextTheme
-      )
-    ) {
-      return;
-    }
-
-    /*
-     * Optimistic UI:
-     * change immediately.
-     */
-    setThemeState(
-      nextTheme
-    );
-
-    applyTheme(
-      nextTheme
-    );
-
-    /*
-     * Cache immediately.
-     */
-    window.localStorage.setItem(
-      THEME_STORAGE_KEY,
-      nextTheme
-    );
-
-    /*
-     * Save to database.
-     */
-    try {
-      const response =
-        await apiClient<{
-          success: boolean;
-          preferences?: {
-            theme?: ThemeMode;
-          };
-        }>(
-          "/users/preferences",
-          {
-            method: "PATCH",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-
-            body: JSON.stringify({
-              theme:
-                nextTheme,
-            }),
-          }
-        );
-
-      /*
-       * Backend may return
-       * the normalized/saved theme.
-       */
-      const savedTheme =
-        response.preferences
-          ?.theme;
-
+  const setTheme =
+    async (
+      nextTheme: ThemeMode
+    ) => {
       if (
-        response.success &&
-        isThemeMode(
-          savedTheme
+        !isThemeMode(
+          nextTheme
         )
       ) {
-        setThemeState(
-          savedTheme
-        );
+        return;
+      }
 
-        applyTheme(
-          savedTheme
-        );
+      /* Immediate UI */
+      setThemeState(
+        nextTheme
+      );
 
-        window.localStorage.setItem(
-          THEME_STORAGE_KEY,
-          savedTheme
+      applyTheme(
+        nextTheme
+      );
+
+      /* Local cache */
+      window.localStorage.setItem(
+        THEME_STORAGE_KEY,
+        nextTheme
+      );
+
+      /* Backend */
+      try {
+        const response =
+          await apiClient<{
+            success: boolean;
+
+            preferences?: {
+              appearance?: {
+                theme?: ThemeMode;
+              };
+
+              theme?: ThemeMode;
+            };
+
+            message?: string;
+          }>(
+            "/settings/preferences",
+            {
+              method: "PATCH",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body: JSON.stringify({
+                appearance: {
+                  theme:
+                    nextTheme,
+                },
+              }),
+            }
+          );
+
+        if (
+          !response.success
+        ) {
+          return;
+        }
+
+        const savedTheme =
+          response.preferences
+            ?.appearance
+            ?.theme ??
+          response.preferences
+            ?.theme;
+
+        if (
+          isThemeMode(
+            savedTheme
+          )
+        ) {
+          setThemeState(
+            savedTheme
+          );
+
+          applyTheme(
+            savedTheme
+          );
+
+          window.localStorage.setItem(
+            THEME_STORAGE_KEY,
+            savedTheme
+          );
+        }
+      } catch (
+        error
+      ) {
+        console.error(
+          "Failed to save theme:",
+          error
         );
       }
-    } catch (error) {
-      /*
-       * UI remains on selected theme.
-       * It is already cached locally.
-       */
-      console.error(
-        "Failed to save user theme:",
-        error
-      );
-    }
-  };
-
-  /* =======================================================
-     PROVIDER
-  ======================================================= */
+    };
 
   return (
     <ThemeContext.Provider

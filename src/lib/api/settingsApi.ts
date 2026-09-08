@@ -7,7 +7,9 @@ import { apiClient } from "./client";
 export type ThemeMode =
   | "light"
   | "dark"
-  | "system";
+  | "eye-care"
+  | "ocean"
+  | "forest";
 
 export type Density =
   | "comfortable"
@@ -88,22 +90,19 @@ export interface SettingsWallet {
 
 export interface UserSettingsResponse {
   success: boolean;
-
   profile: SettingsProfile;
-
   preferences: UserSettingsPreferences;
-
   wallet: SettingsWallet | null;
+  message?: string;
 }
 
 /* =========================================================
-   UPDATE PREFERENCES RESPONSE
+   UPDATE PREFERENCES
 ========================================================= */
 
 export interface UpdatePreferencesResponse {
   success: boolean;
   message: string;
-
   preferences: UserSettingsPreferences;
 }
 
@@ -115,18 +114,12 @@ export interface UpdateProfilePayload {
   name: string;
   email: string;
   phone: string;
-
-  /*
-   * Required by backend only when
-   * email or phone is changed.
-   */
   password?: string;
 }
 
 export interface UpdateProfileResponse {
   success: boolean;
   message: string;
-
   profile: SettingsProfile;
 }
 
@@ -147,6 +140,7 @@ export interface SessionResponse {
   success: boolean;
   sessions: UserSession[];
   note?: string;
+  message?: string;
 }
 
 /* =========================================================
@@ -158,15 +152,15 @@ export interface ExportResponse {
 
   export: {
     generatedAt: string;
-
     profile: SettingsProfile;
-
     preferences: UserSettingsPreferences;
   };
+
+  message?: string;
 }
 
 /* =========================================================
-   GENERIC MESSAGE RESPONSE
+   GENERIC MESSAGE
 ========================================================= */
 
 export interface MessageResponse {
@@ -181,28 +175,25 @@ export interface MessageResponse {
 export const settingsApi = {
   /* =======================================================
      GET SETTINGS
-
      GET /api/settings
   ======================================================= */
 
   get:
-    async (): Promise<UserSettingsResponse> => {
-      return apiClient<UserSettingsResponse>(
+    async (): Promise<UserSettingsResponse> =>
+      apiClient<UserSettingsResponse>(
         "/settings"
-      );
-    },
+      ),
 
   /* =======================================================
      UPDATE PREFERENCES
-
      PATCH /api/settings/preferences
   ======================================================= */
 
   updatePreferences:
     async (
       preferences: UserSettingsPreferences
-    ): Promise<UpdatePreferencesResponse> => {
-      return apiClient<UpdatePreferencesResponse>(
+    ): Promise<UpdatePreferencesResponse> =>
+      apiClient<UpdatePreferencesResponse>(
         "/settings/preferences",
         {
           method: "PATCH",
@@ -216,20 +207,18 @@ export const settingsApi = {
             preferences
           ),
         }
-      );
-    },
+      ),
 
   /* =======================================================
      UPDATE PROFILE
-
      PATCH /api/settings/profile
   ======================================================= */
 
   updateProfile:
     async (
       payload: UpdateProfilePayload
-    ): Promise<UpdateProfileResponse> => {
-      return apiClient<UpdateProfileResponse>(
+    ): Promise<UpdateProfileResponse> =>
+      apiClient<UpdateProfileResponse>(
         "/settings/profile",
         {
           method: "PATCH",
@@ -243,54 +232,46 @@ export const settingsApi = {
             payload
           ),
         }
-      );
-    },
+      ),
 
   /* =======================================================
-     GET CURRENT SESSION
-
+     GET ACTIVE SESSION
      GET /api/settings/session
   ======================================================= */
 
   getSession:
-    async (): Promise<SessionResponse> => {
-      return apiClient<SessionResponse>(
+    async (): Promise<SessionResponse> =>
+      apiClient<SessionResponse>(
         "/settings/session"
-      );
-    },
+      ),
 
   /* =======================================================
-     LOG OUT ALL DEVICES
-
+     LOGOUT ALL OTHER DEVICES
      POST /api/settings/logout-all
   ======================================================= */
 
   logoutAll:
-    async (): Promise<MessageResponse> => {
-      return apiClient<MessageResponse>(
+    async (): Promise<MessageResponse> =>
+      apiClient<MessageResponse>(
         "/settings/logout-all",
         {
           method: "POST",
         }
-      );
-    },
+      ),
 
   /* =======================================================
-     EXPORT ACCOUNT SETTINGS
-
+     EXPORT
      GET /api/settings/export
   ======================================================= */
 
   exportData:
-    async (): Promise<ExportResponse> => {
-      return apiClient<ExportResponse>(
+    async (): Promise<ExportResponse> =>
+      apiClient<ExportResponse>(
         "/settings/export"
-      );
-    },
+      ),
 
   /* =======================================================
      DELETE ACCOUNT
-
      DELETE /api/settings/account
   ======================================================= */
 
@@ -300,8 +281,8 @@ export const settingsApi = {
         password: string;
         confirmation: "DELETE";
       }
-    ): Promise<MessageResponse> => {
-      return apiClient<MessageResponse>(
+    ): Promise<MessageResponse> =>
+      apiClient<MessageResponse>(
         "/settings/account",
         {
           method: "DELETE",
@@ -315,6 +296,5 @@ export const settingsApi = {
             payload
           ),
         }
-      );
-    },
+      ),
 };

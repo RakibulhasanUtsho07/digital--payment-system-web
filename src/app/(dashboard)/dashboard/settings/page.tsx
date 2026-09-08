@@ -4,16 +4,24 @@ import React, {
   useEffect,
   useMemo,
   useState,
+  type Dispatch,
+  type SetStateAction,
 } from "react";
 
 import Link from "next/link";
-
-import { apiClient } from "@/lib/api/client";
 
 import {
   useTheme,
   type ThemeMode,
 } from "@/context/ThemeContext";
+
+import {
+  settingsApi,
+  type SettingsProfile,
+  type SettingsWallet,
+  type UserSession,
+  type UserSettingsPreferences,
+} from "@/lib/api/settingsApi";
 
 import {
   AnimatePresence,
@@ -23,10 +31,13 @@ import {
 import {
   Activity,
   AlertTriangle,
+  Bell,
   BellRing,
+  Check,
   CheckCircle2,
   ChevronRight,
   Database,
+  Download,
   FileJson,
   FileSpreadsheet,
   Fingerprint,
@@ -36,6 +47,7 @@ import {
   Lock,
   LogOut,
   Mail,
+  Menu,
   MonitorSmartphone,
   Moon,
   Palette,
@@ -45,8 +57,8 @@ import {
   Settings,
   ShieldAlert,
   ShieldCheck,
-  Sparkles,
   Smartphone,
+  Sparkles,
   Sun,
   Trash2,
   Trees,
@@ -93,6 +105,7 @@ type ToastState = {
     | "success"
     | "info"
     | "error";
+
   message: string;
 };
 
@@ -101,6 +114,18 @@ type UserSettingsState = {
     name: string;
     email: string;
     phone: string;
+
+    role:
+      | "user"
+      | "admin";
+
+    kycStatus:
+      | "not_started"
+      | "pending"
+      | "verified"
+      | "rejected";
+
+    createdAt?: string;
   };
 
   appearance: {
@@ -109,29 +134,14 @@ type UserSettingsState = {
     reduceMotion: boolean;
   };
 
-  wallet: {
-    defaultCurrency:
-      | "BDT"
-      | "USD"
-      | "EUR";
-    hideAmounts: boolean;
-    confirmThreshold: number;
-    requireConfirmation: boolean;
-  };
+  wallet:
+    UserSettingsPreferences["wallet"];
 
-  notifications: {
-    email: boolean;
-    push: boolean;
-    sms: boolean;
-    marketing: boolean;
-  };
+  notifications:
+    UserSettingsPreferences["notifications"];
 
-  privacy: {
-    analytics: boolean;
-    discoverability: boolean;
-    personalization: boolean;
-    showTransactionNames: boolean;
-  };
+  privacy:
+    UserSettingsPreferences["privacy"];
 };
 
 type SectionConfig = {
@@ -142,92 +152,81 @@ type SectionConfig = {
   keywords: string[];
 };
 
-type SessionItem = {
+type SessionView = {
   id: string;
-  device: string;
-  browser: string;
-  os: string;
-  location: string;
-  maskedIp: string;
-  lastActiveAt: string;
-  expiresAt: string;
-  createdAt: string;
   current: boolean;
-  icon: LucideIcon;
+  device: string;
+  location: string;
+  lastActive: string;
+  ip?: string;
 };
-
-interface ActiveSessionsResponse {
-  success: boolean;
-  count: number;
-  sessions: Array<{
-    sessionId: string;
-    device: string;
-    browser: string;
-    os: string;
-    location: string;
-    maskedIp: string;
-    lastActiveAt: string;
-    expiresAt: string;
-    createdAt: string;
-    isCurrent: boolean;
-  }>;
-  message?: string;
-}
 
 /* =========================================================
    CONSTANTS
 ========================================================= */
 
-const STORAGE_KEY =
-  "coffer_user_settings_ui";
+const DEFAULT_SETTINGS:
+  UserSettingsState = {
+  profile: {
+    name: "Coffer User",
+    email: "user@example.com",
+    phone: "+880 1XXXXXXXXX",
+    role: "user",
+    kycStatus:
+      "not_started",
+  },
 
-const DEFAULT_SETTINGS: UserSettingsState =
-  {
-    profile: {
-      name: "Coffer User",
-      email: "user@example.com",
-      phone: "+880 1XXXXXXXXX",
-    },
+  appearance: {
+    theme: "light",
+    density:
+      "comfortable",
+    reduceMotion:
+      false,
+  },
 
-    appearance: {
-      theme: "light",
-      density: "comfortable",
-      reduceMotion: false,
-    },
+  wallet: {
+    defaultCurrency:
+      "BDT",
+    hideAmounts:
+      false,
+    requireConfirmation:
+      true,
+    confirmThreshold:
+      10000,
+  },
 
-    wallet: {
-      defaultCurrency: "BDT",
-      hideAmounts: false,
-      confirmThreshold: 10000,
-      requireConfirmation: true,
-    },
+  notifications: {
+    email: true,
+    push: true,
+    sms: true,
+    marketing:
+      false,
+  },
 
-    notifications: {
-      email: true,
-      push: true,
-      sms: true,
-      marketing: false,
-    },
+  privacy: {
+    analytics: false,
+    discoverability:
+      true,
+    personalization:
+      true,
+    showTransactionNames:
+      true,
+  },
+};
 
-    privacy: {
-      analytics: false,
-      discoverability: true,
-      personalization: true,
-      showTransactionNames: true,
-    },
-  };
-
-const THEME_OPTIONS: Array<{
-  id: ThemeMode;
-  label: string;
-  description: string;
-  icon: LucideIcon;
-  previewClass: string;
-}> = [
+const THEME_OPTIONS:
+  Array<{
+    id: ThemeMode;
+    label: string;
+    description: string;
+    icon: LucideIcon;
+    previewClass: string;
+  }> = [
   {
     id: "light",
     label: "Light",
-    description: "Clean and bright",
+    description:
+      "Clean and bright",
     icon: Sun,
     previewClass:
       "bg-gradient-to-br from-white via-slate-50 to-blue-50",
@@ -236,16 +235,18 @@ const THEME_OPTIONS: Array<{
   {
     id: "dark",
     label: "Dark",
-    description: "Low-light friendly",
+    description:
+      "Deep and low-light friendly",
     icon: Moon,
     previewClass:
-      "bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950",
+      "bg-gradient-to-br from-[#05070d] via-[#0b101a] to-[#24133f]",
   },
 
   {
     id: "eye-care",
     label: "Eye Care",
-    description: "Soft and easy on eyes",
+    description:
+      "Soft and easy on eyes",
     icon: Sparkles,
     previewClass:
       "bg-gradient-to-br from-[#f7f1e4] via-[#f0eee3] to-[#e3ede5]",
@@ -254,7 +255,8 @@ const THEME_OPTIONS: Array<{
   {
     id: "ocean",
     label: "Ocean",
-    description: "Cool and calm",
+    description:
+      "Cool and calm",
     icon: Waves,
     previewClass:
       "bg-gradient-to-br from-[#e9f9fb] via-[#dff3f7] to-[#e5efff]",
@@ -263,14 +265,16 @@ const THEME_OPTIONS: Array<{
   {
     id: "forest",
     label: "Forest",
-    description: "Natural and balanced",
+    description:
+      "Natural and balanced",
     icon: Trees,
     previewClass:
       "bg-gradient-to-br from-[#eef6f0] via-[#e7f0ea] to-[#dcebe2]",
   },
 ];
 
-const SECTIONS: SectionConfig[] = [
+const SECTIONS:
+  SectionConfig[] = [
   {
     id: "overview",
     label: "Overview",
@@ -312,8 +316,8 @@ const SECTIONS: SectionConfig[] = [
       "session",
       "2fa",
       "mfa",
-      "device",
       "login",
+      "device",
     ],
   },
 
@@ -329,6 +333,7 @@ const SECTIONS: SectionConfig[] = [
       "push",
       "sms",
       "marketing",
+      "alerts",
     ],
   },
 
@@ -343,6 +348,7 @@ const SECTIONS: SectionConfig[] = [
       "analytics",
       "visibility",
       "personalization",
+      "data",
     ],
   },
 
@@ -366,7 +372,7 @@ const SECTIONS: SectionConfig[] = [
 
   {
     id: "wallet",
-    label: "Wallet Preferences",
+    label: "Wallet Performance",
     description:
       "Balance and confirmation rules",
     icon: WalletCards,
@@ -376,6 +382,7 @@ const SECTIONS: SectionConfig[] = [
       "balance",
       "confirmation",
       "transfer",
+      "performance",
     ],
   },
 
@@ -410,42 +417,125 @@ const SECTIONS: SectionConfig[] = [
 ];
 
 /* =========================================================
-   SESSION HELPERS
+   HELPERS
 ========================================================= */
 
-function getSessionIcon(
-  device: string,
-  os: string
-): LucideIcon {
-  const value =
-    `${device} ${os}`.toLowerCase();
+function isThemeMode(
+  value: unknown
+): value is ThemeMode {
+  return (
+    value === "light" ||
+    value === "dark" ||
+    value === "eye-care" ||
+    value === "ocean" ||
+    value === "forest"
+  );
+}
+
+function mergeSettings(
+  base: UserSettingsState,
+  incoming: Partial<UserSettingsState>
+): UserSettingsState {
+  return {
+    ...base,
+    ...incoming,
+
+    profile: {
+      ...base.profile,
+      ...(incoming.profile ??
+        {}),
+    },
+
+    appearance: {
+      ...base.appearance,
+      ...(incoming.appearance ??
+        {}),
+    },
+
+    wallet: {
+      ...base.wallet,
+      ...(incoming.wallet ??
+        {}),
+    },
+
+    notifications: {
+      ...base.notifications,
+      ...(incoming.notifications ??
+        {}),
+    },
+
+    privacy: {
+      ...base.privacy,
+      ...(incoming.privacy ??
+        {}),
+    },
+  };
+}
+
+function getInitials(
+  name: string
+) {
+  const parts =
+    name
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
 
   if (
-    value.includes("iphone") ||
-    value.includes("ipad") ||
-    value.includes("android") ||
-    value.includes("ios")
+    parts.length ===
+    0
   ) {
-    return Smartphone;
+    return "U";
   }
 
   if (
-    value.includes("mac") ||
-    value.includes("windows") ||
-    value.includes("linux") ||
-    value.includes("desktop") ||
-    value.includes("laptop") ||
-    value.includes("pc")
+    parts.length ===
+    1
   ) {
-    return Laptop;
+    return parts[0]
+      .slice(0, 2)
+      .toUpperCase();
   }
 
-  return MonitorSmartphone;
+  return (
+    parts[0][0] +
+    parts[
+      parts.length - 1
+    ][0]
+  ).toUpperCase();
+}
+
+function formatDate(
+  value?: string
+) {
+  if (!value) {
+    return "—";
+  }
+
+  const date =
+    new Date(value);
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return value;
+  }
+
+  return date.toLocaleDateString(
+    "en-US",
+    {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }
+  );
 }
 
 function formatRelativeTime(
   value: string
-): string {
+) {
   const date =
     new Date(value);
 
@@ -470,12 +560,10 @@ function formatRelativeTime(
       diff / 1000
     );
 
-  if (seconds < 30) {
+  if (
+    seconds < 30
+  ) {
     return "just now";
-  }
-
-  if (seconds < 60) {
-    return `${seconds}s ago`;
   }
 
   const minutes =
@@ -483,7 +571,9 @@ function formatRelativeTime(
       seconds / 60
     );
 
-  if (minutes < 60) {
+  if (
+    minutes < 60
+  ) {
     return `${minutes}m ago`;
   }
 
@@ -492,7 +582,9 @@ function formatRelativeTime(
       minutes / 60
     );
 
-  if (hours < 24) {
+  if (
+    hours < 24
+  ) {
     return `${hours}h ago`;
   }
 
@@ -501,22 +593,74 @@ function formatRelativeTime(
       hours / 24
     );
 
-  if (days < 30) {
+  if (
+    days < 30
+  ) {
     return `${days}d ago`;
   }
 
-  const months =
-    Math.floor(
-      days / 30
-    );
+  return formatDate(
+    value
+  );
+}
 
-  if (months < 12) {
-    return `${months}mo ago`;
+function getSessionIcon(
+  device: string
+): LucideIcon {
+  const value =
+    device.toLowerCase();
+
+  if (
+    value.includes(
+      "iphone"
+    ) ||
+    value.includes(
+      "ipad"
+    ) ||
+    value.includes(
+      "android"
+    ) ||
+    value.includes(
+      "mobile"
+    )
+  ) {
+    return Smartphone;
   }
 
-  return `${Math.floor(
-    months / 12
-  )}y ago`;
+  if (
+    value.includes(
+      "mac"
+    ) ||
+    value.includes(
+      "windows"
+    ) ||
+    value.includes(
+      "linux"
+    ) ||
+    value.includes(
+      "desktop"
+    ) ||
+    value.includes(
+      "laptop"
+    ) ||
+    value.includes(
+      "pc"
+    )
+  ) {
+    return Laptop;
+  }
+
+  return MonitorSmartphone;
+}
+
+function errorText(
+  error: unknown
+) {
+  return error instanceof
+    Error &&
+    error.message
+    ? error.message
+    : "Something went wrong.";
 }
 
 /* =========================================================
@@ -524,69 +668,25 @@ function formatRelativeTime(
 ========================================================= */
 
 export default function UserSettingsPage() {
-  const [
-    mounted,
-    setMounted,
-  ] = useState(false);
-
-  /* =======================================================
-     THEME CONTEXT
-  ======================================================= */
-
   const {
     theme,
     setTheme,
   } = useTheme();
 
-  /* =======================================================
-     ACTIVE SESSIONS
-  ======================================================= */
-
   const [
-    sessions,
-    setSessions,
-  ] = useState<SessionItem[]>([]);
-
-  const [
-    sessionsLoading,
-    setSessionsLoading,
+    mounted,
+    setMounted,
   ] = useState(false);
 
   const [
-    sessionsError,
-    setSessionsError,
-  ] = useState("");
+    loading,
+    setLoading,
+  ] = useState(true);
 
   const [
-    sessionActionLoading,
-    setSessionActionLoading,
-  ] = useState<string | null>(
-    null
-  );
-
-  /* =======================================================
-     PAGE STATE
-  ======================================================= */
-
-  const [
-    activeSection,
-    setActiveSection,
-  ] = useState<SectionId>(
-    "overview"
-  );
-
-  const [
-    searchQuery,
-    setSearchQuery,
-  ] = useState("");
-
-  const [
-    savedSettings,
-    setSavedSettings,
-  ] =
-    useState<UserSettingsState>(
-      DEFAULT_SETTINGS
-    );
+    refreshing,
+    setRefreshing,
+  ] = useState(false);
 
   const [
     draft,
@@ -597,10 +697,71 @@ export default function UserSettingsPage() {
     );
 
   const [
+    savedSettings,
+    setSavedSettings,
+  ] =
+    useState<UserSettingsState>(
+      DEFAULT_SETTINGS
+    );
+
+  const [
+    wallet,
+    setWallet,
+  ] =
+    useState<SettingsWallet | null>(
+      null
+    );
+
+  const [
+    activeSection,
+    setActiveSection,
+  ] =
+    useState<SectionId>(
+      "overview"
+    );
+
+  const [
+    searchQuery,
+    setSearchQuery,
+  ] = useState("");
+
+  const [
     drawerType,
     setDrawerType,
   ] =
-    useState<DrawerType>(null);
+    useState<DrawerType>(
+      null
+    );
+
+  const [
+    sessions,
+    setSessions,
+  ] =
+    useState<SessionView[]>([]);
+
+  const [
+    sessionsLoading,
+    setSessionsLoading,
+  ] =
+    useState(false);
+
+  const [
+    sessionsError,
+    setSessionsError,
+  ] = useState("");
+
+  const [
+    sessionActionLoading,
+    setSessionActionLoading,
+  ] =
+    useState<string | null>(
+      null
+    );
+
+  const [
+    saving,
+    setSaving,
+  ] = useState(false);
 
   const [
     dangerAction,
@@ -611,6 +772,11 @@ export default function UserSettingsPage() {
     );
 
   const [
+    deletePassword,
+    setDeletePassword,
+  ] = useState("");
+
+  const [
     toast,
     setToast,
   ] =
@@ -618,393 +784,179 @@ export default function UserSettingsPage() {
       null
     );
 
-  const [
-    saving,
-    setSaving,
-  ] = useState(false);
-
   /* =======================================================
-     LOAD ACTIVE SESSIONS
+     TOAST
   ======================================================= */
 
-  const loadSessions =
-    async () => {
-      if (sessionsLoading) {
-        return;
-      }
+  const showToast =
+    (
+      message: string,
+      type:
+        ToastState["type"] =
+        "success"
+    ) => {
+      setToast({
+        message,
+        type,
+      });
+    };
 
-      setSessionsLoading(true);
-      setSessionsError("");
+  useEffect(() => {
+    if (!toast) {
+      return;
+    }
+
+    const timeout =
+      window.setTimeout(
+        () => {
+          setToast(null);
+        },
+        3200
+      );
+
+    return () =>
+      window.clearTimeout(
+        timeout
+      );
+  }, [toast]);
+
+  /* =======================================================
+     LOAD SETTINGS
+  ======================================================= */
+
+  const loadSettings =
+    async (
+      silent = false
+    ) => {
+      if (silent) {
+        setRefreshing(
+          true
+        );
+      } else {
+        setLoading(
+          true
+        );
+      }
 
       try {
         const response =
-          await apiClient<ActiveSessionsResponse>(
-            "/auth/sessions",
-            {
-              method: "GET",
-            }
-          );
+          await settingsApi.get();
 
         if (
-          !response.success
+          !response?.success
         ) {
           throw new Error(
-            response.message ||
-              "Unable to load active sessions."
+            response?.message ||
+              "Unable to load settings."
           );
         }
 
-        const mappedSessions: SessionItem[] =
-          (
-            response.sessions ||
-            []
-          ).map(
-            (
-              session
-            ) => ({
-              id:
-                session.sessionId,
+        const nextSettings:
+          UserSettingsState =
+          mergeSettings(
+            DEFAULT_SETTINGS,
+            {
+              profile:
+                response.profile,
 
-              device:
-                session.device,
+              appearance:
+                response
+                  .preferences
+                  .appearance,
 
-              browser:
-                session.browser,
+              wallet:
+                response
+                  .preferences
+                  .wallet,
 
-              os:
-                session.os,
+              notifications:
+                response
+                  .preferences
+                  .notifications,
 
-              location:
-                session.location,
-
-              maskedIp:
-                session.maskedIp,
-
-              lastActiveAt:
-                session.lastActiveAt,
-
-              expiresAt:
-                session.expiresAt,
-
-              createdAt:
-                session.createdAt,
-
-              current:
-                session.isCurrent,
-
-              icon:
-                getSessionIcon(
-                  session.device,
-                  session.os
-                ),
-            })
+              privacy:
+                response
+                  .preferences
+                  .privacy,
+            }
           );
 
-        setSessions(
-          mappedSessions
+        const serverTheme =
+          response
+            .preferences
+            .appearance
+            .theme;
+
+        if (
+          isThemeMode(
+            serverTheme
+          )
+        ) {
+          nextSettings.appearance.theme =
+            serverTheme;
+        }
+
+        setSavedSettings(
+          nextSettings
         );
-      } catch (error) {
+
+        setDraft(
+          nextSettings
+        );
+
+        setWallet(
+          response.wallet ??
+            null
+        );
+
+        if (
+          serverTheme !==
+          theme &&
+          isThemeMode(
+            serverTheme
+          )
+        ) {
+          await setTheme(
+            serverTheme
+          );
+        }
+      } catch (
+        error
+      ) {
         console.error(
-          "LOAD SESSIONS ERROR:",
+          "SETTINGS LOAD ERROR:",
           error
         );
 
-        setSessionsError(
-          error instanceof Error
-            ? error.message
-            : "Unable to load active sessions."
+        showToast(
+          errorText(
+            error
+          ),
+          "error"
         );
       } finally {
-        setSessionsLoading(
+        setMounted(
+          true
+        );
+
+        setLoading(
+          false
+        );
+
+        setRefreshing(
           false
         );
       }
     };
 
-  /* =======================================================
-     OPEN SESSION DRAWER
-  ======================================================= */
-
-  const openSessionsDrawer =
-    async () => {
-      setDrawerType(
-        "sessions"
-      );
-
-      await loadSessions();
-    };
-
-  /* =======================================================
-     LOGOUT ONE SESSION
-  ======================================================= */
-
-  const logoutOneSession =
-    async (
-      sessionId: string
-    ) => {
-      if (!sessionId) {
-        return;
-      }
-
-      setSessionActionLoading(
-        sessionId
-      );
-
-      try {
-        const response =
-          await apiClient<{
-            success: boolean;
-            message?: string;
-          }>(
-            `/auth/sessions/${encodeURIComponent(
-              sessionId
-            )}`,
-            {
-              method: "DELETE",
-            }
-          );
-
-        if (
-          !response.success
-        ) {
-          throw new Error(
-            response.message ||
-              "Unable to log out this device."
-          );
-        }
-
-        setSessions(
-          (
-            current
-          ) =>
-            current.filter(
-              (
-                session
-              ) =>
-                session.id !==
-                sessionId
-            )
-        );
-
-        setToast({
-          type: "success",
-          message:
-            response.message ||
-            "The selected device has been logged out.",
-        });
-      } catch (error) {
-        console.error(
-          "LOGOUT SESSION ERROR:",
-          error
-        );
-
-        setToast({
-          type: "error",
-          message:
-            error instanceof Error
-              ? error.message
-              : "Unable to log out this device.",
-        });
-      } finally {
-        setSessionActionLoading(
-          null
-        );
-      }
-    };
-
-  /* =======================================================
-     LOGOUT OTHER DEVICES
-  ======================================================= */
-
-  const logoutOtherDevices =
-    async () => {
-      if (
-        sessionActionLoading
-      ) {
-        return;
-      }
-
-      setSessionActionLoading(
-        "others"
-      );
-
-      try {
-        const response =
-          await apiClient<{
-            success: boolean;
-            revokedCount?: number;
-            message?: string;
-          }>(
-            "/auth/sessions/others",
-            {
-              method: "DELETE",
-            }
-          );
-
-        if (
-          !response.success
-        ) {
-          throw new Error(
-            response.message ||
-              "Unable to log out other devices."
-          );
-        }
-
-        setSessions(
-          (
-            current
-          ) =>
-            current.filter(
-              (
-                session
-              ) =>
-                session.current
-            )
-        );
-
-        setToast({
-          type: "success",
-          message:
-            response.message ||
-            "All other devices have been logged out.",
-        });
-      } catch (error) {
-        console.error(
-          "LOGOUT OTHER SESSIONS ERROR:",
-          error
-        );
-
-        setToast({
-          type: "error",
-          message:
-            error instanceof Error
-              ? error.message
-              : "Unable to log out other devices.",
-        });
-      } finally {
-        setSessionActionLoading(
-          null
-        );
-      }
-    };
-
-  /* =======================================================
-     HYDRATION
-  ======================================================= */
-
   useEffect(() => {
-    setMounted(true);
+    void loadSettings();
 
-    try {
-      const storedSettings =
-        window.localStorage.getItem(
-          STORAGE_KEY
-        );
-
-      if (
-        storedSettings
-      ) {
-        const parsed =
-          JSON.parse(
-            storedSettings
-          ) as Partial<UserSettingsState>;
-
-        const merged:
-          UserSettingsState = {
-          ...DEFAULT_SETTINGS,
-
-          ...parsed,
-
-          profile: {
-            ...DEFAULT_SETTINGS.profile,
-            ...(parsed.profile ??
-              {}),
-          },
-
-          appearance: {
-            ...DEFAULT_SETTINGS.appearance,
-            ...(parsed.appearance ??
-              {}),
-
-            theme,
-          },
-
-          wallet: {
-            ...DEFAULT_SETTINGS.wallet,
-            ...(parsed.wallet ??
-              {}),
-          },
-
-          notifications: {
-            ...DEFAULT_SETTINGS.notifications,
-            ...(parsed.notifications ??
-              {}),
-          },
-
-          privacy: {
-            ...DEFAULT_SETTINGS.privacy,
-            ...(parsed.privacy ??
-              {}),
-          },
-        };
-
-        setSavedSettings(
-          merged
-        );
-
-        setDraft(
-          merged
-        );
-      } else {
-        const initialSettings:
-          UserSettingsState = {
-          ...DEFAULT_SETTINGS,
-
-          appearance: {
-            ...DEFAULT_SETTINGS.appearance,
-            theme,
-          },
-        };
-
-        setSavedSettings(
-          initialSettings
-        );
-
-        setDraft(
-          initialSettings
-        );
-      }
-    } catch (error) {
-      console.error(
-        "SETTINGS HYDRATION ERROR:",
-        error
-      );
-
-      const fallbackSettings:
-        UserSettingsState = {
-        ...DEFAULT_SETTINGS,
-
-        appearance: {
-          ...DEFAULT_SETTINGS.appearance,
-          theme,
-        },
-      };
-
-      setSavedSettings(
-        fallbackSettings
-      );
-
-      setDraft(
-        fallbackSettings
-      );
-    }
-
-    // ThemeContext owns theme initialization.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* =======================================================
-     SYNC DRAFT THEME WITH GLOBAL THEME
+     KEEP DRAFT THEME SYNCED
   ======================================================= */
 
   useEffect(() => {
@@ -1013,7 +965,8 @@ export default function UserSettingsPage() {
         current
       ) => {
         if (
-          current.appearance.theme ===
+          current.appearance
+            .theme ===
           theme
         ) {
           return current;
@@ -1033,31 +986,192 @@ export default function UserSettingsPage() {
   }, [theme]);
 
   /* =======================================================
-     TOAST AUTO DISMISS
+     SESSIONS
   ======================================================= */
 
-  useEffect(() => {
-    if (!toast) {
-      return;
-    }
+  const loadSessions =
+    async () => {
+      if (
+        sessionsLoading
+      ) {
+        return;
+      }
 
-    const timer =
-      window.setTimeout(
-        () => {
-          setToast(null);
-        },
-        2800
+      setSessionsLoading(
+        true
       );
 
-    return () =>
-      window.clearTimeout(
-        timer
+      setSessionsError(
+        ""
       );
-  }, [toast]);
+
+      try {
+        const response =
+          await settingsApi.getSession();
+
+        if (
+          !response?.success
+        ) {
+          throw new Error(
+            response?.message ||
+              "Unable to load active sessions."
+          );
+        }
+
+        const mapped =
+          (
+            response.sessions ??
+            []
+          ).map(
+            (
+              session: UserSession
+            ) => ({
+              id:
+                session.id,
+
+              current:
+                session.current,
+
+              device:
+                session.device,
+
+              location:
+                session.location,
+
+              lastActive:
+                session.lastActive,
+
+              ip:
+                session.ip,
+            })
+          );
+
+        setSessions(
+          mapped
+        );
+      } catch (
+        error
+      ) {
+        setSessionsError(
+          errorText(
+            error
+          )
+        );
+      } finally {
+        setSessionsLoading(
+          false
+        );
+      }
+    };
+
+  const openSessions =
+    async () => {
+      setDrawerType(
+        "sessions"
+      );
+
+      await loadSessions();
+    };
+
+  const logoutOtherDevices =
+    async () => {
+      if (
+        sessionActionLoading
+      ) {
+        return;
+      }
+
+      setSessionActionLoading(
+        "logout-all"
+      );
+
+      try {
+        const response =
+          await settingsApi.logoutAll();
+
+        if (
+          !response?.success
+        ) {
+          throw new Error(
+            response?.message ||
+              "Unable to log out other devices."
+          );
+        }
+
+        setSessions(
+          (
+            current
+          ) =>
+            current.filter(
+              (
+                session
+              ) =>
+                session.current
+            )
+        );
+
+        showToast(
+          response.message ||
+            "Other devices were logged out."
+        );
+      } catch (
+        error
+      ) {
+        showToast(
+          errorText(
+            error
+          ),
+          "error"
+        );
+      } finally {
+        setSessionActionLoading(
+          null
+        );
+      }
+    };
 
   /* =======================================================
-     UNSAVED CHANGES
+     DERIVED DATA
   ======================================================= */
+
+  const filteredSections =
+    useMemo(
+      () => {
+        const query =
+          searchQuery
+            .trim()
+            .toLowerCase();
+
+        if (!query) {
+          return SECTIONS;
+        }
+
+        return SECTIONS.filter(
+          (
+            section
+          ) =>
+            section.label
+              .toLowerCase()
+              .includes(query) ||
+            section.description
+              .toLowerCase()
+              .includes(query) ||
+            section.keywords.some(
+              (
+                keyword
+              ) =>
+                keyword
+                  .toLowerCase()
+                  .includes(
+                    query
+                  )
+            )
+        );
+      },
+      [
+        searchQuery,
+      ]
+    );
 
   const hasUnsavedChanges =
     useMemo(
@@ -1074,158 +1188,122 @@ export default function UserSettingsPage() {
       ]
     );
 
-  /* =======================================================
-     FILTERED SETTINGS
-  ======================================================= */
-
-  const filteredSections =
-    useMemo(() => {
-      const query =
-        searchQuery
-          .trim()
-          .toLowerCase();
-
-      if (!query) {
-        return SECTIONS;
-      }
-
-      return SECTIONS.filter(
-        (
-          section
-        ) =>
-          section.label
-            .toLowerCase()
-            .includes(query) ||
-          section.description
-            .toLowerCase()
-            .includes(query) ||
-          section.keywords.some(
-            (
-              keyword
-            ) =>
-              keyword
-                .toLowerCase()
-                .includes(query)
-          )
-      );
-    }, [
-      searchQuery,
-    ]);
-
-  /* =======================================================
-     ACCOUNT HEALTH
-  ======================================================= */
-
   const accountHealth =
-    useMemo(() => {
-      let score = 54;
+    useMemo(
+      () => {
+        let score = 55;
 
-      if (
-        draft.notifications.email
-      ) {
-        score += 5;
-      }
+        if (
+          draft.notifications
+            .email
+        ) {
+          score += 5;
+        }
 
-      if (
-        draft.notifications.push
-      ) {
-        score += 5;
-      }
+        if (
+          draft.notifications
+            .push
+        ) {
+          score += 5;
+        }
 
-      if (
-        !draft.privacy.analytics
-      ) {
-        score += 5;
-      }
+        if (
+          !draft.privacy
+            .analytics
+        ) {
+          score += 7;
+        }
 
-      if (
-        draft.wallet
-          .requireConfirmation
-      ) {
-        score += 10;
-      }
+        if (
+          draft.wallet
+            .requireConfirmation
+        ) {
+          score += 10;
+        }
 
-      if (
-        draft.wallet
-          .confirmThreshold <=
-        15000
-      ) {
-        score += 6;
-      }
+        if (
+          draft.wallet
+            .confirmThreshold <=
+          15000
+        ) {
+          score += 6;
+        }
 
-      if (
-        draft.privacy.personalization
-      ) {
-        score += 4;
-      }
+        if (
+          draft.privacy
+            .showTransactionNames ===
+          false
+        ) {
+          score += 4;
+        }
 
-      if (
-        draft.privacy.discoverability
-      ) {
-        score += 3;
-      }
+        if (
+          draft.profile
+            .kycStatus ===
+          "verified"
+        ) {
+          score += 5;
+        }
 
-      if (
-        draft.appearance.reduceMotion
-      ) {
-        score += 2;
-      }
-
-      return Math.min(
-        score,
-        100
-      );
-    }, [draft]);
-
-  /* =======================================================
-     PRIVACY SCORE
-  ======================================================= */
+        return Math.min(
+          score,
+          100
+        );
+      },
+      [
+        draft,
+      ]
+    );
 
   const privacyScore =
-    useMemo(() => {
-      let score = 58;
+    useMemo(
+      () => {
+        let score = 56;
 
-      if (
-        !draft.privacy.analytics
-      ) {
-        score += 16;
-      }
+        if (
+          !draft.privacy
+            .analytics
+        ) {
+          score += 18;
+        }
 
-      if (
-        !draft.privacy
-          .discoverability
-      ) {
-        score += 10;
-      }
+        if (
+          !draft.privacy
+            .discoverability
+        ) {
+          score += 10;
+        }
 
-      if (
-        !draft.privacy
-          .showTransactionNames
-      ) {
-        score += 10;
-      }
+        if (
+          !draft.privacy
+            .showTransactionNames
+        ) {
+          score += 10;
+        }
 
-      if (
-        !draft.privacy
-          .personalization
-      ) {
-        score += 6;
-      }
+        if (
+          !draft.privacy
+            .personalization
+        ) {
+          score += 6;
+        }
 
-      return Math.min(
-        score,
-        100
-      );
-    }, [
-      draft.privacy,
-    ]);
+        return Math.min(
+          score,
+          100
+        );
+      },
+      [
+        draft.privacy,
+      ]
+    );
 
   /* =======================================================
-     CHANGE THEME
+     THEME
   ======================================================= */
 
   const changeTheme =
-    (
+    async (
       nextTheme: ThemeMode
     ) => {
       setDraft(
@@ -1243,13 +1321,13 @@ export default function UserSettingsPage() {
         })
       );
 
-      void setTheme(
+      await setTheme(
         nextTheme
       );
     };
 
   /* =======================================================
-     SAVE SETTINGS
+     SAVE
   ======================================================= */
 
   const saveChanges =
@@ -1258,55 +1336,145 @@ export default function UserSettingsPage() {
         return;
       }
 
-      setSaving(true);
+      setSaving(
+        true
+      );
 
       try {
-        const normalizedSettings:
-          UserSettingsState = {
-          ...draft,
-
-          appearance: {
-            ...draft.appearance,
-
-            theme,
-          },
-        };
-
-        window.localStorage.setItem(
-          STORAGE_KEY,
+        const profileChanged =
           JSON.stringify(
-            normalizedSettings
-          )
-        );
+            savedSettings.profile
+          ) !==
+          JSON.stringify(
+            draft.profile
+          );
+
+        let latestProfile:
+          SettingsProfile =
+          savedSettings.profile;
+
+        if (
+          profileChanged
+        ) {
+          const profileResponse =
+            await settingsApi.updateProfile(
+              {
+                name:
+                  draft.profile.name.trim(),
+
+                email:
+                  draft.profile.email.trim(),
+
+                phone:
+                  draft.profile.phone.trim(),
+              }
+            );
+
+          if (
+            !profileResponse?.success
+          ) {
+            throw new Error(
+              profileResponse?.message ||
+                "Unable to update profile."
+            );
+          }
+
+          latestProfile =
+            profileResponse.profile;
+        }
+
+        const preferencesPayload:
+          UserSettingsPreferences =
+          {
+            appearance: {
+              ...draft.appearance,
+
+              theme,
+            },
+
+            notifications:
+              draft
+                .notifications,
+
+            privacy:
+              draft.privacy,
+
+            wallet:
+              draft.wallet,
+          };
+
+        const preferencesResponse =
+          await settingsApi.updatePreferences(
+            preferencesPayload
+          );
+
+        if (
+          !preferencesResponse?.success
+        ) {
+          throw new Error(
+            preferencesResponse?.message ||
+              "Unable to update preferences."
+          );
+        }
+
+        const normalized:
+          UserSettingsState =
+          {
+            profile:
+              latestProfile,
+
+            appearance:
+              preferencesResponse
+                .preferences
+                .appearance,
+
+            notifications:
+              preferencesResponse
+                .preferences
+                .notifications,
+
+            privacy:
+              preferencesResponse
+                .preferences
+                .privacy,
+
+            wallet:
+              preferencesResponse
+                .preferences
+                .wallet,
+          };
 
         setSavedSettings(
-          normalizedSettings
+          normalized
         );
 
         setDraft(
-          normalizedSettings
+          normalized
         );
 
-        setToast({
-          type: "success",
-
-          message:
-            "Your settings were saved successfully.",
-        });
-      } catch (error) {
+        showToast(
+          profileChanged
+            ? "Profile and settings saved successfully."
+            : "Settings saved successfully."
+        );
+      } catch (
+        error
+      ) {
         console.error(
-          "SAVE SETTINGS ERROR:",
+          "SETTINGS SAVE ERROR:",
           error
         );
 
-        setToast({
-          type: "error",
-
-          message:
-            "Could not save your settings.",
-        });
+        showToast(
+          errorText(
+            error
+          ),
+          "error"
+        );
       } finally {
-        setSaving(false);
+        setSaving(
+          false
+        );
       }
     };
 
@@ -1315,262 +1483,364 @@ export default function UserSettingsPage() {
   ======================================================= */
 
   const discardChanges =
-    () => {
+    async () => {
       setDraft(
         savedSettings
       );
 
       if (
-        savedSettings.appearance
+        savedSettings
+          .appearance
           .theme !==
         theme
       ) {
-        void setTheme(
-          savedSettings.appearance.theme
+        await setTheme(
+          savedSettings
+            .appearance
+            .theme
         );
       }
 
-      setToast({
-        type: "info",
-
-        message:
-          "Unsaved changes were discarded.",
-      });
+      showToast(
+        "Unsaved changes were discarded.",
+        "info"
+      );
     };
 
   /* =======================================================
      EXPORT
   ======================================================= */
 
-  const downloadExport =
-    (
+  const exportData =
+    async (
       format:
         | "json"
         | "csv"
     ) => {
-      const payload = {
-        exportedAt:
-          new Date().toISOString(),
+      try {
+        const response =
+          await settingsApi.exportData();
 
-        profile:
-          draft.profile,
+        if (
+          !response?.success ||
+          !response.export
+        ) {
+          throw new Error(
+            response?.message ||
+              "Unable to prepare export."
+          );
+        }
 
-        settings:
-          draft,
-      };
+        const payload =
+          response.export;
 
-      let blob: Blob;
+        let blob:
+          Blob;
 
-      let filename: string;
+        let filename:
+          string;
 
-      if (
-        format ===
-        "json"
-      ) {
-        blob =
-          new Blob(
+        if (
+          format ===
+          "json"
+        ) {
+          blob =
+            new Blob(
+              [
+                JSON.stringify(
+                  payload,
+                  null,
+                  2
+                ),
+              ],
+              {
+                type:
+                  "application/json;charset=utf-8",
+              }
+            );
+
+          filename =
+            "coffer-account-data.json";
+        } else {
+          const rows =
             [
-              JSON.stringify(
-                payload,
-                null,
-                2
+              [
+                "Section",
+                "Key",
+                "Value",
+              ],
+
+              ...Object.entries(
+                payload.profile
+              ).map(
+                (
+                  [
+                    key,
+                    value,
+                  ]
+                ) => [
+                  "profile",
+                  key,
+                  String(
+                    value ??
+                      ""
+                  ),
+                ]
               ),
-            ],
-            {
-              type:
-                "application/json",
-            }
-          );
 
-        filename =
-          "coffer-account-settings.json";
-      } else {
-        const rows = [
-          [
-            "Section",
-            "Key",
-            "Value",
-          ],
+              ...Object.entries(
+                payload
+                  .preferences
+                  .appearance
+              ).map(
+                (
+                  [
+                    key,
+                    value,
+                  ]
+                ) => [
+                  "appearance",
+                  key,
+                  String(
+                    value ??
+                      ""
+                  ),
+                ]
+              ),
 
-          ...Object.entries(
-            draft.profile
-          ).map(
-            ([
-              key,
-              value,
-            ]) => [
-              "profile",
-              key,
-              String(value),
-            ]
-          ),
+              ...Object.entries(
+                payload
+                  .preferences
+                  .wallet
+              ).map(
+                (
+                  [
+                    key,
+                    value,
+                  ]
+                ) => [
+                  "wallet",
+                  key,
+                  String(
+                    value ??
+                      ""
+                  ),
+                ]
+              ),
 
-          ...Object.entries(
-            draft.appearance
-          ).map(
-            ([
-              key,
-              value,
-            ]) => [
-              "appearance",
-              key,
-              String(value),
-            ]
-          ),
+              ...Object.entries(
+                payload
+                  .preferences
+                  .notifications
+              ).map(
+                (
+                  [
+                    key,
+                    value,
+                  ]
+                ) => [
+                  "notifications",
+                  key,
+                  String(
+                    value ??
+                      ""
+                  ),
+                ]
+              ),
 
-          ...Object.entries(
-            draft.wallet
-          ).map(
-            ([
-              key,
-              value,
-            ]) => [
-              "wallet",
-              key,
-              String(value),
-            ]
-          ),
+              ...Object.entries(
+                payload
+                  .preferences
+                  .privacy
+              ).map(
+                (
+                  [
+                    key,
+                    value,
+                  ]
+                ) => [
+                  "privacy",
+                  key,
+                  String(
+                    value ??
+                      ""
+                  ),
+                ]
+              ),
+            ];
 
-          ...Object.entries(
-            draft.notifications
-          ).map(
-            ([
-              key,
-              value,
-            ]) => [
-              "notifications",
-              key,
-              String(value),
-            ]
-          ),
-
-          ...Object.entries(
-            draft.privacy
-          ).map(
-            ([
-              key,
-              value,
-            ]) => [
-              "privacy",
-              key,
-              String(value),
-            ]
-          ),
-        ];
-
-        const csv =
-          rows
-            .map(
-              (
-                row
-              ) =>
-                row
-                  .map(
-                    (
-                      cell
-                    ) =>
-                      `"${String(
+          const csv =
+            rows
+              .map(
+                (
+                  row
+                ) =>
+                  row
+                    .map(
+                      (
                         cell
-                      ).replaceAll(
-                        '"',
-                        '""'
-                      )}"`
-                  )
-                  .join(",")
-            )
-            .join("\n");
+                      ) =>
+                        `"${String(
+                          cell
+                        ).replaceAll(
+                          '"',
+                          '""'
+                        )}"`
+                    )
+                    .join(
+                      ","
+                    )
+              )
+              .join(
+                "\n"
+              );
 
-        blob =
-          new Blob(
-            [csv],
-            {
-              type:
-                "text/csv;charset=utf-8",
-            }
+          blob =
+            new Blob(
+              [csv],
+              {
+                type:
+                  "text/csv;charset=utf-8",
+              }
+            );
+
+          filename =
+            "coffer-account-data.csv";
+        }
+
+        const url =
+          URL.createObjectURL(
+            blob
           );
 
-        filename =
-          "coffer-account-settings.csv";
+        const anchor =
+          document.createElement(
+            "a"
+          );
+
+        anchor.href =
+          url;
+
+        anchor.download =
+          filename;
+
+        document.body.appendChild(
+          anchor
+        );
+
+        anchor.click();
+
+        anchor.remove();
+
+        URL.revokeObjectURL(
+          url
+        );
+
+        setDrawerType(
+          null
+        );
+
+        showToast(
+          `${format.toUpperCase()} export created successfully.`
+        );
+      } catch (
+        error
+      ) {
+        showToast(
+          errorText(
+            error
+          ),
+          "error"
+        );
       }
-
-      const url =
-        URL.createObjectURL(
-          blob
-        );
-
-      const anchor =
-        document.createElement(
-          "a"
-        );
-
-      anchor.href = url;
-
-      anchor.download =
-        filename;
-
-      document.body.appendChild(
-        anchor
-      );
-
-      anchor.click();
-
-      anchor.remove();
-
-      URL.revokeObjectURL(
-        url
-      );
-
-      setDrawerType(
-        null
-      );
-
-      setToast({
-        type: "success",
-
-        message:
-          `${format.toUpperCase()} export created.`,
-      });
     };
 
   /* =======================================================
-     DANGER
+     DELETE ACCOUNT
   ======================================================= */
 
-  const confirmDangerAction =
-    (
-      action: Exclude<
-        DangerAction,
-        null
-      >
-    ) => {
-      setDangerAction(
-        null
-      );
-
+  const deleteAccount =
+    async () => {
       if (
-        action ===
-        "logout-all"
+        !deletePassword.trim()
       ) {
-        void logoutOtherDevices();
+        showToast(
+          "Enter your password first.",
+          "error"
+        );
 
         return;
       }
 
-      setToast({
-        type: "info",
+      try {
+        const response =
+          await settingsApi.deleteAccount(
+            {
+              password:
+                deletePassword,
 
-        message:
-          "Account deletion requires the protected account-deletion API.",
-      });
+              confirmation:
+                "DELETE",
+            }
+          );
+
+        if (
+          !response?.success
+        ) {
+          throw new Error(
+            response?.message ||
+              "Account deletion failed."
+          );
+        }
+
+        setDangerAction(
+          null
+        );
+
+        setDeletePassword(
+          ""
+        );
+
+        showToast(
+          response.message ||
+            "Account deletion request accepted."
+        );
+      } catch (
+        error
+      ) {
+        showToast(
+          errorText(
+            error
+          ),
+          "error"
+        );
+      }
     };
 
   /* =======================================================
-     PRE-MOUNT
+     PRE MOUNT
   ======================================================= */
 
-  if (!mounted) {
+  if (
+    !mounted ||
+    loading
+  ) {
     return (
-      <div className="min-h-screen bg-background" />
+      <main className="flex min-h-[75vh] items-center justify-center bg-background px-4">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card shadow-sm">
+            <RefreshCw className="h-6 w-6 animate-spin text-[var(--dashboard-primary)]" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-card-foreground">
+            Loading Settings
+          </p>
+
+          <p className="mt-1 text-xs text-muted-foreground">
+            Syncing your account preferences.
+          </p>
+        </div>
+      </main>
     );
   }
 
@@ -1579,21 +1849,69 @@ export default function UserSettingsPage() {
   ======================================================= */
 
   return (
-    <main className="min-h-screen bg-background pb-12 text-foreground transition-colors duration-300">
+    <main className="min-h-screen bg-background pb-24 text-foreground transition-colors duration-300">
       <div className="mx-auto w-full max-w-[1500px] px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
-        <UserHero
+
+        {/* =================================================
+            HERO
+        ================================================== */}
+
+        <SettingsHero
           name={
             draft.profile.name
+          }
+          role={
+            draft.profile.role
+          }
+          kycStatus={
+            draft.profile
+              .kycStatus
           }
           accountHealth={
             accountHealth
           }
           onOpenSessions={
-            openSessionsDrawer
+            openSessions
           }
         />
 
-        <div className="mt-4 space-y-5">
+        <div className="mt-5 space-y-5">
+
+          {/* =============================================
+              REFRESH ERROR
+          ============================================== */}
+
+          {refreshing && (
+            <div className="flex items-center gap-2 rounded-2xl border border-border bg-card px-4 py-3 text-xs font-semibold text-muted-foreground">
+              <RefreshCw className="h-3.5 w-3.5 animate-spin text-[var(--dashboard-primary)]" />
+              Refreshing settings...
+            </div>
+          )}
+
+          {/* =============================================
+              SAVE BAR
+          ============================================== */}
+
+          <AnimatePresence>
+            {hasUnsavedChanges && (
+              <SaveBar
+                saving={
+                  saving
+                }
+                onSave={() =>
+                  void saveChanges()
+                }
+                onDiscard={
+                  discardChanges
+                }
+              />
+            )}
+          </AnimatePresence>
+
+          {/* =============================================
+              NAVIGATION
+          ============================================== */}
+
           <SettingsNavigation
             activeSection={
               activeSection
@@ -1612,185 +1930,175 @@ export default function UserSettingsPage() {
             }
           />
 
-          <section className="min-w-0">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={
-                  activeSection
-                }
-                initial={{
-                  opacity: 0,
-                  y: 14,
-                  scale: 0.992,
-                }}
-                animate={{
-                  opacity: 1,
-                  y: 0,
-                  scale: 1,
-                }}
-                exit={{
-                  opacity: 0,
-                  y: -8,
-                }}
-                transition={{
-                  duration: 0.28,
-                }}
-                className="min-w-0"
-              >
-                {activeSection ===
-                  "overview" && (
-                  <OverviewSection
-                    draft={
-                      draft
-                    }
-                    accountHealth={
-                      accountHealth
-                    }
-                    privacyScore={
-                      privacyScore
-                    }
-                    onOpenSessions={
-                      openSessionsDrawer
-                    }
-                    onOpenPrivacy={() =>
-                      setDrawerType(
-                        "privacy"
-                      )
-                    }
-                  />
-                )}
+          {/* =============================================
+              CONTENT
+          ============================================== */}
 
-                {activeSection ===
-                  "profile" && (
-                  <ProfileSection
-                    draft={
-                      draft
-                    }
-                    setDraft={
-                      setDraft
-                    }
-                  />
-                )}
+          <AnimatePresence
+            mode="wait"
+          >
+            <motion.div
+              key={
+                activeSection
+              }
+              initial={{
+                opacity: 0,
+                y: 12,
+              }}
+              animate={{
+                opacity: 1,
+                y: 0,
+              }}
+              exit={{
+                opacity: 0,
+                y: -8,
+              }}
+              transition={{
+                duration:
+                  0.25,
+              }}
+            >
 
-                {activeSection ===
-                  "security" && (
-                  <SecuritySection
-                    accountHealth={
-                      accountHealth
-                    }
-                    onOpenSessions={
-                      openSessionsDrawer
-                    }
-                  />
-                )}
+              {activeSection ===
+                "overview" && (
+                <OverviewSection
+                  draft={
+                    draft
+                  }
+                  accountHealth={
+                    accountHealth
+                  }
+                  privacyScore={
+                    privacyScore
+                  }
+                  wallet={
+                    wallet
+                  }
+                  onOpenSessions={
+                    openSessions
+                  }
+                  onOpenPrivacy={() =>
+                    setDrawerType(
+                      "privacy"
+                    )
+                  }
+                />
+              )}
 
-                {activeSection ===
-                  "notifications" && (
-                  <NotificationSection
-                    draft={
-                      draft
-                    }
-                    setDraft={
-                      setDraft
-                    }
-                  />
-                )}
+              {activeSection ===
+                "profile" && (
+                <ProfileSection
+                  draft={
+                    draft
+                  }
+                  setDraft={
+                    setDraft
+                  }
+                />
+              )}
 
-                {activeSection ===
-                  "privacy" && (
-                  <PrivacySection
-                    draft={
-                      draft
-                    }
-                    privacyScore={
-                      privacyScore
-                    }
-                    setDraft={
-                      setDraft
-                    }
-                    onOpenDetails={() =>
-                      setDrawerType(
-                        "privacy"
-                      )
-                    }
-                  />
-                )}
+              {activeSection ===
+                "security" && (
+                <SecuritySection
+                  accountHealth={
+                    accountHealth
+                  }
+                  onOpenSessions={
+                    openSessions
+                  }
+                />
+              )}
 
-                {activeSection ===
-                  "appearance" && (
-                  <AppearanceSection
-                    draft={
-                      draft
-                    }
-                    setDraft={
-                      setDraft
-                    }
-                    onThemeChange={
-                      changeTheme
-                    }
-                  />
-                )}
+              {activeSection ===
+                "notifications" && (
+                <NotificationSection
+                  draft={
+                    draft
+                  }
+                  setDraft={
+                    setDraft
+                  }
+                />
+              )}
 
-                {activeSection ===
-                  "wallet" && (
-                  <WalletSection
-                    draft={
-                      draft
-                    }
-                    setDraft={
-                      setDraft
-                    }
-                  />
-                )}
+              {activeSection ===
+                "privacy" && (
+                <PrivacySection
+                  draft={
+                    draft
+                  }
+                  privacyScore={
+                    privacyScore
+                  }
+                  setDraft={
+                    setDraft
+                  }
+                  onOpenDetails={() =>
+                    setDrawerType(
+                      "privacy"
+                    )
+                  }
+                />
+              )}
 
-                {activeSection ===
-                  "data" && (
-                  <DataSection
-                    onOpenExport={() =>
-                      setDrawerType(
-                        "export"
-                      )
-                    }
-                  />
-                )}
+              {activeSection ===
+                "appearance" && (
+                <AppearanceSection
+                  draft={
+                    draft
+                  }
+                  setDraft={
+                    setDraft
+                  }
+                  onThemeChange={
+                    changeTheme
+                  }
+                />
+              )}
 
-                {activeSection ===
-                  "danger" && (
-                  <DangerSection
-                    onAction={
-                      setDangerAction
-                    }
-                  />
-                )}
-              </motion.div>
-            </AnimatePresence>
-          </section>
+              {activeSection ===
+                "wallet" && (
+                <WalletSection
+                  draft={
+                    draft
+                  }
+                  setDraft={
+                    setDraft
+                  }
+                  wallet={
+                    wallet
+                  }
+                />
+              )}
+
+              {activeSection ===
+                "data" && (
+                <DataSection
+                  onOpenExport={() =>
+                    setDrawerType(
+                      "export"
+                    )
+                  }
+                />
+              )}
+
+              {activeSection ===
+                "danger" && (
+                <DangerSection
+                  onAction={
+                    setDangerAction
+                  }
+                />
+              )}
+
+            </motion.div>
+          </AnimatePresence>
         </div>
       </div>
 
-      {/* ===================================================
-          SAVE BAR
-      =================================================== */}
-
-      <AnimatePresence>
-        {hasUnsavedChanges && (
-          <SaveBar
-            saving={
-              saving
-            }
-            onSave={() =>
-              void saveChanges()
-            }
-            onDiscard={
-              discardChanges
-            }
-          />
-        )}
-      </AnimatePresence>
-
-      {/* ===================================================
+      {/* =================================================
           DRAWER
-      =================================================== */}
+      ================================================== */}
 
       <AnimatePresence>
         {drawerType && (
@@ -1818,25 +2126,22 @@ export default function UserSettingsPage() {
                 null
               )
             }
-            onExport={
-              downloadExport
-            }
             onReloadSessions={
               loadSessions
             }
-            onLogoutSession={
-              logoutOneSession
-            }
             onLogoutOthers={
               logoutOtherDevices
+            }
+            onExport={
+              exportData
             }
           />
         )}
       </AnimatePresence>
 
-      {/* ===================================================
+      {/* =================================================
           DANGER MODAL
-      =================================================== */}
+      ================================================== */}
 
       <AnimatePresence>
         {dangerAction && (
@@ -1844,17 +2149,33 @@ export default function UserSettingsPage() {
             action={
               dangerAction
             }
-            onCancel={() =>
+            password={
+              deletePassword
+            }
+            onPasswordChange={
+              setDeletePassword
+            }
+            onCancel={() => {
               setDangerAction(
                 null
-              )
-            }
+              );
+
+              setDeletePassword(
+                ""
+              );
+            }}
             onConfirm={() => {
               if (
-                dangerAction
+                dangerAction ===
+                "delete-account"
               ) {
-                confirmDangerAction(
-                  dangerAction
+                void deleteAccount();
+              } else {
+                void logoutOtherDevices().then(
+                  () =>
+                    setDangerAction(
+                      null
+                    )
                 );
               }
             }}
@@ -1862,9 +2183,9 @@ export default function UserSettingsPage() {
         )}
       </AnimatePresence>
 
-      {/* ===================================================
+      {/* =================================================
           TOAST
-      =================================================== */}
+      ================================================== */}
 
       <AnimatePresence>
         {toast && (
@@ -1888,15 +2209,41 @@ export default function UserSettingsPage() {
    HERO
 ========================================================= */
 
-function UserHero({
+function SettingsHero({
   name,
+  role,
+  kycStatus,
   accountHealth,
   onOpenSessions,
 }: {
   name: string;
+  role:
+    | "user"
+    | "admin";
+
+  kycStatus:
+    | "not_started"
+    | "pending"
+    | "verified"
+    | "rejected";
+
   accountHealth: number;
-  onOpenSessions: () => void;
+
+  onOpenSessions:
+    () => void;
 }) {
+  const kycLabel =
+    kycStatus ===
+    "verified"
+      ? "KYC Verified"
+      : kycStatus ===
+          "pending"
+        ? "KYC Pending"
+        : kycStatus ===
+            "rejected"
+          ? "KYC Needs Review"
+          : "KYC Not Started";
+
   return (
     <motion.section
       initial={{
@@ -1907,84 +2254,94 @@ function UserHero({
         opacity: 1,
         y: 0,
       }}
-      className="relative overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(135deg,#07182b_0%,#0d3152_48%,#1f6ca6_100%)] px-5 py-6 text-white shadow-[0_25px_70px_rgba(15,39,69,0.18)] sm:px-7 sm:py-8 lg:px-9"
+      transition={{
+        duration:
+          0.45,
+      }}
+      className="relative overflow-hidden rounded-[34px] border border-violet-300/10 bg-[linear-gradient(135deg,#090612_0%,#160d2b_40%,#291746_68%,#4a267a_100%)] px-5 py-7 text-white shadow-[0_30px_90px_rgba(42,24,82,.24)] sm:px-7 sm:py-8 lg:px-10 lg:py-9"
     >
-      <motion.div
-        className="pointer-events-none absolute -right-20 -top-24 h-80 w-80 rounded-full border border-cyan-300/15"
-        animate={{
-          rotate: 360,
-        }}
-        transition={{
-          duration: 24,
-          repeat: Infinity,
-          ease: "linear",
-        }}
-      />
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -right-28 -top-28 h-[440px] w-[440px] rounded-full bg-violet-500/15 blur-[110px]" />
 
-      <motion.div
-        className="pointer-events-none absolute right-20 top-14 h-32 w-32 rounded-full bg-cyan-300/10 blur-3xl"
-        animate={{
-          scale: [
-            0.85,
-            1.15,
-            0.85,
-          ],
-          opacity: [
-            0.25,
-            0.65,
-            0.25,
-          ],
-        }}
-        transition={{
-          duration: 4.5,
-          repeat: Infinity,
-        }}
-      />
+        <div className="absolute -bottom-36 left-1/4 h-[340px] w-[340px] rounded-full bg-indigo-500/10 blur-[100px]" />
 
-      <div className="relative z-10 flex flex-col gap-7 xl:flex-row xl:items-center xl:justify-between">
+        <motion.div
+          animate={{
+            rotate: [
+              0,
+              360,
+            ],
+          }}
+          transition={{
+            duration:
+              30,
+            repeat:
+              Infinity,
+            ease:
+              "linear",
+          }}
+          className="absolute -right-10 top-5 h-[300px] w-[300px] rounded-full border border-white/10"
+        />
+
+        <motion.div
+          animate={{
+            rotate: [
+              360,
+              0,
+            ],
+          }}
+          transition={{
+            duration:
+              22,
+            repeat:
+              Infinity,
+            ease:
+              "linear",
+          }}
+          className="absolute right-24 top-14 h-[180px] w-[180px] rounded-full border border-violet-300/10"
+        />
+      </div>
+
+      <div className="relative z-10 grid items-center gap-8 xl:grid-cols-[1fr_390px]">
         <div className="max-w-3xl">
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/10">
-              <Settings className="h-5 w-5 text-cyan-200" />
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-violet-200">
+              <Settings className="h-5 w-5" />
             </div>
 
-            <span className="rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-blue-100">
-              Personal Account
+            <span className="rounded-full border border-violet-200/10 bg-violet-300/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-violet-100">
+              Personal Control Center
             </span>
           </div>
 
-          <h1 className="mt-5 text-3xl font-black tracking-[-0.035em] sm:text-4xl lg:text-[42px]">
+          <h1 className="mt-5 text-3xl font-black tracking-[-0.04em] sm:text-4xl lg:text-[46px]">
             Settings & Preferences
           </h1>
 
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-blue-100/75 sm:text-base">
-            Customize your Coffer experience, privacy,
-            wallet behaviour, notifications and account
-            preferences from one personal control center.
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-violet-100/70 sm:text-base">
+            Manage your identity, security, wallet behaviour,
+            notifications, privacy and dashboard experience
+            from one intelligent control center.
           </p>
 
-          <div className="mt-5 flex flex-wrap gap-2">
-            <StatusPill
-              icon={
-                ShieldCheck
-              }
-              text="Account protected"
-              tone="green"
-            />
+          <div className="mt-6 flex flex-wrap gap-2">
+            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/15 bg-emerald-300/10 px-3 py-1.5 text-[10px] font-black text-emerald-100">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Health {accountHealth}%
+            </span>
 
-            <StatusPill
-              icon={
-                UserRound
-              }
-              text="Personal scope"
-              tone="blue"
-            />
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[10px] font-black text-violet-100">
+              <UserRound className="h-3.5 w-3.5" />
+              {role ===
+              "admin"
+                ? "Administrator"
+                : "Personal Account"}
+            </span>
 
-            <StatusPill
-              icon={Lock}
-              text="Privacy controls"
-              tone="blue"
-            />
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[10px] font-black text-white/80">
+              <Fingerprint className="h-3.5 w-3.5" />
+              {kycLabel}
+            </span>
           </div>
         </div>
 
@@ -1993,55 +2350,46 @@ function UserHero({
           onClick={
             onOpenSessions
           }
-          className="group flex w-full max-w-sm items-center justify-between rounded-[24px] border border-white/10 bg-white/10 p-4 text-left backdrop-blur-xl transition hover:bg-white/15 xl:w-[360px]"
+          className="group relative overflow-hidden rounded-[26px] border border-white/10 bg-white/[0.07] p-5 text-left backdrop-blur-xl transition hover:-translate-y-1 hover:bg-white/[0.1]"
         >
-          <div className="flex items-center gap-4">
-            <div className="relative flex h-14 w-14 shrink-0 items-center justify-center">
-              <motion.div
-                className="absolute inset-0 rounded-full border border-emerald-300/30"
-                animate={{
-                  scale: [
-                    0.86,
-                    1.08,
-                    0.86,
-                  ],
-                  opacity: [
-                    0.35,
-                    0.8,
-                    0.35,
-                  ],
-                }}
-                transition={{
-                  duration: 2.6,
-                  repeat: Infinity,
-                }}
-              />
+          <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-violet-400/10 blur-3xl" />
 
-              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-300/15 text-sm font-black text-emerald-100">
-                {
-                  accountHealth
-                }
-              </div>
+          <div className="relative flex items-center gap-4">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[22px] border border-violet-300/15 bg-violet-300/10 text-lg font-black text-violet-100">
+              {getInitials(
+                name ||
+                  "User"
+              )}
             </div>
 
-            <div>
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-blue-100/55">
-                Account health
+            <div className="min-w-0 flex-1">
+              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-violet-100/45">
+                Welcome Back
               </p>
 
-              <p className="mt-1 text-sm font-black">
-                Hello,{" "}
+              <p className="mt-1 truncate text-lg font-black">
                 {name ||
                   "User"}
               </p>
 
-              <p className="mt-1 text-[10px] text-blue-100/55">
-                Review your active sessions
+              <p className="mt-1 text-xs text-violet-100/50">
+                Manage active devices
               </p>
             </div>
+
+            <ChevronRight className="h-5 w-5 text-violet-100/45 transition group-hover:translate-x-1 group-hover:text-white" />
           </div>
 
-          <ChevronRight className="h-4 w-4 text-blue-100/50 transition group-hover:translate-x-0.5 group-hover:text-white" />
+          <div className="mt-5 flex items-center justify-between border-t border-white/10 pt-4">
+            <span className="text-[9px] font-black uppercase tracking-[0.14em] text-violet-100/45">
+              Security
+            </span>
+
+            <span className="inline-flex items-center gap-2 text-xs font-black text-emerald-300">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,.8)]" />
+              Protected
+            </span>
+          </div>
         </button>
       </div>
     </motion.section>
@@ -2049,7 +2397,7 @@ function UserHero({
 }
 
 /* =========================================================
-   NAVIGATION
+   SETTINGS NAVIGATION
 ========================================================= */
 
 function SettingsNavigation({
@@ -2069,88 +2417,387 @@ function SettingsNavigation({
     id: SectionId
   ) => void;
 }) {
-  return (
-    <nav className="sticky top-3 z-30 min-w-0 rounded-[24px] border border-border bg-card/95 p-3 shadow-[0_14px_40px_rgba(15,39,69,0.07)] backdrop-blur-xl">
-      <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center">
-        <div className="flex shrink-0 items-center gap-3 2xl:w-[255px]">
-          <motion.div
-            animate={{
-              rotate: [
-                0,
-                5,
-                -5,
-                0,
-              ],
-            }}
-            transition={{
-              duration: 5,
-              repeat: Infinity,
-              repeatDelay: 2,
-            }}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#0F2745,#1F5EA8)] text-white"
-          >
-            <Settings className="h-4 w-4" />
-          </motion.div>
+  const [
+    commandOpen,
+    setCommandOpen,
+  ] =
+    useState(false);
 
-          <div className="min-w-0">
-            <p
-              className="text-[9px] font-black uppercase tracking-[0.14em]"
+  useEffect(() => {
+    const handleKeyDown =
+      (
+        event: KeyboardEvent
+      ) => {
+        if (
+          (
+            event.ctrlKey ||
+            event.metaKey
+          ) &&
+          event.key.toLowerCase() ===
+            "k"
+        ) {
+          event.preventDefault();
+
+          setCommandOpen(
+            true
+          );
+        }
+
+        if (
+          event.key ===
+          "Escape"
+        ) {
+          setCommandOpen(
+            false
+          );
+        }
+      };
+
+    window.addEventListener(
+      "keydown",
+      handleKeyDown
+    );
+
+    return () =>
+      window.removeEventListener(
+        "keydown",
+        handleKeyDown
+      );
+  }, []);
+
+  return (
+    <>
+      <nav className="sticky top-3 z-30 overflow-hidden rounded-[26px] border border-border bg-card/95 p-3 shadow-[0_18px_55px_rgba(15,23,42,.07)] backdrop-blur-xl">
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
+          <div className="flex shrink-0 items-center gap-3 xl:w-[245px]">
+            <div
+              className="flex h-10 w-10 items-center justify-center rounded-xl"
               style={{
+                background:
+                  "var(--dashboard-primary-soft)",
                 color:
                   "var(--dashboard-primary)",
               }}
             >
-              Coffer Settings
-            </p>
+              <Settings className="h-4 w-4" />
+            </div>
 
-            <p className="truncate text-xs font-black text-card-foreground">
-              Personal Control Center
-            </p>
+            <div className="min-w-0">
+              <p
+                className="text-[9px] font-black uppercase tracking-[0.16em]"
+                style={{
+                  color:
+                    "var(--dashboard-primary)",
+                }}
+              >
+                Coffer Settings
+              </p>
+
+              <p className="truncate text-xs font-black text-card-foreground">
+                Personal Control Center
+              </p>
+            </div>
           </div>
+
+          <button
+            type="button"
+            onClick={() =>
+              setCommandOpen(
+                true
+              )
+            }
+            className="flex h-11 min-w-0 flex-1 items-center gap-3 rounded-2xl border border-border bg-muted/40 px-3 text-left transition hover:bg-muted"
+          >
+            <Search
+              className="h-4 w-4 shrink-0"
+              style={{
+                color:
+                  "var(--dashboard-primary)",
+              }}
+            />
+
+            <span className="min-w-0 flex-1 truncate text-xs font-semibold text-muted-foreground">
+              Search settings, privacy, security...
+            </span>
+
+            <span className="hidden rounded-lg border border-border bg-card px-2 py-1 text-[9px] font-black text-muted-foreground sm:block">
+              Ctrl / ⌘ K
+            </span>
+          </button>
         </div>
 
-        <div className="relative min-w-0 flex-1">
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+        <div className="mt-3 border-t border-border pt-3">
+          {sections.length ===
+          0 ? (
+            <div className="rounded-xl bg-muted px-4 py-5 text-center text-xs font-semibold text-muted-foreground">
+              No matching settings.
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-9">
+              {sections.map(
+                (
+                  section
+                ) => {
+                  const Icon =
+                    section.icon;
 
-          <input
-            value={
+                  const active =
+                    section.id ===
+                    activeSection;
+
+                  return (
+                    <button
+                      key={
+                        section.id
+                      }
+                      type="button"
+                      onClick={() =>
+                        onSectionChange(
+                          section.id
+                        )
+                      }
+                      className="group relative min-w-0 overflow-hidden rounded-[14px] px-2 py-2.5 text-center transition hover:bg-muted/40"
+                    >
+                      {active && (
+                        <motion.span
+                          layoutId="settings-nav-active"
+                          className="absolute inset-0 rounded-[14px]"
+                          style={{
+                            background:
+                              "var(--dashboard-primary-soft)",
+                            border:
+                              "1px solid var(--border)",
+                          }}
+                        />
+                      )}
+
+                      <span
+                        className="relative z-10 mx-auto flex h-8 w-8 items-center justify-center rounded-[10px]"
+                        style={{
+                          background:
+                            active
+                              ? "var(--dashboard-primary)"
+                              : "var(--muted)",
+
+                          color:
+                            active
+                              ? "var(--primary-foreground)"
+                              : "var(--muted-foreground)",
+                        }}
+                      >
+                        <Icon className="h-3.5 w-3.5" />
+                      </span>
+
+                      <span
+                        className={`relative z-10 mt-1.5 block truncate text-[9px] font-black ${
+                          active
+                            ? "text-card-foreground"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {
+                          section.label
+                        }
+                      </span>
+                    </button>
+                  );
+                }
+              )}
+            </div>
+          )}
+        </div>
+      </nav>
+
+      <AnimatePresence>
+        {commandOpen && (
+          <CommandPalette
+            query={
               searchQuery
             }
-            onChange={(event) =>
-              onSearchChange(
-                event.target.value
+            sections={
+              SECTIONS
+            }
+            activeSection={
+              activeSection
+            }
+            onQueryChange={
+              onSearchChange
+            }
+            onSelect={(
+              section
+            ) => {
+              onSectionChange(
+                section
+              );
+
+              setCommandOpen(
+                false
+              );
+            }}
+            onClose={() =>
+              setCommandOpen(
+                false
+              )
+            }
+          />
+        )}
+      </AnimatePresence>
+    </>
+  );
+}
+
+/* =========================================================
+   COMMAND PALETTE
+========================================================= */
+
+function CommandPalette({
+  query,
+  sections,
+  activeSection,
+  onQueryChange,
+  onSelect,
+  onClose,
+}: {
+  query: string;
+  sections: SectionConfig[];
+  activeSection: SectionId;
+  onQueryChange: (
+    value: string
+  ) => void;
+  onSelect: (
+    id: SectionId
+  ) => void;
+  onClose: () => void;
+}) {
+  const normalized =
+    query
+      .trim()
+      .toLowerCase();
+
+  const filtered =
+    sections.filter(
+      (
+        section
+      ) =>
+        !normalized ||
+        section.label
+          .toLowerCase()
+          .includes(
+            normalized
+          ) ||
+        section.description
+          .toLowerCase()
+          .includes(
+            normalized
+          ) ||
+        section.keywords.some(
+          (
+            keyword
+          ) =>
+            keyword
+              .toLowerCase()
+              .includes(
+                normalized
+              )
+        )
+    );
+
+  return (
+    <motion.div
+      initial={{
+        opacity: 0,
+      }}
+      animate={{
+        opacity: 1,
+      }}
+      exit={{
+        opacity: 0,
+      }}
+      onMouseDown={
+        onClose
+      }
+      className="fixed inset-0 z-[200] flex items-start justify-center bg-slate-950/55 px-4 pt-[9vh] backdrop-blur-md"
+    >
+      <motion.div
+        initial={{
+          opacity: 0,
+          y: 20,
+          scale:
+            0.97,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          scale: 1,
+        }}
+        exit={{
+          opacity: 0,
+          y: 12,
+          scale:
+            0.98,
+        }}
+        onMouseDown={(
+          event
+        ) =>
+          event.stopPropagation()
+        }
+        className="w-full max-w-2xl overflow-hidden rounded-[26px] border border-border bg-card shadow-2xl"
+      >
+        <div className="h-1 bg-[linear-gradient(90deg,#31205f,#6d46b5,#a78bfa)]" />
+
+        <div className="flex items-center gap-3 border-b border-border px-4 py-3.5">
+          <Search
+            className="h-5 w-5"
+            style={{
+              color:
+                "var(--dashboard-primary)",
+            }}
+          />
+
+          <input
+            autoFocus
+            value={
+              query
+            }
+            onChange={(
+              event
+            ) =>
+              onQueryChange(
+                event.target
+                  .value
               )
             }
             placeholder="Search settings..."
-            className="h-10 w-full rounded-xl border border-border bg-muted/50 pl-10 pr-9 text-xs font-semibold text-foreground outline-none transition focus:ring-4 focus:ring-[var(--dashboard-primary)]/10"
+            className="h-10 min-w-0 flex-1 bg-transparent text-sm font-semibold text-foreground outline-none placeholder:text-muted-foreground"
           />
 
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() =>
-                onSearchChange(
-                  ""
-                )
-              }
-              aria-label="Clear settings search"
-              className="absolute right-2.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={
+              onClose
+            }
+            className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-muted-foreground hover:bg-muted/70"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
-      </div>
 
-      <div className="mt-3 border-t border-border pt-3">
-        {sections.length ===
-        0 ? (
-          <div className="rounded-xl bg-muted px-4 py-5 text-center text-xs font-semibold text-muted-foreground">
-            No matching settings.
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-9">
-            {sections.map(
+        <div className="max-h-[65vh] overflow-y-auto p-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          {filtered.length ===
+          0 ? (
+            <div className="flex min-h-48 flex-col items-center justify-center">
+              <Search className="h-7 w-7 text-muted-foreground/40" />
+
+              <p className="mt-3 text-sm font-black text-card-foreground">
+                No settings found
+              </p>
+
+              <p className="mt-1 text-xs text-muted-foreground">
+                Try another keyword.
+              </p>
+            </div>
+          ) : (
+            filtered.map(
               (
                 section
               ) => {
@@ -2168,76 +2815,66 @@ function SettingsNavigation({
                     }
                     type="button"
                     onClick={() =>
-                      onSectionChange(
+                      onSelect(
                         section.id
                       )
                     }
-                    className="group relative min-w-0 overflow-hidden rounded-[14px] px-2 py-2.5 text-center"
+                    className="group flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition hover:bg-muted"
                   >
-                    {active && (
-                      <motion.div
-                        layoutId="settings-active"
-                        className="absolute inset-0 rounded-[14px]"
-                        style={{
-                          background:
-                            "var(--dashboard-primary-soft)",
-                          border:
-                            "1px solid var(--border)",
-                        }}
-                      />
-                    )}
-
                     <span
-                      className="relative z-10 mx-auto flex h-8 w-8 items-center justify-center rounded-[10px]"
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
                       style={{
                         background:
                           active
-                            ? "var(--dashboard-primary)"
+                            ? "var(--dashboard-primary-soft)"
                             : "var(--muted)",
+
                         color:
                           active
-                            ? "#fff"
+                            ? "var(--dashboard-primary)"
                             : "var(--muted-foreground)",
                       }}
                     >
-                      <Icon className="h-3.5 w-3.5" />
+                      <Icon className="h-4 w-4" />
                     </span>
 
-                    <span
-                      className={`relative z-10 mt-1.5 block truncate text-[9px] font-black ${
-                        active
-                          ? "text-card-foreground"
-                          : "text-muted-foreground"
-                      }`}
-                    >
-                      {
-                        section.label
-                      }
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-xs font-black text-card-foreground">
+                        {
+                          section.label
+                        }
+                      </span>
+
+                      <span className="mt-0.5 block truncate text-[10px] text-muted-foreground">
+                        {
+                          section.description
+                        }
+                      </span>
                     </span>
 
                     {active && (
-                      <motion.span
-                        initial={{
-                          scaleX: 0,
-                        }}
-                        animate={{
-                          scaleX: 1,
-                        }}
-                        className="absolute bottom-0 left-1/2 z-10 h-0.5 w-8 -translate-x-1/2 rounded-full"
+                      <span
+                        className="rounded-full px-2 py-1 text-[8px] font-black uppercase"
                         style={{
                           background:
+                            "var(--dashboard-primary-soft)",
+                          color:
                             "var(--dashboard-primary)",
                         }}
-                      />
+                      >
+                        Current
+                      </span>
                     )}
+
+                    <ChevronRight className="h-4 w-4 text-muted-foreground/50 group-hover:translate-x-0.5" />
                   </button>
                 );
               }
-            )}
-          </div>
-        )}
-      </div>
-    </nav>
+            )
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -2249,30 +2886,34 @@ function OverviewSection({
   draft,
   accountHealth,
   privacyScore,
+  wallet,
   onOpenSessions,
   onOpenPrivacy,
 }: {
   draft: UserSettingsState;
   accountHealth: number;
   privacyScore: number;
+  wallet: SettingsWallet | null;
   onOpenSessions: () => void;
   onOpenPrivacy: () => void;
 }) {
   return (
     <div className="space-y-6">
       <SectionHeader
-        eyebrow="Personal Control Center"
+        eyebrow="Control Center"
         title="Account Overview"
-        description="A quick view of your account settings, privacy posture and wallet preferences."
+        description="A quick snapshot of your account health, privacy posture, wallet controls and notification coverage."
         icon={Activity}
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          icon={ShieldCheck}
+          icon={
+            ShieldCheck
+          }
           title="Account Health"
           value={`${accountHealth}%`}
-          note="Settings protection baseline"
+          note="Protection baseline"
           tone="green"
         />
 
@@ -2280,34 +2921,47 @@ function OverviewSection({
           icon={Lock}
           title="Privacy Score"
           value={`${privacyScore}%`}
-          note="Based on visibility choices"
+          note="Visibility and privacy controls"
           tone="blue"
         />
 
         <MetricCard
-          icon={WalletCards}
-          title="Confirm Above"
-          value={`৳${Math.round(
-            draft.wallet
-              .confirmThreshold /
-              1000
-          )}k`}
-          note="Large transfer confirmation"
+          icon={
+            WalletCards
+          }
+          title="Wallet Balance"
+          value={
+            wallet
+              ? `৳${Number(
+                  wallet.balance
+                ).toLocaleString(
+                  "en-BD"
+                )}`
+              : "—"
+          }
+          note={
+            wallet?.status ||
+            "Wallet snapshot"
+          }
           tone="amber"
         />
 
         <MetricCard
-          icon={BellRing}
-          title="Alerts"
+          icon={
+            BellRing
+          }
+          title="Push Alerts"
           value={
-            draft.notifications
+            draft
+              .notifications
               .push
               ? "Active"
               : "Limited"
           }
-          note="Push notification preference"
+          note="Notification coverage"
           tone={
-            draft.notifications
+            draft
+              .notifications
               .push
               ? "green"
               : "amber"
@@ -2315,16 +2969,14 @@ function OverviewSection({
         />
       </div>
 
-      <div
-        className="grid items-start gap-6"
-        style={{
-          gridTemplateColumns:
-            "repeat(auto-fit, minmax(min(100%, 420px), 1fr))",
-        }}
-      >
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(340px,.8fr)]">
         <AccountHealthCard
-          score={accountHealth}
-          draft={draft}
+          score={
+            accountHealth
+          }
+          draft={
+            draft
+          }
         />
 
         <QuickActionsCard
@@ -2340,6 +2992,10 @@ function OverviewSection({
   );
 }
 
+/* =========================================================
+   ACCOUNT HEALTH
+========================================================= */
+
 function AccountHealthCard({
   score,
   draft,
@@ -2348,44 +3004,60 @@ function AccountHealthCard({
   draft: UserSettingsState;
 }) {
   const circumference =
-    2 * Math.PI * 44;
+    2 *
+    Math.PI *
+    44;
 
-  const items = [
-    {
-      label:
-        "Wallet confirmation",
-      value:
-        draft.wallet
-          .requireConfirmation
-          ? 95
-          : 60,
-      icon: WalletCards,
-    },
+  const checks =
+    [
+      {
+        label:
+          "Wallet confirmation",
 
-    {
-      label:
-        "Privacy controls",
-      value:
-        draft.privacy.analytics
-          ? 72
-          : 94,
-      icon: Lock,
-    },
+        value:
+          draft.wallet
+            .requireConfirmation
+            ? 95
+            : 58,
 
-    {
-      label:
-        "Alert coverage",
-      value:
-        draft.notifications
-          .push
-          ? 92
-          : 68,
-      icon: BellRing,
-    },
-  ];
+        icon:
+          WalletCards,
+      },
+
+      {
+        label:
+          "Privacy controls",
+
+        value:
+          draft.privacy
+            .analytics
+            ? 70
+            : 94,
+
+        icon:
+          Lock,
+      },
+
+      {
+        label:
+          "Alert coverage",
+
+        value:
+          draft
+            .notifications
+            .push
+            ? 92
+            : 68,
+
+        icon:
+          BellRing,
+      },
+    ];
 
   return (
-    <div className="relative self-start overflow-hidden rounded-[30px] bg-[#0F2745] p-5 text-white shadow-[0_18px_55px_rgba(15,39,69,0.16)] sm:p-6">
+    <div className="relative overflow-hidden rounded-[30px] border border-violet-300/10 bg-[linear-gradient(145deg,#0b0716,#18112f_54%,#40206a)] p-5 text-white shadow-[0_22px_65px_rgba(42,24,82,.22)] sm:p-6">
+      <div className="absolute -right-20 -top-24 h-56 w-56 rounded-full bg-violet-500/15 blur-3xl" />
+
       <div className="relative z-10">
         <div className="grid grid-cols-[112px_minmax(0,1fr)] items-center gap-5 sm:grid-cols-[128px_minmax(0,1fr)]">
           <div className="relative h-28 w-28 sm:h-32 sm:w-32">
@@ -2407,7 +3079,7 @@ function AccountHealthCard({
                 cy="54"
                 r="44"
                 fill="none"
-                stroke="#10b981"
+                stroke="#a78bfa"
                 strokeWidth="8"
                 strokeLinecap="round"
                 strokeDasharray={
@@ -2425,92 +3097,73 @@ function AccountHealthCard({
                         100),
                 }}
                 transition={{
-                  duration: 1.4,
-                  ease: "easeOut",
+                  duration:
+                    1.2,
+                  ease:
+                    "easeOut",
                 }}
               />
             </svg>
 
             <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <motion.span
-                key={score}
-                initial={{
-                  opacity: 0,
-                  scale: 0.8,
-                }}
-                animate={{
-                  opacity: 1,
-                  scale: 1,
-                }}
-                className="text-2xl font-black sm:text-3xl"
-              >
+              <span className="text-2xl font-black sm:text-3xl">
                 {score}
-              </motion.span>
+              </span>
 
-              <span className="text-[8px] font-black uppercase tracking-[0.14em] text-blue-100/45">
+              <span className="text-[8px] font-black uppercase tracking-[0.14em] text-violet-100/45">
                 Health
               </span>
             </div>
           </div>
 
           <div className="min-w-0">
-            <p className="text-[9px] font-black uppercase tracking-[0.15em] text-blue-100/50">
+            <p className="text-[9px] font-black uppercase tracking-[0.15em] text-violet-100/45">
               Account Health
             </p>
 
             <h3 className="mt-2 text-lg font-black leading-tight sm:text-xl">
-              Your preferences are in good shape
+              Your preferences are working together
             </h3>
 
-            <p className="mt-2 text-[11px] leading-5 text-blue-100/60">
-              This score reacts to privacy,
-              transfer confirmation and
-              notification choices.
+            <p className="mt-2 text-[11px] leading-5 text-violet-100/60">
+              The score reacts to privacy,
+              confirmation and notification
+              choices.
             </p>
           </div>
         </div>
 
         <div className="mt-6 grid gap-3 sm:grid-cols-3">
-          {items.map(
+          {checks.map(
             (
-              item,
-              index
+              item
             ) => {
               const Icon =
                 item.icon;
 
               return (
-                <motion.div
+                <div
                   key={
                     item.label
                   }
-                  initial={{
-                    opacity: 0,
-                    y: 8,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                  }}
-                  transition={{
-                    delay:
-                      0.08 *
-                      index,
-                  }}
                   className="rounded-2xl border border-white/10 bg-white/[0.045] p-3"
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/[0.06] text-cyan-200">
+                  <div className="flex items-center justify-between">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/[0.06] text-violet-200">
                       <Icon className="h-3.5 w-3.5" />
                     </span>
 
                     <span className="text-[10px] font-black">
-                      {item.value}%
+                      {
+                        item.value
+                      }%
                     </span>
                   </div>
 
-                  <p className="mt-3 truncate text-[9px] font-semibold text-blue-100/55">
-                    {item.label}
+                  <p className="mt-3 truncate text-[9px] font-semibold text-violet-100/55">
+                    {
+                      item.label
+                    }
                   </p>
 
                   <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
@@ -2519,26 +3172,13 @@ function AccountHealthCard({
                         width: 0,
                       }}
                       animate={{
-                        width: `${item.value}%`,
+                        width:
+                          `${item.value}%`,
                       }}
-                      transition={{
-                        duration: 1,
-                        delay:
-                          0.08 *
-                          index,
-                      }}
-                      className={`h-full rounded-full ${
-                        item.value >=
-                        90
-                          ? "bg-emerald-400"
-                          : item.value >=
-                              75
-                            ? "bg-amber-400"
-                            : "bg-rose-400"
-                      }`}
+                      className="h-full rounded-full bg-[linear-gradient(90deg,#8b5cf6,#c4b5fd)]"
                     />
                   </div>
-                </motion.div>
+                </div>
               );
             }
           )}
@@ -2547,6 +3187,10 @@ function AccountHealthCard({
     </div>
   );
 }
+
+/* =========================================================
+   QUICK ACTIONS
+========================================================= */
 
 function QuickActionsCard({
   onSessions,
@@ -2557,7 +3201,13 @@ function QuickActionsCard({
 }) {
   return (
     <div className="self-start rounded-[30px] border border-border bg-card p-5 shadow-sm sm:p-6">
-      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+      <p
+        className="text-[10px] font-black uppercase tracking-[0.14em]"
+        style={{
+          color:
+            "var(--dashboard-primary)",
+        }}
+      >
         Quick Actions
       </p>
 
@@ -2578,7 +3228,9 @@ function QuickActionsCard({
         />
 
         <QuickAction
-          icon={Lock}
+          icon={
+            Lock
+          }
           title="Privacy summary"
           description="Review visibility choices"
           onClick={
@@ -2591,7 +3243,7 @@ function QuickActionsCard({
             KeyRound
           }
           title="Security Center"
-          description="Password, sessions and 2FA"
+          description="Password, 2FA and authentication"
           href="/dashboard/security"
         />
       </div>
@@ -2612,48 +3264,53 @@ function QuickAction({
   onClick?: () => void;
   href?: string;
 }) {
-  const content = (
-    <>
-      <div
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-        style={{
-          background:
-            "var(--dashboard-primary-soft)",
-          color:
-            "var(--dashboard-primary)",
-        }}
-      >
-        <Icon className="h-4 w-4" />
-      </div>
+  const content =
+    (
+      <>
+        <span
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+          style={{
+            background:
+              "var(--dashboard-primary-soft)",
+            color:
+              "var(--dashboard-primary)",
+          }}
+        >
+          <Icon className="h-4 w-4" />
+        </span>
 
-      <div className="min-w-0 flex-1">
-        <p className="text-xs font-black text-card-foreground">
-          {title}
-        </p>
+        <span className="min-w-0 flex-1">
+          <span className="block text-xs font-black text-card-foreground">
+            {
+              title
+            }
+          </span>
 
-        <p className="mt-0.5 text-[10px] text-muted-foreground">
-          {description}
-        </p>
-      </div>
+          <span className="mt-0.5 block text-[10px] text-muted-foreground">
+            {
+              description
+            }
+          </span>
+        </span>
 
-      <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
-    </>
-  );
+        <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
+      </>
+    );
 
   const className =
-    "flex w-full items-center gap-3 rounded-2xl border border-border bg-muted/40 p-3 text-left transition hover:-translate-y-0.5 hover:shadow-sm";
+    "flex w-full items-center gap-3 rounded-2xl border border-border bg-muted/40 p-3 text-left transition hover:-translate-y-0.5 hover:bg-muted hover:shadow-sm";
 
   if (href) {
     return (
       <Link
-        href={
-          href
-        }
+        href={href}
         className={
           className
         }
       >
-        {content}
+        {
+          content
+        }
       </Link>
     );
   }
@@ -2668,7 +3325,9 @@ function QuickAction({
         className
       }
     >
-      {content}
+      {
+        content
+      }
     </button>
   );
 }
@@ -2682,18 +3341,11 @@ function ProfileSection({
   setDraft,
 }: {
   draft: UserSettingsState;
-  setDraft: React.Dispatch<
-    React.SetStateAction<UserSettingsState>
+  setDraft: Dispatch<
+    SetStateAction<UserSettingsState>
   >;
 }) {
-  const initial =
-    draft.profile.name
-      .trim()
-      .charAt(0)
-      .toUpperCase() ||
-    "U";
-
-  const updateProfile =
+  const update =
     <
       K extends keyof UserSettingsState["profile"]
     >(
@@ -2708,7 +3360,9 @@ function ProfileSection({
 
           profile: {
             ...current.profile,
-            [key]: value,
+
+            [key]:
+              value,
           },
         })
       );
@@ -2719,122 +3373,198 @@ function ProfileSection({
       <SectionHeader
         eyebrow="Identity"
         title="Profile & Identity"
-        description="Manage your personal information and how it appears across Coffer."
-        icon={UserRound}
+        description="Update the information associated with your Coffer account. Changes are submitted through the backend save action."
+        icon={
+          UserRound
+        }
+        indigo
       />
 
-      <div className="rounded-[28px] border border-border bg-card p-5 shadow-sm sm:p-6">
-        <div className="flex flex-col gap-5 rounded-[24px] border border-border bg-muted/40 p-5 sm:flex-row sm:items-center">
-          <motion.div
-            animate={{
-              boxShadow: [
-                "0 10px 25px rgba(31,94,168,.12)",
-                "0 12px 35px rgba(34,211,238,.22)",
-                "0 10px 25px rgba(31,94,168,.12)",
-              ],
-            }}
-            transition={{
-              duration: 4,
-              repeat: Infinity,
-            }}
-            className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#1F5EA8] to-cyan-400 text-2xl font-black text-white"
-          >
-            {
-              initial
-            }
-          </motion.div>
-
-          <div>
-            <p className="text-sm font-black text-card-foreground">
-              {
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,.8fr)]">
+        <div className="rounded-[28px] border border-border bg-card p-5 shadow-sm sm:p-6">
+          <div className="flex flex-col gap-5 rounded-[24px] border border-border bg-muted/40 p-5 sm:flex-row sm:items-center">
+            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#31205f,#6d46b5)] text-2xl font-black text-white shadow-[0_12px_30px_rgba(59,35,104,.25)]">
+              {getInitials(
                 draft.profile.name
+              )}
+            </div>
+
+            <div className="min-w-0">
+              <p className="text-sm font-black text-card-foreground">
+                {
+                  draft.profile
+                    .name
+                }
+              </p>
+
+              <p className="mt-1 truncate text-xs text-muted-foreground">
+                {
+                  draft.profile
+                    .email
+                }
+              </p>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                <StatusBadge
+                  text={
+                    draft.profile
+                      .role
+                  }
+                />
+
+                <StatusBadge
+                  text={
+                    draft.profile
+                      .kycStatus
+                      .replaceAll(
+                        "_",
+                        " "
+                      )
+                  }
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-5 md:grid-cols-2">
+            <TextField
+              label="Full Name"
+              value={
+                draft.profile
+                  .name
               }
-            </p>
-
-            <p className="mt-1 text-xs text-muted-foreground">
-              Personal identity profile
-            </p>
-
-            <button
-              type="button"
-              onClick={() =>
-                window.alert(
-                  "Connect your avatar upload endpoint here."
+              icon={
+                User
+              }
+              onChange={(
+                value
+              ) =>
+                update(
+                  "name",
+                  value
                 )
               }
-              className="mt-3 rounded-xl border border-border bg-card px-4 py-2.5 text-xs font-black"
-            >
-              Change Avatar
-            </button>
+            />
+
+            <TextField
+              label="Email Address"
+              type="email"
+              value={
+                draft.profile
+                  .email
+              }
+              icon={
+                Mail
+              }
+              onChange={(
+                value
+              ) =>
+                update(
+                  "email",
+                  value
+                )
+              }
+            />
+
+            <TextField
+              label="Phone Number"
+              type="tel"
+              value={
+                draft.profile
+                  .phone
+              }
+              icon={
+                Phone
+              }
+              onChange={(
+                value
+              ) =>
+                update(
+                  "phone",
+                  value
+                )
+              }
+            />
+          </div>
+
+          <div
+            className="mt-6 rounded-2xl border p-4"
+            style={{
+              background:
+                "var(--dashboard-primary-soft)",
+
+              borderColor:
+                "var(--border)",
+            }}
+          >
+            <p className="text-xs leading-5 text-foreground">
+              Profile updates are saved to
+              <strong>
+                {" "}
+                /settings/profile
+              </strong>
+              . Email or phone changes may
+              require backend verification.
+            </p>
           </div>
         </div>
 
-        <div className="mt-6 grid gap-5 md:grid-cols-2">
-          <TextField
-            label="Full Name"
-            value={
-              draft.profile.name
-            }
-            icon={
-              User
-            }
-            onChange={(value) =>
-              updateProfile(
-                "name",
-                value
-              )
-            }
-          />
-
-          <TextField
-            label="Email Address"
-            value={
-              draft.profile.email
-            }
-            type="email"
-            icon={
-              Mail
-            }
-            onChange={(value) =>
-              updateProfile(
-                "email",
-                value
-              )
-            }
-          />
-
-          <TextField
-            label="Phone Number"
-            value={
-              draft.profile.phone
-            }
-            type="tel"
-            icon={
-              Phone
-            }
-            onChange={(value) =>
-              updateProfile(
-                "phone",
-                value
-              )
-            }
-          />
-        </div>
-
-        <div
-          className="mt-6 rounded-2xl border p-4"
-          style={{
-            background:
-              "var(--dashboard-primary-soft)",
-            borderColor:
-              "var(--border)",
-          }}
-        >
-          <p className="text-xs leading-5 text-foreground">
-            Changes to legal identity information may
-            require KYC verification before they affect
-            verified account identity.
+        <div className="self-start rounded-[28px] border border-border bg-card p-6 shadow-sm">
+          <p
+            className="text-[10px] font-black uppercase tracking-[0.14em]"
+            style={{
+              color:
+                "var(--dashboard-primary)",
+            }}
+          >
+            Account Identity
           </p>
+
+          <h3 className="mt-1 text-lg font-black text-card-foreground">
+            Current profile
+          </h3>
+
+          <div className="mt-5">
+            <DetailList
+              rows={[
+                [
+                  "Email",
+                  draft.profile
+                    .email,
+                ],
+
+                [
+                  "Phone",
+                  draft.profile
+                    .phone,
+                ],
+
+                [
+                  "Role",
+                  draft.profile
+                    .role,
+                ],
+
+                [
+                  "KYC",
+                  draft.profile
+                    .kycStatus
+                    .replaceAll(
+                      "_",
+                      " "
+                    ),
+                ],
+
+                [
+                  "Created",
+                  formatDate(
+                    draft.profile
+                      .createdAt
+                  ),
+                ],
+              ]}
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -2856,20 +3586,15 @@ function SecuritySection({
     <div className="space-y-6">
       <SectionHeader
         eyebrow="Protection"
-        title="Security Preferences"
-        description="Review account protection, active sessions and dedicated security controls."
+        title="Security Center"
+        description="Manage active sessions here while password and two-factor authentication remain available in the dedicated Security Center."
         icon={
           ShieldCheck
         }
+        indigo
       />
 
-      <div
-        className="grid items-start gap-6"
-        style={{
-          gridTemplateColumns:
-            "repeat(auto-fit, minmax(min(100%, 420px), 1fr))",
-        }}
-      >
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.1fr)_minmax(320px,.9fr)]">
         <div className="space-y-4">
           <SecurityInfoCard
             icon={
@@ -2877,18 +3602,19 @@ function SecuritySection({
             }
             title="Security Score"
             value={`${accountHealth} / 100`}
-            description="Your settings provide a strong protection baseline."
+            description="Your current protection baseline."
             tone="green"
           />
 
           <SecurityInfoCard
             icon={
-              Smartphone
+              KeyRound
             }
-            title="Two-Factor Authentication"
+            title="Password & 2FA"
             value="Security Center"
-            description="Manage 2FA and sensitive authentication from the dedicated security page."
+            description="Open the dedicated security route for authentication controls."
             tone="blue"
+            href="/dashboard/security"
           />
 
           <button
@@ -2899,43 +3625,32 @@ function SecuritySection({
             className="flex w-full items-center justify-between rounded-[24px] border border-border bg-card p-5 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
           >
             <div className="flex items-center gap-3">
-              <div
+              <span
                 className="flex h-11 w-11 items-center justify-center rounded-xl"
                 style={{
                   background:
                     "var(--dashboard-primary-soft)",
+
                   color:
                     "var(--dashboard-primary)",
                 }}
               >
                 <MonitorSmartphone className="h-5 w-5" />
-              </div>
+              </span>
 
-              <div>
-                <p className="text-sm font-black text-card-foreground">
+              <span>
+                <span className="block text-sm font-black text-card-foreground">
                   Active Sessions
-                </p>
+                </span>
 
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Review devices where your account is signed in.
-                </p>
-              </div>
+                <span className="mt-1 block text-xs text-muted-foreground">
+                  Review signed-in devices.
+                </span>
+              </span>
             </div>
 
             <ChevronRight className="h-4 w-4 text-muted-foreground/50" />
           </button>
-
-          <Link
-            href="/dashboard/security"
-            className="inline-flex items-center gap-2 rounded-xl px-4 py-3 text-xs font-black text-white"
-            style={{
-              background:
-                "var(--dashboard-primary)",
-            }}
-          >
-            <KeyRound className="h-4 w-4" />
-            Open Security Center
-          </Link>
         </div>
 
         <SecurityPulse
@@ -2954,6 +3669,7 @@ function SecurityInfoCard({
   value,
   description,
   tone,
+  href,
 }: {
   icon: LucideIcon;
   title: string;
@@ -2962,36 +3678,68 @@ function SecurityInfoCard({
   tone:
     | "green"
     | "blue";
+  href?: string;
 }) {
+  const inner =
+    (
+      <>
+        <span
+          className="flex h-11 w-11 items-center justify-center rounded-xl"
+          style={{
+            background:
+              tone ===
+              "green"
+                ? "color-mix(in srgb, var(--dashboard-success) 12%, transparent)"
+                : "var(--dashboard-primary-soft)",
+
+            color:
+              tone ===
+              "green"
+                ? "var(--dashboard-success)"
+                : "var(--dashboard-primary)",
+          }}
+        >
+          <Icon className="h-5 w-5" />
+        </span>
+
+        <p className="mt-5 text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+          {
+            title
+          }
+        </p>
+
+        <p className="mt-1 text-2xl font-black text-card-foreground">
+          {
+            value
+          }
+        </p>
+
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">
+          {
+            description
+          }
+        </p>
+      </>
+    );
+
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className="block rounded-[24px] border border-border bg-card p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+      >
+        {
+          inner
+        }
+      </Link>
+    );
+  }
+
   return (
     <div className="rounded-[24px] border border-border bg-card p-5 shadow-sm">
-      <div
-        className="flex h-11 w-11 items-center justify-center rounded-xl"
-        style={{
-          background:
-            tone === "green"
-              ? "color-mix(in srgb, var(--dashboard-success) 12%, transparent)"
-              : "var(--dashboard-primary-soft)",
-          color:
-            tone === "green"
-              ? "var(--dashboard-success)"
-              : "var(--dashboard-primary)",
-        }}
-      >
-        <Icon className="h-5 w-5" />
-      </div>
-
-      <p className="mt-5 text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
-        {title}
-      </p>
-
-      <p className="mt-1 text-2xl font-black text-card-foreground">
-        {value}
-      </p>
-
-      <p className="mt-2 text-xs leading-5 text-muted-foreground">
-        {description}
-      </p>
+      {
+        inner
+      }
     </div>
   );
 }
@@ -3002,13 +3750,15 @@ function SecurityPulse({
   score: number;
 }) {
   return (
-    <div className="relative self-start overflow-hidden rounded-[28px] bg-[#0F2745] p-5 text-white shadow-[0_18px_50px_rgba(15,39,69,.14)]">
-      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-blue-100/50">
+    <div className="relative overflow-hidden rounded-[28px] border border-violet-300/10 bg-[linear-gradient(145deg,#0b0716,#1a1232_60%,#44216d)] p-5 text-white shadow-[0_20px_55px_rgba(42,24,82,.2)]">
+      <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-violet-400/15 blur-3xl" />
+
+      <p className="relative z-10 text-[10px] font-black uppercase tracking-[0.14em] text-violet-100/50">
         Security Pulse
       </p>
 
-      <div className="mt-7 flex justify-center">
-        <div className="relative flex h-40 w-40 items-center justify-center">
+      <div className="relative z-10 mt-7 flex justify-center">
+        <div className="relative flex h-44 w-44 items-center justify-center">
           {[1, 2, 3].map(
             (
               ring
@@ -3017,61 +3767,47 @@ function SecurityPulse({
                 key={
                   ring
                 }
-                className="absolute rounded-full border border-cyan-300/15"
+                className="absolute rounded-full border border-violet-300/15"
                 style={{
-                  width: `${
-                    62 +
+                  width:
+                    68 +
                     ring *
-                      34
-                  }px`,
-                  height: `${
-                    62 +
+                      32,
+
+                  height:
+                    68 +
                     ring *
-                      34
-                  }px`,
+                      32,
                 }}
                 animate={{
                   rotate:
-                    ring %
-                      2
+                    ring % 2
                       ? 360
                       : -360,
+
                   opacity: [
-                    0.25,
-                    0.65,
-                    0.25,
+                    0.2,
+                    0.55,
+                    0.2,
                   ],
                 }}
                 transition={{
                   duration:
-                    12 +
+                    10 +
                     ring *
                       4,
+
                   repeat:
                     Infinity,
-                  ease: "linear",
+
+                  ease:
+                    "linear",
                 }}
-              >
-                <span className="absolute left-1/2 top-[-3px] h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-cyan-300" />
-              </motion.div>
+              />
             )
           )}
 
-          <motion.div
-            animate={{
-              boxShadow: [
-                "0 0 0 rgba(16,185,129,0)",
-                "0 0 45px rgba(16,185,129,.2)",
-                "0 0 0 rgba(16,185,129,0)",
-              ],
-            }}
-            transition={{
-              duration: 3,
-              repeat:
-                Infinity,
-            }}
-            className="relative z-10 flex h-24 w-24 flex-col items-center justify-center rounded-[30px] border border-emerald-300/20 bg-emerald-300/10"
-          >
+          <div className="relative z-10 flex h-24 w-24 flex-col items-center justify-center rounded-[30px] border border-emerald-300/20 bg-emerald-300/10">
             <Fingerprint className="h-9 w-9 text-emerald-300" />
 
             <span className="mt-1 text-sm font-black">
@@ -3079,13 +3815,13 @@ function SecurityPulse({
                 score
               }
             </span>
-          </motion.div>
+          </div>
         </div>
       </div>
 
-      <p className="text-center text-xs leading-6 text-blue-100/60">
-        Account protection visualization based on
-        your current settings.
+      <p className="relative z-10 text-center text-xs leading-6 text-violet-100/60">
+        Authentication and account protection
+        overview.
       </p>
     </div>
   );
@@ -3100,13 +3836,14 @@ function NotificationSection({
   setDraft,
 }: {
   draft: UserSettingsState;
-  setDraft: React.Dispatch<
-    React.SetStateAction<UserSettingsState>
+  setDraft: Dispatch<
+    SetStateAction<UserSettingsState>
   >;
 }) {
   const update =
     (
-      key: keyof UserSettingsState["notifications"],
+      key:
+        keyof UserSettingsState["notifications"],
       value: boolean
     ) => {
       setDraft(
@@ -3117,7 +3854,9 @@ function NotificationSection({
 
           notifications: {
             ...current.notifications,
-            [key]: value,
+
+            [key]:
+              value,
           },
         })
       );
@@ -3128,84 +3867,105 @@ function NotificationSection({
       <SectionHeader
         eyebrow="Communication"
         title="Notification Preferences"
-        description="Choose how Coffer communicates account, security and product updates."
+        description="Choose which channels can deliver account, security and product notifications."
         icon={
           BellRing
         }
+        indigo
       />
 
-      <div
-        className="grid items-start gap-6"
-        style={{
-          gridTemplateColumns:
-            "repeat(auto-fit, minmax(min(100%, 420px), 1fr))",
-        }}
-      >
-        <div className="rounded-[28px] border border-border bg-card p-5 shadow-sm sm:p-6">
-          <ToggleRow
-            label="Email Notifications"
-            description="Account summaries and important alerts."
-            enabled={
-              draft.notifications
-                .email
-            }
-            onChange={(value) =>
-              update(
-                "email",
-                value
-              )
-            }
-          />
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(340px,.9fr)]">
 
-          <div className="mt-5 border-t border-border pt-5">
-            <ToggleRow
-              label="Push Notifications"
-              description="Immediate alerts delivered to supported devices."
-              enabled={
-                draft.notifications
-                  .push
-              }
-              onChange={(value) =>
-                update(
-                  "push",
-                  value
-                )
-              }
-            />
-          </div>
+        <div className="relative overflow-hidden rounded-[28px] border border-violet-300/10 bg-[linear-gradient(145deg,#0b0716,#19102f_55%,#45216f)] p-5 text-white shadow-[0_20px_55px_rgba(42,24,82,.18)] sm:p-6">
+          <div className="absolute -right-20 -top-20 h-52 w-52 rounded-full bg-violet-400/15 blur-3xl" />
 
-          <div className="mt-5 border-t border-border pt-5">
-            <ToggleRow
-              label="SMS Alerts"
-              description="Use text messages for critical security alerts."
-              enabled={
-                draft.notifications
-                  .sms
-              }
-              onChange={(value) =>
-                update(
-                  "sms",
-                  value
-                )
-              }
-            />
-          </div>
+          <div className="relative z-10">
+            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-violet-100/50">
+              Notification Channels
+            </p>
 
-          <div className="mt-5 border-t border-border pt-5">
-            <ToggleRow
-              label="Tips & Offers"
-              description="Optional product updates and financial tips."
-              enabled={
-                draft.notifications
-                  .marketing
-              }
-              onChange={(value) =>
-                update(
-                  "marketing",
+            <h3 className="mt-2 text-xl font-black">
+              Control every delivery path
+            </h3>
+
+            <p className="mt-1 text-xs leading-5 text-violet-100/55">
+              Changes are held in the draft state and
+              synchronized when you press Save Changes.
+            </p>
+
+            <div className="mt-6 space-y-3">
+              <DarkToggleRow
+                label="Email Notifications"
+                description="Account summaries and important alerts."
+                enabled={
+                  draft
+                    .notifications
+                    .email
+                }
+                onChange={(
                   value
-                )
-              }
-            />
+                ) =>
+                  update(
+                    "email",
+                    value
+                  )
+                }
+              />
+
+              <DarkToggleRow
+                label="Push Notifications"
+                description="Immediate alerts on supported devices."
+                enabled={
+                  draft
+                    .notifications
+                    .push
+                }
+                onChange={(
+                  value
+                ) =>
+                  update(
+                    "push",
+                    value
+                  )
+                }
+              />
+
+              <DarkToggleRow
+                label="SMS Alerts"
+                description="Text messages for important security events."
+                enabled={
+                  draft
+                    .notifications
+                    .sms
+                }
+                onChange={(
+                  value
+                ) =>
+                  update(
+                    "sms",
+                    value
+                  )
+                }
+              />
+
+              <DarkToggleRow
+                label="Tips & Offers"
+                description="Optional product updates and financial tips."
+                enabled={
+                  draft
+                    .notifications
+                    .marketing
+                }
+                onChange={(
+                  value
+                ) =>
+                  update(
+                    "marketing",
+                    value
+                  )
+                }
+              />
+            </div>
           </div>
         </div>
 
@@ -3224,51 +3984,67 @@ function NotificationVisualizer({
 }: {
   draft: UserSettingsState;
 }) {
-  const channels = [
-    {
-      label: "Email",
-      active:
-        draft.notifications
-          .email,
-      icon: Mail,
-    },
+  const channels =
+    [
+      {
+        label:
+          "Email",
+        active:
+          draft
+            .notifications
+            .email,
+        icon:
+          Mail,
+      },
 
-    {
-      label: "Push",
-      active:
-        draft.notifications
-          .push,
-      icon: BellRing,
-    },
+      {
+        label:
+          "Push",
+        active:
+          draft
+            .notifications
+            .push,
+        icon:
+          BellRing,
+      },
 
-    {
-      label: "SMS",
-      active:
-        draft.notifications
-          .sms,
-      icon: Phone,
-    },
-  ];
+      {
+        label:
+          "SMS",
+        active:
+          draft
+            .notifications
+            .sms,
+        icon:
+          Phone,
+      },
+    ];
 
-  const positions = [
-    "left-[8%] top-[20%]",
-    "right-[8%] top-[20%]",
-    "left-1/2 bottom-[4%] -translate-x-1/2",
-  ];
+  const positions =
+    [
+      "left-[8%] top-[18%]",
+      "right-[8%] top-[18%]",
+      "left-1/2 bottom-[5%] -translate-x-1/2",
+    ];
 
   return (
-    <div className="relative self-start overflow-hidden rounded-[28px] bg-[linear-gradient(155deg,#0F2745,#153c63)] p-5 text-white shadow-[0_18px_50px_rgba(15,39,69,.14)]">
-      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-blue-100/50">
+    <div className="rounded-[28px] border border-border bg-card p-5 shadow-sm">
+      <p
+        className="text-[10px] font-black uppercase tracking-[0.14em]"
+        style={{
+          color:
+            "var(--dashboard-primary)",
+        }}
+      >
         Alert Flow
       </p>
 
-      <h3 className="mt-2 text-lg font-black">
-        Notification channels
+      <h3 className="mt-2 text-lg font-black text-card-foreground">
+        Channel coverage
       </h3>
 
-      <div className="relative mt-6 flex h-[195px] items-center justify-center">
+      <div className="relative mt-6 flex h-[195px] items-center justify-center overflow-hidden rounded-2xl bg-muted/40">
         <motion.div
-          className="absolute flex h-24 w-24 items-center justify-center rounded-full border border-cyan-300/20 bg-cyan-300/10"
           animate={{
             scale: [
               0.96,
@@ -3277,33 +4053,42 @@ function NotificationVisualizer({
             ],
           }}
           transition={{
-            duration: 3.2,
-            repeat: Infinity,
+            duration:
+              3.2,
+            repeat:
+              Infinity,
+          }}
+          className="absolute flex h-24 w-24 items-center justify-center rounded-full"
+          style={{
+            background:
+              "var(--dashboard-primary-soft)",
+            color:
+              "var(--dashboard-primary)",
           }}
         >
-          <BellRing className="h-9 w-9 text-cyan-200" />
+          <BellRing className="h-9 w-9" />
         </motion.div>
 
         {channels.map(
           (
-            item,
+            channel,
             index
           ) => {
             const Icon =
-              item.icon;
+              channel.icon;
 
             return (
               <motion.div
                 key={
-                  item.label
+                  channel.label
                 }
                 className={`absolute ${positions[index]} flex h-16 w-16 items-center justify-center rounded-2xl border ${
-                  item.active
-                    ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-200"
-                    : "border-white/10 bg-white/[0.05] text-blue-100/35"
+                  channel.active
+                    ? "border-emerald-300/30 bg-emerald-50 text-emerald-600"
+                    : "border-border bg-card text-muted-foreground/40"
                 }`}
                 animate={
-                  item.active
+                  channel.active
                     ? {
                         y: [
                           0,
@@ -3328,39 +4113,6 @@ function NotificationVisualizer({
           }
         )}
       </div>
-
-      <div className="grid grid-cols-3 gap-2">
-        {channels.map(
-          (
-            item
-          ) => (
-            <div
-              key={
-                item.label
-              }
-              className="rounded-xl border border-white/10 bg-white/[0.05] p-2 text-center"
-            >
-              <p className="text-[9px] text-blue-100/45">
-                {
-                  item.label
-                }
-              </p>
-
-              <p
-                className={`mt-1 text-[9px] font-black ${
-                  item.active
-                    ? "text-emerald-300"
-                    : "text-slate-400"
-                }`}
-              >
-                {item.active
-                  ? "ON"
-                  : "OFF"}
-              </p>
-            </div>
-          )
-        )}
-      </div>
     </div>
   );
 }
@@ -3377,14 +4129,15 @@ function PrivacySection({
 }: {
   draft: UserSettingsState;
   privacyScore: number;
-  setDraft: React.Dispatch<
-    React.SetStateAction<UserSettingsState>
+  setDraft: Dispatch<
+    SetStateAction<UserSettingsState>
   >;
   onOpenDetails: () => void;
 }) {
   const update =
     (
-      key: keyof UserSettingsState["privacy"],
+      key:
+        keyof UserSettingsState["privacy"],
       value: boolean
     ) => {
       setDraft(
@@ -3395,7 +4148,9 @@ function PrivacySection({
 
           privacy: {
             ...current.privacy,
-            [key]: value,
+
+            [key]:
+              value,
           },
         })
       );
@@ -3406,26 +4161,26 @@ function PrivacySection({
       <SectionHeader
         eyebrow="Privacy"
         title="Privacy Center"
-        description="Control visibility, analytics and personalization behaviour for your account."
-        icon={Lock}
+        description="Control profile visibility, analytics, personalization and transaction-name display."
+        icon={
+          Lock
+        }
+        indigo
       />
 
-      <div
-        className="grid items-start gap-6"
-        style={{
-          gridTemplateColumns:
-            "repeat(auto-fit, minmax(min(100%, 420px), 1fr))",
-        }}
-      >
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(340px,.9fr)]">
         <div className="rounded-[28px] border border-border bg-card p-5 shadow-sm sm:p-6">
           <ToggleRow
             label="Analytics Participation"
-            description="Allow anonymous usage analytics to improve the product."
+            description="Allow anonymous product analytics."
             enabled={
-              draft.privacy
+              draft
+                .privacy
                 .analytics
             }
-            onChange={(value) =>
+            onChange={(
+              value
+            ) =>
               update(
                 "analytics",
                 value
@@ -3433,56 +4188,65 @@ function PrivacySection({
             }
           />
 
-          <div className="mt-5 border-t border-border pt-5">
-            <ToggleRow
-              label="Profile Discoverability"
-              description="Allow supported transfer flows to find your account."
-              enabled={
-                draft.privacy
-                  .discoverability
-              }
-              onChange={(value) =>
-                update(
-                  "discoverability",
-                  value
-                )
-              }
-            />
-          </div>
+          <Divider />
 
-          <div className="mt-5 border-t border-border pt-5">
-            <ToggleRow
-              label="Personalization"
-              description="Allow the dashboard to tailor suggestions and layout preferences."
-              enabled={
-                draft.privacy
-                  .personalization
-              }
-              onChange={(value) =>
-                update(
-                  "personalization",
-                  value
-                )
-              }
-            />
-          </div>
+          <ToggleRow
+            label="Profile Discoverability"
+            description="Allow supported transfer flows to find your account."
+            enabled={
+              draft
+                .privacy
+                .discoverability
+            }
+            onChange={(
+              value
+            ) =>
+              update(
+                "discoverability",
+                value
+              )
+            }
+          />
 
-          <div className="mt-5 border-t border-border pt-5">
-            <ToggleRow
-              label="Show transaction counterparty names"
-              description="Display saved counterparty names in supported transaction views."
-              enabled={
-                draft.privacy
-                  .showTransactionNames
-              }
-              onChange={(value) =>
-                update(
-                  "showTransactionNames",
-                  value
-                )
-              }
-            />
-          </div>
+          <Divider />
+
+          <ToggleRow
+            label="Personalization"
+            description="Tailor suggestions and dashboard preferences."
+            enabled={
+              draft
+                .privacy
+                .personalization
+            }
+            onChange={(
+              value
+            ) =>
+              update(
+                "personalization",
+                value
+              )
+            }
+          />
+
+          <Divider />
+
+          <ToggleRow
+            label="Show transaction counterparty names"
+            description="Display saved names in supported transaction views."
+            enabled={
+              draft
+                .privacy
+                .showTransactionNames
+            }
+            onChange={(
+              value
+            ) =>
+              update(
+                "showTransactionNames",
+                value
+              )
+            }
+          />
 
           <button
             type="button"
@@ -3493,8 +4257,10 @@ function PrivacySection({
             style={{
               background:
                 "var(--dashboard-primary-soft)",
+
               borderColor:
                 "var(--border)",
+
               color:
                 "var(--dashboard-primary)",
             }}
@@ -3520,51 +4286,47 @@ function PrivacyShield({
   score: number;
 }) {
   return (
-    <div className="relative self-start overflow-hidden rounded-[28px] bg-[#0F2745] p-5 text-white shadow-[0_18px_50px_rgba(15,39,69,.14)]">
-      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-blue-100/50">
+    <div className="relative overflow-hidden rounded-[28px] border border-violet-300/10 bg-[linear-gradient(145deg,#0b0716,#18112f_55%,#45216f)] p-5 text-white shadow-[0_20px_55px_rgba(42,24,82,.18)]">
+      <div className="absolute -right-16 -top-16 h-44 w-44 rounded-full bg-violet-500/15 blur-3xl" />
+
+      <p className="relative z-10 text-[10px] font-black uppercase tracking-[0.14em] text-violet-100/50">
         Privacy Shield
       </p>
 
-      <div className="mt-8 flex justify-center">
+      <div className="relative z-10 mt-8 flex justify-center">
         <div className="relative flex h-44 w-44 items-center justify-center">
           <motion.div
-            className="absolute h-44 w-44 rounded-[40%] border border-cyan-300/15"
+            className="absolute h-44 w-44 rounded-[40%] border border-violet-300/15"
             animate={{
               rotate: 360,
             }}
             transition={{
-              duration: 18,
-              repeat: Infinity,
-              ease: "linear",
+              duration:
+                18,
+              repeat:
+                Infinity,
+              ease:
+                "linear",
             }}
           />
 
           <motion.div
-            className="absolute h-36 w-36 rounded-[38%] border border-blue-300/15"
+            className="absolute h-36 w-36 rounded-[38%] border border-indigo-300/15"
             animate={{
-              rotate: -360,
+              rotate:
+                -360,
             }}
             transition={{
-              duration: 14,
-              repeat: Infinity,
-              ease: "linear",
+              duration:
+                14,
+              repeat:
+                Infinity,
+              ease:
+                "linear",
             }}
           />
 
-          <motion.div
-            animate={{
-              scale: [
-                0.96,
-                1.04,
-                0.96,
-              ],
-            }}
-            transition={{
-              duration: 3.2,
-              repeat: Infinity,
-            }}
-            className="relative z-10 flex h-24 w-24 flex-col items-center justify-center rounded-[30px] border border-emerald-300/20 bg-emerald-300/10"
-          >
+          <div className="relative z-10 flex h-24 w-24 flex-col items-center justify-center rounded-[30px] border border-emerald-300/20 bg-emerald-300/10">
             <Lock className="h-8 w-8 text-emerald-300" />
 
             <span className="mt-1 text-sm font-black">
@@ -3572,13 +4334,13 @@ function PrivacyShield({
                 score
               }%
             </span>
-          </motion.div>
+          </div>
         </div>
       </div>
 
-      <p className="text-center text-xs leading-6 text-blue-100/60">
-        Privacy score reacts to your current analytics,
-        discoverability and visibility preferences.
+      <p className="relative z-10 text-center text-xs leading-6 text-violet-100/60">
+        Your score reacts to analytics, discoverability,
+        personalization and visibility settings.
       </p>
     </div>
   );
@@ -3594,8 +4356,8 @@ function AppearanceSection({
   onThemeChange,
 }: {
   draft: UserSettingsState;
-  setDraft: React.Dispatch<
-    React.SetStateAction<UserSettingsState>
+  setDraft: Dispatch<
+    SetStateAction<UserSettingsState>
   >;
   onThemeChange: (
     theme: ThemeMode
@@ -3606,52 +4368,43 @@ function AppearanceSection({
       <SectionHeader
         eyebrow="Experience"
         title="Appearance"
-        description="Customize your theme, dashboard density and motion preferences."
-        icon={Palette}
+        description="Switch visual themes instantly and control dashboard density and motion."
+        icon={
+          Palette
+        }
       />
 
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(340px,0.85fr)]">
-        <div className="min-w-0 rounded-[28px] border border-border bg-card p-5 shadow-sm transition-colors duration-300 sm:p-6">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.35fr)_minmax(340px,.85fr)]">
+        <div className="rounded-[28px] border border-border bg-card p-5 shadow-sm sm:p-6">
           <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
+            <div>
               <p className="text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
                 Color Theme
               </p>
 
               <h3 className="mt-1 text-lg font-black text-card-foreground">
-                Choose your experience
+                Choose your environment
               </h3>
 
               <p className="mt-1 max-w-xl text-xs leading-5 text-muted-foreground">
-                Select a visual environment that matches
-                your lighting, mood and viewing comfort.
+                Theme changes are applied immediately
+                through ThemeContext and persisted to the
+                backend.
               </p>
             </div>
 
-            <motion.div
-              animate={{
-                rotate: [
-                  0,
-                  8,
-                  -8,
-                  0,
-                ],
-              }}
-              transition={{
-                duration: 4,
-                repeat: Infinity,
-                ease: "easeInOut",
-              }}
+            <span
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
               style={{
                 background:
                   "var(--dashboard-primary-soft)",
+
                 color:
                   "var(--dashboard-primary)",
               }}
             >
               <Palette className="h-4 w-4" />
-            </motion.div>
+            </span>
           </div>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -3663,7 +4416,9 @@ function AppearanceSection({
                   themeOption.icon;
 
                 const active =
-                  draft.appearance.theme ===
+                  draft
+                    .appearance
+                    .theme ===
                   themeOption.id;
 
                 return (
@@ -3678,15 +4433,13 @@ function AppearanceSection({
                       )
                     }
                     whileHover={{
-                      y: -4,
+                      y: -3,
                     }}
                     whileTap={{
-                      scale: 0.985,
+                      scale:
+                        0.985,
                     }}
-                    aria-pressed={
-                      active
-                    }
-                    className="group relative overflow-hidden rounded-[20px] border p-3 text-left transition-all duration-300 focus:outline-none"
+                    className="group relative overflow-hidden rounded-[20px] border p-3 text-left transition"
                     style={{
                       background:
                         active
@@ -3697,11 +4450,6 @@ function AppearanceSection({
                         active
                           ? "var(--dashboard-primary)"
                           : "var(--border)",
-
-                      boxShadow:
-                        active
-                          ? "0 12px 30px rgba(15,23,42,.08)"
-                          : "none",
                     }}
                   >
                     <div
@@ -3716,98 +4464,34 @@ function AppearanceSection({
                       </div>
 
                       <div className="absolute bottom-3 left-3 right-3 grid grid-cols-2 gap-2">
-                        <div className="rounded-lg bg-white/65 p-2 shadow-sm">
+                        <div className="rounded-lg bg-white/65 p-2">
                           <div className="h-1.5 w-8 rounded-full bg-black/10" />
-
                           <div className="mt-1.5 h-2.5 w-12 rounded-full bg-black/15" />
-
                           <div className="mt-1.5 h-1.5 w-8 rounded-full bg-black/10" />
                         </div>
 
-                        <div className="rounded-lg bg-white/55 p-2 shadow-sm">
+                        <div className="rounded-lg bg-white/55 p-2">
                           <div className="h-1.5 w-7 rounded-full bg-black/10" />
-
                           <div className="mt-1.5 h-2.5 w-10 rounded-full bg-black/15" />
-
                           <div className="mt-1.5 h-1.5 w-7 rounded-full bg-black/10" />
                         </div>
                       </div>
 
-                      <AnimatePresence>
-                        {active && (
-                          <motion.div
-                            initial={{
-                              opacity: 0,
-                              scale: 0.65,
-                              rotate: -10,
+                      {active && (
+                        <div className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white shadow">
+                          <CheckCircle2
+                            className="h-4 w-4"
+                            style={{
+                              color:
+                                "var(--dashboard-primary)",
                             }}
-                            animate={{
-                              opacity: 1,
-                              scale: 1,
-                              rotate: 0,
-                            }}
-                            exit={{
-                              opacity: 0,
-                              scale: 0.7,
-                            }}
-                            transition={{
-                              type: "spring",
-                              stiffness: 380,
-                              damping: 22,
-                            }}
-                            className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white shadow-md"
-                          >
-                            <CheckCircle2
-                              className="h-4 w-4"
-                              style={{
-                                color:
-                                  "var(--dashboard-primary)",
-                              }}
-                            />
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-
-                      <motion.div
-                        className="pointer-events-none absolute inset-y-0 -left-1/2 w-1/3 rotate-12 bg-white/25 blur-md"
-                        animate={{
-                          x: [
-                            "-120%",
-                            "420%",
-                          ],
-                        }}
-                        transition={{
-                          duration: 3.8,
-                          repeat:
-                            Infinity,
-                          repeatDelay: 3,
-                          ease: "easeInOut",
-                        }}
-                      />
+                          />
+                        </div>
+                      )}
                     </div>
 
-                    <div className="mt-3 flex items-start gap-3">
-                      <motion.div
-                        animate={
-                          active
-                            ? {
-                                scale: [
-                                  1,
-                                  1.06,
-                                  1,
-                                ],
-                              }
-                            : {
-                                scale: 1,
-                              }
-                        }
-                        transition={{
-                          duration: 2.5,
-                          repeat:
-                            active
-                              ? Infinity
-                              : 0,
-                        }}
+                    <div className="mt-3 flex items-center gap-3">
+                      <span
                         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
                         style={{
                           background:
@@ -3822,106 +4506,37 @@ function AppearanceSection({
                         }}
                       >
                         <Icon className="h-4 w-4" />
-                      </motion.div>
+                      </span>
 
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-black text-card-foreground">
+                      <span className="min-w-0">
+                        <span className="block text-sm font-black text-card-foreground">
                           {
                             themeOption.label
                           }
-                        </p>
+                        </span>
 
-                        <p className="mt-0.5 text-[10px] leading-4 text-muted-foreground">
+                        <span className="mt-0.5 block text-[10px] text-muted-foreground">
                           {
                             themeOption.description
                           }
-                        </p>
-                      </div>
+                        </span>
+                      </span>
                     </div>
 
-                    <AnimatePresence>
-                      {active && (
-                        <motion.div
-                          initial={{
-                            scaleX: 0,
-                            opacity: 0,
-                          }}
-                          animate={{
-                            scaleX: 1,
-                            opacity: 1,
-                          }}
-                          exit={{
-                            scaleX: 0,
-                            opacity: 0,
-                          }}
-                          transition={{
-                            duration: 0.25,
-                          }}
-                          className="absolute bottom-0 left-4 right-4 h-[3px] origin-center rounded-full"
-                          style={{
-                            background:
-                              "var(--dashboard-primary)",
-                          }}
-                        />
-                      )}
-                    </AnimatePresence>
+                    {active && (
+                      <span
+                        className="absolute bottom-0 left-4 right-4 h-[3px] rounded-full"
+                        style={{
+                          background:
+                            "var(--dashboard-primary)",
+                        }}
+                      />
+                    )}
                   </motion.button>
                 );
               }
             )}
           </div>
-
-          <motion.div
-            layout
-            className="mt-6 rounded-2xl border border-border bg-muted/40 p-4"
-          >
-            <div className="flex items-center gap-3">
-              <motion.div
-                animate={{
-                  rotate: [
-                    0,
-                    12,
-                    -12,
-                    0,
-                  ],
-                }}
-                transition={{
-                  duration: 3,
-                  repeat: Infinity,
-                  repeatDelay: 1,
-                  ease: "easeInOut",
-                }}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
-                style={{
-                  background:
-                    "var(--dashboard-primary-soft)",
-                  color:
-                    "var(--dashboard-primary)",
-                }}
-              >
-                <Sparkles className="h-4 w-4" />
-              </motion.div>
-
-              <div className="min-w-0">
-                <p className="text-xs font-black text-card-foreground">
-                  {THEME_OPTIONS.find(
-                    (
-                      item
-                    ) =>
-                      item.id ===
-                      draft.appearance.theme
-                  )?.label ??
-                    "Light"}{" "}
-                  theme selected
-                </p>
-
-                <p className="mt-0.5 text-[10px] leading-4 text-muted-foreground">
-                  Theme changes are applied instantly across
-                  the dashboard.
-                </p>
-              </div>
-            </div>
-          </motion.div>
 
           <div className="mt-7 border-t border-border pt-6">
             <p className="text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
@@ -3939,21 +4554,17 @@ function AppearanceSection({
                   density
                 ) => {
                   const active =
-                    draft.appearance.density ===
+                    draft
+                      .appearance
+                      .density ===
                     density;
 
                   return (
-                    <motion.button
+                    <button
                       key={
                         density
                       }
                       type="button"
-                      whileHover={{
-                        y: -2,
-                      }}
-                      whileTap={{
-                        scale: 0.985,
-                      }}
                       onClick={() =>
                         setDraft(
                           (
@@ -3961,14 +4572,17 @@ function AppearanceSection({
                           ) => ({
                             ...current,
 
-                            appearance: {
-                              ...current.appearance,
-                              density,
-                            },
+                            appearance:
+                              {
+                                ...current
+                                  .appearance,
+
+                                density,
+                              },
                           })
                         )
                       }
-                      className="rounded-2xl border p-4 text-left transition-all"
+                      className="rounded-2xl border p-4 text-left transition"
                       style={{
                         background:
                           active
@@ -3981,7 +4595,7 @@ function AppearanceSection({
                             : "var(--border)",
                       }}
                     >
-                      <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center justify-between">
                         <div>
                           <p className="text-sm font-black text-card-foreground">
                             {density ===
@@ -4000,7 +4614,7 @@ function AppearanceSection({
 
                         {active && (
                           <CheckCircle2
-                            className="h-4 w-4 shrink-0"
+                            className="h-4 w-4"
                             style={{
                               color:
                                 "var(--dashboard-primary)",
@@ -4008,7 +4622,7 @@ function AppearanceSection({
                           />
                         )}
                       </div>
-                    </motion.button>
+                    </button>
                   );
                 }
               )}
@@ -4020,21 +4634,27 @@ function AppearanceSection({
               label="Reduce Motion"
               description="Use calmer interface transitions where supported."
               enabled={
-                draft.appearance
+                draft
+                  .appearance
                   .reduceMotion
               }
-              onChange={(value) =>
+              onChange={(
+                value
+              ) =>
                 setDraft(
                   (
                     current
                   ) => ({
                     ...current,
 
-                    appearance: {
-                      ...current.appearance,
-                      reduceMotion:
-                        value,
-                    },
+                    appearance:
+                      {
+                        ...current
+                          .appearance,
+
+                        reduceMotion:
+                          value,
+                      },
                   })
                 )
               }
@@ -4052,10 +4672,6 @@ function AppearanceSection({
   );
 }
 
-/* =========================================================
-   APPEARANCE PREVIEW
-========================================================= */
-
 function AppearancePreview({
   draft,
 }: {
@@ -4064,10 +4680,11 @@ function AppearancePreview({
   const currentTheme =
     THEME_OPTIONS.find(
       (
-        item
+        option
       ) =>
-        item.id ===
-        draft.appearance
+        option.id ===
+        draft
+          .appearance
           .theme
     );
 
@@ -4075,89 +4692,41 @@ function AppearancePreview({
     currentTheme?.icon ??
     Palette;
 
-  const isDark =
-    draft.appearance.theme ===
-    "dark";
-
   return (
-    <motion.div
-      layout
-      className="relative self-start overflow-hidden rounded-[28px] border border-border p-5 shadow-sm transition-colors duration-300"
-      style={{
-        background:
-          "var(--card)",
-
-        color:
-          "var(--card-foreground)",
-      }}
-    >
-      <motion.div
-        className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full blur-3xl"
-        animate={{
-          scale: [
-            0.9,
-            1.1,
-            0.9,
-          ],
-          opacity: [
-            0.2,
-            0.45,
-            0.2,
-          ],
-        }}
-        transition={{
-          duration: 4,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
+    <div className="relative overflow-hidden rounded-[28px] border border-border bg-card p-5 shadow-sm">
+      <div
+        className="absolute -right-16 -top-16 h-40 w-40 rounded-full blur-3xl"
         style={{
           background:
             "var(--dashboard-primary)",
+          opacity:
+            0.12,
         }}
       />
 
       <div className="relative z-10">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
-              Live Preview
-            </p>
+        <p className="text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+          Live Preview
+        </p>
 
-            <h3 className="mt-1 text-lg font-black text-card-foreground">
+        <div className="mt-1 flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-black text-card-foreground">
               {
-                currentTheme?.label ??
+                currentTheme?.label ||
                 "Light"
               }
             </h3>
 
             <p className="mt-1 text-xs text-muted-foreground">
               {
-                currentTheme?.description ??
-                "Clean and bright"
+                currentTheme?.description
               }
             </p>
           </div>
 
-          <motion.div
-            animate={{
-              rotate: [
-                0,
-                8,
-                -8,
-                0,
-              ],
-              scale: [
-                1,
-                1.05,
-                1,
-              ],
-            }}
-            transition={{
-              duration: 4,
-              repeat: Infinity,
-              ease: "easeInOut",
-            }}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+          <span
+            className="flex h-10 w-10 items-center justify-center rounded-xl"
             style={{
               background:
                 "var(--dashboard-primary-soft)",
@@ -4166,24 +4735,21 @@ function AppearancePreview({
             }}
           >
             <ThemeIcon className="h-4 w-4" />
-          </motion.div>
+          </span>
         </div>
 
-        <motion.div
-          layout
-          className="mt-6 overflow-hidden rounded-[24px] border p-3 transition-all duration-300"
+        <div
+          className="mt-6 rounded-[24px] border p-3"
           style={{
             background:
               "var(--dashboard-surface-soft)",
-
             borderColor:
               "var(--border)",
           }}
         >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <motion.div
-                layout
+              <div
                 className="h-8 w-8 rounded-lg"
                 style={{
                   background:
@@ -4192,38 +4758,18 @@ function AppearancePreview({
               />
 
               <div className="space-y-1.5">
-                <div
-                  className="h-2 w-20 rounded-full"
-                  style={{
-                    background:
-                      "var(--border)",
-                  }}
-                />
-
-                <div
-                  className="h-1.5 w-12 rounded-full"
-                  style={{
-                    background:
-                      "var(--muted)",
-                  }}
-                />
+                <div className="h-2 w-20 rounded-full bg-border" />
+                <div className="h-1.5 w-12 rounded-full bg-muted" />
               </div>
             </div>
 
-            <div
-              className="h-7 w-7 rounded-full border"
-              style={{
-                background:
-                  "var(--card)",
-                borderColor:
-                  "var(--border)",
-              }}
-            />
+            <div className="h-7 w-7 rounded-full border border-border bg-card" />
           </div>
 
           <div
             className={`mt-4 grid grid-cols-2 ${
-              draft.appearance
+              draft
+                .appearance
                 .density ===
               "compact"
                 ? "gap-2"
@@ -4231,114 +4777,31 @@ function AppearancePreview({
             }`}
           >
             {[
-              {
-                accent:
-                  "var(--dashboard-primary)",
-                label:
-                  "Balance",
-              },
-
-              {
-                accent:
-                  "var(--dashboard-success)",
-                label:
-                  "Income",
-              },
+              "Balance",
+              "Income",
             ].map(
               (
-                item
+                label
               ) => (
-                <motion.div
+                <div
                   key={
-                    item.label
+                    label
                   }
-                  layout
-                  className="rounded-xl border p-3"
-                  style={{
-                    background:
-                      "var(--card)",
-                    borderColor:
-                      "var(--border)",
-                  }}
+                  className="rounded-xl border border-border bg-card p-3"
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <div
-                      className="h-2 w-10 rounded-full"
-                      style={{
-                        background:
-                          item.accent,
-                        opacity:
-                          0.5,
-                      }}
-                    />
+                  <div className="h-2 w-10 rounded-full bg-[var(--dashboard-primary)] opacity-40" />
 
-                    <div
-                      className="h-4 w-4 rounded-md"
-                      style={{
-                        background:
-                          item.accent,
-                        opacity:
-                          0.12,
-                      }}
-                    />
-                  </div>
+                  <div className="mt-2 h-5 w-16 rounded-lg bg-[var(--dashboard-primary)] opacity-10" />
 
-                  <div
-                    className="mt-2 h-5 w-16 rounded-lg"
-                    style={{
-                      background:
-                        item.accent,
-                      opacity:
-                        0.12,
-                    }}
-                  />
-
-                  <div
-                    className="mt-2 h-1.5 w-12 rounded-full"
-                    style={{
-                      background:
-                        "var(--muted)",
-                    }}
-                  />
-                </motion.div>
+                  <div className="mt-2 h-1.5 w-12 rounded-full bg-muted" />
+                </div>
               )
             )}
           </div>
+        </div>
 
-          <div className="mt-3 flex items-center gap-2">
-            <div
-              className="h-2 flex-1 rounded-full"
-              style={{
-                background:
-                  "var(--muted)",
-              }}
-            />
-
-            <motion.div
-              animate={{
-                opacity: [
-                  0.7,
-                  1,
-                  0.7,
-                ],
-              }}
-              transition={{
-                duration: 2.5,
-                repeat:
-                  Infinity,
-              }}
-              className="h-7 w-16 rounded-lg"
-              style={{
-                background:
-                  "var(--dashboard-primary)",
-              }}
-            />
-          </div>
-        </motion.div>
-
-        <motion.div
-          layout
-          className="mt-4 flex items-center gap-2 rounded-xl border p-3"
+        <div
+          className="mt-4 rounded-xl border p-3"
           style={{
             background:
               "var(--dashboard-primary-soft)",
@@ -4346,73 +4809,26 @@ function AppearancePreview({
               "var(--border)",
           }}
         >
-          <CheckCircle2
-            className="h-4 w-4 shrink-0"
-            style={{
-              color:
-                "var(--dashboard-primary)",
-            }}
-          />
+          <div className="flex items-center gap-2">
+            <CheckCircle2
+              className="h-4 w-4"
+              style={{
+                color:
+                  "var(--dashboard-primary)",
+              }}
+            />
 
-          <div className="min-w-0">
             <p className="text-[10px] font-black text-card-foreground">
               {
-                currentTheme?.label ??
+                currentTheme?.label ||
                 "Light"
               }{" "}
-              theme is active
-            </p>
-
-            <p className="mt-0.5 text-[9px] leading-4 text-muted-foreground">
-              {isDark
-                ? "Designed for comfortable low-light viewing."
-                : "Your selected visual theme is active across the dashboard."}
+              theme selected
             </p>
           </div>
-        </motion.div>
-
-        <div className="mt-4 flex items-center gap-2">
-          {THEME_OPTIONS.map(
-            (
-              item
-            ) => {
-              const active =
-                item.id ===
-                draft.appearance.theme;
-
-              return (
-                <motion.div
-                  key={
-                    item.id
-                  }
-                  animate={{
-                    scale:
-                      active
-                        ? 1
-                        : 0.92,
-
-                    opacity:
-                      active
-                        ? 1
-                        : 0.45,
-                  }}
-                  transition={{
-                    duration: 0.2,
-                  }}
-                  className="h-2 flex-1 rounded-full"
-                  style={{
-                    background:
-                      active
-                        ? "var(--dashboard-primary)"
-                        : "var(--border)",
-                  }}
-                />
-              );
-            }
-          )}
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -4423,31 +4839,49 @@ function AppearancePreview({
 function WalletSection({
   draft,
   setDraft,
+  wallet,
 }: {
   draft: UserSettingsState;
-  setDraft: React.Dispatch<
-    React.SetStateAction<UserSettingsState>
+  setDraft: Dispatch<
+    SetStateAction<UserSettingsState>
   >;
+  wallet: SettingsWallet | null;
 }) {
   return (
     <div className="space-y-6">
       <SectionHeader
         eyebrow="Wallet"
-        title="Wallet Preferences"
-        description="Control balance display, default currency and confirmation behaviour."
+        title="Wallet Performance"
+        description="Review your live wallet snapshot and control balance display and transfer confirmation behaviour."
         icon={
           WalletCards
         }
+        indigo
       />
 
-      <div
-        className="grid items-start gap-6"
-        style={{
-          gridTemplateColumns:
-            "repeat(auto-fit, minmax(min(100%, 420px), 1fr))",
-        }}
-      >
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.05fr)_minmax(340px,.95fr)]">
         <div className="rounded-[28px] border border-border bg-card p-5 shadow-sm sm:p-6">
+          {wallet && (
+            <div className="mb-6 grid gap-3 sm:grid-cols-2">
+              <WalletMetric
+                title="Live Balance"
+                value={`৳${Number(
+                  wallet.balance
+                ).toLocaleString(
+                  "en-BD"
+                )}`}
+              />
+
+              <WalletMetric
+                title="Wallet Status"
+                value={
+                  wallet.status ||
+                  "Active"
+                }
+              />
+            </div>
+          )}
+
           <label className="mb-2 block text-xs font-black text-card-foreground">
             Default Currency
           </label>
@@ -4457,7 +4891,9 @@ function WalletSection({
               draft.wallet
                 .defaultCurrency
             }
-            onChange={(event) =>
+            onChange={(
+              event
+            ) =>
               setDraft(
                 (
                   current
@@ -4468,7 +4904,9 @@ function WalletSection({
                     ...current.wallet,
 
                     defaultCurrency:
-                      event.target.value as
+                      event
+                        .target
+                        .value as
                         | "BDT"
                         | "USD"
                         | "EUR",
@@ -4476,7 +4914,7 @@ function WalletSection({
                 })
               )
             }
-            className="h-12 w-full rounded-xl border border-border bg-muted/40 px-4 text-sm font-semibold text-foreground outline-none"
+            className="h-12 w-full rounded-xl border border-border bg-muted/40 px-4 text-sm font-semibold text-foreground outline-none focus:border-[var(--dashboard-primary)]"
           >
             <option value="BDT">
               BDT — Bangladeshi Taka
@@ -4491,86 +4929,101 @@ function WalletSection({
             </option>
           </select>
 
-          <div className="mt-6 border-t border-border pt-5">
-            <ToggleRow
-              label="Hide balances on launch"
-              description="Mask wallet amounts until you explicitly reveal them."
-              enabled={
-                draft.wallet
-                  .hideAmounts
-              }
-              onChange={(value) =>
-                setDraft(
-                  (
-                    current
-                  ) => ({
-                    ...current,
+          <Divider />
 
-                    wallet: {
-                      ...current.wallet,
-                      hideAmounts:
-                        value,
-                    },
-                  })
-                )
-              }
-            />
-          </div>
+          <ToggleRow
+            label="Hide balances on launch"
+            description="Mask wallet amounts until explicitly revealed."
+            enabled={
+              draft.wallet
+                .hideAmounts
+            }
+            onChange={(
+              value
+            ) =>
+              setDraft(
+                (
+                  current
+                ) => ({
+                  ...current,
 
-          <div className="mt-6 border-t border-border pt-5">
-            <ToggleRow
-              label="Require transfer confirmation"
-              description="Ask for confirmation before supported wallet transfer actions."
-              enabled={
-                draft.wallet
-                  .requireConfirmation
-              }
-              onChange={(value) =>
-                setDraft(
-                  (
-                    current
-                  ) => ({
-                    ...current,
+                  wallet: {
+                    ...current.wallet,
 
-                    wallet: {
-                      ...current.wallet,
-                      requireConfirmation:
-                        value,
-                    },
-                  })
-                )
-              }
-            />
-          </div>
+                    hideAmounts:
+                      value,
+                  },
+                })
+              )
+            }
+          />
 
-          <div className="mt-6 border-t border-border pt-5">
-            <RangeField
-              label="Large transfer confirmation"
-              description="Use an extra confirmation above this amount."
-              value={
-                draft.wallet
-                  .confirmThreshold
-              }
-              min={1000}
-              max={50000}
-              step={1000}
-              onChange={(value) =>
-                setDraft(
-                  (
-                    current
-                  ) => ({
-                    ...current,
+          <Divider />
 
-                    wallet: {
-                      ...current.wallet,
-                      confirmThreshold:
-                        value,
-                    },
-                  })
-                )
-              }
-            />
-          </div>
+          <ToggleRow
+            label="Require transfer confirmation"
+            description="Ask for confirmation before supported transfers."
+            enabled={
+              draft.wallet
+                .requireConfirmation
+            }
+            onChange={(
+              value
+            ) =>
+              setDraft(
+                (
+                  current
+                ) => ({
+                  ...current,
+
+                  wallet: {
+                    ...current.wallet,
+
+                    requireConfirmation:
+                      value,
+                  },
+                })
+              )
+            }
+          />
+
+          <Divider />
+
+          <RangeField
+            label="Large transfer confirmation"
+            description="Require stronger confirmation above this amount."
+            value={
+              draft.wallet
+                .confirmThreshold
+            }
+            min={
+              1000
+            }
+            max={
+              50000
+            }
+            step={
+              1000
+            }
+            onChange={(
+              value
+            ) =>
+              setDraft(
+                (
+                  current
+                ) => ({
+                  ...current,
+
+                  wallet: {
+                    ...current.wallet,
+
+                    confirmThreshold:
+                      value,
+                  },
+                })
+              )
+            }
+          />
         </div>
 
         <WalletVisualizer
@@ -4579,6 +5032,30 @@ function WalletSection({
           }
         />
       </div>
+    </div>
+  );
+}
+
+function WalletMetric({
+  title,
+  value,
+}: {
+  title: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-border bg-muted/40 p-4">
+      <p className="text-[9px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+        {
+          title
+        }
+      </p>
+
+      <p className="mt-2 text-xl font-black text-card-foreground">
+        {
+          value
+        }
+      </p>
     </div>
   );
 }
@@ -4600,55 +5077,53 @@ function WalletVisualizer({
         : "€";
 
   return (
-    <div className="relative self-start overflow-hidden rounded-[28px] bg-[linear-gradient(155deg,#0F2745,#154d7a)] p-5 text-white shadow-[0_18px_50px_rgba(15,39,69,.14)]">
-      <p className="text-[10px] font-black uppercase tracking-[0.14em] text-blue-100/50">
+    <div className="relative overflow-hidden rounded-[28px] border border-violet-300/10 bg-[linear-gradient(145deg,#0b0716,#18112f_55%,#45216f)] p-5 text-white shadow-[0_20px_55px_rgba(42,24,82,.18)]">
+      <div className="absolute -right-16 -top-16 h-44 w-44 rounded-full bg-violet-400/15 blur-3xl" />
+
+      <p className="relative z-10 text-[10px] font-black uppercase tracking-[0.14em] text-violet-100/50">
         Wallet Guard
       </p>
 
-      <div className="mt-7 flex justify-center">
-        <div className="relative flex h-52 w-52 items-center justify-center">
+      <div className="relative z-10 mt-6 flex justify-center">
+        <div className="relative flex h-48 w-48 items-center justify-center">
           <motion.div
-            className="absolute h-44 w-44 rounded-full border border-cyan-300/15"
+            className="absolute h-44 w-44 rounded-full border border-violet-300/15"
             animate={{
               rotate: 360,
             }}
             transition={{
-              duration: 18,
-              repeat: Infinity,
-              ease: "linear",
+              duration:
+                18,
+              repeat:
+                Infinity,
+              ease:
+                "linear",
             }}
           />
 
           <motion.div
-            className="absolute h-36 w-36 rounded-full border border-blue-300/15"
+            className="absolute h-36 w-36 rounded-full border border-indigo-300/15"
             animate={{
-              rotate: -360,
+              rotate:
+                -360,
             }}
             transition={{
-              duration: 14,
-              repeat: Infinity,
-              ease: "linear",
+              duration:
+                14,
+              repeat:
+                Infinity,
+              ease:
+                "linear",
             }}
           />
 
-          <motion.div
-            animate={{
-              scale: [
-                0.97,
-                1.04,
-                0.97,
-              ],
-            }}
-            transition={{
-              duration: 3,
-              repeat: Infinity,
-            }}
-            className="relative z-10 flex h-24 w-24 flex-col items-center justify-center rounded-[30px] border border-cyan-300/20 bg-cyan-300/10"
-          >
+          <div className="relative z-10 flex h-24 w-24 flex-col items-center justify-center rounded-[30px] border border-cyan-300/20 bg-cyan-300/10">
             <WalletCards className="h-8 w-8 text-cyan-200" />
 
             <span className="mt-1 text-sm font-black">
-              {symbol}
+              {
+                symbol
+              }
               {Math.round(
                 draft.wallet
                   .confirmThreshold /
@@ -4656,11 +5131,11 @@ function WalletVisualizer({
               )}
               k
             </span>
-          </motion.div>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="relative z-10 grid grid-cols-2 gap-2">
         <WalletState
           label="Balance Mask"
           active={
@@ -4670,7 +5145,7 @@ function WalletVisualizer({
         />
 
         <WalletState
-          label="Confirm"
+          label="Transfer Confirm"
           active={
             draft.wallet
               .requireConfirmation
@@ -4690,7 +5165,7 @@ function WalletState({
 }) {
   return (
     <div className="rounded-xl border border-white/10 bg-white/[0.05] p-3 text-center">
-      <p className="text-[9px] text-blue-100/45">
+      <p className="text-[9px] text-violet-100/45">
         {
           label
         }
@@ -4703,9 +5178,11 @@ function WalletState({
             : "text-slate-400"
         }`}
       >
-        {active
-          ? "ON"
-          : "OFF"}
+        {
+          active
+            ? "ON"
+            : "OFF"
+        }
       </p>
     </div>
   );
@@ -4720,42 +5197,51 @@ function DataSection({
 }: {
   onOpenExport: () => void;
 }) {
-  const cards = [
-    {
-      title: "Account Data",
-      description:
-        "Profile and personal settings.",
-      icon: UserRound,
-    },
+  const cards =
+    [
+      {
+        title:
+          "Account Data",
+        description:
+          "Profile and identity information.",
+        icon:
+          UserRound,
+      },
 
-    {
-      title: "Transaction History",
-      description:
-        "Wallet transaction records.",
-      icon: Activity,
-    },
+      {
+        title:
+          "Transaction History",
+        description:
+          "Wallet activity and transaction records.",
+        icon:
+          Activity,
+      },
 
-    {
-      title: "Financial Reports",
-      description:
-        "Budget and cash-flow summaries.",
-      icon: Gauge,
-    },
+      {
+        title:
+          "Financial Preferences",
+        description:
+          "Wallet, privacy and notification settings.",
+        icon:
+          Gauge,
+      },
 
-    {
-      title: "Receipt Archive",
-      description:
-        "Saved receipt metadata.",
-      icon: Database,
-    },
-  ];
+      {
+        title:
+          "Receipt Data",
+        description:
+          "Receipt-related account data where included by the backend.",
+        icon:
+          Database,
+      },
+    ];
 
   return (
     <div className="space-y-6">
       <SectionHeader
         eyebrow="Your Data"
         title="Data & Export"
-        description="Prepare account information for download or future backend export workflows."
+        description="Request your authenticated account export and download the returned data as JSON or CSV."
         icon={
           Database
         }
@@ -4781,7 +5267,7 @@ function DataSection({
                 }
                 initial={{
                   opacity: 0,
-                  y: 10,
+                  y: 8,
                 }}
                 animate={{
                   opacity: 1,
@@ -4793,21 +5279,22 @@ function DataSection({
                     0.05,
                 }}
                 whileHover={{
-                  y: -4,
+                  y: -3,
                 }}
                 className="rounded-[24px] border border-border bg-card p-5 text-left shadow-sm"
               >
-                <div
+                <span
                   className="flex h-11 w-11 items-center justify-center rounded-xl"
                   style={{
                     background:
                       "var(--dashboard-primary-soft)",
+
                     color:
                       "var(--dashboard-primary)",
                   }}
                 >
                   <Icon className="h-5 w-5" />
-                </div>
+                </span>
 
                 <h3 className="mt-5 text-sm font-black text-card-foreground">
                   {
@@ -4828,7 +5315,7 @@ function DataSection({
                       "var(--dashboard-primary)",
                   }}
                 >
-                  Configure Export
+                  Open Export Center
                   <ChevronRight className="h-3.5 w-3.5" />
                 </span>
               </motion.button>
@@ -4837,18 +5324,11 @@ function DataSection({
         )}
       </div>
 
-      <div
-        className="rounded-[24px] border p-4"
-        style={{
-          background:
-            "var(--dashboard-primary-soft)",
-          borderColor:
-            "var(--border)",
-        }}
-      >
-        <p className="text-xs leading-5 text-foreground">
-          The JSON/CSV download on this page exports
-          the current frontend settings state only.
+      <div className="rounded-[24px] border border-border bg-muted/30 p-4">
+        <p className="text-xs leading-5 text-muted-foreground">
+          The server endpoint provides the authenticated
+          export payload. The browser formats that payload
+          into JSON or CSV.
         </p>
       </div>
     </div>
@@ -4871,47 +5351,36 @@ function DangerSection({
       <SectionHeader
         eyebrow="Sensitive Actions"
         title="Danger Zone"
-        description="Sensitive account actions use a separate verification flow."
+        description="These controls can affect account authentication or permanently remove account data."
         icon={
           AlertTriangle
         }
         danger
       />
 
-      <div className="relative overflow-hidden rounded-[30px] border border-[#183d65] bg-[linear-gradient(145deg,#091a2d_0%,#0f2b49_54%,#123d63_100%)] p-5 text-white shadow-[0_24px_70px_rgba(15,39,69,.2)] sm:p-7">
-        <div className="relative z-10 grid items-center gap-7 lg:grid-cols-[220px_minmax(0,1fr)]">
-          <div className="mx-auto flex w-full max-w-[220px] flex-col items-center rounded-[24px] border border-white/10 bg-white/[0.045] p-5 text-center">
-            <motion.div
-              animate={{
-                scale: [
-                  0.96,
-                  1.05,
-                  0.96,
-                ],
-              }}
-              transition={{
-                duration: 3,
-                repeat:
-                  Infinity,
-              }}
-              className="flex h-20 w-20 items-center justify-center rounded-[28px] bg-cyan-300/10"
-            >
-              <ShieldAlert className="h-8 w-8 text-cyan-200" />
-            </motion.div>
+      <div className="relative overflow-hidden rounded-[30px] border border-rose-300/10 bg-[linear-gradient(145deg,#170b16,#27101f_55%,#35172b)] p-5 text-white shadow-[0_24px_70px_rgba(127,29,29,.16)] sm:p-7">
+        <div className="absolute -right-24 -top-24 h-64 w-64 rounded-full bg-rose-500/10 blur-3xl" />
 
-            <p className="mt-4 text-[9px] font-black uppercase tracking-[0.16em] text-cyan-100/55">
-              Verification Gate
+        <div className="relative z-10 grid gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+          <div className="flex flex-col items-center justify-center rounded-[24px] border border-white/10 bg-white/[0.04] p-5 text-center">
+            <div className="flex h-20 w-20 items-center justify-center rounded-[28px] bg-rose-300/10 text-rose-200">
+              <ShieldAlert className="h-8 w-8" />
+            </div>
+
+            <p className="mt-4 text-[9px] font-black uppercase tracking-[0.16em] text-rose-100/50">
+              Protected Actions
             </p>
           </div>
 
-          <div className="min-w-0">
+          <div>
             <h3 className="text-lg font-black">
               Account protection checkpoint
             </h3>
 
-            <p className="mt-1 max-w-2xl text-xs leading-6 text-blue-100/55">
-              Signing out other devices and account deletion
-              require explicit confirmation.
+            <p className="mt-1 max-w-2xl text-xs leading-6 text-rose-100/55">
+              Logging out other devices is reversible.
+              Deleting your account is permanent and requires
+              your password.
             </p>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -4920,7 +5389,7 @@ function DangerSection({
                   LogOut
                 }
                 title="Log out other devices"
-                description="Revoke every other active account session."
+                description="Revoke all other active sessions."
                 status="Security action"
                 tone="blue"
                 onClick={() =>
@@ -4935,7 +5404,7 @@ function DangerSection({
                   Trash2
                 }
                 title="Delete account"
-                description="Begin the permanent deletion workflow."
+                description="Start the permanent deletion workflow."
                 status="Permanent action"
                 tone="rose"
                 onClick={() =>
@@ -4970,7 +5439,8 @@ function DangerActionCard({
   onClick: () => void;
 }) {
   const destructive =
-    tone === "rose";
+    tone ===
+    "rose";
 
   return (
     <motion.button
@@ -4979,42 +5449,42 @@ function DangerActionCard({
         onClick
       }
       whileHover={{
-        y: -4,
-        scale: 1.01,
+        y: -3,
       }}
       whileTap={{
-        scale: 0.985,
+        scale:
+          0.985,
       }}
-      className={`group relative overflow-hidden rounded-[20px] border p-4 text-left ${
+      className={`rounded-[20px] border p-4 text-left ${
         destructive
           ? "border-rose-300/20 bg-rose-400/[0.07]"
-          : "border-cyan-300/15 bg-cyan-300/[0.055]"
+          : "border-violet-300/15 bg-violet-300/[0.055]"
       }`}
     >
-      <div
+      <span
         className={`flex h-10 w-10 items-center justify-center rounded-xl ${
           destructive
             ? "bg-rose-400/15 text-rose-200"
-            : "bg-cyan-300/10 text-cyan-200"
+            : "bg-violet-300/10 text-violet-200"
         }`}
       >
         <Icon className="h-4 w-4" />
-      </div>
+      </span>
 
-      <p className="mt-4 text-sm font-black text-white">
+      <p className="mt-4 text-sm font-black">
         {
           title
         }
       </p>
 
-      <p className="mt-1 text-[10px] leading-5 text-blue-100/55">
+      <p className="mt-1 text-[10px] leading-5 text-rose-100/55">
         {
           description
         }
       </p>
 
       <div className="mt-4 border-t border-white/10 pt-3">
-        <span className="text-[9px] font-black uppercase tracking-[0.1em] text-cyan-100/65">
+        <span className="text-[9px] font-black uppercase tracking-[0.1em] text-violet-100/65">
           {
             status
           }
@@ -5025,7 +5495,7 @@ function DangerActionCard({
 }
 
 /* =========================================================
-   SETTINGS DRAWER
+   DRAWER
 ========================================================= */
 
 function SettingsDrawer({
@@ -5038,7 +5508,6 @@ function SettingsDrawer({
   onClose,
   onExport,
   onReloadSessions,
-  onLogoutSession,
   onLogoutOthers,
 }: {
   type: Exclude<
@@ -5046,13 +5515,17 @@ function SettingsDrawer({
     null
   >;
 
-  privacyScore: number;
+  privacyScore:
+    number;
 
-  sessions: SessionItem[];
+  sessions:
+    SessionView[];
 
-  sessionsLoading: boolean;
+  sessionsLoading:
+    boolean;
 
-  sessionsError: string;
+  sessionsError:
+    string;
 
   sessionActionLoading:
     | string
@@ -5066,22 +5539,12 @@ function SettingsDrawer({
       | "csv"
   ) => void;
 
-  onReloadSessions: () => void;
+  onReloadSessions:
+    () => void;
 
-  onLogoutSession: (
-    sessionId: string
-  ) => void;
-
-  onLogoutOthers: () => void;
+  onLogoutOthers:
+    () => void;
 }) {
-  const hasOtherSessions =
-    sessions.some(
-      (
-        session
-      ) =>
-        !session.current
-    );
-
   return (
     <>
       <motion.button
@@ -5099,7 +5562,7 @@ function SettingsDrawer({
         onClick={
           onClose
         }
-        className="fixed inset-0 z-[80] bg-slate-950/25 backdrop-blur-sm"
+        className="fixed inset-0 z-[80] bg-slate-950/45 backdrop-blur-sm"
       />
 
       <motion.aside
@@ -5113,13 +5576,16 @@ function SettingsDrawer({
           x: "100%",
         }}
         transition={{
-          type: "spring",
-          stiffness: 240,
-          damping: 28,
+          type:
+            "spring",
+          stiffness:
+            240,
+          damping:
+            28,
         }}
         className="fixed bottom-0 right-0 top-0 z-[90] flex w-full max-w-[560px] flex-col border-l border-border bg-card shadow-2xl"
       >
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur-xl">
+        <div className="flex items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur-xl">
           <div>
             <p className="text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">
               Personal Drawer
@@ -5147,8 +5613,7 @@ function SettingsDrawer({
                 disabled={
                   sessionsLoading
                 }
-                aria-label="Refresh sessions"
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground transition hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground hover:bg-muted/70 disabled:opacity-50"
               >
                 <RefreshCw
                   className={`h-4 w-4 ${
@@ -5165,17 +5630,18 @@ function SettingsDrawer({
               onClick={
                 onClose
               }
-              className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground transition hover:bg-muted/80"
+              className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground hover:bg-muted/70"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="flex-1 overflow-y-auto p-5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {type ===
             "sessions" && (
             <div className="space-y-4">
+
               {sessionsLoading && (
                 <div className="space-y-3">
                   {[1, 2, 3].map(
@@ -5188,14 +5654,12 @@ function SettingsDrawer({
                         }
                         className="animate-pulse rounded-2xl border border-border p-4"
                       >
-                        <div className="flex items-start gap-3">
+                        <div className="flex gap-3">
                           <div className="h-11 w-11 rounded-xl bg-muted" />
 
                           <div className="flex-1 space-y-2">
                             <div className="h-4 w-40 rounded bg-muted" />
-
                             <div className="h-3 w-28 rounded bg-muted" />
-
                             <div className="h-3 w-48 rounded bg-muted" />
                           </div>
                         </div>
@@ -5207,38 +5671,34 @@ function SettingsDrawer({
 
               {!sessionsLoading &&
                 sessionsError && (
-                  <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5">
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-600">
-                        <AlertTriangle className="h-5 w-5" />
-                      </div>
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5">
+                  <div className="flex gap-3">
+                    <AlertTriangle className="h-5 w-5 shrink-0 text-rose-600" />
 
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-black text-rose-800">
-                          Could not load sessions
-                        </p>
+                    <div className="min-w-0">
+                      <p className="text-sm font-black text-rose-800">
+                        Could not load sessions
+                      </p>
 
-                        <p className="mt-1 text-xs leading-5 text-rose-700">
-                          {
-                            sessionsError
-                          }
-                        </p>
+                      <p className="mt-1 text-xs leading-5 text-rose-700">
+                        {
+                          sessionsError
+                        }
+                      </p>
 
-                        <button
-                          type="button"
-                          onClick={
-                            onReloadSessions
-                          }
-                          className="mt-3 inline-flex items-center gap-2 rounded-xl bg-rose-600 px-3 py-2 text-xs font-black text-white transition hover:bg-rose-700"
-                        >
-                          <RefreshCw className="h-3.5 w-3.5" />
-
-                          Try again
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={
+                          onReloadSessions
+                        }
+                        className="mt-3 rounded-xl bg-rose-600 px-3 py-2 text-xs font-black text-white"
+                      >
+                        Try Again
+                      </button>
                     </div>
                   </div>
-                )}
+                </div>
+              )}
 
               {!sessionsLoading &&
                 !sessionsError &&
@@ -5249,10 +5709,6 @@ function SettingsDrawer({
 
                     <p className="mt-4 text-sm font-black text-card-foreground">
                       No active sessions
-                    </p>
-
-                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      No active device sessions were found for your account.
                     </p>
                   </div>
                 )}
@@ -5280,7 +5736,12 @@ function SettingsDrawer({
                         </p>
                       </div>
 
-                      {hasOtherSessions && (
+                      {sessions.some(
+                        (
+                          session
+                        ) =>
+                          !session.current
+                      ) && (
                         <button
                           type="button"
                           onClick={
@@ -5288,21 +5749,15 @@ function SettingsDrawer({
                           }
                           disabled={
                             sessionActionLoading ===
-                            "others"
+                            "logout-all"
                           }
-                          className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[10px] font-black text-rose-600 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[10px] font-black text-rose-600 disabled:opacity-50"
                         >
-                          {sessionActionLoading ===
-                          "others" ? (
-                            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                          ) : (
-                            <LogOut className="h-3.5 w-3.5" />
-                          )}
-
-                          {sessionActionLoading ===
-                          "others"
-                            ? "Signing out..."
-                            : "Sign out others"}
+                          {
+                            sessionActionLoading ===
+                            "logout-all"
+                              ? "Signing out..."
+                              : "Sign out others"}
                         </button>
                       )}
                     </div>
@@ -5313,49 +5768,30 @@ function SettingsDrawer({
                           session
                         ) => {
                           const Icon =
-                            session.icon;
+                            getSessionIcon(
+                              session.device
+                            );
 
                           return (
-                            <motion.div
+                            <div
                               key={
                                 session.id
                               }
-                              layout
-                              initial={{
-                                opacity: 0,
-                                y: 8,
-                              }}
-                              animate={{
-                                opacity: 1,
-                                y: 0,
-                              }}
-                              exit={{
-                                opacity: 0,
-                                x: 20,
-                              }}
-                              className={`rounded-2xl border p-4 transition ${
-                                session.current
-                                  ? "border-cyan-200 bg-cyan-50/50"
-                                  : "border-border bg-card"
-                              }`}
+                              className="rounded-2xl border border-border bg-card p-4"
                             >
                               <div className="flex items-start gap-3">
-                                <div
+                                <span
                                   className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
                                   style={{
                                     background:
-                                      session.current
-                                        ? "var(--dashboard-primary-soft)"
-                                        : "var(--muted)",
+                                      "var(--dashboard-primary-soft)",
 
                                     color:
-                                      session.current
-                                        ? "var(--dashboard-primary)"
-                                        : "var(--muted-foreground)",
+                                      "var(--dashboard-primary)",
                                   }}
                                 >
                                   <Icon className="h-5 w-5" />
-                                </div>
+                                </span>
 
                                 <div className="min-w-0 flex-1">
                                   <div className="flex flex-wrap items-center gap-2">
@@ -5374,100 +5810,49 @@ function SettingsDrawer({
 
                                   <p className="mt-1 text-xs text-muted-foreground">
                                     {
-                                      session.browser
-                                    }{" "}
-                                    on{" "}
-                                    {
-                                      session.os
+                                      session.location ||
+                                      "Unknown location"
                                     }
                                   </p>
 
-                                  <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
-                                    <span>
+                                  {session.ip && (
+                                    <p className="mt-1 text-[10px] text-muted-foreground">
                                       {
-                                        session.location
+                                        session.ip
                                       }
-                                    </span>
-
-                                    {session.maskedIp && (
-                                      <>
-                                        <span className="text-muted-foreground/40">
-                                          •
-                                        </span>
-
-                                        <span>
-                                          {
-                                            session.maskedIp
-                                          }
-                                        </span>
-                                      </>
-                                    )}
-                                  </div>
+                                    </p>
+                                  )}
 
                                   <p className="mt-2 text-[10px] font-semibold text-muted-foreground">
                                     Last active{" "}
                                     {formatRelativeTime(
-                                      session.lastActiveAt
+                                      session.lastActive
                                     )}
                                   </p>
                                 </div>
-
-                                {!session.current && (
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      onLogoutSession(
-                                        session.id
-                                      )
-                                    }
-                                    disabled={
-                                      sessionActionLoading ===
-                                      session.id
-                                    }
-                                    className="shrink-0 rounded-xl px-3 py-2 text-[10px] font-black text-rose-500 transition hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
-                                  >
-                                    {sessionActionLoading ===
-                                    session.id ? (
-                                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                                    ) : (
-                                      "Sign out"
-                                    )}
-                                  </button>
-                                )}
                               </div>
-                            </motion.div>
+                            </div>
                           );
                         }
                       )}
                     </div>
                   </>
                 )}
-
-              <div className="rounded-2xl border border-cyan-100 bg-cyan-50/60 p-4">
-                <div className="flex items-start gap-3">
-                  <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-cyan-600" />
-
-                  <p className="text-[10px] leading-5 text-cyan-800">
-                    Sessions are tied to server-side authentication records. Signing out a device immediately revokes its session.
-                  </p>
-                </div>
-              </div>
             </div>
           )}
 
           {type ===
             "privacy" && (
             <div className="space-y-5">
-              <div className="rounded-[24px] bg-[#0F2745] p-5 text-white">
-                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-blue-100/50">
+              <div className="rounded-[24px] bg-[linear-gradient(145deg,#0b0716,#18112f_55%,#45216f)] p-5 text-white">
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-violet-100/50">
                   Privacy Score
                 </p>
 
                 <p className="mt-2 text-4xl font-black">
                   {
                     privacyScore
-                  }
-                  %
+                  }%
                 </p>
               </div>
 
@@ -5497,66 +5882,94 @@ function SettingsDrawer({
           {type ===
             "export" && (
             <div className="space-y-4">
-              <button
-                type="button"
+              <ExportCard
+                icon={
+                  FileJson
+                }
+                title="JSON Export"
+                description="Download the backend-generated account export as JSON."
                 onClick={() =>
                   onExport(
                     "json"
                   )
                 }
-                className="flex w-full items-center gap-4 rounded-[22px] border border-border p-4 text-left transition hover:bg-muted/50"
-              >
-                <div
-                  className="flex h-11 w-11 items-center justify-center rounded-xl"
-                  style={{
-                    background:
-                      "var(--dashboard-primary-soft)",
-                    color:
-                      "var(--dashboard-primary)",
-                  }}
-                >
-                  <FileJson className="h-5 w-5" />
-                </div>
+              />
 
-                <div>
-                  <p className="text-sm font-black text-card-foreground">
-                    JSON Export
-                  </p>
-
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Download current settings state.
-                  </p>
-                </div>
-              </button>
-
-              <button
-                type="button"
+              <ExportCard
+                icon={
+                  FileSpreadsheet
+                }
+                title="CSV Export"
+                description="Download the same backend data as a spreadsheet-friendly CSV."
                 onClick={() =>
                   onExport(
                     "csv"
                   )
                 }
-                className="flex w-full items-center gap-4 rounded-[22px] border border-border p-4 text-left transition hover:bg-muted/50"
-              >
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-                  <FileSpreadsheet className="h-5 w-5" />
-                </div>
-
-                <div>
-                  <p className="text-sm font-black text-card-foreground">
-                    CSV Export
-                  </p>
-
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Download a simple settings spreadsheet file.
-                  </p>
-                </div>
-              </button>
+                green
+              />
             </div>
           )}
         </div>
       </motion.aside>
     </>
+  );
+}
+
+function ExportCard({
+  icon: Icon,
+  title,
+  description,
+  onClick,
+  green = false,
+}: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  onClick: () => void;
+  green?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={
+        onClick
+      }
+      className="flex w-full items-center gap-4 rounded-[22px] border border-border bg-card p-4 text-left transition hover:bg-muted/40"
+    >
+      <span
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+        style={{
+          background:
+            green
+              ? "color-mix(in srgb, var(--dashboard-success) 12%, transparent)"
+              : "var(--dashboard-primary-soft)",
+
+          color:
+            green
+              ? "var(--dashboard-success)"
+              : "var(--dashboard-primary)",
+        }}
+      >
+        <Icon className="h-5 w-5" />
+      </span>
+
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-black text-card-foreground">
+          {
+            title
+          }
+        </span>
+
+        <span className="mt-1 block text-xs text-muted-foreground">
+          {
+            description
+          }
+        </span>
+      </span>
+
+      <Download className="h-4 w-4 text-muted-foreground/50" />
+    </button>
   );
 }
 
@@ -5566,24 +5979,19 @@ function SettingsDrawer({
 
 function DangerModal({
   action,
+  password,
+  onPasswordChange,
   onCancel,
   onConfirm,
 }: {
   action: DangerAction;
+  password: string;
+  onPasswordChange: (
+    value: string
+  ) => void;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  const [
-    confirmText,
-    setConfirmText,
-  ] = useState("");
-
-  useEffect(() => {
-    if (!action) {
-      setConfirmText("");
-    }
-  }, [action]);
-
   if (!action) {
     return null;
   }
@@ -5591,13 +5999,6 @@ function DangerModal({
   const deleting =
     action ===
     "delete-account";
-
-  const canConfirm =
-    !deleting ||
-    confirmText
-      .trim()
-      .toUpperCase() ===
-      "DELETE";
 
   return (
     <motion.div
@@ -5610,7 +6011,7 @@ function DangerModal({
       exit={{
         opacity: 0,
       }}
-      className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-md"
+      className="fixed inset-0 z-[140] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-md"
     >
       <button
         type="button"
@@ -5624,22 +6025,18 @@ function DangerModal({
       <motion.div
         initial={{
           opacity: 0,
-          y: 24,
-          scale: 0.94,
+          y: 20,
+          scale:
+            0.95,
         }}
         animate={{
           opacity: 1,
           y: 0,
           scale: 1,
         }}
-        transition={{
-          type: "spring",
-          stiffness: 260,
-          damping: 24,
-        }}
-        className="relative z-10 w-full max-w-md overflow-hidden rounded-[28px] bg-card shadow-2xl"
+        className="relative z-10 w-full max-w-md overflow-hidden rounded-[28px] border border-border bg-card shadow-2xl"
       >
-        <div className="bg-[linear-gradient(145deg,#1d1019,#301221_65%,#15243a)] p-6 text-white">
+        <div className="bg-[linear-gradient(145deg,#180b17,#2b1020,#3a172d)] p-6 text-white">
           <div className="flex items-start gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-rose-500/15 text-rose-300">
               {deleting ? (
@@ -5650,7 +6047,7 @@ function DangerModal({
             </div>
 
             <div>
-              <p className="text-[9px] font-black uppercase tracking-[0.15em] text-rose-200/50">
+              <p className="text-[9px] font-black uppercase tracking-[0.15em] text-rose-100/50">
                 Protected confirmation
               </p>
 
@@ -5662,8 +6059,8 @@ function DangerModal({
 
               <p className="mt-2 text-xs leading-6 text-rose-100/55">
                 {deleting
-                  ? "This action is intended to permanently remove the account."
-                  : "Your current browser will remain signed in."}
+                  ? "This is a permanent account action."
+                  : "Your current session remains active."}
               </p>
             </div>
           </div>
@@ -5673,27 +6070,31 @@ function DangerModal({
           {deleting && (
             <div className="mb-5">
               <label className="mb-2 block text-xs font-black text-card-foreground">
-                Type{" "}
-                <span className="text-rose-600">
-                  DELETE
-                </span>{" "}
-                to confirm
+                Current Password
               </label>
 
               <input
                 value={
-                  confirmText
+                  password
                 }
-                onChange={(event) =>
-                  setConfirmText(
-                    event.target
+                onChange={(
+                  event
+                ) =>
+                  onPasswordChange(
+                    event
+                      .target
                       .value
                   )
                 }
-                placeholder="DELETE"
-                autoComplete="off"
-                className="h-12 w-full rounded-xl border border-rose-200 bg-rose-50/50 px-4 text-sm font-black tracking-[0.08em] text-rose-900 outline-none"
+                type="password"
+                autoComplete="current-password"
+                placeholder="Enter your password"
+                className="h-12 w-full rounded-xl border border-border bg-muted/40 px-4 text-sm font-semibold text-foreground outline-none focus:border-rose-400 focus:ring-4 focus:ring-rose-500/10"
               />
+
+              <p className="mt-2 text-[10px] text-muted-foreground">
+                The API receives the required DELETE confirmation.
+              </p>
             </div>
           )}
 
@@ -5714,12 +6115,13 @@ function DangerModal({
                 onConfirm
               }
               disabled={
-                !canConfirm
+                deleting &&
+                !password.trim()
               }
               className="rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-40"
             >
               {deleting
-                ? "Confirm Delete"
+                ? "Delete Account"
                 : "Confirm Logout"}
             </button>
           </div>
@@ -5746,31 +6148,36 @@ function SaveBar({
     <motion.div
       initial={{
         opacity: 0,
-        y: 30,
+        y: -8,
       }}
       animate={{
         opacity: 1,
         y: 0,
       }}
-      exit={{
-        opacity: 0,
-        y: 30,
-      }}
-      className="fixed bottom-5 left-1/2 z-50 flex w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 flex-col gap-4 rounded-[22px] border border-white/10 bg-[#0F2745]/95 p-4 text-white shadow-[0_24px_70px_rgba(15,39,69,.35)] backdrop-blur"
+      className="rounded-[22px] border border-border bg-card p-3 shadow-[0_18px_50px_rgba(15,23,42,.12)]"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-300/10 text-amber-300">
+          <span
+            className="flex h-9 w-9 items-center justify-center rounded-xl"
+            style={{
+              background:
+                "color-mix(in srgb, var(--dashboard-warning) 14%, transparent)",
+
+              color:
+                "var(--dashboard-warning)",
+            }}
+          >
             <AlertTriangle className="h-4 w-4" />
-          </div>
+          </span>
 
           <div>
-            <p className="text-xs font-black">
-              Unsaved personal settings
+            <p className="text-xs font-black text-card-foreground">
+              Unsaved changes
             </p>
 
-            <p className="mt-0.5 text-[10px] text-blue-100/50">
-              Save to persist your changes.
+            <p className="mt-0.5 text-[10px] text-muted-foreground">
+              Save to sync your changes with the backend.
             </p>
           </div>
         </div>
@@ -5784,7 +6191,7 @@ function SaveBar({
             disabled={
               saving
             }
-            className="rounded-xl px-4 py-2.5 text-xs font-black text-blue-100/70"
+            className="rounded-xl px-4 py-2.5 text-xs font-black text-muted-foreground hover:bg-muted disabled:opacity-50"
           >
             Discard
           </button>
@@ -5803,8 +6210,10 @@ function SaveBar({
                 "var(--dashboard-primary)",
             }}
           >
-            {saving && (
+            {saving ? (
               <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Check className="h-3.5 w-3.5" />
             )}
 
             {saving
@@ -5840,7 +6249,7 @@ function Toast({
     <motion.div
       initial={{
         opacity: 0,
-        x: 30,
+        x: 24,
       }}
       animate={{
         opacity: 1,
@@ -5848,11 +6257,11 @@ function Toast({
       }}
       exit={{
         opacity: 0,
-        x: 30,
+        x: 24,
       }}
-      className="fixed right-5 top-5 z-[140] flex w-[calc(100%-2.5rem)] max-w-sm items-start gap-3 rounded-2xl border border-border bg-card p-4 shadow-2xl"
+      className="fixed right-5 top-5 z-[200] flex w-[calc(100%-2.5rem)] max-w-sm items-start gap-3 rounded-2xl border border-border bg-card p-4 shadow-2xl"
     >
-      <div
+      <span
         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
         style={{
           background:
@@ -5875,15 +6284,17 @@ function Toast({
         ) : (
           <CheckCircle2 className="h-4 w-4" />
         )}
-      </div>
+      </span>
 
       <div className="min-w-0 flex-1">
         <p className="text-xs font-black text-card-foreground">
-          {success
-            ? "Saved"
-            : error
-              ? "Error"
-              : "Updated"}
+          {
+            success
+              ? "Saved"
+              : error
+                ? "Error"
+                : "Updated"
+          }
         </p>
 
         <p className="mt-1 text-xs leading-5 text-muted-foreground">
@@ -5907,7 +6318,7 @@ function Toast({
 }
 
 /* =========================================================
-   SHARED
+   SHARED HEADER
 ========================================================= */
 
 function SectionHeader({
@@ -5916,15 +6327,57 @@ function SectionHeader({
   description,
   icon: Icon,
   danger = false,
+  indigo = false,
 }: {
   eyebrow: string;
   title: string;
   description: string;
   icon: LucideIcon;
   danger?: boolean;
+  indigo?: boolean;
 }) {
+  if (indigo) {
+    return (
+      <div className="relative overflow-hidden rounded-[28px] border border-violet-300/10 bg-[linear-gradient(135deg,#0b0716,#18112f_55%,#45216f)] p-5 text-white shadow-[0_20px_55px_rgba(42,24,82,.16)] sm:p-6">
+        <div className="absolute -right-20 -top-24 h-60 w-60 rounded-full bg-violet-500/12 blur-3xl" />
+
+        <div className="relative z-10 flex items-start gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-violet-200">
+            <Icon className="h-5 w-5" />
+          </div>
+
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-violet-200/70">
+              {
+                eyebrow
+              }
+            </p>
+
+            <h2 className="mt-1 text-2xl font-black tracking-[-0.025em] sm:text-[30px]">
+              {
+                title
+              }
+            </h2>
+
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-violet-100/60">
+              {
+                description
+              }
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="rounded-[26px] border border-border bg-card p-5 text-card-foreground shadow-sm sm:p-6">
+    <div
+      className={`rounded-[26px] border p-5 shadow-sm sm:p-6 ${
+        danger
+          ? "border-rose-200 bg-rose-50/80"
+          : "border-border bg-card"
+      }`}
+    >
       <div className="flex items-start gap-4">
         <div
           className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
@@ -5945,20 +6398,26 @@ function SectionHeader({
 
         <div>
           <p
-            className="text-[10px] font-black uppercase tracking-[0.14em]"
-            style={{
-              color:
-                danger
-                  ? "var(--dashboard-danger)"
-                  : "var(--dashboard-primary)",
-            }}
+            className={`text-[10px] font-black uppercase tracking-[0.14em] ${
+              danger
+                ? "text-rose-600"
+                : ""
+            }`}
+            style={
+              danger
+                ? undefined
+                : {
+                    color:
+                      "var(--dashboard-primary)",
+                  }
+            }
           >
             {
               eyebrow
             }
           </p>
 
-          <h2 className="mt-1 text-2xl font-black tracking-[-0.025em] sm:text-[28px]">
+          <h2 className="mt-1 text-2xl font-black tracking-[-0.025em] text-card-foreground sm:text-[28px]">
             {
               title
             }
@@ -5975,32 +6434,36 @@ function SectionHeader({
   );
 }
 
-function StatusPill({
-  icon: Icon,
+/* =========================================================
+   STATUS
+========================================================= */
+
+function StatusBadge({
   text,
-  tone,
 }: {
-  icon: LucideIcon;
   text: string;
-  tone:
-    | "green"
-    | "blue";
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-black ${
-        tone === "green"
-          ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-100"
-          : "border-white/10 bg-white/10 text-blue-100"
-      }`}
+      className="rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-wide"
+      style={{
+        background:
+          "var(--dashboard-primary-soft)",
+
+        color:
+          "var(--dashboard-primary)",
+      }}
     >
-      <Icon className="h-3.5 w-3.5" />
       {
         text
       }
     </span>
   );
 }
+
+/* =========================================================
+   METRIC
+========================================================= */
 
 function MetricCard({
   icon: Icon,
@@ -6021,30 +6484,34 @@ function MetricCard({
   return (
     <motion.div
       whileHover={{
-        y: -4,
+        y: -3,
       }}
-      className="min-w-0 rounded-[24px] border border-border bg-card p-5 shadow-sm"
+      className="rounded-[24px] border border-border bg-card p-5 shadow-sm"
     >
-      <div
+      <span
         className="flex h-10 w-10 items-center justify-center rounded-xl"
         style={{
           background:
-            tone === "green"
+            tone ===
+            "green"
               ? "color-mix(in srgb, var(--dashboard-success) 12%, transparent)"
-              : tone === "amber"
+              : tone ===
+                  "amber"
                 ? "color-mix(in srgb, var(--dashboard-warning) 14%, transparent)"
                 : "var(--dashboard-primary-soft)",
 
           color:
-            tone === "green"
+            tone ===
+            "green"
               ? "var(--dashboard-success)"
-              : tone === "amber"
+              : tone ===
+                  "amber"
                 ? "var(--dashboard-warning)"
                 : "var(--dashboard-primary)",
         }}
       >
         <Icon className="h-[18px] w-[18px]" />
-      </div>
+      </span>
 
       <p className="mt-5 text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
         {
@@ -6053,14 +6520,16 @@ function MetricCard({
       </p>
 
       <p
-        className="mt-2 whitespace-normal text-[22px] font-black leading-[1.15]"
+        className="mt-2 text-[22px] font-black leading-[1.15]"
         style={{
           color:
-            tone === "green"
+            tone ===
+            "green"
               ? "var(--dashboard-success)"
-              : tone === "amber"
+              : tone ===
+                  "amber"
                 ? "var(--dashboard-warning)"
-                : "var(--foreground)",
+                : "var(--card-foreground)",
         }}
       >
         {
@@ -6076,6 +6545,10 @@ function MetricCard({
     </motion.div>
   );
 }
+
+/* =========================================================
+   TOGGLE
+========================================================= */
 
 function ToggleRow({
   label,
@@ -6133,15 +6606,99 @@ function ToggleRow({
               : 0,
           }}
           transition={{
-            type: "spring",
-            stiffness: 480,
-            damping: 30,
+            type:
+              "spring",
+            stiffness:
+              480,
+            damping:
+              30,
           }}
         />
       </button>
     </div>
   );
 }
+
+function DarkToggleRow({
+  label,
+  description,
+  enabled,
+  onChange,
+}: {
+  label: string;
+  description: string;
+  enabled: boolean;
+  onChange: (
+    value: boolean
+  ) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/[0.05] p-4">
+      <div className="min-w-0">
+        <p className="text-sm font-black text-white">
+          {
+            label
+          }
+        </p>
+
+        <p className="mt-1 text-[10px] leading-5 text-violet-100/55">
+          {
+            description
+          }
+        </p>
+      </div>
+
+      <button
+        type="button"
+        role="switch"
+        aria-checked={
+          enabled
+        }
+        onClick={() =>
+          onChange(
+            !enabled
+          )
+        }
+        className={`relative h-8 w-14 shrink-0 rounded-full p-1 ${
+          enabled
+            ? "bg-violet-500"
+            : "bg-white/10"
+        }`}
+      >
+        <motion.span
+          className="block h-6 w-6 rounded-full bg-white shadow-sm"
+          animate={{
+            x: enabled
+              ? 24
+              : 0,
+          }}
+          transition={{
+            type:
+              "spring",
+            stiffness:
+              480,
+            damping:
+              30,
+          }}
+        />
+      </button>
+    </div>
+  );
+}
+
+/* =========================================================
+   DIVIDER
+========================================================= */
+
+function Divider() {
+  return (
+    <div className="my-5 border-t border-border" />
+  );
+}
+
+/* =========================================================
+   RANGE
+========================================================= */
 
 function RangeField({
   label,
@@ -6184,22 +6741,12 @@ function RangeField({
           </p>
         </div>
 
-        <motion.span
-          key={
-            value
-          }
-          initial={{
-            scale: 0.9,
-            opacity: 0,
-          }}
-          animate={{
-            scale: 1,
-            opacity: 1,
-          }}
+        <span
           className="w-fit rounded-xl px-3 py-2 text-xs font-black"
           style={{
             background:
               "var(--dashboard-primary-soft)",
+
             color:
               "var(--dashboard-primary)",
           }}
@@ -6208,15 +6755,16 @@ function RangeField({
           {value.toLocaleString(
             "en-BD"
           )}
-        </motion.span>
+        </span>
       </div>
 
       <div className="relative mt-5">
         <div className="absolute left-0 right-0 top-1/2 h-2 -translate-y-1/2 overflow-hidden rounded-full bg-muted">
           <motion.div
-            className="h-full rounded-full bg-[linear-gradient(90deg,#1F5EA8,#22d3ee)]"
+            className="h-full rounded-full bg-[linear-gradient(90deg,var(--dashboard-primary),#8b5cf6)]"
             animate={{
-              width: `${percent}%`,
+              width:
+                `${percent}%`,
             }}
           />
         </div>
@@ -6235,10 +6783,14 @@ function RangeField({
           value={
             value
           }
-          onChange={(event) =>
+          onChange={(
+            event
+          ) =>
             onChange(
               Number(
-                event.target.value
+                event
+                  .target
+                  .value
               )
             )
           }
@@ -6253,12 +6805,17 @@ function RangeField({
   );
 }
 
+/* =========================================================
+   TEXT FIELD
+========================================================= */
+
 function TextField({
   label,
   value,
   onChange,
   icon: Icon,
-  type = "text",
+  type =
+    "text",
 }: {
   label: string;
   value: string;
@@ -6286,17 +6843,25 @@ function TextField({
           value={
             value
           }
-          onChange={(event) =>
+          onChange={(
+            event
+          ) =>
             onChange(
-              event.target.value
+              event
+                .target
+                .value
             )
           }
-          className="h-12 w-full rounded-xl border border-border bg-muted/40 pl-11 pr-4 text-sm font-semibold text-foreground outline-none transition focus:border-[var(--dashboard-primary)] focus:ring-4 focus:ring-[var(--dashboard-primary)]/10"
+          className="h-12 w-full rounded-xl border border-border bg-muted/40 pl-11 pr-4 text-sm font-semibold text-foreground outline-none focus:border-[var(--dashboard-primary)] focus:ring-4 focus:ring-[var(--dashboard-primary)]/10"
         />
       </div>
     </label>
   );
 }
+
+/* =========================================================
+   DETAIL LIST
+========================================================= */
 
 function DetailList({
   rows,
@@ -6333,7 +6898,7 @@ function DetailList({
               }
             </span>
 
-            <span className="text-right text-xs font-black text-card-foreground">
+            <span className="max-w-[60%] truncate text-right text-xs font-black text-card-foreground">
               {
                 row[1]
               }
