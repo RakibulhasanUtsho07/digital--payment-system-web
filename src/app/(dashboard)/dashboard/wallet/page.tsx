@@ -20,13 +20,17 @@ import {
   CheckCircle2,
   ChevronRight,
   CreditCard,
+  Eye,
+  EyeOff,
   Loader2,
   LockKeyhole,
   Plus,
   RefreshCw,
   ShieldCheck,
+  Smartphone,
   WalletCards,
   X,
+  Landmark,
 } from "lucide-react";
 
 import {
@@ -36,8 +40,11 @@ import {
 
 import {
   depositFunds,
+  validatePaymentSource,
   withdrawFunds,
   type FundsResponse,
+  type PaymentProvider,
+  type PaymentSourceAccount,
 } from "@/lib/api/fundsApi";
 
 import { apiClient } from "@/lib/api/client";
@@ -57,17 +64,17 @@ type AddMoneySource =
   | "BANK";
 
 type AddMoneyProvider =
-  | "BKASH"
-  | "NAGAD"
-  | "ROCKET"
-  | "UPAY"
-  | "DBBL"
-  | "BRAC_BANK"
-  | "CITY_BANK"
-  | "EBL"
-  | "BANK_ASIA"
-  | "PRIME_BANK"
-  | "SONALI_BANK";
+  | "bkash"
+  | "nagad"
+  | "rocket"
+  | "upay"
+  | "dbbl"
+  | "brac"
+  | "city"
+  | "ebl"
+  | "bankasia"
+  | "prime"
+  | "sonali";
 
 type IdempotencyState = {
   fingerprint: string;
@@ -104,89 +111,135 @@ interface AddMoneyProviderItem {
 }
 
 /* =========================================================
-   MFS PROVIDERS
-
-   Demo UI only.
-   Real gateway credentials can be connected later.
+   PROVIDERS
 ========================================================= */
 
 const MFS_PROVIDERS: AddMoneyProviderItem[] = [
   {
-    id: "BKASH",
+    id: "bkash",
     name: "bKash",
     description: "Add money using bKash",
     icon: "৳",
   },
   {
-    id: "NAGAD",
+    id: "nagad",
     name: "Nagad",
     description: "Add money using Nagad",
     icon: "৳",
   },
   {
-    id: "ROCKET",
+    id: "rocket",
     name: "Rocket",
     description: "Add money using Rocket",
     icon: "R",
   },
   {
-    id: "UPAY",
+    id: "upay",
     name: "Upay",
     description: "Add money using Upay",
     icon: "U",
   },
 ];
 
-/* =========================================================
-   BANK PROVIDERS
-
-   Demo UI only.
-========================================================= */
-
 const BANK_PROVIDERS: AddMoneyProviderItem[] = [
   {
-    id: "DBBL",
+    id: "dbbl",
     name: "Dutch-Bangla Bank",
     description: "Transfer from DBBL",
     icon: "DB",
   },
   {
-    id: "BRAC_BANK",
+    id: "brac",
     name: "BRAC Bank",
     description: "Transfer from BRAC Bank",
     icon: "BB",
   },
   {
-    id: "CITY_BANK",
+    id: "city",
     name: "City Bank",
     description: "Transfer from City Bank",
     icon: "CB",
   },
   {
-    id: "EBL",
+    id: "ebl",
     name: "Eastern Bank",
     description: "Transfer from EBL",
     icon: "EB",
   },
   {
-    id: "BANK_ASIA",
+    id: "bankasia",
     name: "Bank Asia",
     description: "Transfer from Bank Asia",
     icon: "BA",
   },
   {
-    id: "PRIME_BANK",
+    id: "prime",
     name: "Prime Bank",
     description: "Transfer from Prime Bank",
     icon: "PB",
   },
   {
-    id: "SONALI_BANK",
+    id: "sonali",
     name: "Sonali Bank",
     description: "Transfer from Sonali Bank",
     icon: "SB",
   },
 ];
+
+/* =========================================================
+   HELPERS
+========================================================= */
+
+function formatCurrency(
+  amount: number
+): string {
+  return `৳ ${Number(amount || 0).toLocaleString(
+    "en-BD",
+    {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }
+  )}`;
+}
+
+function formatDate(
+  value?: string
+): string {
+  if (!value) {
+    return "N/A";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "N/A";
+  }
+
+  return date.toLocaleString(
+    "en-BD",
+    {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }
+  );
+}
+
+function createSecureRequestId(): string {
+  if (
+    typeof crypto === "undefined" ||
+    typeof crypto.randomUUID !==
+      "function"
+  ) {
+    throw new Error(
+      "Secure request IDs are not supported by this browser."
+    );
+  }
+
+  return crypto.randomUUID();
+}
 
 /* =========================================================
    PAGE
@@ -197,12 +250,10 @@ export default function WalletPage() {
 
   /* =======================================================
      WALLET
-  ======================================================== */
+  ====================================================== */
 
   const [wallet, setWallet] =
-    useState<WalletData | null>(
-      null
-    );
+    useState<WalletData | null>(null);
 
   const [loading, setLoading] =
     useState(true);
@@ -215,7 +266,7 @@ export default function WalletPage() {
 
   /* =======================================================
      KYC
-  ======================================================== */
+  ====================================================== */
 
   const [kycStatus, setKycStatus] =
     useState<KYCStatus | null>(null);
@@ -231,12 +282,10 @@ export default function WalletPage() {
 
   /* =======================================================
      FUNDS
-  ======================================================== */
+  ====================================================== */
 
   const [fundsAction, setFundsAction] =
-    useState<FundsAction | null>(
-      null
-    );
+    useState<FundsAction | null>(null);
 
   const [fundsAmount, setFundsAmount] =
     useState("");
@@ -253,26 +302,51 @@ export default function WalletPage() {
   const [fundsSuccess, setFundsSuccess] =
     useState("");
 
-  const [lastFundsResponse, setLastFundsResponse] =
-    useState<FundsResponse | null>(
-      null
-    );
+  const [
+    lastFundsResponse,
+    setLastFundsResponse,
+  ] = useState<FundsResponse | null>(null);
 
   const idempotencyRef =
-    useRef<IdempotencyState | null>(
-      null
-    );
+    useRef<IdempotencyState | null>(null);
 
   /* =======================================================
-     ADD MONEY PROVIDER
-  ======================================================== */
+     ADD MONEY SOURCE
+  ====================================================== */
 
   const [addMoneySource, setAddMoneySource] =
     useState<AddMoneySource>("MFS");
 
   const [addMoneyProvider, setAddMoneyProvider] =
-    useState<AddMoneyProvider>(
-      "BKASH"
+    useState<AddMoneyProvider>("bkash");
+
+  const [sourceAccountNumber, setSourceAccountNumber] =
+    useState("");
+
+  const [sourceSecretCode, setSourceSecretCode] =
+    useState("");
+
+  const [showSourceSecret, setShowSourceSecret] =
+    useState(false);
+
+  const [
+    sourceVerificationState,
+    setSourceVerificationState,
+  ] = useState<
+    "idle" | "checking" | "verified" | "failed"
+  >("idle");
+
+  const [
+    sourceVerificationError,
+    setSourceVerificationError,
+  ] = useState("");
+
+  const [
+    verifiedSource,
+    setVerifiedSource,
+  ] =
+    useState<PaymentSourceAccount | null>(
+      null
     );
 
   /* =========================================================
@@ -324,7 +398,7 @@ export default function WalletPage() {
   );
 
   /* =========================================================
-     LOAD KYC STATUS
+     LOAD KYC
   ========================================================== */
 
   const loadKYCStatus =
@@ -382,7 +456,7 @@ export default function WalletPage() {
   ]);
 
   /* =========================================================
-     REFRESH PAGE
+     REFRESH
   ========================================================== */
 
   const refreshWalletPage =
@@ -398,35 +472,71 @@ export default function WalletPage() {
   ========================================================== */
 
   const requireVerifiedKYC = (
-    onVerified: () => void
+    callback: () => void
   ) => {
     if (
       !kycLoading &&
       !kycError &&
       kycStatus === "verified"
     ) {
-      onVerified();
+      callback();
       return;
     }
 
     setKycGuardOpen(true);
   };
 
-  /* =========================================================
-     OPEN PROTECTED ROUTE
-  ========================================================== */
-
   const openProtectedRoute = (
     href: string
   ) => {
-    requireVerifiedKYC(
-      () => router.push(href)
+    requireVerifiedKYC(() =>
+      router.push(href)
     );
   };
 
   /* =========================================================
+     SOURCE VERIFICATION RESET
+  ========================================================== */
+
+  const resetSourceVerification =
+    () => {
+      setSourceAccountNumber("");
+      setSourceSecretCode("");
+      setShowSourceSecret(false);
+
+      setVerifiedSource(null);
+
+      setSourceVerificationState(
+        "idle"
+      );
+
+      setSourceVerificationError("");
+    };
+
+  /* =========================================================
      OPEN FUNDS MODAL
   ========================================================== */
+
+  const openFundsModalUnsafe = (
+    action: FundsAction
+  ) => {
+    setFundsAction(action);
+
+    setFundsAmount("");
+    setFundsReference("");
+    setFundsError("");
+    setFundsSuccess("");
+    setLastFundsResponse(null);
+
+    idempotencyRef.current = null;
+
+    if (action === "deposit") {
+      setAddMoneySource("MFS");
+      setAddMoneyProvider("bkash");
+
+      resetSourceVerification();
+    }
+  };
 
   const openFundsModal = (
     action: FundsAction
@@ -443,37 +553,7 @@ export default function WalletPage() {
       return;
     }
 
-    openFundsModalUnsafe(
-      action
-    );
-  };
-
-  /* =========================================================
-     OPEN FUNDS UNSAFE
-  ========================================================== */
-
-  const openFundsModalUnsafe = (
-    action: FundsAction
-  ) => {
-    setFundsAction(action);
-
-    setFundsAmount("");
-
-    setFundsReference("");
-
-    setFundsError("");
-
-    setFundsSuccess("");
-
-    setLastFundsResponse(null);
-
-    idempotencyRef.current = null;
-
-    if (action === "deposit") {
-      setAddMoneySource("MFS");
-
-      setAddMoneyProvider("BKASH");
-    }
+    openFundsModalUnsafe(action);
   };
 
   /* =========================================================
@@ -486,18 +566,15 @@ export default function WalletPage() {
     }
 
     setFundsAction(null);
-
     setFundsAmount("");
-
     setFundsReference("");
-
     setFundsError("");
-
     setFundsSuccess("");
-
     setLastFundsResponse(null);
 
     idempotencyRef.current = null;
+
+    resetSourceVerification();
   };
 
   /* =========================================================
@@ -506,36 +583,183 @@ export default function WalletPage() {
 
   const getProviderName = (
     provider: AddMoneyProvider
-  ): string => {
+  ) => {
     const allProviders = [
       ...MFS_PROVIDERS,
       ...BANK_PROVIDERS,
     ];
 
-    const found =
+    return (
       allProviders.find(
         (item) =>
           item.id === provider
-      );
-
-    return (
-      found?.name || provider
+      )?.name || provider
     );
   };
 
   /* =========================================================
-     IDEMPOTENCY KEY
+     SOURCE CHANGE
+  ========================================================== */
+
+  const handleSourceChange = (
+    source: AddMoneySource
+  ) => {
+    setAddMoneySource(source);
+
+    if (source === "MFS") {
+      setAddMoneyProvider("bkash");
+    } else {
+      setAddMoneyProvider("dbbl");
+    }
+
+    resetSourceVerification();
+    setFundsError("");
+  };
+
+  const handleProviderChange = (
+    provider: AddMoneyProvider
+  ) => {
+    setAddMoneyProvider(provider);
+
+    resetSourceVerification();
+    setFundsError("");
+  };
+
+  /* =========================================================
+     VERIFY SOURCE ACCOUNT
+  ========================================================== */
+
+  const verifySourceAccount =
+    async () => {
+      if (!fundsAction) {
+        return;
+      }
+
+      const account =
+        sourceAccountNumber
+          .trim()
+          .replace(/\s+/g, "");
+
+      const secret =
+        sourceSecretCode.trim();
+
+      setSourceVerificationError("");
+      setVerifiedSource(null);
+
+      if (!account) {
+        setSourceVerificationState(
+          "failed"
+        );
+
+        setSourceVerificationError(
+          "Enter the source account number."
+        );
+
+        return;
+      }
+
+      if (
+        account.length < 8 ||
+        account.length > 32
+      ) {
+        setSourceVerificationState(
+          "failed"
+        );
+
+        setSourceVerificationError(
+          "Enter a valid account number."
+        );
+
+        return;
+      }
+
+      if (!secret) {
+        setSourceVerificationState(
+          "failed"
+        );
+
+        setSourceVerificationError(
+          "Enter the source account secret code."
+        );
+
+        return;
+      }
+
+      setSourceVerificationState(
+        "checking"
+      );
+
+      try {
+        const response =
+          await validatePaymentSource({
+            provider:
+              addMoneyProvider,
+
+            accountNumber:
+              account,
+
+            secretCode:
+              secret,
+          });
+
+        if (
+          !response.success ||
+          !response.account
+        ) {
+          throw new Error(
+            response.message ||
+              "Unable to verify source account."
+          );
+        }
+
+        setVerifiedSource(
+          response.account
+        );
+
+        setSourceAccountNumber(
+          account
+        );
+
+        setSourceVerificationState(
+          "verified"
+        );
+
+        setFundsError("");
+      } catch (error) {
+        console.error(
+          "SOURCE ACCOUNT VERIFICATION ERROR:",
+          error
+        );
+
+        setSourceVerificationState(
+          "failed"
+        );
+
+        setSourceVerificationError(
+          error instanceof Error
+            ? error.message
+            : "Unable to verify source account."
+        );
+      }
+    };
+
+  /* =========================================================
+     IDEMPOTENCY
   ========================================================== */
 
   const getOrCreateIdempotencyKey = (
     action: FundsAction,
     amountMinorUnits: number,
-    reference: string
-  ): string => {
+    reference: string,
+    provider?: AddMoneyProvider,
+    accountNumber?: string
+  ) => {
     const fingerprint = [
       action,
       amountMinorUnits,
       reference,
+      provider || "",
+      accountNumber || "",
     ].join("|");
 
     if (
@@ -546,19 +770,8 @@ export default function WalletPage() {
       return idempotencyRef.current.key;
     }
 
-    if (
-      typeof crypto ===
-        "undefined" ||
-      typeof crypto.randomUUID !==
-        "function"
-    ) {
-      throw new Error(
-        "Your browser does not support secure request IDs. Please update your browser."
-      );
-    }
-
     const key =
-      crypto.randomUUID();
+      createSecureRequestId();
 
     idempotencyRef.current = {
       fingerprint,
@@ -569,7 +782,7 @@ export default function WalletPage() {
   };
 
   /* =========================================================
-     FUNDS SUBMIT
+     SUBMIT FUNDS
   ========================================================== */
 
   const handleFundsSubmit =
@@ -589,9 +802,9 @@ export default function WalletPage() {
       setFundsSuccess("");
       setLastFundsResponse(null);
 
-      /* ================================================
-         AMOUNT VALIDATION
-      ================================================= */
+      /* =====================================================
+         AMOUNT
+      ====================================================== */
 
       const rawAmount =
         fundsAmount.trim();
@@ -635,9 +848,9 @@ export default function WalletPage() {
       const normalizedAmount =
         minorUnits / 100;
 
-      /* ================================================
-         WITHDRAW BALANCE
-      ================================================= */
+      /* =====================================================
+         WITHDRAW
+      ====================================================== */
 
       if (
         fundsAction ===
@@ -654,9 +867,9 @@ export default function WalletPage() {
         return;
       }
 
-      /* ================================================
+      /* =====================================================
          REFERENCE
-      ================================================= */
+      ====================================================== */
 
       let reference =
         fundsReference.trim();
@@ -671,30 +884,65 @@ export default function WalletPage() {
         return;
       }
 
-      /* ================================================
-         ADD MONEY PROVIDER
-      ================================================= */
+      /* =====================================================
+         DEPOSIT SOURCE VALIDATION
+      ====================================================== */
 
       if (
         fundsAction ===
         "deposit"
       ) {
-        const providerName =
+        if (
+          sourceVerificationState !==
+            "verified" ||
+          !verifiedSource
+        ) {
+          setFundsError(
+            "Please verify the source account before adding money."
+          );
+
+          return;
+        }
+
+        if (
+          !sourceSecretCode.trim()
+        ) {
+          setFundsError(
+            "Source account secret code is required."
+          );
+
+          return;
+        }
+
+        if (
+          normalizedAmount >
+          Number(
+            verifiedSource.availableBalance ||
+              0
+          )
+        ) {
+          setFundsError(
+            `Insufficient source account balance. Available ${formatCurrency(
+              verifiedSource.availableBalance
+            )}.`
+          );
+
+          return;
+        }
+
+        const providerLabel =
           getProviderName(
             addMoneyProvider
           );
 
-        const providerPrefix =
-          `[${addMoneySource}] ${providerName}`;
+        const prefix =
+          `[${addMoneySource}] ${providerLabel}`;
 
         reference =
           reference
-            ? `${providerPrefix} - ${reference}`
-            : providerPrefix;
+            ? `${prefix} - ${reference}`
+            : prefix;
 
-        /*
-         * Keep reference under backend limit.
-         */
         reference =
           reference.slice(
             0,
@@ -702,26 +950,43 @@ export default function WalletPage() {
           );
       }
 
-      /* ================================================
+      /* =====================================================
          SUBMIT
-      ================================================= */
+      ====================================================== */
 
       try {
-        setFundsSubmitting(
-          true
-        );
+        setFundsSubmitting(true);
 
         const idempotencyKey =
           getOrCreateIdempotencyKey(
             fundsAction,
             minorUnits,
-            reference
+            reference,
+            fundsAction ===
+              "deposit"
+              ? addMoneyProvider
+              : undefined,
+            fundsAction ===
+              "deposit"
+              ? verifiedSource
+                  ?.accountNumber
+              : undefined
           );
 
         const response =
           fundsAction ===
           "deposit"
             ? await depositFunds({
+                provider:
+                  addMoneyProvider,
+
+                accountNumber:
+                  verifiedSource!
+                    .accountNumber,
+
+                secretCode:
+                  sourceSecretCode.trim(),
+
                 amount:
                   normalizedAmount,
 
@@ -752,23 +1017,37 @@ export default function WalletPage() {
           );
         }
 
-        /* ==============================================
-           UPDATE LOCAL BALANCE
-        =============================================== */
+setWallet((current) => {
+  if (!current) {
+    return current;
+  }
 
-        setWallet(
-          (current) =>
-            current
-              ? {
-                  ...current,
-                  balance:
-                    response.wallet!
-                      .balance,
-                  updatedAt:
-                    new Date().toISOString(),
-                }
-              : current
-        );
+  const updatedWallet: WalletData = {
+    ...current,
+    balance: Number(response.wallet!.balance),
+
+    pendingBalance:
+      response.wallet!.pendingBalance ??
+      current.pendingBalance,
+
+    status:
+      response.wallet!.status === "ACTIVE" ||
+      response.wallet!.status === "FROZEN" ||
+      response.wallet!.status === "BLOCKED"
+        ? response.wallet!.status
+        : current.status,
+
+    currency:
+      response.wallet!.currency ??
+      current.currency,
+
+    updatedAt:
+      response.wallet!.updatedAt ??
+      new Date().toISOString(),
+  };
+
+  return updatedWallet;
+});
 
         setLastFundsResponse(
           response
@@ -789,13 +1068,10 @@ export default function WalletPage() {
         idempotencyRef.current =
           null;
 
-        /*
-         * Final backend sync.
-         */
         await loadWallet(true);
       } catch (error) {
         console.error(
-          "Funds request error:",
+          "FUNDS REQUEST ERROR:",
           error
         );
 
@@ -818,23 +1094,19 @@ export default function WalletPage() {
   if (loading) {
     return (
       <div className="flex min-h-[70vh] items-center justify-center px-4">
-        <div className="flex flex-col items-center gap-4 text-center">
-          <div className="relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-[18px] bg-gradient-to-br from-[#4C1D95] to-[#6D28D9] text-white shadow-[0_14px_35px_rgba(109,40,217,0.24)]">
-            <div className="absolute inset-0 bg-gradient-to-br from-white/15 to-transparent" />
-
-            <Loader2 className="relative h-6 w-6 animate-spin" />
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-gradient-to-br from-[#4C1D95] to-[#6D28D9] text-white shadow-[0_14px_35px_rgba(79,70,229,.2)]">
+            <Loader2 className="h-6 w-6 animate-spin" />
           </div>
 
-          <div>
-            <p className="text-sm font-extrabold text-slate-900">
-              Loading your wallet
-            </p>
+          <p className="mt-4 text-sm font-black text-slate-900">
+            Loading your wallet
+          </p>
 
-            <p className="mt-1 text-xs text-slate-500">
-              Syncing your latest balance
-              and wallet information...
-            </p>
-          </div>
+          <p className="mt-1 text-xs text-slate-500">
+            Syncing your latest balance
+            and wallet information...
+          </p>
         </div>
       </div>
     );
@@ -884,22 +1156,22 @@ export default function WalletPage() {
   ========================================================== */
 
   const balance =
-    Number(wallet.balance) ||
-    0;
+    Number(wallet.balance) || 0;
 
   const formattedBalance =
     formatCurrency(balance);
 
   /* =========================================================
-     MAIN UI
+     MAIN
   ========================================================== */
 
   return (
     <>
       <main className="space-y-6 pb-10">
+
         {/* =================================================
             HEADER
-        ================================================== */}
+        ================================================= */}
 
         <section className="rounded-[26px] border border-indigo-100 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.035)] sm:p-6">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
@@ -945,8 +1217,8 @@ export default function WalletPage() {
         </section>
 
         {/* =================================================
-            PREMIUM WALLET CARD
-        ================================================== */}
+            PREMIUM CARD
+        ================================================= */}
 
         <PremiumWalletCard
           walletId={wallet._id}
@@ -957,7 +1229,7 @@ export default function WalletPage() {
 
         {/* =================================================
             QUICK ACTIONS
-        ================================================== */}
+        ================================================= */}
 
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <WalletActionButton
@@ -1038,14 +1310,18 @@ export default function WalletPage() {
 
         {/* =================================================
             WALLET INFORMATION
-        ================================================== */}
+        ================================================= */}
 
         <section className="grid gap-6 xl:grid-cols-[1.45fr_0.75fr]">
+
           <div className="relative overflow-hidden rounded-[28px] border border-indigo-100 bg-white shadow-[0_16px_50px_rgba(15,23,42,0.05)]">
+
             <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-indigo-100/60 blur-3xl" />
 
             <div className="relative p-5 sm:p-7">
+
               <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+
                 <div className="flex items-center gap-4">
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-[0_10px_22px_rgba(79,70,229,0.22)]">
                     <WalletCards className="h-5 w-5" />
@@ -1070,7 +1346,6 @@ export default function WalletPage() {
                 <div className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1.5">
                   <span className="relative flex h-2 w-2">
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-
                     <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
                   </span>
 
@@ -1080,13 +1355,10 @@ export default function WalletPage() {
                 </div>
               </div>
 
-              {/* BALANCE */}
-
               <div className="relative mt-6 overflow-hidden rounded-[22px] border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-violet-50 p-5 sm:p-6">
-                <div className="pointer-events-none absolute -bottom-20 -right-10 h-40 w-40 rounded-full bg-violet-300/15 blur-3xl" />
-
                 <div className="relative">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+
                     <div>
                       <p className="text-[10px] font-extrabold uppercase tracking-[0.16em] text-indigo-500">
                         Available Balance
@@ -1094,9 +1366,7 @@ export default function WalletPage() {
 
                       <div className="mt-2 flex flex-wrap items-baseline gap-2">
                         <span className="text-3xl font-black tracking-[-0.04em] text-indigo-950 sm:text-4xl">
-                          {
-                            formattedBalance
-                          }
+                          {formattedBalance}
                         </span>
 
                         <span className="text-xs font-bold text-slate-400">
@@ -1128,25 +1398,19 @@ export default function WalletPage() {
                 </div>
               </div>
 
-              {/* DETAILS */}
-
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 <ModernInfoItem
                   label="Wallet Owner ID"
                   value={String(
                     wallet.userId
                   )}
-                  icon={
-                    ShieldCheck
-                  }
+                  icon={ShieldCheck}
                 />
 
                 <ModernInfoItem
                   label="Currency"
                   value="Bangladeshi Taka (BDT)"
-                  icon={
-                    Banknote
-                  }
+                  icon={Banknote}
                 />
 
                 <ModernInfoItem
@@ -1154,9 +1418,7 @@ export default function WalletPage() {
                   value={formatDate(
                     wallet.createdAt
                   )}
-                  icon={
-                    CreditCard
-                  }
+                  icon={CreditCard}
                 />
 
                 <ModernInfoItem
@@ -1164,24 +1426,18 @@ export default function WalletPage() {
                   value={formatDate(
                     wallet.updatedAt
                   )}
-                  icon={
-                    RefreshCw
-                  }
+                  icon={RefreshCw}
                 />
               </div>
             </div>
           </div>
 
-          {/* =================================================
-              SECURITY CARD
-          ================================================== */}
+          {/* SECURITY */}
 
           <div className="relative overflow-hidden rounded-[28px] border border-indigo-100 bg-gradient-to-br from-indigo-950 via-indigo-900 to-violet-900 p-5 text-white shadow-[0_18px_50px_rgba(30,27,75,0.16)] sm:p-7">
-            <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-violet-400/20 blur-3xl" />
-
-            <div className="pointer-events-none absolute -bottom-24 -left-10 h-44 w-44 rounded-full bg-indigo-400/10 blur-3xl" />
 
             <div className="relative flex h-full flex-col">
+
               <div className="flex items-start justify-between gap-4">
                 <div className="flex h-12 w-12 items-center justify-center rounded-[16px] border border-white/10 bg-white/10 text-indigo-100 backdrop-blur-sm">
                   <ShieldCheck className="h-6 w-6" />
@@ -1212,8 +1468,9 @@ export default function WalletPage() {
                 </p>
               </div>
 
-              <div className="mt-6 rounded-[20px] border border-white/10 bg-white/[0.06] p-4 backdrop-blur-sm">
+              <div className="mt-6 rounded-[20px] border border-white/10 bg-white/[0.06] p-4">
                 <div className="flex items-center gap-3">
+
                   <div
                     className={[
                       "flex h-10 w-10 items-center justify-center rounded-[13px]",
@@ -1227,6 +1484,7 @@ export default function WalletPage() {
                   </div>
 
                   <div className="min-w-0">
+
                     <p className="text-[9px] font-extrabold uppercase tracking-[0.14em] text-indigo-200">
                       Verification status
                     </p>
@@ -1239,14 +1497,14 @@ export default function WalletPage() {
                           ? "Identity Verified"
                           : kycStatus ===
                             "under_review"
-                            ? "Under Review"
-                            : kycStatus ===
-                              "pending"
-                            ? "Pending Verification"
-                            : kycStatus ===
-                              "rejected"
-                            ? "Needs Resubmission"
-                            : "Verification Required"}
+                          ? "Under Review"
+                          : kycStatus ===
+                            "pending"
+                          ? "Pending Verification"
+                          : kycStatus ===
+                            "rejected"
+                          ? "Needs Resubmission"
+                          : "Verification Required"}
                     </p>
                   </div>
                 </div>
@@ -1254,9 +1512,7 @@ export default function WalletPage() {
 
               <div className="mt-5 space-y-3">
                 <SecurityPoint text="Protected financial actions" />
-
                 <SecurityPoint text="Backend verification enabled" />
-
                 <SecurityPoint text="Secure wallet activity monitoring" />
               </div>
 
@@ -1266,7 +1522,6 @@ export default function WalletPage() {
                   className="group flex h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-white px-4 text-xs font-extrabold text-indigo-950 shadow-[0_10px_30px_rgba(0,0,0,0.15)] transition hover:bg-indigo-50"
                 >
                   Verification Center
-
                   <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
                 </Link>
 
@@ -1282,10 +1537,11 @@ export default function WalletPage() {
 
         {/* =================================================
             FOOTER
-        ================================================== */}
+        ================================================= */}
 
         <section className="rounded-[26px] border border-indigo-100 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.035)] sm:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-indigo-50 text-indigo-600">
                 <WalletCards className="h-5 w-5" />
@@ -1366,47 +1622,150 @@ export default function WalletPage() {
               ?.transaction
               ?._id
           }
+
           addMoneySource={
             addMoneySource
           }
+
           addMoneyProvider={
             addMoneyProvider
           }
-          onAddMoneySourceChange={(
-            source
-          ) => {
-            setAddMoneySource(
-              source
-            );
 
-            if (
-              source === "MFS"
-            ) {
-              setAddMoneyProvider(
-                "BKASH"
-              );
-            } else {
-              setAddMoneyProvider(
-                "DBBL"
-              );
-            }
-          }}
-          onAddMoneyProviderChange={
-            setAddMoneyProvider
+          sourceAccountNumber={
+            sourceAccountNumber
           }
+
+          sourceSecretCode={
+            sourceSecretCode
+          }
+
+          showSourceSecret={
+            showSourceSecret
+          }
+
+          sourceVerificationState={
+            sourceVerificationState
+          }
+
+          sourceVerificationError={
+            sourceVerificationError
+          }
+
+          verifiedSource={
+            verifiedSource
+          }
+
+          onAddMoneySourceChange={
+            handleSourceChange
+          }
+
+          onAddMoneyProviderChange={
+            handleProviderChange
+          }
+
+          onSourceAccountNumberChange={
+            (value) => {
+              setSourceAccountNumber(
+                value
+                  .replace(
+                    /\s+/g,
+                    ""
+                  )
+                  .replace(
+                    /[^\d]/g,
+                    ""
+                  )
+              );
+
+              setVerifiedSource(
+                null
+              );
+
+              setSourceVerificationState(
+                "idle"
+              );
+
+              setSourceVerificationError("");
+            }
+          }
+
+          onSourceSecretCodeChange={
+            (value) => {
+              setSourceSecretCode(
+                value
+              );
+
+              setVerifiedSource(
+                null
+              );
+
+              setSourceVerificationState(
+                "idle"
+              );
+
+              setSourceVerificationError("");
+            }
+          }
+
+          onToggleSourceSecret={() =>
+            setShowSourceSecret(
+              (current) =>
+                !current
+            )
+          }
+
+          onVerifySource={
+            verifySourceAccount
+          }
+
           onAmountChange={
             setFundsAmount
           }
+
           onReferenceChange={
             setFundsReference
           }
+
           onClose={
             closeFundsModal
           }
+
           onSubmit={
             handleFundsSubmit
           }
         />
+      )}
+
+      {/* =====================================================
+          SUCCESS TOAST
+      ====================================================== */}
+
+      {fundsSuccess && (
+        <div className="fixed bottom-6 right-6 z-[200] max-w-sm rounded-2xl border border-emerald-200 bg-white px-5 py-4 shadow-2xl">
+          <div className="flex items-start gap-3">
+            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+
+            <div className="min-w-0">
+              <p className="text-sm font-black text-slate-900">
+                Funds processed
+              </p>
+
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                {fundsSuccess}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                setFundsSuccess("")
+              }
+              className="text-slate-400 transition hover:text-slate-700"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
       )}
     </>
   );
@@ -1508,8 +1867,8 @@ function KYCGuardModal({
       />
 
       <div className="relative z-10 w-full max-w-md overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-2xl">
+
         <div className="relative overflow-hidden border-b border-indigo-100 bg-gradient-to-br from-indigo-50 to-white p-6">
-          <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-violet-300/15 blur-3xl" />
 
           <div className="relative flex items-start justify-between gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-[16px] border border-indigo-100 bg-white text-indigo-600 shadow-sm">
@@ -1571,9 +1930,7 @@ function KYCGuardModal({
           ) : (
             <button
               type="button"
-              onClick={
-                onGoToKYC
-              }
+              onClick={onGoToKYC}
               disabled={loading}
               className="flex h-11 w-full items-center justify-center gap-2 rounded-[14px] bg-indigo-700 text-xs font-extrabold text-white transition hover:bg-indigo-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -1603,11 +1960,7 @@ function KYCGuardModal({
 
 function getWalletKYCContent(
   status: KYCStatus | null
-): {
-  title: string;
-  description: string;
-  cta: string;
-} {
+) {
   switch (status) {
     case "verified":
       return {
@@ -1660,7 +2013,7 @@ function getWalletKYCMessage(
   status: KYCStatus | null,
   loading: boolean,
   errorMessage: string
-): string {
+) {
   if (loading) {
     return "Checking your identity verification status...";
   }
@@ -1687,34 +2040,60 @@ function FundsModal({
   errorMessage,
   successMessage,
   transactionId,
+
   addMoneySource,
   addMoneyProvider,
+
+  sourceAccountNumber,
+  sourceSecretCode,
+  showSourceSecret,
+  sourceVerificationState,
+  sourceVerificationError,
+  verifiedSource,
+
   onAddMoneySourceChange,
   onAddMoneyProviderChange,
+
+  onSourceAccountNumberChange,
+  onSourceSecretCodeChange,
+  onToggleSourceSecret,
+  onVerifySource,
+
   onAmountChange,
   onReferenceChange,
+
   onClose,
   onSubmit,
 }: {
   action: FundsAction;
-
   balance: number;
-
   amount: string;
-
   reference: string;
 
   submitting: boolean;
-
   errorMessage: string;
-
   successMessage: string;
 
   transactionId?: string;
 
   addMoneySource: AddMoneySource;
-
   addMoneyProvider: AddMoneyProvider;
+
+  sourceAccountNumber: string;
+  sourceSecretCode: string;
+  showSourceSecret: boolean;
+
+  sourceVerificationState:
+    | "idle"
+    | "checking"
+    | "verified"
+    | "failed";
+
+  sourceVerificationError: string;
+
+  verifiedSource:
+    | PaymentSourceAccount
+    | null;
 
   onAddMoneySourceChange: (
     source: AddMoneySource
@@ -1723,6 +2102,18 @@ function FundsModal({
   onAddMoneyProviderChange: (
     provider: AddMoneyProvider
   ) => void;
+
+  onSourceAccountNumberChange: (
+    value: string
+  ) => void;
+
+  onSourceSecretCodeChange: (
+    value: string
+  ) => void;
+
+  onToggleSourceSecret: () => void;
+
+  onVerifySource: () => void;
 
   onAmountChange: (
     value: string
@@ -1760,36 +2151,30 @@ function FundsModal({
         aria-label="Close funds dialog"
         onClick={onClose}
         disabled={submitting}
-        className="absolute inset-0 bg-slate-950/55 backdrop-blur-sm"
+        className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
       />
 
-      <div className="relative z-10 max-h-[92vh] w-full max-w-2xl overflow-y-auto overflow-x-hidden rounded-[30px] border border-slate-200 bg-white shadow-2xl">
-        {/* =================================================
-            HEADER
-        ================================================== */}
+      <div className="relative z-10 max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[30px] border border-slate-200 bg-white shadow-2xl">
 
-        <div
-          className={
-            isDeposit
-              ? "bg-gradient-to-br from-violet-800 via-violet-700 to-indigo-600 p-6 text-white"
-              : "bg-gradient-to-br from-fuchsia-900 via-fuchsia-700 to-violet-700 p-6 text-white"
-          }
-        >
+        {/* HEADER */}
+
+        <div className="bg-gradient-to-br from-[#17133B] via-[#281A63] to-[#5226A6] p-6 text-white sm:p-7">
           <div className="flex items-start justify-between gap-4">
+
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-[0.17em] text-white/65">
+              <p className="text-[9px] font-black uppercase tracking-[0.18em] text-violet-200/60">
                 Wallet Funds
               </p>
 
-              <h2 className="mt-1 text-xl font-black">
+              <h2 className="mt-1 text-2xl font-black">
                 {isDeposit
                   ? "Add Money"
                   : "Withdraw Money"}
               </h2>
 
-              <p className="mt-2 text-xs leading-5 text-white/70">
+              <p className="mt-2 max-w-xl text-xs leading-5 text-violet-100/70">
                 {isDeposit
-                  ? "Choose a bank or mobile financial service to add money to your wallet."
+                  ? "Verify your source account first, then add money securely to your wallet."
                   : "Withdraw funds from your available wallet balance."}
               </p>
             </div>
@@ -1798,104 +2183,49 @@ function FundsModal({
               type="button"
               onClick={onClose}
               disabled={submitting}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 transition hover:bg-white/20 disabled:opacity-50"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10 transition hover:bg-white/20"
             >
               <X className="h-4 w-4" />
             </button>
+
           </div>
         </div>
 
         <form
           onSubmit={onSubmit}
-          className="p-6"
+          className="space-y-6 p-6 sm:p-7"
         >
-          {/* =================================================
-              SUCCESS
-          ================================================== */}
 
-          {successMessage ? (
-            <div className="text-center">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
-                <CheckCircle2 className="h-7 w-7" />
-              </div>
-
-              <h3 className="mt-4 text-lg font-black text-slate-900">
-                Completed
-              </h3>
-
-              <p className="mt-2 text-sm leading-6 text-slate-500">
-                {successMessage}
-              </p>
-
-              {selectedProvider &&
-                isDeposit && (
-                  <div className="mt-4 rounded-2xl border border-violet-100 bg-violet-50 p-4 text-left">
-                    <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-violet-500">
-                      Funding Provider
-                    </p>
-
-                    <p className="mt-1 text-sm font-black text-violet-950">
-                      {
-                        selectedProvider.name
-                      }
-                    </p>
-
-                    <p className="mt-1 text-[10px] text-violet-700">
-                      {addMoneySource ===
-                      "MFS"
-                        ? "Mobile Financial Service"
-                        : "Bank transfer"}
-                    </p>
-                  </div>
-                )}
-
-              {transactionId && (
-                <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-left">
-                  <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-slate-400">
-                    Transaction ID
-                  </p>
-
-                  <p className="mt-1 break-all font-mono text-[11px] font-bold text-slate-700">
-                    {transactionId}
-                  </p>
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={onClose}
-                className="mt-6 h-11 w-full rounded-xl bg-slate-900 text-xs font-bold text-white transition hover:bg-slate-800"
-              >
-                Done
-              </button>
-            </div>
-          ) : (
+          {!successMessage ? (
             <>
-              {/* =================================================
-                  ADD MONEY SOURCE
-              ================================================== */}
+              {/* =============================================
+                  PAYMENT SOURCE
+              ============================================= */}
 
               {isDeposit && (
                 <>
+
                   <div>
                     <div className="flex items-center justify-between gap-3">
+
                       <div>
-                        <p className="text-sm font-black text-slate-800">
+                        <p className="text-sm font-black text-slate-900">
                           Payment Source
                         </p>
 
                         <p className="mt-1 text-xs text-slate-500">
-                          Select where the money will
-                          come from.
+                          Select where the money
+                          will come from.
                         </p>
                       </div>
 
-                      <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[9px] font-black uppercase tracking-wide text-amber-700">
-                        Demo gateway
+                      <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[9px] font-black uppercase tracking-wide text-amber-700">
+                        Demo provider
                       </span>
                     </div>
 
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
+
                       <button
                         type="button"
                         onClick={() =>
@@ -1903,31 +2233,23 @@ function FundsModal({
                             "MFS"
                           )
                         }
-                        className={`rounded-2xl border p-4 text-left transition ${
+                        className={[
+                          "rounded-[20px] border p-4 text-left transition",
                           addMoneySource ===
                           "MFS"
                             ? "border-violet-600 bg-violet-50 ring-2 ring-violet-100"
-                            : "border-slate-200 bg-white hover:border-violet-200 hover:bg-slate-50"
-                        }`}
+                            : "border-slate-200 bg-white hover:border-violet-200 hover:bg-slate-50",
+                        ].join(" ")}
                       >
                         <div className="flex items-center gap-3">
-                          <div
-                            className={`flex h-12 w-12 items-center justify-center rounded-xl ${
-                              addMoneySource ===
-                              "MFS"
-                                ? "bg-violet-600 text-white"
-                                : "bg-slate-100 text-slate-600"
-                            }`}
-                          >
-                            <span className="text-lg font-black">
-                              MFS
-                            </span>
+
+                          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+                            <Smartphone className="h-5 w-5" />
                           </div>
 
                           <div>
                             <p className="text-sm font-black text-slate-800">
-                              Mobile Financial
-                              Service
+                              Mobile Financial Service
                             </p>
 
                             <p className="mt-1 text-xs text-slate-500">
@@ -1945,23 +2267,18 @@ function FundsModal({
                             "BANK"
                           )
                         }
-                        className={`rounded-2xl border p-4 text-left transition ${
+                        className={[
+                          "rounded-[20px] border p-4 text-left transition",
                           addMoneySource ===
                           "BANK"
                             ? "border-indigo-600 bg-indigo-50 ring-2 ring-indigo-100"
-                            : "border-slate-200 bg-white hover:border-indigo-200 hover:bg-slate-50"
-                        }`}
+                            : "border-slate-200 bg-white hover:border-indigo-200 hover:bg-slate-50",
+                        ].join(" ")}
                       >
                         <div className="flex items-center gap-3">
-                          <div
-                            className={`flex h-12 w-12 items-center justify-center rounded-xl ${
-                              addMoneySource ===
-                              "BANK"
-                                ? "bg-indigo-600 text-white"
-                                : "bg-slate-100 text-slate-600"
-                            }`}
-                          >
-                            <Banknote className="h-5 w-5" />
+
+                          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700">
+                            <Landmark className="h-5 w-5" />
                           </div>
 
                           <div>
@@ -1970,120 +2287,334 @@ function FundsModal({
                             </p>
 
                             <p className="mt-1 text-xs text-slate-500">
-                              Transfer from
-                              your bank
+                              DBBL, BRAC, City,
+                              EBL & more
                             </p>
                           </div>
                         </div>
                       </button>
+
                     </div>
                   </div>
 
-                  {/* =================================================
-                      PROVIDERS
-                  ================================================== */}
+                  {/* =========================================
+                      PROVIDER
+                  ========================================== */}
 
-                  <div className="mt-7">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-black text-slate-800">
-                        Select{" "}
-                        {addMoneySource ===
-                        "MFS"
-                          ? "MFS"
-                          : "Bank"}
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-black text-slate-900">
+                        Select Provider
                       </p>
 
                       <span className="text-[9px] font-bold uppercase tracking-wide text-slate-400">
-                        Demo only
+                        {providers.length} available
                       </span>
                     </div>
 
                     <div className="mt-3 grid gap-3 sm:grid-cols-2">
+
                       {providers.map(
-                        (provider) => {
+                        (item) => {
                           const active =
                             addMoneyProvider ===
-                            provider.id;
+                            item.id;
 
                           return (
                             <button
                               key={
-                                provider.id
+                                item.id
                               }
                               type="button"
                               onClick={() =>
                                 onAddMoneyProviderChange(
-                                  provider.id
+                                  item.id
                                 )
                               }
-                              className={`flex items-center gap-3 rounded-2xl border p-4 text-left transition ${
+                              className={[
+                                "flex items-center gap-3 rounded-[18px] border p-4 text-left transition",
                                 active
                                   ? "border-violet-600 bg-violet-50 ring-2 ring-violet-100"
-                                  : "border-slate-200 bg-white hover:border-violet-200 hover:bg-slate-50"
-                              }`}
+                                  : "border-slate-200 bg-white hover:border-violet-200 hover:bg-slate-50",
+                              ].join(
+                                " "
+                              )}
                             >
+
                               <div
-                                className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xs font-black ${
+                                className={[
+                                  "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-black",
                                   active
                                     ? "bg-violet-600 text-white"
-                                    : "bg-slate-100 text-slate-600"
-                                }`}
+                                    : "bg-slate-100 text-slate-600",
+                                ].join(
+                                  " "
+                                )}
                               >
                                 {
-                                  provider.icon
+                                  item.icon
                                 }
                               </div>
 
                               <div className="min-w-0 flex-1">
-                                <p className="text-sm font-black text-slate-800">
+
+                                <p className="truncate text-sm font-black text-slate-800">
                                   {
-                                    provider.name
+                                    item.name
                                   }
                                 </p>
 
-                                <p className="mt-1 text-xs text-slate-500">
+                                <p className="mt-1 truncate text-xs text-slate-500">
                                   {
-                                    provider.description
+                                    item.description
                                   }
                                 </p>
+
                               </div>
 
                               {active && (
                                 <CheckCircle2 className="h-5 w-5 shrink-0 text-violet-600" />
                               )}
+
                             </button>
                           );
                         }
                       )}
+
+                    </div>
+                  </div>
+
+                  {/* =========================================
+                      ACCOUNT
+                  ========================================== */}
+
+                  <div className="rounded-[22px] border border-slate-200 bg-slate-50/70 p-4">
+
+                    <div className="flex items-center justify-between gap-3">
+
+                      <div>
+                        <p className="text-sm font-black text-slate-900">
+                          Source Account
+                        </p>
+
+                        <p className="mt-1 text-xs text-slate-500">
+                          Enter the account that
+                          will fund your wallet.
+                        </p>
+                      </div>
+
+                      {sourceVerificationState ===
+                        "verified" && (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[9px] font-black text-emerald-700">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Verified
+                        </span>
+                      )}
+
                     </div>
 
-                    <div className="mt-3 rounded-xl border border-amber-100 bg-amber-50 px-4 py-3">
-                      <p className="text-[10px] leading-5 text-amber-800">
-                        This demo shows the selected
-                        provider in the payment flow.
-                        Real provider API/checkout
-                        credentials can be connected
-                        later without changing this
-                        wallet architecture.
-                      </p>
+                    <div className="mt-4">
+
+                      <label className="text-[10px] font-black uppercase tracking-wide text-slate-500">
+                        {selectedProvider?.name ||
+                          "Provider"}{" "}
+                        Account Number
+                      </label>
+
+                      <div className="mt-2 relative">
+
+                        <CreditCard className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          autoComplete="off"
+                          value={
+                            sourceAccountNumber
+                          }
+                          onChange={(
+                            event
+                          ) =>
+                            onSourceAccountNumberChange(
+                              event.target.value
+                            )
+                          }
+                          disabled={
+                            submitting ||
+                            sourceVerificationState ===
+                              "checking"
+                          }
+                          placeholder={
+                            addMoneySource ===
+                            "MFS"
+                              ? "01710000001"
+                              : "1000000001"
+                          }
+                          className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-4 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
+                        />
+
+                      </div>
                     </div>
+
+                    <div className="mt-4">
+
+                      <div className="flex items-center justify-between">
+
+                        <label className="text-[10px] font-black uppercase tracking-wide text-slate-500">
+                          Secret Code
+                        </label>
+
+                        <span className="text-[9px] font-medium text-slate-400">
+                          Never stored in browser
+                        </span>
+
+                      </div>
+
+                      <div className="relative mt-2">
+
+                        <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+
+                        <input
+                          type={
+                            showSourceSecret
+                              ? "text"
+                              : "password"
+                          }
+                          autoComplete="off"
+                          value={
+                            sourceSecretCode
+                          }
+                          onChange={(
+                            event
+                          ) =>
+                            onSourceSecretCodeChange(
+                              event.target.value
+                            )
+                          }
+                          disabled={
+                            submitting ||
+                            sourceVerificationState ===
+                              "checking"
+                          }
+                          placeholder={
+                            addMoneySource ===
+                            "MFS"
+                              ? "Enter MFS secret code"
+                              : "Enter bank secret code"
+                          }
+                          className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-12 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
+                        />
+
+                        <button
+                          type="button"
+                          onClick={
+                            onToggleSourceSecret
+                          }
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-700"
+                        >
+                          {showSourceSecret ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </button>
+
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={
+                        onVerifySource
+                      }
+                      disabled={
+                        submitting ||
+                        sourceVerificationState ===
+                          "checking"
+                      }
+                      className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-violet-700 text-xs font-black text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {sourceVerificationState ===
+                      "checking" ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Verifying source...
+                        </>
+                      ) : sourceVerificationState ===
+                        "verified" ? (
+                        <>
+                          <CheckCircle2 className="h-4 w-4" />
+                          Source Verified
+                        </>
+                      ) : (
+                        <>
+                          <ShieldCheck className="h-4 w-4" />
+                          Verify Source Account
+                        </>
+                      )}
+                    </button>
+
+                    {sourceVerificationError && (
+                      <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3">
+                        <div className="flex items-start gap-2">
+                          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
+
+                          <p className="text-[10px] font-semibold leading-5 text-rose-700">
+                            {
+                              sourceVerificationError
+                            }
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {verifiedSource && (
+                      <div className="mt-4 rounded-[18px] border border-emerald-200 bg-emerald-50 p-4">
+
+                        <div className="flex items-start gap-3">
+
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-600 shadow-sm">
+                            <CheckCircle2 className="h-5 w-5" />
+                          </div>
+
+                          <div className="min-w-0">
+
+                            <p className="text-sm font-black text-emerald-800">
+                              {
+                                verifiedSource.accountName
+                              }
+                            </p>
+
+                            <p className="mt-1 font-mono text-[10px] text-emerald-700">
+                              {
+                                verifiedSource.accountNumber
+                              }
+                            </p>
+
+                            <p className="mt-1 text-[10px] font-black text-emerald-700">
+                              Available balance:{" "}
+                              {formatCurrency(
+                                verifiedSource.availableBalance
+                              )}
+                            </p>
+
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                   </div>
                 </>
               )}
 
-              {/* =================================================
-                  AVAILABLE BALANCE
-              ================================================== */}
+              {/* =============================================
+                  BALANCE
+              ============================================== */}
 
-              <div
-                className={
-                  isDeposit
-                    ? "mt-7 rounded-2xl border border-indigo-100 bg-indigo-50/60 p-4"
-                    : "rounded-2xl border border-fuchsia-100 bg-fuchsia-50/60 p-4"
-                }
-              >
-                <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-slate-400">
-                  Available Balance
+              <div className="rounded-[18px] border border-indigo-100 bg-indigo-50 p-4">
+
+                <p className="text-[9px] font-black uppercase tracking-[0.14em] text-indigo-500">
+                  Wallet Balance
                 </p>
 
                 <p className="mt-1 text-lg font-black text-indigo-950">
@@ -2091,18 +2622,21 @@ function FundsModal({
                     balance
                   )}
                 </p>
+
               </div>
 
-              {/* =================================================
+              {/* =============================================
                   AMOUNT
-              ================================================== */}
+              ============================================== */}
 
-              <div className="mt-5">
-                <label className="text-xs font-bold text-slate-700">
+              <div>
+
+                <label className="text-xs font-black text-slate-700">
                   Amount
                 </label>
 
                 <div className="relative mt-2">
+
                   <Banknote className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
 
                   <input
@@ -2111,7 +2645,9 @@ function FundsModal({
                     step="0.01"
                     inputMode="decimal"
                     required
-                    autoFocus
+                    autoFocus={
+                      !isDeposit
+                    }
                     value={amount}
                     onChange={(
                       event
@@ -2137,19 +2673,21 @@ function FundsModal({
                       }
                     }}
                     placeholder="0.00"
-                    className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-4 text-sm font-bold text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+                    className="h-13 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-4 text-sm font-black text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
                   />
+
                 </div>
               </div>
 
-              {/* =================================================
+              {/* =============================================
                   REFERENCE
-              ================================================== */}
+              ============================================== */}
 
-              <div className="mt-4">
-                <label className="text-xs font-bold text-slate-700">
-                  Reference
-                  <span className="ml-1 font-medium text-slate-400">
+              <div>
+
+                <label className="text-xs font-black text-slate-700">
+                  Reference{" "}
+                  <span className="font-medium text-slate-400">
                     (optional)
                   </span>
                 </label>
@@ -2170,73 +2708,138 @@ function FundsModal({
                       ? "Example: Monthly top-up"
                       : "Example: Cash withdrawal"
                   }
-                  className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
+                  className="mt-2 h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 outline-none transition placeholder:text-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
                 />
 
                 <p className="mt-1 text-right text-[10px] text-slate-400">
-                  {reference.length}
-                  /160
+                  {reference.length}/160
                 </p>
+
               </div>
 
-              {/* =================================================
+              {/* =============================================
                   ERROR
-              ================================================== */}
+              ============================================== */}
 
               {errorMessage && (
-                <div className="mt-4 flex items-start gap-3 rounded-2xl border border-rose-100 bg-rose-50 p-4">
+                <div className="flex items-start gap-3 rounded-[18px] border border-rose-200 bg-rose-50 p-4">
+
                   <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
 
-                  <p className="text-xs font-medium leading-5 text-rose-700">
+                  <p className="text-xs font-semibold leading-5 text-rose-700">
                     {errorMessage}
                   </p>
+
                 </div>
               )}
 
-              {/* =================================================
+              {/* =============================================
                   SUBMIT
-              ================================================== */}
+              ============================================== */}
 
               <button
                 type="submit"
-                disabled={submitting}
-                className={`mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm font-bold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                  isDeposit
-                    ? "bg-violet-700 hover:bg-violet-800"
-                    : "bg-fuchsia-700 hover:bg-fuchsia-800"
-                }`}
+                disabled={
+                  submitting ||
+                  (isDeposit &&
+                    sourceVerificationState !==
+                      "verified")
+                }
+                className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-violet-700 text-sm font-black text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
+
                 {submitting ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-
                     Processing...
                   </>
                 ) : isDeposit ? (
                   <>
                     <Plus className="h-4 w-4" />
-
                     Add Money
-                    {selectedProvider
-                      ? ` • ${selectedProvider.name}`
-                      : ""}
                   </>
                 ) : (
                   <>
                     <ArrowDownLeft className="h-4 w-4" />
-
                     Withdraw
                   </>
                 )}
+
               </button>
 
-              <p className="mt-3 text-center text-[10px] leading-4 text-slate-400">
-                Duplicate submissions are
-                protected with a unique
-                request ID.
+              <p className="text-center text-[10px] leading-4 text-slate-400">
+                All fund requests are protected
+                with server-side validation and
+                idempotent processing.
               </p>
             </>
+          ) : (
+            /* =============================================
+               SUCCESS
+            ============================================== */
+
+            <div className="py-5 text-center">
+
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+                <CheckCircle2 className="h-8 w-8" />
+              </div>
+
+              <h3 className="mt-5 text-xl font-black text-slate-900">
+                Transaction completed
+              </h3>
+
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                {successMessage}
+              </p>
+
+              {selectedProvider &&
+                isDeposit && (
+                  <div className="mx-auto mt-5 max-w-sm rounded-[18px] border border-indigo-100 bg-indigo-50 p-4 text-left">
+                    <p className="text-[9px] font-black uppercase tracking-wide text-indigo-500">
+                      Provider
+                    </p>
+
+                    <p className="mt-1 text-sm font-black text-indigo-950">
+                      {
+                        selectedProvider.name
+                      }
+                    </p>
+
+                    {verifiedSource && (
+                      <p className="mt-1 font-mono text-[10px] text-indigo-700">
+                        {
+                          verifiedSource.accountNumber
+                        }
+                      </p>
+                    )}
+                  </div>
+                )}
+
+              {transactionId && (
+                <div className="mx-auto mt-4 max-w-sm rounded-[18px] bg-slate-50 p-4 text-left">
+                  <p className="text-[9px] font-black uppercase tracking-wide text-slate-400">
+                    Transaction ID
+                  </p>
+
+                  <p className="mt-1 break-all font-mono text-[10px] font-bold text-slate-700">
+                    {transactionId}
+                  </p>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={
+                  onClose
+                }
+                className="mt-6 h-11 w-full rounded-xl bg-slate-900 text-xs font-black text-white transition hover:bg-slate-800"
+              >
+                Done
+              </button>
+
+            </div>
           )}
+
         </form>
       </div>
     </div>
@@ -2244,7 +2847,7 @@ function FundsModal({
 }
 
 /* =========================================================
-   WALLET ACTION LINK
+   WALLET ACTION
 ========================================================= */
 
 function WalletAction({
@@ -2266,6 +2869,7 @@ function WalletAction({
       className="group rounded-[23px] border border-indigo-100 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.035)] transition duration-300 hover:-translate-y-1 hover:border-violet-200 hover:shadow-[0_18px_40px_rgba(15,23,42,0.07)]"
     >
       <div className="flex items-start justify-between gap-3">
+
         <div
           className={`flex h-11 w-11 items-center justify-center rounded-[14px] ${iconClass}`}
         >
@@ -2310,6 +2914,7 @@ function WalletActionButton({
       className="group rounded-[23px] border border-indigo-100 bg-white p-5 text-left shadow-[0_10px_30px_rgba(15,23,42,0.035)] transition duration-300 hover:-translate-y-1 hover:border-violet-200 hover:shadow-[0_18px_40px_rgba(15,23,42,0.07)]"
     >
       <div className="flex items-start justify-between gap-3">
+
         <div
           className={`flex h-11 w-11 items-center justify-center rounded-[14px] ${iconClass}`}
         >
@@ -2327,57 +2932,5 @@ function WalletActionButton({
         {description}
       </p>
     </button>
-  );
-}
-
-/* =========================================================
-   CURRENCY
-========================================================= */
-
-function formatCurrency(
-  amount: number
-): string {
-  return `৳ ${Number(
-    amount || 0
-  ).toLocaleString(
-    "en-BD",
-    {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 2,
-    }
-  )}`;
-}
-
-/* =========================================================
-   DATE
-========================================================= */
-
-function formatDate(
-  value?: string
-): string {
-  if (!value) {
-    return "N/A";
-  }
-
-  const date =
-    new Date(value);
-
-  if (
-    Number.isNaN(
-      date.getTime()
-    )
-  ) {
-    return "N/A";
-  }
-
-  return date.toLocaleString(
-    "en-BD",
-    {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }
   );
 }
