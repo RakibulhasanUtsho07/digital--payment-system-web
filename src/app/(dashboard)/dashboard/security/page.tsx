@@ -7,10 +7,7 @@ import React, {
   useState,
 } from "react";
 
-import {
-  AnimatePresence,
-  motion,
-} from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 
 import {
   Activity,
@@ -18,6 +15,7 @@ import {
   Bell,
   CheckCircle2,
   CheckSquare,
+  Copy,
   Eye,
   EyeOff,
   Fingerprint,
@@ -44,6 +42,34 @@ import { apiClient } from "@/lib/api/client";
    TYPES
 ========================================================= */
 
+type ToastType = "success" | "error" | "info";
+
+type TwoFAMethod =
+  | "app"
+  | "sms"
+  | "email";
+
+type RiskLevel =
+  | "Low"
+  | "Moderate"
+  | "Elevated";
+
+type ActivityStatus =
+  | "success"
+  | "warning"
+  | "info";
+
+type TwoFAModalMode =
+  | "setup"
+  | "disable"
+  | "method"
+  | "backup";
+
+interface ToastState {
+  message: string;
+  type: ToastType;
+}
+
 interface Session {
   id: string;
   device: string;
@@ -51,43 +77,44 @@ interface Session {
   os: string;
   location: string;
   ip: string;
-  lastActive: string;
+  lastActiveAt: string;
   expiresAt: string;
   createdAt: string;
   isCurrent: boolean;
 }
 
-interface ActiveSessionsResponse {
-  success: boolean;
-  count: number;
-  sessions: Array<{
-    sessionId: string;
-    device: string;
-    browser: string;
-    os: string;
-    location: string;
-    maskedIp: string;
-    lastActiveAt: string;
-    expiresAt: string;
-    createdAt: string;
-    isCurrent: boolean;
-  }>;
-  message?: string;
-}
-
-interface SessionActionResponse {
-  success: boolean;
-  message?: string;
-  revokedCount?: number;
-}
-
 interface SecurityEvent {
   id: string;
+  type: string;
   title: string;
-  date: string;
-  icon: React.ElementType;
-  status: "success" | "warning" | "info";
-  details?: string;
+  status: ActivityStatus;
+  detail: string;
+  device: string;
+  location: string;
+  ip: string;
+  createdAt: string;
+}
+
+interface ChecklistState {
+  emailVerified: boolean;
+  kycCompleted: boolean;
+  strongPassword: boolean;
+  twoFactorEnabled: boolean;
+}
+
+interface SecurityMetrics {
+  activeSessions: number;
+  failedLogins30d: number;
+  enabledAlerts: number;
+  walletFrozen: boolean;
+}
+
+interface SecurityState {
+  score: number;
+  riskLevel: RiskLevel;
+  checklist: ChecklistState;
+  metrics: SecurityMetrics;
+  lastSecurityCheckAt: string | null;
 }
 
 interface AlertSettings {
@@ -96,88 +123,245 @@ interface AlertSettings {
   failedLogin: boolean;
 }
 
-type TwoFAMethod =
-  | "app"
-  | "sms"
-  | "email";
-
-type ToastType =
-  | "success"
-  | "error"
-  | "info";
+interface DeliveryAvailability {
+  app: boolean;
+  email: boolean;
+  sms: boolean;
+}
 
 /* =========================================================
-   SECURITY ACTIVITY
+   API TYPES
 ========================================================= */
 
-const SECURITY_ACTIVITY: SecurityEvent[] = [
-  {
-    id: "e1",
-    title: "Successful login",
-    date: "Recent account activity",
-    icon: CheckCircle2,
-    status: "success",
-    details:
-      "Authenticated session detected",
-  },
+interface SecurityOverviewResponse {
+  success: boolean;
 
-  {
-    id: "e2",
-    title: "2FA protection reviewed",
-    date: "Security Center",
-    icon: Key,
-    status: "info",
-    details:
-      "Two-factor authentication settings",
-  },
+  security: {
+    score: number;
+    riskLevel: RiskLevel;
 
-  {
-    id: "e3",
-    title: "Failed login attempt",
-    date: "Security event",
-    icon: AlertTriangle,
-    status: "warning",
-    details:
-      "Review your sessions if this activity was not yours",
-  },
+    checklist: {
+      emailVerified: boolean;
+      kycCompleted: boolean;
+      strongPassword: boolean;
+      twoFactorEnabled: boolean;
+    };
 
-  {
-    id: "e4",
-    title: "KYC verification approved",
-    date: "Account activity",
-    icon: ShieldCheck,
-    status: "success",
-  },
+    metrics: {
+      activeSessions: number;
+      failedLogins30d: number;
+      enabledAlerts: number;
+      walletFrozen: boolean;
+    };
 
-  {
-    id: "e5",
-    title: "Login alerts updated",
-    date: "Security settings",
-    icon: Bell,
-    status: "info",
-    details:
-      "Security notification preferences updated",
-  },
-];
+    lastSecurityCheckAt:
+      | string
+      | null;
+  };
+
+  twoFactor: {
+    enabled: boolean;
+
+    method: TwoFAMethod;
+
+    deliveryAvailability: {
+      app: boolean;
+      email: boolean;
+      sms: boolean;
+    };
+  };
+
+  alerts: AlertSettings;
+
+  message?: string;
+}
+
+interface SessionsResponse {
+  success: boolean;
+  count: number;
+
+  sessions: Array<{
+    id: string;
+    device: string;
+    browser: string;
+    os: string;
+    location: string;
+    ip: string;
+    lastActiveAt: string;
+    expiresAt: string;
+    createdAt: string;
+    isCurrent: boolean;
+  }>;
+
+  message?: string;
+}
+
+interface ActivityResponse {
+  success: boolean;
+
+  events: SecurityEvent[];
+
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+
+  message?: string;
+}
+
+interface AlertResponse {
+  success: boolean;
+
+  alerts: AlertSettings;
+
+  message?: string;
+}
+
+interface TwoFASetupResponse {
+  success: boolean;
+
+  setup?: {
+    method: "app";
+    secret: string;
+    otpauthUri: string;
+  };
+
+  message?: string;
+}
+
+interface TwoFAActionResponse {
+  success: boolean;
+
+  method?: TwoFAMethod;
+
+  target?: string;
+
+  backupCodes?: string[];
+
+  warning?: string;
+
+  message?: string;
+}
+
+interface WalletResponse {
+  success: boolean;
+
+  wallet?: {
+    frozen: boolean;
+    frozenAt?: string;
+    unfrozenAt?: string;
+  };
+
+  message?: string;
+}
+
+interface SecurityCheckResponse {
+  success: boolean;
+
+  security?: SecurityState;
+
+  message?: string;
+}
+
+interface PasswordResponse {
+  success: boolean;
+
+  message?: string;
+}
 
 /* =========================================================
-   DEFAULT ALERTS
+   CONSTANTS
 ========================================================= */
 
 const DEFAULT_ALERTS: AlertSettings = {
   newDevice: true,
   suspiciousActivity: true,
-  failedLogin: false,
+  failedLogin: true,
 };
 
 /* =========================================================
-   SESSION ICON
+   HELPERS
 ========================================================= */
 
-function getSessionIcon(
+const methodLabel = (
+  method: TwoFAMethod
+): string => {
+  if (method === "app") {
+    return "Authenticator";
+  }
+
+  return method.toUpperCase();
+};
+
+const formatDate = (
+  value: string | null | undefined
+): string => {
+  if (!value) {
+    return "Never";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Unknown";
+  }
+
+  return date.toLocaleString("en-BD", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+};
+
+const formatRelativeTime = (
+  value: string | null | undefined
+): string => {
+  if (!value) {
+    return "Unknown";
+  }
+
+  const timestamp = new Date(value).getTime();
+
+  if (Number.isNaN(timestamp)) {
+    return "Unknown";
+  }
+
+  const diff = Date.now() - timestamp;
+
+  if (diff < 30_000) {
+    return "Active now";
+  }
+
+  if (diff < 60_000) {
+    return "1 minute ago";
+  }
+
+  if (diff < 3_600_000) {
+    return `${Math.floor(
+      diff / 60_000
+    )} minutes ago`;
+  }
+
+  if (diff < 86_400_000) {
+    return `${Math.floor(
+      diff / 3_600_000
+    )} hours ago`;
+  }
+
+  if (diff < 604_800_000) {
+    return `${Math.floor(
+      diff / 86_400_000
+    )} days ago`;
+  }
+
+  return formatDate(value);
+};
+
+const getSessionIcon = (
   device: string,
   os: string
-): React.ElementType {
+) => {
   const value =
     `${device} ${os}`.toLowerCase();
 
@@ -203,152 +387,180 @@ function getSessionIcon(
   }
 
   return Smartphone;
-}
+};
 
-/* =========================================================
-   DATE HELPERS
-========================================================= */
-
-function formatSessionDate(
-  value: string
-): string {
-  if (!value) {
-    return "Unknown";
+const securityLabel = (
+  score: number
+): string => {
+  if (score >= 90) {
+    return "Strong";
   }
 
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "Unknown";
+  if (score >= 75) {
+    return "Healthy";
   }
 
-  return date.toLocaleString("en-BD", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
-
-function formatRelativeTime(
-  value: string
-): string {
-  if (!value) {
-    return "Unknown";
+  if (score >= 50) {
+    return "Needs review";
   }
 
-  const timestamp =
-    new Date(value).getTime();
-
-  if (Number.isNaN(timestamp)) {
-    return "Unknown";
-  }
-
-  const diff =
-    Date.now() - timestamp;
-
-  if (diff < 30 * 1000) {
-    return "Active now";
-  }
-
-  if (diff < 60 * 1000) {
-    return "1 minute ago";
-  }
-
-  if (diff < 60 * 60 * 1000) {
-    return `${Math.floor(
-      diff / (60 * 1000)
-    )} minutes ago`;
-  }
-
-  if (diff < 24 * 60 * 60 * 1000) {
-    return `${Math.floor(
-      diff / (60 * 60 * 1000)
-    )} hours ago`;
-  }
-
-  if (diff < 7 * 24 * 60 * 60 * 1000) {
-    return `${Math.floor(
-      diff / (24 * 60 * 60 * 1000)
-    )} days ago`;
-  }
-
-  return formatSessionDate(value);
-}
+  return "At risk";
+};
 
 /* =========================================================
    PAGE
 ========================================================= */
 
 export default function SecurityPage() {
-  const [
-    mounted,
-    setMounted,
-  ] = useState(false);
+  /* =======================================================
+     MOUNT
+  ======================================================= */
 
-  const [
-    toast,
-    setToast,
-  ] = useState<{
-    message: string;
-    type: ToastType;
-  } | null>(null);
+  const [mounted, setMounted] =
+    useState(false);
 
   /* =======================================================
-     SECURITY STATE
+     TOAST
+  ======================================================= */
+
+  const [toast, setToast] =
+    useState<ToastState | null>(
+      null
+    );
+
+  /* =======================================================
+     OVERVIEW
   ======================================================= */
 
   const [
-    is2FAEnabled,
-    setIs2FAEnabled,
+    loadingOverview,
+    setLoadingOverview,
   ] = useState(true);
+
+  const [
+    overviewError,
+    setOverviewError,
+  ] = useState("");
+
+  const [
+    security,
+    setSecurity,
+  ] = useState<SecurityState>({
+    score: 0,
+
+    riskLevel: "Elevated",
+
+    checklist: {
+      emailVerified: false,
+      kycCompleted: false,
+      strongPassword: false,
+      twoFactorEnabled: false,
+    },
+
+    metrics: {
+      activeSessions: 0,
+      failedLogins30d: 0,
+      enabledAlerts: 0,
+      walletFrozen: false,
+    },
+
+    lastSecurityCheckAt: null,
+  });
+
+  /* =======================================================
+     2FA
+  ======================================================= */
+
+  const [
+    twoFAEnabled,
+    setTwoFAEnabled,
+  ] = useState(false);
 
   const [
     twoFAMethod,
     setTwoFAMethod,
-  ] =
-    useState<TwoFAMethod>("app");
+  ] = useState<TwoFAMethod>(
+    "app"
+  );
 
   const [
-    alertSettings,
-    setAlertSettings,
+    deliveryAvailability,
+    setDeliveryAvailability,
   ] =
-    useState<AlertSettings>(
-      DEFAULT_ALERTS
+    useState<DeliveryAvailability>({
+      app: true,
+      email: false,
+      sms: false,
+    });
+
+  const [
+    twoFAModal,
+    setTwoFAModal,
+  ] =
+    useState<TwoFAModalMode | null>(
+      null
     );
 
   const [
-    isWalletFrozen,
-    setIsWalletFrozen,
+    twoFABusy,
+    setTwoFABusy,
   ] = useState(false);
 
   const [
-    passwordModalOpen,
-    setPasswordModalOpen,
+    twoFAPassword,
+    setTwoFAPassword,
+  ] = useState("");
+
+  const [
+    showTwoFAPassword,
+    setShowTwoFAPassword,
   ] = useState(false);
 
   const [
-    freezeModalOpen,
-    setFreezeModalOpen,
-  ] = useState(false);
+    setupSecret,
+    setSetupSecret,
+  ] = useState("");
 
   const [
-    showAllActivity,
-    setShowAllActivity,
-  ] = useState(false);
+    setupUri,
+    setSetupUri,
+  ] = useState("");
 
   const [
-    isScanning,
-    setIsScanning,
-  ] = useState(false);
+    setupCode,
+    setSetupCode,
+  ] = useState("");
 
   const [
-    lastSecurityCheck,
-    setLastSecurityCheck,
-  ] = useState(
-    "Not checked yet"
+    selectedMethod,
+    setSelectedMethod,
+  ] = useState<TwoFAMethod>(
+    "app"
+  );
+
+  const [
+    backupCodes,
+    setBackupCodes,
+  ] = useState<string[]>([]);
+
+  const [
+    copied,
+    setCopied,
+  ] = useState(false);
+
+  /* =======================================================
+     ALERTS
+  ======================================================= */
+
+  const [
+    alerts,
+    setAlerts,
+  ] = useState<AlertSettings>(
+    DEFAULT_ALERTS
   );
 
   /* =======================================================
-     REAL ACTIVE SESSIONS
+     SESSIONS
   ======================================================= */
 
   const [
@@ -373,60 +585,205 @@ export default function SecurityPage() {
     useState<string | null>(null);
 
   /* =======================================================
+     ACTIVITY
+  ======================================================= */
+
+  const [
+    events,
+    setEvents,
+  ] = useState<SecurityEvent[]>([]);
+
+  const [
+    activityLoading,
+    setActivityLoading,
+  ] = useState(false);
+
+  const [
+    showAllActivity,
+    setShowAllActivity,
+  ] = useState(false);
+
+  /* =======================================================
+     SECURITY CHECK
+  ======================================================= */
+
+  const [
+    isScanning,
+    setIsScanning,
+  ] = useState(false);
+
+  /* =======================================================
+     PASSWORD
+  ======================================================= */
+
+  const [
+    passwordModalOpen,
+    setPasswordModalOpen,
+  ] = useState(false);
+
+  const [
+    passwordBusy,
+    setPasswordBusy,
+  ] = useState(false);
+
+  /* =======================================================
+     WALLET FREEZE
+  ======================================================= */
+
+  const [
+    freezeModalOpen,
+    setFreezeModalOpen,
+  ] = useState(false);
+
+  const [
+    freezeBusy,
+    setFreezeBusy,
+  ] = useState(false);
+
+  const [
+    walletPassword,
+    setWalletPassword,
+  ] = useState("");
+
+  const [
+    showWalletPassword,
+    setShowWalletPassword,
+  ] = useState(false);
+
+  /* =======================================================
      TOAST
   ======================================================= */
 
-  const showToast = useCallback(
-    (
-      message: string,
-      type: ToastType = "success"
-    ) => {
-      setToast({
-        message,
-        type,
-      });
-    },
-    []
-  );
+  const showToast =
+    useCallback(
+      (
+        message: string,
+        type: ToastType = "success"
+      ) => {
+        setToast({
+          message,
+          type,
+        });
+      },
+      []
+    );
 
   /* =======================================================
-     LOAD REAL ACTIVE SESSIONS
+     LOAD OVERVIEW
   ======================================================= */
 
-  const loadSessions =
+  const loadOverview =
     useCallback(
       async () => {
-        setSessionsLoading(true);
-        setSessionsError("");
+        setLoadingOverview(
+          true
+        );
+
+        setOverviewError("");
 
         try {
           const response =
-            await apiClient<ActiveSessionsResponse>(
-              "/auth/sessions",
+            await apiClient<SecurityOverviewResponse>(
+              "/security/overview",
               {
                 method: "GET",
               }
             );
-
-          console.log(
-            "SECURITY ACTIVE SESSIONS:",
-            response
-          );
 
           if (
             !response.success
           ) {
             throw new Error(
               response.message ||
-                "Unable to load active sessions."
+                "Failed to load Security Center."
             );
           }
 
-          const mappedSessions: Session[] =
+          setSecurity(
+            response.security
+          );
+
+          setTwoFAEnabled(
+            response.twoFactor
+              .enabled
+          );
+
+          setTwoFAMethod(
+            response.twoFactor
+              .method
+          );
+
+          setSelectedMethod(
+            response.twoFactor
+              .method
+          );
+
+          setDeliveryAvailability(
+            response.twoFactor
+              .deliveryAvailability
+          );
+
+          setAlerts(
+            response.alerts
+          );
+        } catch (
+          error
+        ) {
+          console.error(
+            "SECURITY OVERVIEW ERROR:",
+            error
+          );
+
+          setOverviewError(
+            error instanceof Error
+              ? error.message
+              : "Failed to load Security Center."
+          );
+        } finally {
+          setLoadingOverview(
+            false
+          );
+        }
+      },
+      []
+    );
+
+  /* =======================================================
+     LOAD SESSIONS
+  ======================================================= */
+
+  const loadSessions =
+    useCallback(
+      async () => {
+        setSessionsLoading(
+          true
+        );
+
+        setSessionsError("");
+
+        try {
+          const response =
+            await apiClient<SessionsResponse>(
+              "/security/sessions",
+              {
+                method: "GET",
+              }
+            );
+
+          if (
+            !response.success
+          ) {
+            throw new Error(
+              response.message ||
+                "Failed to load sessions."
+            );
+          }
+
+          const mapped: Session[] =
             response.sessions.map(
               (session) => ({
                 id:
-                  session.sessionId,
+                  session.id,
 
                 device:
                   session.device ||
@@ -445,10 +802,10 @@ export default function SecurityPage() {
                   "Unknown location",
 
                 ip:
-                  session.maskedIp ||
+                  session.ip ||
                   "",
 
-                lastActive:
+                lastActiveAt:
                   session.lastActiveAt,
 
                 expiresAt:
@@ -462,25 +819,102 @@ export default function SecurityPage() {
               })
             );
 
-          setSessions(
-            mappedSessions
-          );
-        } catch (error) {
+          setSessions(mapped);
+        } catch (
+          error
+        ) {
           console.error(
-            "LOAD SECURITY SESSIONS ERROR:",
+            "SECURITY SESSIONS ERROR:",
             error
           );
 
           setSessionsError(
             error instanceof Error
               ? error.message
-              : "Unable to load active sessions."
+              : "Failed to load sessions."
           );
         } finally {
-          setSessionsLoading(false);
+          setSessionsLoading(
+            false
+          );
         }
       },
       []
+    );
+
+  /* =======================================================
+     LOAD ACTIVITY
+  ======================================================= */
+
+  const loadActivity =
+    useCallback(
+      async () => {
+        setActivityLoading(
+          true
+        );
+
+        try {
+          const response =
+            await apiClient<ActivityResponse>(
+              "/security/activity?page=1&limit=50",
+              {
+                method: "GET",
+              }
+            );
+
+          if (
+            !response.success
+          ) {
+            throw new Error(
+              response.message ||
+                "Failed to load security activity."
+            );
+          }
+
+          setEvents(
+            response.events
+          );
+        } catch (
+          error
+        ) {
+          console.error(
+            "SECURITY ACTIVITY ERROR:",
+            error
+          );
+
+          showToast(
+            error instanceof Error
+              ? error.message
+              : "Failed to load security activity.",
+            "error"
+          );
+        } finally {
+          setActivityLoading(
+            false
+          );
+        }
+      },
+      [showToast]
+    );
+
+  /* =======================================================
+     REFRESH ALL
+  ======================================================= */
+
+  const refreshAll =
+    useCallback(
+      async () => {
+        await Promise.all([
+          loadOverview(),
+          loadSessions(),
+          loadActivity(),
+        ]);
+      },
+      [
+        loadOverview,
+        loadSessions,
+        loadActivity,
+      ]
     );
 
   /* =======================================================
@@ -490,35 +924,42 @@ export default function SecurityPage() {
   useEffect(() => {
     setMounted(true);
 
-    try {
-      const savedAlerts =
-        window.localStorage.getItem(
-          "coffer_security_alerts"
-        ) ??
-        window.localStorage.getItem(
-          "nova_security_alerts"
-        );
+    void refreshAll();
 
-      if (savedAlerts) {
-        const parsed =
-          JSON.parse(
-            savedAlerts
-          ) as Partial<AlertSettings>;
-
-        setAlertSettings({
-          ...DEFAULT_ALERTS,
-          ...parsed,
-        });
-      }
-    } catch (error) {
-      console.error(
-        "SECURITY SETTINGS LOAD ERROR:",
-        error
+    const timer =
+      window.setInterval(
+        () => {
+          if (
+            document.visibilityState ===
+            "visible"
+          ) {
+            void refreshAll();
+          }
+        },
+        30_000
       );
-    }
 
-    void loadSessions();
-  }, [loadSessions]);
+    const handleFocus =
+      () => {
+        void refreshAll();
+      };
+
+    window.addEventListener(
+      "focus",
+      handleFocus
+    );
+
+    return () => {
+      window.clearInterval(
+        timer
+      );
+
+      window.removeEventListener(
+        "focus",
+        handleFocus
+      );
+    };
+  }, [refreshAll]);
 
   /* =======================================================
      TOAST AUTO DISMISS
@@ -530,9 +971,12 @@ export default function SecurityPage() {
     }
 
     const timer =
-      window.setTimeout(() => {
-        setToast(null);
-      }, 3000);
+      window.setTimeout(
+        () => {
+          setToast(null);
+        },
+        3000
+      );
 
     return () =>
       window.clearTimeout(
@@ -548,115 +992,127 @@ export default function SecurityPage() {
     useMemo(
       () =>
         Object.values(
-          alertSettings
-        ).filter(Boolean).length,
-      [alertSettings]
+          alerts
+        ).filter(Boolean)
+          .length,
+      [alerts]
     );
 
   const failedLoginCount =
-    useMemo(
-      () =>
-        SECURITY_ACTIVITY.filter(
-          (event) =>
-            event.status ===
-            "warning"
-        ).length,
-      []
-    );
+    security.metrics
+      .failedLogins30d;
 
-  const protectionScore =
-    useMemo(() => {
-      let score = 50;
-
-      if (is2FAEnabled) {
-        score += 20;
-      }
-
-      if (
-        alertSettings.newDevice
-      ) {
-        score += 8;
-      }
-
-      if (
-        alertSettings.suspiciousActivity
-      ) {
-        score += 8;
-      }
-
-      if (
-        alertSettings.failedLogin
-      ) {
-        score += 5;
-      }
-
-      if (
-        sessions.length > 0 &&
-        sessions.length <= 3
-      ) {
-        score += 5;
-      }
-
-      return Math.min(
-        100,
-        score
-      );
-    }, [
-      alertSettings,
-      is2FAEnabled,
-      sessions.length,
-    ]);
-
-  const riskLevel =
-    protectionScore >= 90
-      ? "Low"
-      : protectionScore >= 75
-        ? "Moderate"
-        : "Elevated";
-
-  const visibleActivity =
+  const visibleEvents =
     showAllActivity
-      ? SECURITY_ACTIVITY
-      : SECURITY_ACTIVITY.slice(
-          0,
-          3
-        );
+      ? events
+      : events.slice(0, 5);
 
   /* =======================================================
      ALERT UPDATE
   ======================================================= */
 
-  const updateAlert = (
-    key: keyof AlertSettings
-  ) => {
-    const next = {
-      ...alertSettings,
+  const updateAlert =
+    async (
+      key: keyof AlertSettings
+    ) => {
+      const previousValue =
+        alerts[key];
 
-      [key]:
-        !alertSettings[key],
-    };
+      const nextValue =
+        !previousValue;
 
-    setAlertSettings(next);
-
-    try {
-      window.localStorage.setItem(
-        "coffer_security_alerts",
-        JSON.stringify(next)
+      setAlerts(
+        (current) => ({
+          ...current,
+          [key]: nextValue,
+        })
       );
-    } catch {
-      // Ignore storage errors.
-    }
 
-    showToast(
-      `${formatSettingName(
-        key
-      )} alerts ${
-        next[key]
-          ? "enabled"
-          : "disabled"
-      }.`
-    );
-  };
+      try {
+        const response =
+          await apiClient<AlertResponse>(
+            "/security/alerts",
+            {
+              method: "PATCH",
+
+              body:
+                JSON.stringify({
+                  [key]: nextValue,
+                }),
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+            }
+          );
+
+        if (
+          !response.success
+        ) {
+          throw new Error(
+            response.message ||
+              "Failed to update alert preference."
+          );
+        }
+
+        setAlerts(
+          response.alerts
+        );
+
+        setSecurity(
+          (current) => ({
+            ...current,
+
+            metrics: {
+              ...current.metrics,
+
+              enabledAlerts:
+                Object.values(
+                  response.alerts
+                ).filter(
+                  Boolean
+                ).length,
+            },
+          })
+        );
+
+        const label =
+          key === "newDevice"
+            ? "New device"
+            : key ===
+                "suspiciousActivity"
+              ? "Suspicious activity"
+              : "Failed login";
+
+        showToast(
+          `${label} alerts ${
+            nextValue
+              ? "enabled"
+              : "disabled"
+          }.`
+        );
+
+        await loadActivity();
+      } catch (
+        error
+      ) {
+        setAlerts(
+          (current) => ({
+            ...current,
+            [key]:
+              previousValue,
+          })
+        );
+
+        showToast(
+          error instanceof Error
+            ? error.message
+            : "Failed to update alert preference.",
+          "error"
+        );
+      }
+    };
 
   /* =======================================================
      TERMINATE ONE SESSION
@@ -676,8 +1132,8 @@ export default function SecurityPage() {
 
       try {
         const response =
-          await apiClient<SessionActionResponse>(
-            `/auth/sessions/${encodeURIComponent(
+          await apiClient<PasswordResponse>(
+            `/security/sessions/${encodeURIComponent(
               sessionId
             )}`,
             {
@@ -690,33 +1146,35 @@ export default function SecurityPage() {
         ) {
           throw new Error(
             response.message ||
-              "Unable to log out this device."
+              "Failed to sign out session."
           );
         }
 
         setSessions(
           (current) =>
             current.filter(
-              (session) =>
-                session.id !==
+              (item) =>
+                item.id !==
                 sessionId
             )
         );
 
         showToast(
           response.message ||
-            "The selected session has been terminated."
-        );
-      } catch (error) {
-        console.error(
-          "TERMINATE SESSION ERROR:",
-          error
+            "Session signed out successfully."
         );
 
+        await Promise.all([
+          loadOverview(),
+          loadActivity(),
+        ]);
+      } catch (
+        error
+      ) {
         showToast(
           error instanceof Error
             ? error.message
-            : "Unable to log out this device.",
+            : "Failed to sign out session.",
           "error"
         );
       } finally {
@@ -732,20 +1190,14 @@ export default function SecurityPage() {
 
   const terminateOtherSessions =
     async () => {
-      if (
-        sessionActionLoading
-      ) {
-        return;
-      }
-
       setSessionActionLoading(
         "others"
       );
 
       try {
         const response =
-          await apiClient<SessionActionResponse>(
-            "/auth/sessions/others",
+          await apiClient<PasswordResponse>(
+            "/security/sessions/others",
             {
               method: "DELETE",
             }
@@ -756,32 +1208,34 @@ export default function SecurityPage() {
         ) {
           throw new Error(
             response.message ||
-              "Unable to log out other devices."
+              "Failed to sign out other sessions."
           );
         }
 
         setSessions(
           (current) =>
             current.filter(
-              (session) =>
-                session.isCurrent
+              (item) =>
+                item.isCurrent
             )
         );
 
         showToast(
           response.message ||
-            "All other sessions have been terminated."
-        );
-      } catch (error) {
-        console.error(
-          "TERMINATE OTHER SESSIONS ERROR:",
-          error
+            "Other sessions signed out successfully."
         );
 
+        await Promise.all([
+          loadOverview(),
+          loadActivity(),
+        ]);
+      } catch (
+        error
+      ) {
         showToast(
           error instanceof Error
             ? error.message
-            : "Unable to log out other devices.",
+            : "Failed to sign out other sessions.",
           "error"
         );
       } finally {
@@ -792,7 +1246,7 @@ export default function SecurityPage() {
     };
 
   /* =======================================================
-     SECURITY SCAN
+     SECURITY CHECK
   ======================================================= */
 
   const runSecurityCheck =
@@ -804,32 +1258,40 @@ export default function SecurityPage() {
       setIsScanning(true);
 
       try {
-        await new Promise<void>(
-          (resolve) =>
-            window.setTimeout(
-              resolve,
-              1600
-            )
-        );
-
-        await loadSessions();
-
-        setLastSecurityCheck(
-          new Date().toLocaleTimeString(
-            [],
+        const response =
+          await apiClient<SecurityCheckResponse>(
+            "/security/check",
             {
-              hour: "2-digit",
-              minute: "2-digit",
+              method: "POST",
             }
-          )
+          );
+
+        if (
+          !response.success ||
+          !response.security
+        ) {
+          throw new Error(
+            response.message ||
+              "Security check failed."
+          );
+        }
+
+        setSecurity(
+          response.security
         );
 
         showToast(
-          `Security scan completed. Protection score: ${protectionScore}/100.`
+          `Security check complete. Score: ${response.security.score}/100.`
         );
-      } catch {
+
+        await loadActivity();
+      } catch (
+        error
+      ) {
         showToast(
-          "Security scan failed. Please try again.",
+          error instanceof Error
+            ? error.message
+            : "Security check failed.",
           "error"
         );
       } finally {
@@ -838,23 +1300,752 @@ export default function SecurityPage() {
     };
 
   /* =======================================================
-     REVIEW SESSIONS
+     2FA START SETUP
+  ======================================================= */
+
+  const startTwoFASetup =
+    async () => {
+      if (
+        !twoFAPassword.trim()
+      ) {
+        showToast(
+          "Enter your current password first.",
+          "error"
+        );
+
+        return;
+      }
+
+      setTwoFABusy(true);
+
+      try {
+        const response =
+          await apiClient<TwoFASetupResponse>(
+            "/security/2fa/setup/start",
+            {
+              method: "POST",
+
+              body:
+                JSON.stringify({
+                  password:
+                    twoFAPassword,
+                }),
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+            }
+          );
+
+        if (
+          !response.success ||
+          !response.setup
+        ) {
+          throw new Error(
+            response.message ||
+              "Failed to start 2FA setup."
+          );
+        }
+
+        setSetupSecret(
+          response.setup.secret
+        );
+
+        setSetupUri(
+          response.setup.otpauthUri
+        );
+
+        setSetupCode("");
+
+        setTwoFAPassword("");
+
+        setTwoFAModal("setup");
+
+        showToast(
+          "2FA setup started. Add the secret to your authenticator app.",
+          "info"
+        );
+      } catch (
+        error
+      ) {
+        showToast(
+          error instanceof Error
+            ? error.message
+            : "Failed to start 2FA setup.",
+          "error"
+        );
+      } finally {
+        setTwoFABusy(false);
+      }
+    };
+
+  /* =======================================================
+     VERIFY 2FA
+  ======================================================= */
+
+  const verifyTwoFASetup =
+    async () => {
+      const code =
+        setupCode.trim();
+
+      if (
+        !/^\d{6}$/.test(code)
+      ) {
+        showToast(
+          "Enter the 6-digit authenticator code.",
+          "error"
+        );
+
+        return;
+      }
+
+      setTwoFABusy(true);
+
+      try {
+        const response =
+          await apiClient<TwoFAActionResponse>(
+            "/security/2fa/setup/verify",
+            {
+              method: "POST",
+
+              body:
+                JSON.stringify({
+                  code,
+                }),
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+            }
+          );
+
+        if (
+          !response.success
+        ) {
+          throw new Error(
+            response.message ||
+              "Failed to enable 2FA."
+          );
+        }
+
+        setTwoFAEnabled(true);
+
+        setTwoFAMethod(
+          "app"
+        );
+
+        setSelectedMethod(
+          "app"
+        );
+
+        setTwoFAModal(null);
+
+        setSetupCode("");
+
+        setSetupSecret("");
+
+        setSetupUri("");
+
+        setTwoFAPassword("");
+
+        if (
+          response.backupCodes
+            ?.length
+        ) {
+          setBackupCodes(
+            response.backupCodes
+          );
+        }
+
+        showToast(
+          response.message ||
+            "Two-factor authentication enabled."
+        );
+
+        await refreshAll();
+      } catch (
+        error
+      ) {
+        showToast(
+          error instanceof Error
+            ? error.message
+            : "Failed to enable 2FA.",
+          "error"
+        );
+      } finally {
+        setTwoFABusy(false);
+      }
+    };
+
+  /* =======================================================
+     DISABLE 2FA
+  ======================================================= */
+
+  const disableTwoFA =
+    async () => {
+      if (
+        !twoFAPassword.trim()
+      ) {
+        showToast(
+          "Enter your current password first.",
+          "error"
+        );
+
+        return;
+      }
+
+      setTwoFABusy(true);
+
+      try {
+        const response =
+          await apiClient<TwoFAActionResponse>(
+            "/security/2fa/disable",
+            {
+              method: "POST",
+
+              body:
+                JSON.stringify({
+                  password:
+                    twoFAPassword,
+                }),
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+            }
+          );
+
+        if (
+          !response.success
+        ) {
+          throw new Error(
+            response.message ||
+              "Failed to disable 2FA."
+          );
+        }
+
+        setTwoFAEnabled(
+          false
+        );
+
+        setTwoFAMethod(
+          "app"
+        );
+
+        setSelectedMethod(
+          "app"
+        );
+
+        setTwoFAModal(null);
+
+        setTwoFAPassword("");
+
+        setBackupCodes([]);
+
+        showToast(
+          response.message ||
+            "Two-factor authentication disabled.",
+          "info"
+        );
+
+        await refreshAll();
+      } catch (
+        error
+      ) {
+        showToast(
+          error instanceof Error
+            ? error.message
+            : "Failed to disable 2FA.",
+          "error"
+        );
+      } finally {
+        setTwoFABusy(false);
+      }
+    };
+
+  /* =======================================================
+     CHANGE 2FA METHOD
+  ======================================================= */
+
+  const updateTwoFAMethod =
+    async () => {
+      if (
+        !twoFAPassword.trim()
+      ) {
+        showToast(
+          "Enter your current password first.",
+          "error"
+        );
+
+        return;
+      }
+
+      setTwoFABusy(true);
+
+      try {
+        const response =
+          await apiClient<TwoFAActionResponse>(
+            "/security/2fa/method",
+            {
+              method: "PATCH",
+
+              body:
+                JSON.stringify({
+                  method:
+                    selectedMethod,
+
+                  password:
+                    twoFAPassword,
+                }),
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+            }
+          );
+
+        if (
+          !response.success
+        ) {
+          throw new Error(
+            response.message ||
+              "Failed to change 2FA method."
+          );
+        }
+
+        const updatedMethod =
+          response.method ||
+          selectedMethod;
+
+        setTwoFAMethod(
+          updatedMethod
+        );
+
+        setSelectedMethod(
+          updatedMethod
+        );
+
+        setTwoFAModal(null);
+
+        setTwoFAPassword("");
+
+        showToast(
+          response.message ||
+            `Primary 2FA method changed to ${methodLabel(
+              updatedMethod
+            )}.`
+        );
+
+        await refreshAll();
+      } catch (
+        error
+      ) {
+        showToast(
+          error instanceof Error
+            ? error.message
+            : "Failed to change 2FA method.",
+          "error"
+        );
+      } finally {
+        setTwoFABusy(false);
+      }
+    };
+
+  /* =======================================================
+     BACKUP CODES
+  ======================================================= */
+
+  const regenerateBackupCodes =
+    async () => {
+      if (
+        !twoFAPassword.trim()
+      ) {
+        showToast(
+          "Enter your current password first.",
+          "error"
+        );
+
+        return;
+      }
+
+      setTwoFABusy(true);
+
+      try {
+        const response =
+          await apiClient<TwoFAActionResponse>(
+            "/security/2fa/backup-codes",
+            {
+              method: "POST",
+
+              body:
+                JSON.stringify({
+                  password:
+                    twoFAPassword,
+                }),
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+            }
+          );
+
+        if (
+          !response.success
+        ) {
+          throw new Error(
+            response.message ||
+              "Failed to regenerate backup codes."
+          );
+        }
+
+        setBackupCodes(
+          response.backupCodes ||
+            []
+        );
+
+        setTwoFAModal(null);
+
+        setTwoFAPassword("");
+
+        showToast(
+          response.message ||
+            "New backup codes generated."
+        );
+
+        await loadActivity();
+      } catch (
+        error
+      ) {
+        showToast(
+          error instanceof Error
+            ? error.message
+            : "Failed to regenerate backup codes.",
+          "error"
+        );
+      } finally {
+        setTwoFABusy(false);
+      }
+    };
+
+  /* =======================================================
+     PASSWORD
+  ======================================================= */
+
+  const changePassword =
+    async (
+      currentPassword: string,
+      newPassword: string
+    ) => {
+      setPasswordBusy(
+        true
+      );
+
+      try {
+        const response =
+          await apiClient<PasswordResponse>(
+            "/security/password",
+            {
+              method: "POST",
+
+              body:
+                JSON.stringify({
+                  currentPassword,
+                  newPassword,
+                }),
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+            }
+          );
+
+        if (
+          !response.success
+        ) {
+          throw new Error(
+            response.message ||
+              "Failed to change password."
+          );
+        }
+
+        setPasswordModalOpen(
+          false
+        );
+
+        showToast(
+          response.message ||
+            "Password changed successfully."
+        );
+
+        await refreshAll();
+      } catch (
+        error
+      ) {
+        showToast(
+          error instanceof Error
+            ? error.message
+            : "Failed to change password.",
+          "error"
+        );
+
+        throw error;
+      } finally {
+        setPasswordBusy(
+          false
+        );
+      }
+    };
+
+  /* =======================================================
+     FREEZE
+  ======================================================= */
+
+  const freezeWallet =
+    async () => {
+      if (
+        !walletPassword.trim()
+      ) {
+        showToast(
+          "Enter your current password first.",
+          "error"
+        );
+
+        return;
+      }
+
+      setFreezeBusy(true);
+
+      try {
+        const response =
+          await apiClient<WalletResponse>(
+            "/security/wallet/freeze",
+            {
+              method: "POST",
+
+              body:
+                JSON.stringify({
+                  password:
+                    walletPassword,
+                }),
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+            }
+          );
+
+        if (
+          !response.success
+        ) {
+          throw new Error(
+            response.message ||
+              "Failed to freeze wallet."
+          );
+        }
+
+        setFreezeModalOpen(
+          false
+        );
+
+        setWalletPassword("");
+
+        showToast(
+          response.message ||
+            "Wallet frozen successfully.",
+          "info"
+        );
+
+        await refreshAll();
+      } catch (
+        error
+      ) {
+        showToast(
+          error instanceof Error
+            ? error.message
+            : "Failed to freeze wallet.",
+          "error"
+        );
+      } finally {
+        setFreezeBusy(false);
+      }
+    };
+
+  /* =======================================================
+     UNFREEZE
+  ======================================================= */
+
+  const unfreezeWallet =
+    async () => {
+      if (
+        !walletPassword.trim()
+      ) {
+        showToast(
+          "Enter your current password first.",
+          "error"
+        );
+
+        return;
+      }
+
+      setFreezeBusy(true);
+
+      try {
+        const response =
+          await apiClient<WalletResponse>(
+            "/security/wallet/unfreeze",
+            {
+              method: "POST",
+
+              body:
+                JSON.stringify({
+                  password:
+                    walletPassword,
+                }),
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+            }
+          );
+
+        if (
+          !response.success
+        ) {
+          throw new Error(
+            response.message ||
+              "Failed to unfreeze wallet."
+          );
+        }
+
+        setFreezeModalOpen(
+          false
+        );
+
+        setWalletPassword("");
+
+        showToast(
+          response.message ||
+            "Wallet unfrozen successfully."
+        );
+
+        await refreshAll();
+      } catch (
+        error
+      ) {
+        showToast(
+          error instanceof Error
+            ? error.message
+            : "Failed to unfreeze wallet.",
+          "error"
+        );
+      } finally {
+        setFreezeBusy(false);
+      }
+    };
+
+  /* =======================================================
+     COPY SETUP SECRET
+  ======================================================= */
+
+  const copySetupData =
+    async () => {
+      if (!setupSecret) {
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(
+          setupSecret
+        );
+
+        setCopied(true);
+
+        window.setTimeout(
+          () =>
+            setCopied(false),
+          1800
+        );
+
+        showToast(
+          "Authenticator secret copied."
+        );
+      } catch {
+        showToast(
+          "Could not copy the secret.",
+          "error"
+        );
+      }
+    };
+
+  /* =======================================================
+     COPY BACKUP
+  ======================================================= */
+
+  const copyBackupCodes =
+    async () => {
+      if (
+        backupCodes.length ===
+        0
+      ) {
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(
+          backupCodes.join("\n")
+        );
+
+        showToast(
+          "Backup codes copied."
+        );
+      } catch {
+        showToast(
+          "Could not copy backup codes.",
+          "error"
+        );
+      }
+    };
+
+  /* =======================================================
+     OPEN SESSIONS
   ======================================================= */
 
   const reviewSessions =
-    () => {
-      document
-        .getElementById(
-          "active-sessions"
-        )
-        ?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        });
+    async () => {
+      await loadSessions();
+
+      window.setTimeout(
+        () => {
+          document
+            .getElementById(
+              "active-sessions"
+            )
+            ?.scrollIntoView({
+              behavior:
+                "smooth",
+              block: "start",
+            });
+        },
+        50
+      );
     };
 
+  /* =======================================================
+     PRE-MOUNT
+  ======================================================= */
+
   if (!mounted) {
-    return null;
+    return (
+      <div className="min-h-screen bg-background" />
+    );
   }
 
   /* =======================================================
@@ -862,74 +2053,131 @@ export default function SecurityPage() {
   ======================================================= */
 
   return (
-    <div className="min-h-screen bg-background pb-14 font-sans text-foreground transition-colors duration-300">
-      <div className="mx-auto max-w-[1480px] space-y-8 px-3 py-4 sm:px-5 lg:px-7 lg:py-7">
+    <div className="min-h-screen bg-background pb-12 text-foreground">
+      <div className="mx-auto max-w-[1450px] space-y-8 px-3 py-4 sm:px-5 lg:px-7">
 
-        {/* =================================================
-            HERO
-        ================================================= */}
+        {/* HERO */}
 
         <SecurityHero
-          score={protectionScore}
-          riskLevel={riskLevel}
+          score={security.score}
+          riskLevel={
+            security.riskLevel
+          }
+          loading={
+            loadingOverview
+          }
+          lastChecked={
+            security.lastSecurityCheckAt
+          }
+          onRefresh={() =>
+            void refreshAll()
+          }
         />
 
-        {/* =================================================
-            MAIN GRID
-        ================================================= */}
+        {/* OVERVIEW ERROR */}
 
-        <div className="grid grid-cols-1 items-start gap-8 xl:grid-cols-[minmax(0,1.65fr)_minmax(330px,0.78fr)]">
+        {overviewError && (
+          <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold text-rose-700">
+            {overviewError}
+          </div>
+        )}
 
-          {/* =================================================
-              LEFT COLUMN
-          ================================================= */}
+        {/* MAIN GRID */}
+
+        <div className="grid grid-cols-1 items-start gap-8 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.8fr)]">
+
+          {/* LEFT */}
 
           <div className="min-w-0 space-y-8">
 
+            {/* 2FA */}
+
             <TwoFactorCard
               enabled={
-                is2FAEnabled
+                twoFAEnabled
               }
               method={
                 twoFAMethod
               }
-              onToggle={() => {
-                const next =
-                  !is2FAEnabled;
-
-                setIs2FAEnabled(
-                  next
+              availability={
+                deliveryAvailability
+              }
+              busy={
+                twoFABusy
+              }
+              onEnable={() => {
+                setTwoFAPassword(
+                  ""
                 );
 
-                showToast(
-                  `Two-factor authentication ${
-                    next
-                      ? "enabled"
-                      : "disabled"
-                  }.`,
-                  next
-                    ? "success"
-                    : "info"
+                setShowTwoFAPassword(
+                  false
+                );
+
+                setSetupSecret(
+                  ""
+                );
+
+                setSetupUri(
+                  ""
+                );
+
+                setSetupCode(
+                  ""
+                );
+
+                setTwoFAModal(
+                  "setup"
+                );
+              }}
+              onDisable={() => {
+                setTwoFAPassword(
+                  ""
+                );
+
+                setShowTwoFAPassword(
+                  false
+                );
+
+                setTwoFAModal(
+                  "disable"
                 );
               }}
               onMethodChange={(
                 method
               ) => {
-                setTwoFAMethod(
+                setSelectedMethod(
                   method
                 );
 
-                showToast(
-                  "Primary authentication method updated."
+                setTwoFAPassword(
+                  ""
+                );
+
+                setShowTwoFAPassword(
+                  false
+                );
+
+                setTwoFAModal(
+                  "method"
                 );
               }}
-              onBackupCodes={() =>
-                showToast(
-                  "Backup-code endpoint is ready to connect.",
-                  "info"
-                )
-              }
+              onBackupCodes={() => {
+                setTwoFAPassword(
+                  ""
+                );
+
+                setShowTwoFAPassword(
+                  false
+                );
+
+                setTwoFAModal(
+                  "backup"
+                );
+              }}
             />
+
+            {/* PASSWORD */}
 
             <PasswordCard
               onChangePassword={() =>
@@ -939,80 +2187,88 @@ export default function SecurityPage() {
               }
             />
 
-            <div id="active-sessions">
-              <SessionsCard
-                sessions={
-                  sessions
-                }
-                loading={
-                  sessionsLoading
-                }
-                error={
-                  sessionsError
-                }
-                actionLoading={
-                  sessionActionLoading
-                }
-                onReload={() =>
-                  void loadSessions()
-                }
-                onTerminate={
-                  terminateSession
-                }
-                onTerminateOthers={
-                  terminateOtherSessions
-                }
-              />
-            </div>
+            {/* SESSIONS */}
+
+            <SessionsCard
+              sessions={
+                sessions
+              }
+              loading={
+                sessionsLoading
+              }
+              error={
+                sessionsError
+              }
+              actionLoading={
+                sessionActionLoading
+              }
+              onReload={() =>
+                void loadSessions()
+              }
+              onTerminate={
+                terminateSession
+              }
+              onTerminateOthers={
+                terminateOtherSessions
+              }
+            />
+
+            {/* ACTIVITY */}
 
             <RecentActivityCard
               events={
-                visibleActivity
+                visibleEvents
               }
               expanded={
                 showAllActivity
               }
+              loading={
+                activityLoading
+              }
               onToggle={() =>
                 setShowAllActivity(
-                  (
-                    current
-                  ) =>
-                    !current
+                  (value) =>
+                    !value
                 )
               }
             />
           </div>
 
-          {/* =================================================
-              RIGHT COLUMN
-          ================================================= */}
+          {/* RIGHT */}
 
-          <aside className="flex min-w-0 flex-col gap-6 xl:sticky xl:top-6">
+          <aside className="flex min-w-0 flex-col gap-8 xl:sticky xl:top-6">
+
+            {/* CHECKLIST */}
 
             <ProtectionChecklist
-              is2FAEnabled={
-                is2FAEnabled
+              checklist={
+                security.checklist
               }
             />
 
+            {/* ALERTS */}
+
             <LoginAlerts
               settings={
-                alertSettings
+                alerts
               }
               onChange={
                 updateAlert
               }
             />
 
+            {/* MONITOR */}
+
             <SecurityIntelligence
               score={
-                protectionScore
+                security.score
               }
               riskLevel={
-                riskLevel
+                security.riskLevel
               }
               sessionCount={
-                sessions.length
+                security.metrics
+                  .activeSessions
               }
               warningCount={
                 failedLoginCount
@@ -1021,89 +2277,236 @@ export default function SecurityPage() {
                 enabledAlertCount
               }
               is2FAEnabled={
-                is2FAEnabled
+                twoFAEnabled
               }
               isWalletFrozen={
-                isWalletFrozen
+                security.metrics
+                  .walletFrozen
               }
               scanning={
                 isScanning
               }
               lastChecked={
-                lastSecurityCheck
+                security.lastSecurityCheckAt
               }
-              onScan={
-                runSecurityCheck
+              onScan={() =>
+                void runSecurityCheck()
               }
               onReviewSessions={
                 reviewSessions
               }
             />
 
+            {/* TIPS */}
+
             <SecurityTips />
+
+            {/* EMERGENCY */}
 
             <EmergencyProtection
               frozen={
-                isWalletFrozen
+                security.metrics
+                  .walletFrozen
               }
-              onFreeze={() =>
+              busy={
+                freezeBusy
+              }
+              onOpen={() => {
+                setWalletPassword(
+                  ""
+                );
+
+                setShowWalletPassword(
+                  false
+                );
+
                 setFreezeModalOpen(
                   true
-                )
-              }
+                );
+              }}
+              onUnfreeze={() => {
+                setWalletPassword(
+                  ""
+                );
+
+                setShowWalletPassword(
+                  false
+                );
+
+                setFreezeModalOpen(
+                  true
+                );
+              }}
             />
           </aside>
         </div>
       </div>
 
-      <PasswordModal
-        open={
-          passwordModalOpen
-        }
-        onClose={() =>
-          setPasswordModalOpen(
-            false
-          )
-        }
-        onSuccess={() => {
-          setPasswordModalOpen(
-            false
-          );
+      {/* PASSWORD MODAL */}
 
-          showToast(
-            "Password change endpoint is ready to connect.",
-            "info"
-          );
-        }}
-      />
+      <AnimatePresence>
+        {passwordModalOpen && (
+          <PasswordModal
+            busy={
+              passwordBusy
+            }
+            onClose={() =>
+              setPasswordModalOpen(
+                false
+              )
+            }
+            onSubmit={
+              changePassword
+            }
+          />
+        )}
+      </AnimatePresence>
 
-      <FreezeWalletModal
-        open={
-          freezeModalOpen
-        }
-        onClose={() =>
-          setFreezeModalOpen(
-            false
-          )
-        }
-        onConfirm={() => {
-          setIsWalletFrozen(
-            true
-          );
+      {/* 2FA MODAL */}
 
-          setFreezeModalOpen(
-            false
-          );
+      <AnimatePresence>
+        {twoFAModal && (
+          <TwoFAModal
+            mode={
+              twoFAModal
+            }
+            enabled={
+              twoFAEnabled
+            }
+            busy={
+              twoFABusy
+            }
+            password={
+              twoFAPassword
+            }
+            setPassword={
+              setTwoFAPassword
+            }
+            showPassword={
+              showTwoFAPassword
+            }
+            setShowPassword={
+              setShowTwoFAPassword
+            }
+            secret={
+              setupSecret
+            }
+            uri={
+              setupUri
+            }
+            code={
+              setupCode
+            }
+            setCode={
+              setSetupCode
+            }
+            selectedMethod={
+              selectedMethod
+            }
+            setSelectedMethod={
+              setSelectedMethod
+            }
+            availability={
+              deliveryAvailability
+            }
+            backupCodes={
+              backupCodes
+            }
+            onClose={() =>
+              setTwoFAModal(
+                null
+              )
+            }
+            onStart={
+              startTwoFASetup
+            }
+            onVerify={
+              verifyTwoFASetup
+            }
+            onDisable={
+              disableTwoFA
+            }
+            onUpdateMethod={
+              updateTwoFAMethod
+            }
+            onRegenerate={
+              regenerateBackupCodes
+            }
+            onCopySecret={
+              copySetupData
+            }
+            copied={
+              copied
+            }
+            onCopyBackupCodes={
+              copyBackupCodes
+            }
+          />
+        )}
+      </AnimatePresence>
 
-          showToast(
-            "Wallet freeze endpoint is ready to connect.",
-            "info"
-          );
-        }}
-      />
+      {/* WALLET MODAL */}
+
+      <AnimatePresence>
+        {freezeModalOpen && (
+          <FreezeWalletModal
+            frozen={
+              security.metrics
+                .walletFrozen
+            }
+            busy={
+              freezeBusy
+            }
+            password={
+              walletPassword
+            }
+            setPassword={
+              setWalletPassword
+            }
+            showPassword={
+              showWalletPassword
+            }
+            setShowPassword={
+              setShowWalletPassword
+            }
+            onClose={() =>
+              setFreezeModalOpen(
+                false
+              )
+            }
+            onConfirm={() =>
+              security.metrics
+                .walletFrozen
+                ? void unfreezeWallet()
+                : void freezeWallet()
+            }
+          />
+        )}
+      </AnimatePresence>
+
+      {/* BACKUP CODES */}
+
+      {backupCodes.length >
+        0 && (
+        <BackupCodesModal
+          codes={
+            backupCodes
+          }
+          onCopy={
+            copyBackupCodes
+          }
+          onClose={() =>
+            setBackupCodes([])
+          }
+        />
+      )}
+
+      {/* TOAST */}
 
       <Toast
-        toast={toast}
+        toast={
+          toast
+        }
         onClose={() =>
           setToast(null)
         }
@@ -1113,21 +2516,24 @@ export default function SecurityPage() {
 }
 
 /* =========================================================
-   SECURITY HERO
+   HERO
 ========================================================= */
 
 function SecurityHero({
   score,
   riskLevel,
+  loading,
+  lastChecked,
+  onRefresh,
 }: {
   score: number;
-  riskLevel:
-    | "Low"
-    | "Moderate"
-    | "Elevated";
+  riskLevel: RiskLevel;
+  loading: boolean;
+  lastChecked: string | null;
+  onRefresh: () => void;
 }) {
   const circumference =
-    2 * Math.PI * 44;
+    2 * Math.PI * 45;
 
   return (
     <motion.section
@@ -1140,22 +2546,54 @@ function SecurityHero({
         y: 0,
       }}
       transition={{
-        duration: 0.55,
+        duration: 0.5,
       }}
-      className="relative overflow-hidden rounded-[34px] border border-indigo-300/15 bg-[linear-gradient(135deg,#08051B_0%,#17104A_42%,#2B1468_70%,#4A1D89_100%)] p-6 text-white shadow-[0_30px_90px_rgba(76,29,149,0.18)] sm:p-8 lg:p-10"
+      className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-[#17133B] via-[#24185A] to-[#3D237A] p-7 text-white shadow-[0_24px_70px_rgba(39,24,93,0.22)] sm:p-9"
     >
       <motion.div
-        className="pointer-events-none absolute -right-20 -top-24 h-80 w-80 rounded-full bg-violet-500/15 blur-3xl"
+        className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full border border-violet-200/10"
+        animate={{
+          rotate: 360,
+        }}
+        transition={{
+          duration: 28,
+          repeat: Infinity,
+          ease: "linear",
+        }}
+      />
+
+      <motion.div
+        className="pointer-events-none absolute -right-4 top-4 h-44 w-44 rounded-full border border-cyan-200/10"
         animate={{
           scale: [
-            0.85,
-            1.1,
-            0.85,
+            0.94,
+            1.08,
+            0.94,
           ],
           opacity: [
-            0.35,
+            0.3,
             0.7,
-            0.35,
+            0.3,
+          ],
+        }}
+        transition={{
+          duration: 4,
+          repeat: Infinity,
+        }}
+      />
+
+      <motion.div
+        className="pointer-events-none absolute bottom-[-80px] left-1/3 h-64 w-64 rounded-full bg-cyan-400/10 blur-3xl"
+        animate={{
+          scale: [
+            0.9,
+            1.15,
+            0.9,
+          ],
+          opacity: [
+            0.2,
+            0.45,
+            0.2,
           ],
         }}
         transition={{
@@ -1164,199 +2602,77 @@ function SecurityHero({
         }}
       />
 
-      <motion.div
-        className="pointer-events-none absolute -bottom-24 left-1/3 h-72 w-72 rounded-full bg-indigo-500/20 blur-3xl"
-        animate={{
-          x: [
-            -20,
-            25,
-            -20,
-          ],
-          opacity: [
-            0.2,
-            0.6,
-            0.2,
-          ],
-        }}
-        transition={{
-          duration: 6,
-          repeat: Infinity,
-        }}
-      />
+      <div className="relative z-10 flex flex-col items-center justify-between gap-8 md:flex-row">
+        <div className="max-w-2xl">
+          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1.5 text-xs font-bold text-emerald-200">
+            <ShieldCheck className="h-4 w-4" />
 
-      <div className="pointer-events-none absolute right-[-40px] top-[-40px] h-[390px] w-[390px]">
-        {[1, 2, 3].map(
-          (ring) => (
-            <motion.div
-              key={ring}
-              className="absolute left-1/2 top-1/2 rounded-full border border-cyan-300/15"
-              style={{
-                width: `${
-                  ring * 105
-                }px`,
-                height: `${
-                  ring * 105
-                }px`,
-                x: "-50%",
-                y: "-50%",
-              }}
-              animate={{
-                scale: [
-                  0.9,
-                  1.04,
-                  0.9,
-                ],
-                opacity: [
-                  0.18,
-                  0.5,
-                  0.18,
-                ],
-              }}
-              transition={{
-                duration:
-                  3.5 +
-                  ring,
-                repeat:
-                  Infinity,
-              }}
-            />
-          )
-        )}
-      </div>
-
-      <div className="relative z-10 flex flex-col gap-10 lg:flex-row lg:items-center lg:justify-between">
-        <div className="max-w-3xl">
-          <div className="inline-flex items-center gap-2 rounded-full border border-cyan-200/15 bg-cyan-200/10 px-3 py-1.5 text-[11px] font-black text-cyan-100">
-            <motion.span
-              animate={{
-                scale: [
-                  1,
-                  1.35,
-                  1,
-                ],
-                opacity: [
-                  0.7,
-                  1,
-                  0.7,
-                ],
-              }}
-              transition={{
-                duration: 1.8,
-                repeat: Infinity,
-              }}
-              className="h-2 w-2 rounded-full bg-emerald-300"
-            />
-
-            Security monitoring active
+            Live account protection
           </div>
 
-          <h1 className="mt-5 text-4xl font-black tracking-[-0.04em] sm:text-5xl lg:text-[54px]">
+          <h1 className="mt-5 text-4xl font-black tracking-tight md:text-5xl">
             Security Center
           </h1>
 
-          <p className="mt-4 max-w-2xl text-sm leading-7 text-indigo-100/75 sm:text-base">
-            Manage authentication, active
-            sessions, login alerts and
-            emergency wallet protection
-            from one secure control center.
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-violet-100/75 sm:text-base">
+            Manage real authentication,
+            active sessions, login
+            alerts, security checks and
+            wallet emergency protection
+            from one place.
           </p>
 
-          <div className="mt-6 flex flex-wrap gap-2">
-            <HeroPill
-              icon={
-                ShieldCheck
+          <div className="mt-5 flex flex-wrap gap-2">
+            <StatusPill
+              text={`${riskLevel} risk`}
+              tone={
+                riskLevel ===
+                "Low"
+                  ? "green"
+                  : "amber"
               }
-              text="Protected account"
             />
 
-            <HeroPill
-              icon={
-                Fingerprint
-              }
-              text="Live security monitor"
-            />
-
-            <HeroPill
-              icon={Wifi}
-              text={`${score}% protection`}
+            <StatusPill
+              text={`${securityLabel(
+                score
+              )} protection`}
+              tone="blue"
             />
           </div>
+
+          <p className="mt-4 text-[10px] text-violet-100/45">
+            Last security check:{" "}
+            {loading
+              ? "Loading..."
+              : formatDate(
+                  lastChecked
+                )}
+          </p>
         </div>
 
-        <motion.div
-          initial={{
-            opacity: 0,
-            scale: 0.9,
-          }}
-          animate={{
-            opacity: 1,
-            scale: 1,
-          }}
-          className="relative mx-auto w-fit lg:mx-0"
-        >
-          <div className="relative h-48 w-48">
-            {[1, 2, 3].map(
-              (ring) => (
-                <motion.div
-                  key={ring}
-                  className="absolute left-1/2 top-1/2 rounded-full border border-cyan-300/10"
-                  style={{
-                    width: `${
-                      100 +
-                      ring *
-                        18
-                    }px`,
-                    height: `${
-                      100 +
-                      ring *
-                        18
-                    }px`,
-                    x: "-50%",
-                    y: "-50%",
-                  }}
-                  animate={{
-                    scale: [
-                      0.95,
-                      1.08,
-                      0.95,
-                    ],
-                    opacity: [
-                      0.15,
-                      0.45,
-                      0.15,
-                    ],
-                  }}
-                  transition={{
-                    duration:
-                      3 +
-                      ring,
-                    repeat:
-                      Infinity,
-                  }}
-                />
-              )
-            )}
-
+        <div className="flex shrink-0 flex-col items-center">
+          <div className="relative h-36 w-36">
             <svg
-              className="absolute inset-0 h-full w-full -rotate-90"
+              className="h-full w-full -rotate-90"
               viewBox="0 0 100 100"
             >
               <circle
                 cx="50"
                 cy="50"
-                r="44"
+                r="45"
                 fill="none"
-                stroke="rgba(255,255,255,0.08)"
-                strokeWidth="7"
+                stroke="rgba(255,255,255,0.10)"
+                strokeWidth="8"
               />
 
               <motion.circle
                 cx="50"
                 cy="50"
-                r="44"
+                r="45"
                 fill="none"
-                stroke="#67E8F9"
-                strokeWidth="7"
+                stroke="#C4B5FD"
+                strokeWidth="8"
                 strokeLinecap="round"
                 strokeDasharray={
                   circumference
@@ -1373,107 +2689,50 @@ function SecurityHero({
                         100),
                 }}
                 transition={{
-                  duration: 1.6,
+                  duration: 1.4,
                   ease: "easeOut",
                 }}
               />
             </svg>
 
-            <motion.div
-              animate={{
-                boxShadow: [
-                  "0 0 0 rgba(103,232,249,0)",
-                  "0 0 45px rgba(103,232,249,.18)",
-                  "0 0 0 rgba(103,232,249,0)",
-                ],
-              }}
-              transition={{
-                duration: 3,
-                repeat: Infinity,
-              }}
-              className="absolute inset-[30px] flex flex-col items-center justify-center rounded-[30px] border border-cyan-200/10 bg-white/[0.05] backdrop-blur"
-            >
-              <ShieldCheck className="h-8 w-8 text-cyan-200" />
-
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
               <motion.span
                 key={score}
                 initial={{
-                  scale: 0.7,
+                  scale: 0.82,
                   opacity: 0,
                 }}
                 animate={{
                   scale: 1,
                   opacity: 1,
                 }}
-                className="mt-1 text-3xl font-black"
+                className="text-3xl font-black"
               >
                 {score}
               </motion.span>
 
-              <span className="text-[9px] font-black uppercase tracking-widest text-cyan-100/50">
-                Protection
+              <span className="text-xs text-violet-200">
+                /100
               </span>
-            </motion.div>
-
-            <motion.span
-              animate={{
-                rotate: 360,
-              }}
-              transition={{
-                duration: 4,
-                repeat: Infinity,
-                ease: "linear",
-              }}
-              className="absolute left-1/2 top-1/2 h-[2px] w-[74px] origin-left bg-gradient-to-r from-cyan-300 to-transparent"
-            />
-
-            <motion.span
-              animate={{
-                opacity: [
-                  0.3,
-                  1,
-                  0.3,
-                ],
-              }}
-              transition={{
-                duration: 1.6,
-                repeat: Infinity,
-              }}
-              className="absolute right-[26px] top-[42px] h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_15px_rgba(103,232,249,.9)]"
-            />
+            </div>
           </div>
 
-          <div className="mt-4 text-center">
-            <p className="text-sm font-black text-cyan-100">
-              {riskLevel} Risk
-            </p>
+          <p className="mt-3 text-sm font-bold text-violet-200">
+            Security Score
+          </p>
 
-            <p className="mt-1 text-[10px] text-indigo-100/50">
-              Continuous protection assessment
-            </p>
-          </div>
-        </motion.div>
+          <button
+            type="button"
+            onClick={onRefresh}
+            className="mt-3 inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[10px] font-black text-white transition hover:bg-white/10"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+
+            Refresh live data
+          </button>
+        </div>
       </div>
     </motion.section>
-  );
-}
-
-/* =========================================================
-   HERO PILL
-========================================================= */
-
-function HeroPill({
-  icon: Icon,
-  text,
-}: {
-  icon: React.ElementType;
-  text: string;
-}) {
-  return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-[10px] font-black text-indigo-100/75">
-      <Icon className="h-3.5 w-3.5 text-cyan-200" />
-      {text}
-    </span>
   );
 }
 
@@ -1484,325 +2743,286 @@ function HeroPill({
 function TwoFactorCard({
   enabled,
   method,
-  onToggle,
+  availability,
+  busy,
+  onEnable,
+  onDisable,
   onMethodChange,
   onBackupCodes,
 }: {
   enabled: boolean;
   method: TwoFAMethod;
-  onToggle: () => void;
+  availability: DeliveryAvailability;
+  busy: boolean;
+  onEnable: () => void;
+  onDisable: () => void;
   onMethodChange: (
     method: TwoFAMethod
   ) => void;
   onBackupCodes: () => void;
 }) {
-  const methods: Array<{
-    id: TwoFAMethod;
-    title: string;
-    description: string;
-    icon: React.ElementType;
-  }> = [
-    {
-      id: "app",
-      title: "Authenticator",
-      description:
-        "Best protection",
-      icon: Fingerprint,
-    },
-    {
-      id: "sms",
-      title: "SMS",
-      description:
-        "Text message code",
-      icon: Smartphone,
-    },
-    {
-      id: "email",
-      title: "Email",
-      description:
-        "Email verification",
-      icon: Mail,
-    },
-  ];
-
   return (
-    <Card className="p-5 sm:p-6 lg:p-8 dark:border-border dark:bg-card">
-      {/* HEADER */}
-
-      <div className="flex flex-col gap-5 border-b border-border pb-6 md:flex-row md:items-center md:justify-between">
-        <div className="flex min-w-0 items-start gap-4">
+    <Card className="p-6 md:p-8">
+      <div className="flex flex-col justify-between gap-5 md:flex-row md:items-center">
+        <div className="flex min-w-0 items-center gap-4">
           <div
-            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${
+            className={`shrink-0 rounded-2xl p-3 ${
               enabled
-                ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300"
+                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300"
                 : "bg-muted text-muted-foreground"
             }`}
           >
-            <Smartphone className="h-6 w-6" />
+            <Fingerprint className="h-6 w-6" />
           </div>
 
           <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-dashboard-primary">
+            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
               Authentication
             </p>
 
-            <h2 className="mt-1 text-xl font-black text-card-foreground sm:text-2xl">
+            <h2 className="mt-1 text-xl font-black text-card-foreground">
               Two-Factor Authentication
             </h2>
 
-            <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-              Add another verification layer
-              to supported sign-in and
-              sensitive account actions.
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              Protect sign-in and
+              sensitive actions with
+              a second verification
+              layer.
             </p>
           </div>
         </div>
 
-        <div className="flex w-full items-center justify-between gap-3 rounded-2xl border border-border bg-muted/40 p-3 md:w-auto md:min-w-[150px]">
-          <div>
-            <p className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">
-              Status
-            </p>
-
-            <p
-              className={`mt-0.5 text-sm font-black ${
-                enabled
-                  ? "text-emerald-600 dark:text-emerald-300"
-                  : "text-muted-foreground"
-              }`}
-            >
-              {enabled
-                ? "Enabled"
-                : "Disabled"}
-            </p>
-          </div>
+        <div className="inline-flex items-center justify-between gap-3 rounded-2xl border border-border bg-muted/50 px-3 py-2">
+          <span
+            className={`text-sm font-bold ${
+              enabled
+                ? "text-emerald-600 dark:text-emerald-300"
+                : "text-muted-foreground"
+            }`}
+          >
+            {enabled
+              ? "Enabled"
+              : "Disabled"}
+          </span>
 
           <Toggle
-            checked={enabled}
-            onChange={onToggle}
+            checked={
+              enabled
+            }
+            disabled={
+              busy
+            }
+            onChange={
+              enabled
+                ? onDisable
+                : onEnable
+            }
           />
         </div>
       </div>
 
-      <AnimatePresence mode="wait">
-        {enabled ? (
-          <motion.div
-            key="enabled"
-            initial={{
-              opacity: 0,
-              y: 8,
-            }}
-            animate={{
-              opacity: 1,
-              y: 0,
-            }}
-            exit={{
-              opacity: 0,
-              y: -8,
-            }}
-            className="mt-6 space-y-7"
-          >
-            {/* SECURITY STATUS */}
+      <div className="mt-6 rounded-2xl border border-violet-200/70 bg-violet-50 p-4 dark:border-violet-400/20 dark:bg-violet-400/10">
+        <div className="flex items-start gap-3">
+          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-violet-700 dark:text-violet-300" />
 
-            <div className="rounded-2xl border border-cyan-200/70 bg-cyan-50/70 p-4 dark:border-cyan-500/15 dark:bg-cyan-500/[0.06]">
-              <div className="flex items-start gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-cyan-100 text-cyan-600 dark:bg-cyan-500/10 dark:text-cyan-300">
-                  <ShieldCheck className="h-4 w-4" />
-                </div>
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-violet-950 dark:text-violet-100">
+              {enabled
+                ? `Primary method: ${methodLabel(
+                    method
+                  )}`
+                : "2FA is currently disabled"}
+            </p>
 
-                <div>
-                  <p className="text-sm font-black text-foreground">
-                    Additional verification is active
-                  </p>
+            <p className="mt-1 text-xs leading-5 text-violet-900/70 dark:text-violet-100/60">
+              {enabled
+                ? "The current method is stored on the backend and will be used during the next authentication challenge."
+                : "Enable Authenticator-based 2FA to generate a secure secret and backup codes."}
+            </p>
+          </div>
+        </div>
+      </div>
 
-                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                    Your selected authentication
-                    method is used for protected
-                    actions.
-                  </p>
-                </div>
-              </div>
-            </div>
+      {enabled && (
+        <>
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            <MethodCard
+              active={
+                method ===
+                "app"
+              }
+              available={
+                availability.app
+              }
+              icon={
+                Fingerprint
+              }
+              label="Authenticator"
+              description="TOTP authenticator app"
+              onClick={() =>
+                onMethodChange(
+                  "app"
+                )
+              }
+            />
 
-            {/* METHOD SELECTOR */}
+            <MethodCard
+              active={
+                method ===
+                "sms"
+              }
+              available={
+                availability.sms
+              }
+              icon={
+                Smartphone
+              }
+              label="SMS"
+              description={
+                availability.sms
+                  ? "Available on server"
+                  : "Not configured"
+              }
+              onClick={() =>
+                onMethodChange(
+                  "sms"
+                )
+              }
+            />
 
-            <div>
-              <div className="mb-3">
-                <p className="text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
-                  Primary Method
-                </p>
+            <MethodCard
+              active={
+                method ===
+                "email"
+              }
+              available={
+                availability.email
+              }
+              icon={Mail}
+              label="Email"
+              description={
+                availability.email
+                  ? "Available on server"
+                  : "Not configured"
+              }
+              onClick={() =>
+                onMethodChange(
+                  "email"
+                )
+              }
+            />
+          </div>
 
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Choose how you receive the second
-                  verification challenge.
-                </p>
-              </div>
+          <div className="mt-6 flex flex-wrap gap-3">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                onMethodChange(
+                  method
+                )
+              }
+              className="rounded-xl bg-violet-700 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Change Method
+            </button>
 
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                {methods.map(
-                  (item) => {
-                    const active =
-                      method ===
-                      item.id;
+            <button
+              type="button"
+              disabled={busy}
+              onClick={
+                onBackupCodes
+              }
+              className="rounded-xl border border-border bg-card px-5 py-2.5 text-sm font-bold text-card-foreground transition hover:bg-muted disabled:opacity-50"
+            >
+              Regenerate Backup Codes
+            </button>
 
-                    const Icon =
-                      item.icon;
-
-                    return (
-                      <motion.button
-                        key={
-                          item.id
-                        }
-                        type="button"
-                        whileHover={{
-                          y: -2,
-                        }}
-                        whileTap={{
-                          scale: 0.985,
-                        }}
-                        onClick={() =>
-                          onMethodChange(
-                            item.id
-                          )
-                        }
-                        aria-pressed={
-                          active
-                        }
-                        className={`group relative min-h-[92px] overflow-hidden rounded-2xl border p-4 text-left transition-all duration-200 ${
-                          active
-                            ? "border-[var(--dashboard-primary)] bg-[var(--dashboard-primary-soft)] shadow-[0_8px_25px_rgba(31,94,168,0.10)]"
-                            : "border-border bg-card hover:bg-muted/50"
-                        }`}
-                      >
-                        {/* SELECTED BAR */}
-
-                        <span
-                          className={`absolute inset-y-3 left-0 w-1 rounded-r-full transition ${
-                            active
-                              ? "bg-[var(--dashboard-primary)]"
-                              : "bg-transparent"
-                          }`}
-                        />
-
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex min-w-0 items-center gap-3">
-                            <div
-                              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition ${
-                                active
-                                  ? "bg-[var(--dashboard-primary)] text-white"
-                                  : "bg-muted text-muted-foreground"
-                              }`}
-                            >
-                              <Icon className="h-4 w-4" />
-                            </div>
-
-                            <div className="min-w-0">
-                              <p
-                                className={`truncate text-sm font-black ${
-                                  active
-                                    ? "text-card-foreground"
-                                    : "text-card-foreground"
-                                }`}
-                              >
-                                {
-                                  item.title
-                                }
-                              </p>
-
-                              <p className="mt-1 text-[10px] text-muted-foreground">
-                                {
-                                  item.description
-                                }
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* RADIO */}
-
-                          <span
-                            className={`relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition ${
-                              active
-                                ? "border-[var(--dashboard-primary)]"
-                                : "border-muted-foreground/30"
-                            }`}
-                          >
-                            {active && (
-                              <span className="h-2.5 w-2.5 rounded-full bg-[var(--dashboard-primary)]" />
-                            )}
-                          </span>
-                        </div>
-
-                        {active && (
-                          <motion.div
-                            layoutId="twofa-selected"
-                            className="absolute bottom-0 left-4 right-4 h-[2px] rounded-full bg-[var(--dashboard-primary)]"
-                          />
-                        )}
-                      </motion.button>
-                    );
-                  }
-                )}
-              </div>
-            </div>
-
-            {/* ACTION BUTTONS */}
-
-            <div className="flex flex-col gap-3 border-t border-border pt-6 sm:flex-row">
-              <button
-                type="button"
-                className="inline-flex min-h-[46px] flex-1 items-center justify-center rounded-xl bg-[var(--dashboard-primary)] px-5 py-3 text-sm font-black text-white transition hover:opacity-90"
-              >
-                <Key className="mr-2 h-4 w-4" />
-                Manage 2FA
-              </button>
-
-              <button
-                type="button"
-                onClick={
-                  onBackupCodes
-                }
-                className="inline-flex min-h-[46px] flex-1 items-center justify-center rounded-xl border border-border bg-card px-5 py-3 text-sm font-black text-card-foreground transition hover:bg-muted"
-              >
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Regenerate Backup Codes
-              </button>
-            </div>
-          </motion.div>
-        ) : (
-          <motion.div
-            key="disabled"
-            initial={{
-              opacity: 0,
-            }}
-            animate={{
-              opacity: 1,
-            }}
-            className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-500/15 dark:bg-amber-500/[0.06]"
-          >
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 shrink-0 text-amber-500" />
-
-              <div>
-                <p className="text-sm font-black text-amber-800 dark:text-amber-200">
-                  Two-factor protection is disabled.
-                </p>
-
-                <p className="mt-1 text-xs leading-5 text-amber-700/80 dark:text-amber-300/70">
-                  Enable 2FA to improve account
-                  protection for sign-in and
-                  sensitive actions.
-                </p>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={
+                onDisable
+              }
+              className="rounded-xl border border-rose-200 bg-rose-50 px-5 py-2.5 text-sm font-bold text-rose-600 transition hover:bg-rose-100 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-300"
+            >
+              Disable 2FA
+            </button>
+          </div>
+        </>
+      )}
     </Card>
   );
 }
 
 /* =========================================================
-   PASSWORD
+   METHOD CARD
+========================================================= */
+
+function MethodCard({
+  active,
+  available,
+  icon: Icon,
+  label,
+  description,
+  onClick,
+}: {
+  active: boolean;
+  available: boolean;
+  icon: React.ElementType;
+  label: string;
+  description: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={!available}
+      onClick={onClick}
+      className={`group rounded-2xl border p-4 text-left transition-all ${
+        active
+          ? "border-violet-600 bg-violet-50 shadow-md dark:border-violet-400 dark:bg-violet-400/10"
+          : available
+            ? "border-border bg-card hover:-translate-y-0.5 hover:bg-muted/40 hover:shadow-sm"
+            : "cursor-not-allowed border-border bg-muted/30 opacity-50"
+      }`}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div
+          className={`flex h-10 w-10 items-center justify-center rounded-xl transition ${
+            active
+              ? "bg-violet-700 text-white"
+              : "bg-muted text-muted-foreground"
+          }`}
+        >
+          <Icon className="h-4 w-4" />
+        </div>
+
+        {active && (
+          <CheckCircle2 className="h-4 w-4 text-violet-700 dark:text-violet-300" />
+        )}
+      </div>
+
+      <p className="mt-4 text-sm font-black text-card-foreground">
+        {label}
+      </p>
+
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+        {description}
+      </p>
+
+      {!available && (
+        <p className="mt-2 text-[10px] font-bold text-rose-500">
+          Backend provider unavailable
+        </p>
+      )}
+    </button>
+  );
+}
+
+/* =========================================================
+   PASSWORD CARD
 ========================================================= */
 
 function PasswordCard({
@@ -1811,38 +3031,26 @@ function PasswordCard({
   onChangePassword: () => void;
 }) {
   return (
-    <Card className="flex flex-col gap-6 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between lg:p-8">
-      <div className="flex min-w-0 items-start gap-4">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300">
+    <Card className="flex flex-col justify-between gap-6 p-6 md:flex-row md:items-center md:p-8">
+      <div className="flex items-start gap-4">
+        <div className="rounded-2xl bg-violet-100 p-3 text-violet-700 dark:bg-violet-400/10 dark:text-violet-300">
           <Key className="h-6 w-6" />
         </div>
 
-        <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-indigo-600 dark:text-indigo-300">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
             Credentials
           </p>
 
-          <h2 className="mt-1 text-xl font-black text-card-foreground">
+          <h2 className="text-xl font-black text-card-foreground">
             Password Security
           </h2>
 
-          <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Use a strong, unique password and
-            update it whenever necessary.
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+            Change your password using
+            the protected backend
+            endpoint.
           </p>
-
-          <div className="mt-4 flex items-center gap-3">
-            <div className="flex gap-1">
-              <span className="h-1.5 w-8 rounded-full bg-emerald-500" />
-              <span className="h-1.5 w-8 rounded-full bg-emerald-500" />
-              <span className="h-1.5 w-8 rounded-full bg-emerald-500" />
-              <span className="h-1.5 w-8 rounded-full bg-muted" />
-            </div>
-
-            <span className="text-[11px] font-black text-emerald-600 dark:text-emerald-300">
-              Strong
-            </span>
-          </div>
         </div>
       </div>
 
@@ -1851,7 +3059,7 @@ function PasswordCard({
         onClick={
           onChangePassword
         }
-        className="inline-flex min-h-[46px] shrink-0 items-center justify-center rounded-xl border-2 border-[var(--dashboard-primary)] px-6 py-3 text-sm font-black text-[var(--dashboard-primary)] transition hover:bg-[var(--dashboard-primary-soft)]"
+        className="shrink-0 rounded-xl border-2 border-violet-700 px-6 py-2.5 text-sm font-bold text-violet-700 transition hover:bg-violet-50 dark:border-violet-400 dark:text-violet-300 dark:hover:bg-violet-400/10"
       >
         Change Password
       </button>
@@ -1860,7 +3068,7 @@ function PasswordCard({
 }
 
 /* =========================================================
-   ACTIVE SESSIONS
+   SESSIONS
 ========================================================= */
 
 function SessionsCard({
@@ -1884,263 +3092,262 @@ function SessionsCard({
 }) {
   const hasOtherSessions =
     sessions.some(
-      (session) =>
-        !session.isCurrent
+      (item) =>
+        !item.isCurrent
     );
 
   return (
-    <Card className="overflow-hidden">
-      <div className="flex flex-col gap-5 border-b border-border p-5 sm:p-6 md:flex-row md:items-center md:justify-between lg:p-8">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-cyan-600 dark:text-cyan-300">
-            Device Security
-          </p>
+    <div
+      id="active-sessions"
+      className="scroll-mt-6"
+    >
+      <Card className="overflow-hidden">
+        <div className="flex flex-col justify-between gap-4 border-b border-border p-6 md:flex-row md:items-center md:p-8">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+              Devices
+            </p>
 
-          <h2 className="mt-1 text-xl font-black text-card-foreground sm:text-2xl">
-            Active Sessions
-          </h2>
+            <h2 className="mt-1 text-xl font-black text-card-foreground">
+              Active Sessions
+            </h2>
 
-          <p className="mt-1 text-sm leading-6 text-muted-foreground">
-            These sessions are loaded directly
-            from your server-side authentication
-            records.
-          </p>
-        </div>
+            <p className="text-sm text-muted-foreground">
+              Live server-side
+              sessions for your
+              account.
+            </p>
+          </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={onReload}
-            disabled={loading}
-            className="inline-flex min-h-[40px] items-center gap-2 rounded-xl border border-border px-3 py-2 text-xs font-black text-muted-foreground transition hover:bg-muted disabled:opacity-50"
-          >
-            <RefreshCw
-              className={`h-4 w-4 ${
-                loading
-                  ? "animate-spin"
-                  : ""
-              }`}
-            />
-
-            Refresh
-          </button>
-
-          {hasOtherSessions && (
+          <div className="flex flex-wrap items-center gap-3">
             <button
               type="button"
               onClick={
-                onTerminateOthers
+                onReload
               }
               disabled={
-                actionLoading ===
-                "others"
+                loading
               }
-              className="inline-flex min-h-[40px] items-center gap-2 rounded-xl bg-rose-50 px-3 py-2 text-xs font-black text-rose-600 transition hover:bg-rose-100 disabled:opacity-50 dark:bg-rose-500/10 dark:text-rose-300 dark:hover:bg-rose-500/15"
+              className="inline-flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-xs font-bold text-muted-foreground transition hover:bg-muted disabled:opacity-50"
             >
-              {actionLoading ===
-              "others" ? (
-                <RefreshCw className="h-4 w-4 animate-spin" />
-              ) : (
-                <LogOut className="h-4 w-4" />
-              )}
+              <RefreshCw
+                className={`h-4 w-4 ${
+                  loading
+                    ? "animate-spin"
+                    : ""
+                }`}
+              />
 
-              Sign out others
+              Refresh
             </button>
-          )}
-        </div>
-      </div>
 
-      {loading && (
-        <div className="divide-y divide-border">
-          {[1, 2, 3].map(
-            (item) => (
-              <div
-                key={item}
-                className="flex animate-pulse items-center gap-4 p-5 sm:p-6"
+            {hasOtherSessions && (
+              <button
+                type="button"
+                onClick={
+                  onTerminateOthers
+                }
+                disabled={
+                  actionLoading ===
+                  "others"
+                }
+                className="inline-flex items-center gap-2 rounded-xl bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600 transition hover:bg-rose-100 disabled:opacity-50 dark:bg-rose-400/10 dark:text-rose-300 dark:hover:bg-rose-400/15"
               >
-                <div className="h-12 w-12 shrink-0 rounded-2xl bg-muted" />
+                <LogOut className="h-4 w-4" />
 
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 w-44 rounded bg-muted" />
-
-                  <div className="h-3 w-32 rounded bg-muted" />
-
-                  <div className="h-3 w-56 rounded bg-muted" />
-                </div>
-              </div>
-            )
-          )}
-        </div>
-      )}
-
-      {!loading && error && (
-        <div className="p-5 sm:p-6 lg:p-8">
-          <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5 dark:border-rose-500/15 dark:bg-rose-500/[0.06]">
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300">
-                <AlertTriangle className="h-5 w-5" />
-              </div>
-
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-black text-rose-800 dark:text-rose-200">
-                  Could not load active sessions
-                </p>
-
-                <p className="mt-1 text-xs leading-5 text-rose-700 dark:text-rose-300/70">
-                  {error}
-                </p>
-
-                <button
-                  type="button"
-                  onClick={
-                    onReload
-                  }
-                  className="mt-4 inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-black text-white transition hover:bg-rose-700"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  Try Again
-                </button>
-              </div>
-            </div>
+                {actionLoading ===
+                "others"
+                  ? "Signing out..."
+                  : "Sign out others"}
+              </button>
+            )}
           </div>
         </div>
-      )}
 
-      {!loading &&
-        !error &&
-        sessions.length === 0 && (
-          <div className="p-8 text-center">
-            <Laptop className="mx-auto h-10 w-10 text-muted-foreground/30" />
+        {loading && (
+          <div className="divide-y divide-border">
+            {[1, 2, 3].map(
+              (item) => (
+                <div
+                  key={
+                    item
+                  }
+                  className="flex animate-pulse gap-4 p-6"
+                >
+                  <div className="h-12 w-12 rounded-xl bg-muted" />
 
-            <p className="mt-4 text-sm font-black text-card-foreground">
-              No active sessions
-            </p>
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-40 rounded bg-muted" />
 
-            <p className="mt-1 text-xs leading-5 text-muted-foreground">
-              No active server-side login
-              sessions were found.
-            </p>
+                    <div className="h-3 w-32 rounded bg-muted" />
+
+                    <div className="h-3 w-52 rounded bg-muted" />
+                  </div>
+                </div>
+              )
+            )}
           </div>
         )}
 
-      {!loading &&
-        !error &&
-        sessions.length > 0 && (
-          <div className="divide-y divide-border">
-            {sessions.map(
-              (session) => {
-                const Icon =
-                  getSessionIcon(
-                    session.device,
-                    session.os
-                  );
+        {!loading &&
+          error && (
+            <div className="p-6">
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5 dark:border-rose-400/20 dark:bg-rose-400/10">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600 dark:text-rose-300" />
 
-                return (
-                  <motion.div
-                    key={
-                      session.id
-                    }
-                    layout
-                    initial={{
-                      opacity: 0,
-                      y: 8,
-                    }}
-                    animate={{
-                      opacity: 1,
-                      y: 0,
-                    }}
-                    className="flex flex-col gap-5 p-5 transition hover:bg-muted/30 sm:p-6 md:flex-row md:items-center md:justify-between lg:p-7"
-                  >
-                    <div className="flex min-w-0 items-start gap-4">
-                      <div
-                        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${
-                          session.isCurrent
-                            ? "bg-[var(--dashboard-primary-soft)] text-[var(--dashboard-primary)]"
-                            : "bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        <Icon className="h-5 w-5" />
-                      </div>
+                  <div className="min-w-0">
+                    <p className="font-bold text-rose-800 dark:text-rose-200">
+                      Could not load sessions
+                    </p>
 
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="break-words text-sm font-black text-card-foreground sm:text-base">
+                    <p className="mt-1 text-sm text-rose-700 dark:text-rose-200/80">
+                      {error}
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={
+                        onReload
+                      }
+                      className="mt-3 inline-flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-2 text-xs font-bold text-white transition hover:bg-rose-700"
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      Try Again
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+        {!loading &&
+          !error &&
+          sessions.length ===
+            0 && (
+            <div className="p-8 text-center">
+              <Laptop className="mx-auto h-10 w-10 text-muted-foreground/35" />
+
+              <p className="mt-3 text-sm font-bold text-card-foreground">
+                No active sessions
+              </p>
+
+              <p className="mt-1 text-xs text-muted-foreground">
+                No active authentication
+                sessions were returned
+                by the server.
+              </p>
+            </div>
+          )}
+
+        {!loading &&
+          !error &&
+          sessions.length >
+            0 && (
+            <div className="divide-y divide-border">
+              {sessions.map(
+                (
+                  session
+                ) => {
+                  const Icon =
+                    getSessionIcon(
+                      session.device,
+                      session.os
+                    );
+
+                  return (
+                    <div
+                      key={
+                        session.id
+                      }
+                      className="flex flex-col justify-between gap-4 p-6 transition hover:bg-muted/25 md:flex-row md:items-center"
+                    >
+                      <div className="flex min-w-0 items-start gap-4">
+                        <div
+                          className={`mt-1 rounded-xl p-2.5 ${
+                            session.isCurrent
+                              ? "bg-violet-100 text-violet-700 dark:bg-violet-400/10 dark:text-violet-300"
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          <Icon className="h-5 w-5" />
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="font-bold text-card-foreground">
+                              {
+                                session.device
+                              }
+                            </p>
+
+                            {session.isCurrent && (
+                              <span className="rounded-md bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300">
+                                Current
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="mt-0.5 text-sm text-muted-foreground">
                             {
-                              session.device
+                              session.browser
+                            }{" "}
+                            on{" "}
+                            {
+                              session.os
                             }
                           </p>
 
-                          {session.isCurrent && (
-                            <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[8px] font-black uppercase tracking-wider text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
-                              Current
-                            </span>
-                          )}
-                        </div>
-
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {
-                            session.browser
-                          }{" "}
-                          on{" "}
-                          {
-                            session.os
-                          }
-                        </p>
-
-                        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground">
-                          <span>
+                          <p className="mt-1 text-xs text-muted-foreground/75">
                             {
                               session.location
                             }
-                          </span>
 
-                          {session.ip && (
-                            <>
-                              <span className="opacity-50">
-                                •
-                              </span>
-
-                              <span>
+                            {session.ip && (
+                              <>
+                                {" "}
+                                •{" "}
                                 {
                                   session.ip
                                 }
-                              </span>
-                            </>
-                          )}
-                        </div>
-
-                        <div className="mt-2 space-y-1">
-                          <p className="text-[10px] font-semibold text-muted-foreground">
-                            Last active{" "}
-                            {formatRelativeTime(
-                              session.lastActive
+                              </>
                             )}
                           </p>
 
-                          <p className="text-[10px] text-muted-foreground/70">
-                            Created{" "}
-                            {formatSessionDate(
-                              session.createdAt
-                            )}
-                          </p>
+                          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-medium text-muted-foreground">
+                            <span>
+                              Last active{" "}
+                              {formatRelativeTime(
+                                session.lastActiveAt
+                              )}
+                            </span>
 
-                          <p className="text-[10px] text-muted-foreground/70">
-                            Expires{" "}
-                            {formatSessionDate(
-                              session.expiresAt
-                            )}
-                          </p>
+                            <span>
+                              •
+                            </span>
+
+                            <span>
+                              Created{" "}
+                              {formatDate(
+                                session.createdAt
+                              )}
+                            </span>
+
+                            <span>
+                              •
+                            </span>
+
+                            <span>
+                              Expires{" "}
+                              {formatDate(
+                                session.expiresAt
+                              )}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="flex items-center justify-between gap-3 border-t border-border pt-4 md:min-w-[120px] md:flex-col md:items-end md:border-0 md:pt-0">
-                      {session.isCurrent ? (
-                        <span className="inline-flex items-center gap-2 text-xs font-black text-emerald-600 dark:text-emerald-300">
-                          <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                          This device
-                        </span>
-                      ) : (
+                      {!session.isCurrent && (
                         <button
                           type="button"
                           onClick={() =>
@@ -2152,7 +3359,7 @@ function SessionsCard({
                             actionLoading ===
                             session.id
                           }
-                          className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-black text-rose-500 transition hover:bg-rose-50 disabled:opacity-50 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                          className="inline-flex items-center gap-2 self-start rounded-xl px-3 py-2 text-sm font-bold text-rose-600 transition hover:bg-rose-50 disabled:opacity-50 dark:text-rose-300 dark:hover:bg-rose-400/10 md:self-auto"
                         >
                           {actionLoading ===
                           session.id ? (
@@ -2168,51 +3375,56 @@ function SessionsCard({
                         </button>
                       )}
                     </div>
-                  </motion.div>
-                );
-              }
-            )}
-          </div>
-        )}
-    </Card>
+                  );
+                }
+              )}
+            </div>
+          )}
+      </Card>
+    </div>
   );
 }
 
 /* =========================================================
-   RECENT SECURITY ACTIVITY
+   ACTIVITY
 ========================================================= */
 
 function RecentActivityCard({
   events,
   expanded,
+  loading,
   onToggle,
 }: {
   events: SecurityEvent[];
   expanded: boolean;
+  loading: boolean;
   onToggle: () => void;
 }) {
   return (
-    <Card className="p-5 sm:p-6 lg:p-8">
+    <Card className="p-6 md:p-8">
       <div className="mb-8 flex items-center justify-between gap-4">
         <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-indigo-600 dark:text-indigo-300">
-            Audit Trail
+          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+            Audit log
           </p>
 
-          <h2 className="mt-1 text-xl font-black text-card-foreground sm:text-2xl">
+          <h2 className="mt-1 text-xl font-black text-card-foreground">
             Recent Security Activity
           </h2>
 
-          <p className="mt-1 text-sm text-muted-foreground">
-            Review recent authentication and
-            security-related activity.
+          <p className="text-sm text-muted-foreground">
+            Events are loaded from
+            the backend security audit
+            collection.
           </p>
         </div>
 
         <button
           type="button"
-          onClick={onToggle}
-          className="shrink-0 rounded-xl px-3 py-2 text-xs font-black text-[var(--dashboard-primary)] hover:bg-[var(--dashboard-primary-soft)]"
+          onClick={
+            onToggle
+          }
+          className="shrink-0 text-sm font-bold text-violet-700 hover:underline dark:text-violet-300"
         >
           {expanded
             ? "Show Less"
@@ -2220,134 +3432,198 @@ function RecentActivityCard({
         </button>
       </div>
 
-      <div
-        id="security-activity"
-        className="relative ml-3 border-l-2 border-border"
-      >
-        <AnimatePresence initial={false}>
-          {events.map(
-            (
-              event,
-              index
-            ) => {
-              const Icon =
-                event.icon;
+      {loading && (
+        <div className="space-y-3">
+          {[1, 2, 3].map(
+            (item) => (
+              <div
+                key={
+                  item
+                }
+                className="animate-pulse rounded-2xl bg-muted p-4"
+              >
+                <div className="h-4 w-48 rounded bg-muted-foreground/10" />
 
-              const tone =
-                event.status ===
-                "success"
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-500 dark:border-emerald-500/20 dark:bg-emerald-500/10 dark:text-emerald-300"
-                  : event.status ===
-                      "warning"
-                    ? "border-amber-200 bg-amber-50 text-amber-500 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300"
-                    : "border-blue-200 bg-blue-50 text-blue-500 dark:border-cyan-500/20 dark:bg-cyan-500/10 dark:text-cyan-300";
-
-              return (
-                <motion.div
-                  key={
-                    event.id
-                  }
-                  initial={{
-                    opacity: 0,
-                    x: -10,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    x: 0,
-                  }}
-                  exit={{
-                    opacity: 0,
-                    x: -8,
-                  }}
-                  transition={{
-                    delay:
-                      index *
-                      0.05,
-                  }}
-                  className="relative pb-8 pl-9 last:pb-2"
-                >
-                  <div
-                    className={`absolute -left-[17px] top-0 flex h-8 w-8 items-center justify-center rounded-full border-2 ${tone}`}
-                  >
-                    <Icon className="h-4 w-4" />
-                  </div>
-
-                  <p className="text-sm font-black text-card-foreground">
-                    {
-                      event.title
-                    }
-                  </p>
-
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {
-                      event.date
-                    }
-                  </p>
-
-                  {event.details && (
-                    <p className="mt-2 inline-flex rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground">
-                      {
-                        event.details
-                      }
-                    </p>
-                  )}
-                </motion.div>
-              );
-            }
+                <div className="mt-2 h-3 w-72 rounded bg-muted-foreground/10" />
+              </div>
+            )
           )}
-        </AnimatePresence>
-      </div>
+        </div>
+      )}
+
+      {!loading &&
+        events.length ===
+          0 && (
+          <div className="rounded-2xl border border-dashed border-border p-8 text-center">
+            <History className="mx-auto h-10 w-10 text-muted-foreground/35" />
+
+            <p className="mt-3 text-sm font-bold text-card-foreground">
+              No security activity yet
+            </p>
+          </div>
+        )}
+
+      {!loading &&
+        events.length >
+          0 && (
+          <div className="relative ml-4 space-y-8 border-l-2 border-border pb-4">
+            <AnimatePresence
+              initial={false}
+            >
+              {events.map(
+                (
+                  event,
+                  index
+                ) => {
+                  const Icon =
+                    event.status ===
+                    "success"
+                      ? CheckCircle2
+                      : event.status ===
+                          "warning"
+                        ? AlertTriangle
+                        : Activity;
+
+                  const tone =
+                    event.status ===
+                    "success"
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-600 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-300"
+                      : event.status ===
+                          "warning"
+                        ? "border-amber-200 bg-amber-50 text-amber-600 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-300"
+                        : "border-violet-200 bg-violet-50 text-violet-600 dark:border-violet-400/20 dark:bg-violet-400/10 dark:text-violet-300";
+
+                  return (
+                    <motion.div
+                      key={
+                        event.id
+                      }
+                      initial={{
+                        opacity: 0,
+                        x: -10,
+                      }}
+                      animate={{
+                        opacity: 1,
+                        x: 0,
+                      }}
+                      exit={{
+                        opacity: 0,
+                        x: -8,
+                      }}
+                      transition={{
+                        delay:
+                          index *
+                          0.04,
+                      }}
+                      className="relative pl-8"
+                    >
+                      <div
+                        className={`absolute -left-[17px] top-1 flex h-8 w-8 items-center justify-center rounded-full border-2 bg-card ${tone}`}
+                      >
+                        <Icon className="h-4 w-4" />
+                      </div>
+
+                      <p className="font-semibold text-card-foreground">
+                        {
+                          event.title
+                        }
+                      </p>
+
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {formatDate(
+                          event.createdAt
+                        )}
+                      </p>
+
+                      <div className="mt-2 flex flex-wrap gap-2 text-[10px] text-muted-foreground">
+                        {event.device && (
+                          <span className="rounded-lg bg-muted px-2 py-1">
+                            {
+                              event.device
+                            }
+                          </span>
+                        )}
+
+                        {event.location && (
+                          <span className="rounded-lg bg-muted px-2 py-1">
+                            {
+                              event.location
+                            }
+                          </span>
+                        )}
+
+                        {event.ip && (
+                          <span className="rounded-lg bg-muted px-2 py-1">
+                            {
+                              event.ip
+                            }
+                          </span>
+                        )}
+                      </div>
+
+                      {event.detail && (
+                        <p className="mt-2 inline-block rounded-lg bg-muted px-3 py-2 text-sm leading-5 text-muted-foreground">
+                          {
+                            event.detail
+                          }
+                        </p>
+                      )}
+                    </motion.div>
+                  );
+                }
+              )}
+            </AnimatePresence>
+          </div>
+        )}
     </Card>
   );
 }
 
 /* =========================================================
-   PROTECTION CHECKLIST
+   CHECKLIST
 ========================================================= */
 
 function ProtectionChecklist({
-  is2FAEnabled,
+  checklist,
 }: {
-  is2FAEnabled: boolean;
+  checklist: ChecklistState;
 }) {
   return (
-    <Card className="p-5 sm:p-6">
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-100 text-cyan-600 dark:bg-cyan-500/10 dark:text-cyan-300">
-          <ShieldCheck className="h-5 w-5" />
-        </div>
+    <Card className="p-6">
+      <div className="flex items-center gap-2">
+        <ShieldCheck className="h-5 w-5 text-emerald-600 dark:text-emerald-300" />
 
-        <div>
-          <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
-            Protection
-          </p>
-
-          <h3 className="text-base font-black text-card-foreground">
-            Security Checklist
-          </h3>
-        </div>
+        <h3 className="font-black text-card-foreground">
+          Protection Checklist
+        </h3>
       </div>
 
-      <div className="mt-6 space-y-3">
+      <div className="mt-6 space-y-4">
         <ChecklistItem
           label="Email Verified"
-          checked
+          checked={
+            checklist.emailVerified
+          }
         />
 
         <ChecklistItem
           label="KYC Completed"
-          checked
+          checked={
+            checklist.kycCompleted
+          }
         />
 
         <ChecklistItem
           label="Strong Password"
-          checked
+          checked={
+            checklist.strongPassword
+          }
         />
 
         <ChecklistItem
           label="Two-Factor Authentication"
           checked={
-            is2FAEnabled
+            checklist.twoFactorEnabled
           }
         />
       </div>
@@ -2363,39 +3639,28 @@ function ChecklistItem({
   checked: boolean;
 }) {
   return (
-    <motion.div
-      whileHover={{
-        x: 2,
-      }}
-      className="flex items-center gap-3 rounded-xl px-2 py-2"
+    <div
+      className={`flex items-center gap-3 ${
+        checked
+          ? "text-emerald-600 dark:text-emerald-300"
+          : "text-amber-500 dark:text-amber-300"
+      }`}
     >
       {checked ? (
-        <CheckSquare className="h-5 w-5 shrink-0 text-emerald-500" />
+        <CheckSquare className="h-5 w-5" />
       ) : (
-        <Square className="h-5 w-5 shrink-0 text-amber-500" />
+        <Square className="h-5 w-5" />
       )}
 
-      <span
-        className={`text-xs font-black ${
-          checked
-            ? "text-card-foreground"
-            : "text-amber-600"
-        }`}
-      >
+      <span className="text-sm font-semibold">
         {label}
       </span>
-
-      {checked && (
-        <span className="ml-auto text-[9px] font-black uppercase text-emerald-500">
-          Ready
-        </span>
-      )}
-    </motion.div>
+    </div>
   );
 }
 
 /* =========================================================
-   LOGIN ALERTS
+   ALERTS
 ========================================================= */
 
 function LoginAlerts({
@@ -2408,27 +3673,19 @@ function LoginAlerts({
   ) => void;
 }) {
   return (
-    <Card className="p-5 sm:p-6">
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300">
-          <Bell className="h-5 w-5" />
-        </div>
+    <Card className="p-6">
+      <div className="flex items-center gap-2">
+        <Bell className="h-5 w-5 text-violet-700 dark:text-violet-300" />
 
-        <div>
-          <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground">
-            Notifications
-          </p>
-
-          <h3 className="text-base font-black text-card-foreground">
-            Login Alerts
-          </h3>
-        </div>
+        <h3 className="font-black text-card-foreground">
+          Login Alerts
+        </h3>
       </div>
 
       <div className="mt-6 space-y-5">
         <AlertToggleRow
           title="New Devices"
-          description="Notify when a new device signs in"
+          description="Notify when a new device signs in."
           checked={
             settings.newDevice
           }
@@ -2441,7 +3698,7 @@ function LoginAlerts({
 
         <AlertToggleRow
           title="Suspicious Activity"
-          description="Flag unusual session patterns"
+          description="Notify about unusual sign-in activity."
           checked={
             settings.suspiciousActivity
           }
@@ -2454,7 +3711,7 @@ function LoginAlerts({
 
         <AlertToggleRow
           title="Failed Logins"
-          description="Notify after failed authentication"
+          description="Notify when authentication attempts fail."
           checked={
             settings.failedLogin
           }
@@ -2483,11 +3740,11 @@ function AlertToggleRow({
   return (
     <div className="flex items-center justify-between gap-4">
       <div className="min-w-0">
-        <p className="text-xs font-black text-card-foreground">
+        <p className="text-sm font-semibold text-card-foreground">
           {title}
         </p>
 
-        <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
+        <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
           {description}
         </p>
       </div>
@@ -2501,7 +3758,7 @@ function AlertToggleRow({
 }
 
 /* =========================================================
-   PROTECTION MONITOR
+   SECURITY INTELLIGENCE
 ========================================================= */
 
 function SecurityIntelligence({
@@ -2518,27 +3775,33 @@ function SecurityIntelligence({
   onReviewSessions,
 }: {
   score: number;
-  riskLevel:
-    | "Low"
-    | "Moderate"
-    | "Elevated";
+  riskLevel: RiskLevel;
   sessionCount: number;
   warningCount: number;
   enabledAlerts: number;
   is2FAEnabled: boolean;
   isWalletFrozen: boolean;
   scanning: boolean;
-  lastChecked: string;
+  lastChecked: string | null;
   onScan: () => void;
   onReviewSessions: () => void;
 }) {
   return (
-    <motion.section
-      layout
-      className="relative overflow-hidden rounded-[30px] bg-[linear-gradient(145deg,#09061D_0%,#19104A_42%,#321A6D_70%,#4C1D8C_100%)] p-5 text-white shadow-[0_25px_70px_rgba(49,25,101,0.20)] sm:p-6"
-    >
+    <motion.section className="relative overflow-hidden rounded-[30px] bg-gradient-to-br from-[#17133B] via-[#24185A] to-[#3D237A] p-6 text-white shadow-[0_22px_60px_rgba(39,24,93,.22)]">
       <motion.div
-        className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-violet-500/10 blur-3xl"
+        className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full border border-violet-200/10"
+        animate={{
+          rotate: 360,
+        }}
+        transition={{
+          duration: 22,
+          repeat: Infinity,
+          ease: "linear",
+        }}
+      />
+
+      <motion.div
+        className="pointer-events-none absolute bottom-[-70px] left-[-60px] h-56 w-56 rounded-full bg-cyan-400/10 blur-3xl"
         animate={{
           scale: [
             0.9,
@@ -2546,13 +3809,13 @@ function SecurityIntelligence({
             0.9,
           ],
           opacity: [
-            0.25,
-            0.6,
-            0.25,
+            0.2,
+            0.5,
+            0.2,
           ],
         }}
         transition={{
-          duration: 5,
+          duration: 4.5,
           repeat: Infinity,
         }}
       />
@@ -2560,7 +3823,7 @@ function SecurityIntelligence({
       <div className="relative z-10">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-[9px] font-black uppercase tracking-[0.18em] text-cyan-200/50">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-violet-200/55">
               Security Intelligence
             </p>
 
@@ -2568,14 +3831,14 @@ function SecurityIntelligence({
               Protection Monitor
             </h3>
 
-            <p className="mt-1 text-[10px] leading-5 text-indigo-100/55">
-              Live assessment of your
-              authentication and session state.
+            <p className="mt-1 text-[11px] leading-5 text-violet-100/55">
+              Live backend-driven
+              security posture.
             </p>
           </div>
 
           <span
-            className={`rounded-full border px-2.5 py-1 text-[8px] font-black uppercase tracking-wider ${
+            className={`rounded-full border px-3 py-1.5 text-[9px] font-black ${
               riskLevel ===
               "Low"
                 ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-200"
@@ -2585,16 +3848,21 @@ function SecurityIntelligence({
                   : "border-rose-300/20 bg-rose-300/10 text-rose-200"
             }`}
           >
-            {riskLevel}
+            {riskLevel} Risk
           </span>
         </div>
 
-        <div className="relative mx-auto my-7 h-48 w-48">
-          {[100, 76, 54, 34].map(
-            (size, index) => (
+        <div className="relative mx-auto my-7 flex h-44 w-44 items-center justify-center">
+          {[100, 76, 52].map(
+            (
+              size,
+              index
+            ) => (
               <motion.div
-                key={size}
-                className="absolute left-1/2 top-1/2 rounded-full border border-cyan-300/15"
+                key={
+                  size
+                }
+                className="absolute left-1/2 top-1/2 rounded-full border border-violet-200/15"
                 style={{
                   width: `${size}%`,
                   height: `${size}%`,
@@ -2605,154 +3873,112 @@ function SecurityIntelligence({
                   scanning
                     ? {
                         scale: [
-                          0.84,
+                          0.88,
                           1.08,
-                          0.84,
+                          0.88,
                         ],
                         opacity: [
-                          0.15,
-                          0.8,
-                          0.15,
+                          0.2,
+                          0.85,
+                          0.2,
                         ],
                       }
                     : {
-                        scale: [
-                          0.98,
-                          1.02,
-                          0.98,
-                        ],
-                        opacity: [
-                          0.25,
+                        scale: 1,
+                        opacity:
                           0.45,
-                          0.25,
-                        ],
                       }
                 }
                 transition={{
                   duration:
-                    1.5 +
+                    1.25 +
                     index *
                       0.25,
                   repeat:
-                    Infinity,
-                  ease: "easeInOut",
+                    scanning
+                      ? Infinity
+                      : 0,
                 }}
               />
             )
           )}
 
           <motion.div
-            animate={{
-              scale: [
-                0.96,
-                1.04,
-                0.96,
-              ],
-              boxShadow: [
-                "0 0 0 rgba(52,211,153,0)",
-                "0 0 45px rgba(52,211,153,.18)",
-                "0 0 0 rgba(52,211,153,0)",
-              ],
-            }}
+            animate={
+              scanning
+                ? {
+                    scale: [
+                      1,
+                      1.08,
+                      1,
+                    ],
+                  }
+                : undefined
+            }
             transition={{
-              duration: 3,
-              repeat: Infinity,
+              repeat:
+                scanning
+                  ? Infinity
+                  : 0,
+              duration: 1.1,
             }}
-            className="absolute left-1/2 top-1/2 flex h-24 w-24 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-[28px] border border-emerald-300/20 bg-emerald-300/10"
+            className="absolute z-10 flex h-20 w-20 flex-col items-center justify-center rounded-[26px] border border-cyan-300/20 bg-cyan-300/10 shadow-[0_0_45px_rgba(34,211,238,0.12)]"
           >
-            <Fingerprint className="h-9 w-9 text-emerald-300" />
+            <Fingerprint className="h-8 w-8 text-cyan-200" />
 
-            <motion.span
-              key={score}
-              initial={{
-                opacity: 0,
-                scale: 0.7,
-              }}
-              animate={{
-                opacity: 1,
-                scale: 1,
-              }}
-              className="mt-1 text-xl font-black"
-            >
+            <span className="mt-1 text-lg font-black">
               {score}
-            </motion.span>
-
-            <span className="text-[8px] font-black uppercase tracking-widest text-emerald-100/50">
-              score
             </span>
           </motion.div>
 
           <motion.div
-            className="absolute left-1/2 top-1/2 h-[2px] w-[42%] origin-left bg-gradient-to-r from-cyan-300 via-cyan-200/70 to-transparent"
+            className="absolute left-1/2 top-1/2 h-[2px] w-[48%] origin-left bg-gradient-to-r from-cyan-300 via-violet-300/70 to-transparent"
             animate={{
               rotate:
                 scanning
                   ? 360
-                  : 20,
+                  : 32,
             }}
             transition={{
-              duration: scanning
-                ? 1.5
-                : 0.4,
-              repeat: scanning
-                ? Infinity
-                : 0,
+              repeat:
+                scanning
+                  ? Infinity
+                  : 0,
+              duration: 1.7,
               ease: "linear",
             }}
-          />
-
-          <motion.span
-            animate={{
-              opacity: [
-                0.2,
-                1,
-                0.2,
-              ],
-            }}
-            transition={{
-              duration: 1.7,
-              repeat: Infinity,
-            }}
-            className="absolute left-[17%] top-[35%] h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_14px_rgba(103,232,249,.8)]"
-          />
-
-          <motion.span
-            animate={{
-              opacity: [
-                1,
-                0.25,
-                1,
-              ],
-            }}
-            transition={{
-              duration: 2.1,
-              repeat: Infinity,
-            }}
-            className="absolute right-[18%] top-[58%] h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_14px_rgba(110,231,183,.8)]"
           />
         </div>
 
         <div className="grid grid-cols-3 gap-2">
           <IntelligenceMetric
             label="Score"
-            value={`${score}`}
+            value={String(
+              score
+            )}
           />
 
           <IntelligenceMetric
             label="Sessions"
-            value={`${sessionCount}`}
+            value={String(
+              sessionCount
+            )}
           />
 
           <IntelligenceMetric
             label="Warnings"
-            value={`${warningCount}`}
+            value={String(
+              warningCount
+            )}
           />
         </div>
 
         <div className="mt-4 space-y-2">
           <SecuritySignal
-            icon={ShieldCheck}
-            label="2FA protection"
+            icon={
+              ShieldCheck
+            }
+            label="Two-factor protection"
             value={
               is2FAEnabled
                 ? "Active"
@@ -2776,7 +4002,9 @@ function SecurityIntelligence({
           <SecuritySignal
             icon={Wifi}
             label="Active sessions"
-            value={`${sessionCount}`}
+            value={String(
+              sessionCount
+            )}
             healthy={
               sessionCount <=
               3
@@ -2784,7 +4012,9 @@ function SecurityIntelligence({
           />
 
           <SecuritySignal
-            icon={Snowflake}
+            icon={
+              Snowflake
+            }
             label="Wallet state"
             value={
               isWalletFrozen
@@ -2797,12 +4027,16 @@ function SecurityIntelligence({
           />
         </div>
 
-        <div className="mt-5 grid gap-2 sm:grid-cols-2">
+        <div className="mt-5 grid gap-2">
           <button
             type="button"
-            disabled={scanning}
-            onClick={onScan}
-            className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-cyan-300 px-4 py-3 text-[10px] font-black text-[#071A2A] transition hover:bg-cyan-200 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={
+              scanning
+            }
+            onClick={
+              onScan
+            }
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-200 px-4 py-3 text-[10px] font-black text-violet-950 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <RefreshCw
               className={`h-3.5 w-3.5 ${
@@ -2813,8 +4047,8 @@ function SecurityIntelligence({
             />
 
             {scanning
-              ? "Scanning..."
-              : "Run Security Check"}
+              ? "Checking..."
+              : "Run Live Security Check"}
           </button>
 
           <button
@@ -2822,16 +4056,19 @@ function SecurityIntelligence({
             onClick={
               onReviewSessions
             }
-            className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.05] px-4 py-3 text-[10px] font-black text-white transition hover:bg-white/10"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-[10px] font-black text-white transition hover:bg-white/10"
           >
-            <History className="h-3.5 w-3.5 text-cyan-200" />
+            <History className="h-3.5 w-3.5 text-violet-200" />
+
             Review Sessions
           </button>
         </div>
 
-        <p className="mt-4 text-center text-[9px] text-indigo-100/35">
+        <p className="mt-4 text-center text-[9px] text-violet-100/40">
           Last checked:{" "}
-          {lastChecked}
+          {formatDate(
+            lastChecked
+          )}
         </p>
       </div>
     </motion.section>
@@ -2850,12 +4087,12 @@ function IntelligenceMetric({
   value: string;
 }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.05] px-2 py-3 text-center">
-      <p className="text-[8px] font-black uppercase tracking-wider text-indigo-100/40">
+    <div className="rounded-xl border border-white/10 bg-white/5 px-2 py-3 text-center">
+      <p className="text-[8px] font-black uppercase tracking-wide text-violet-100/40">
         {label}
       </p>
 
-      <p className="mt-1 text-sm font-black text-cyan-100">
+      <p className="mt-1 text-sm font-black text-violet-100">
         {value}
       </p>
     </div>
@@ -2878,7 +4115,7 @@ function SecuritySignal({
   healthy: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5">
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5">
       <div className="flex min-w-0 items-center gap-2">
         <Icon
           className={`h-3.5 w-3.5 shrink-0 ${
@@ -2888,7 +4125,7 @@ function SecuritySignal({
           }`}
         />
 
-        <span className="truncate text-[10px] font-semibold text-indigo-100/55">
+        <span className="truncate text-[10px] font-semibold text-violet-100/60">
           {label}
         </span>
       </div>
@@ -2907,157 +4144,110 @@ function SecuritySignal({
 }
 
 /* =========================================================
-   SECURITY TIPS
+   TIPS
 ========================================================= */
 
 function SecurityTips() {
   return (
     <div className="grid grid-cols-2 gap-4">
-      <Card className="group p-4 transition hover:-translate-y-1 hover:shadow-md">
-        <Lock className="mb-3 h-6 w-6 text-[var(--dashboard-primary)] transition-transform group-hover:scale-110" />
+      <div className="group rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+        <Lock className="mb-2 h-6 w-6 text-violet-700 transition-transform group-hover:scale-110 dark:text-violet-300" />
 
-        <p className="text-xs font-black text-card-foreground">
+        <p className="text-xs font-bold text-card-foreground">
           Never share OTP
         </p>
 
         <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
-          Keep verification codes private.
+          Keep verification codes
+          private.
         </p>
-      </Card>
+      </div>
 
-      <Card className="group p-4 transition hover:-translate-y-1 hover:shadow-md">
-        <RefreshCw className="mb-3 h-6 w-6 text-emerald-500 transition-transform duration-700 group-hover:rotate-180" />
+      <div className="group rounded-2xl border border-border bg-card p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+        <RefreshCw className="mb-2 h-6 w-6 text-emerald-600 transition-transform duration-700 group-hover:rotate-180 dark:text-emerald-300" />
 
-        <p className="text-xs font-black text-card-foreground">
+        <p className="text-xs font-bold text-card-foreground">
           Review sessions
         </p>
 
         <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
-          Remove devices you no longer use.
+          Remove devices you no
+          longer use.
         </p>
-      </Card>
+      </div>
     </div>
   );
 }
 
 /* =========================================================
-   EMERGENCY / WALLET PROTECTION
+   EMERGENCY
 ========================================================= */
 
 function EmergencyProtection({
   frozen,
-  onFreeze,
+  busy,
+  onOpen,
+  onUnfreeze,
 }: {
   frozen: boolean;
-  onFreeze: () => void;
+  busy: boolean;
+  onOpen: () => void;
+  onUnfreeze: () => void;
 }) {
   return (
-    <Card
-      className="
-        overflow-hidden
-        border-rose-200
-        p-5
-        dark:border-rose-500/20
-        sm:p-6
-      "
-    >
-      <div
-        className="
-          -m-5
-          border-b
-          border-rose-100
-          bg-gradient-to-br
-          from-rose-50
-          via-white
-          to-white
-          p-5
-          sm:-m-6
-          sm:mb-6
-          sm:p-6
-          dark:border-rose-500/10
-          dark:from-rose-500/[0.10]
-          dark:via-rose-950/20
-          dark:to-card
-        "
-      >
-        <div className="flex items-start gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-rose-100 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300">
-            <ShieldAlert className="h-5 w-5" />
-          </div>
+    <Card className="border-rose-200 bg-gradient-to-br from-rose-50 via-card to-card p-6 dark:border-rose-400/20 dark:from-rose-400/10">
+      <h3 className="mb-2 flex items-center gap-2 font-black text-rose-600 dark:text-rose-300">
+        <ShieldAlert className="h-5 w-5" />
 
-          <div className="min-w-0">
-            <p className="text-[9px] font-black uppercase tracking-[0.16em] text-rose-500">
-              Emergency Protection
-            </p>
+        Emergency Protection
+      </h3>
 
-            <h3 className="mt-1 text-base font-black text-card-foreground">
-              Wallet Protection
-            </h3>
+      <p className="mb-5 text-xs leading-5 text-muted-foreground">
+        Freeze outbound wallet
+        activity during a suspected
+        compromise.
+      </p>
 
-            <p className="mt-1 text-[10px] text-muted-foreground">
-              Emergency control for suspected
-              account compromise.
-            </p>
-          </div>
-        </div>
-      </div>
+      {frozen ? (
+        <>
+          <div className="rounded-xl border border-rose-200 bg-rose-100 p-4 text-center dark:border-rose-400/20 dark:bg-rose-400/10">
+            <Snowflake className="mx-auto mb-2 h-6 w-6 text-rose-600 dark:text-rose-300" />
 
-      <div className="pt-6 sm:pt-0">
-        <div className="rounded-2xl border border-border bg-muted/30 p-4">
-          <div className="flex items-start gap-3">
-            <Snowflake className="mt-0.5 h-4 w-4 shrink-0 text-rose-500" />
-
-            <p className="text-xs leading-5 text-muted-foreground">
-              Freezing your wallet should block
-              outbound wallet activity until a
-              protected backend authorization
-              restores access.
-            </p>
-          </div>
-        </div>
-
-        {frozen ? (
-          <motion.div
-            initial={{
-              opacity: 0,
-              scale: 0.96,
-            }}
-            animate={{
-              opacity: 1,
-              scale: 1,
-            }}
-            className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-center dark:border-rose-500/20 dark:bg-rose-500/10"
-          >
-            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-rose-100 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300">
-              <Snowflake className="h-5 w-5" />
-            </div>
-
-            <p className="mt-3 text-sm font-black text-rose-700 dark:text-rose-200">
+            <p className="text-sm font-bold text-rose-700 dark:text-rose-200">
               Wallet is Frozen
             </p>
 
-            <p className="mt-1 text-[10px] leading-4 text-rose-600/80 dark:text-rose-300/70">
-              Backend authorization is required
-              before the wallet can be unfrozen.
+            <p className="mt-1 text-xs text-rose-600 dark:text-rose-200/80">
+              Server-side wallet
+              security lock is active.
             </p>
-          </motion.div>
-        ) : (
-          <motion.button
+          </div>
+
+          <button
             type="button"
-            whileHover={{
-              y: -1,
-            }}
-            whileTap={{
-              scale: 0.985,
-            }}
-            onClick={onFreeze}
-            className="mt-4 flex min-h-[46px] w-full items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-3 text-sm font-black text-white transition hover:bg-rose-700"
+            disabled={busy}
+            onClick={onUnfreeze}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-rose-200 bg-card px-4 py-3 text-sm font-bold text-rose-600 transition hover:bg-rose-50 disabled:opacity-50 dark:border-rose-400/20 dark:text-rose-300 dark:hover:bg-rose-400/10"
           >
-            <Snowflake className="h-4 w-4" />
-            Freeze Wallet
-          </motion.button>
-        )}
-      </div>
+            {busy && (
+              <RefreshCw className="h-4 w-4 animate-spin" />
+            )}
+
+            Unfreeze Wallet
+          </button>
+        </>
+      ) : (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onOpen}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-rose-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-rose-700 disabled:opacity-50"
+        >
+          <Snowflake className="h-4 w-4" />
+
+          Freeze Wallet
+        </button>
+      )}
     </Card>
   );
 }
@@ -3067,13 +4257,16 @@ function EmergencyProtection({
 ========================================================= */
 
 function PasswordModal({
-  open,
+  busy,
   onClose,
-  onSuccess,
+  onSubmit,
 }: {
-  open: boolean;
+  busy: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSubmit: (
+    currentPassword: string,
+    newPassword: string
+  ) => Promise<void>;
 }) {
   const [
     currentPassword,
@@ -3110,221 +4303,1019 @@ function PasswordModal({
     setError,
   ] = useState("");
 
-  useEffect(() => {
-    if (!open) {
-      setCurrentPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
-      setShowCurrent(false);
-      setShowNew(false);
-      setShowConfirm(false);
+  const submit =
+    async () => {
+      if (
+        !currentPassword ||
+        !newPassword ||
+        !confirmPassword
+      ) {
+        setError(
+          "Complete all password fields."
+        );
+
+        return;
+      }
+
+      if (
+        !/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,128}$/.test(
+          newPassword
+        )
+      ) {
+        setError(
+          "Password must be 8-128 characters and include uppercase, lowercase and a number."
+        );
+
+        return;
+      }
+
+      if (
+        newPassword !==
+        confirmPassword
+      ) {
+        setError(
+          "New passwords do not match."
+        );
+
+        return;
+      }
+
       setError("");
-    }
-  }, [open]);
 
-  const submit = () => {
-    if (
-      !currentPassword ||
-      !newPassword ||
-      !confirmPassword
-    ) {
-      setError(
-        "Complete all password fields."
-      );
-      return;
-    }
-
-    if (
-      newPassword.length < 8
-    ) {
-      setError(
-        "New password must be at least 8 characters."
-      );
-      return;
-    }
-
-    if (
-      newPassword !==
-      confirmPassword
-    ) {
-      setError(
-        "New passwords do not match."
-      );
-      return;
-    }
-
-    setError("");
-    onSuccess();
-  };
+      try {
+        await onSubmit(
+          currentPassword,
+          newPassword
+        );
+      } catch {
+        // Parent displays server error.
+      }
+    };
 
   return (
-    <AnimatePresence>
-      {open && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <motion.button
-            type="button"
-            aria-label="Close password modal"
-            initial={{
-              opacity: 0,
-            }}
-            animate={{
-              opacity: 1,
-            }}
-            exit={{
-              opacity: 0,
-            }}
-            onClick={onClose}
-            className="absolute inset-0 bg-slate-950/65 backdrop-blur-md"
-          />
+    <Modal
+      title="Change Password"
+      onClose={
+        onClose
+      }
+    >
+      <div className="space-y-4">
+        <PasswordField
+          label="Current Password"
+          value={
+            currentPassword
+          }
+          onChange={
+            setCurrentPassword
+          }
+          visible={
+            showCurrent
+          }
+          onToggle={() =>
+            setShowCurrent(
+              (value) =>
+                !value
+            )
+          }
+        />
 
-          <motion.div
-            initial={{
-              opacity: 0,
-              y: 20,
-              scale: 0.96,
-            }}
-            animate={{
-              opacity: 1,
-              y: 0,
-              scale: 1,
-            }}
-            exit={{
-              opacity: 0,
-              y: 20,
-              scale: 0.96,
-            }}
-            className="relative z-10 w-full max-w-md rounded-[28px] border border-border bg-card p-6 shadow-2xl sm:p-8"
-          >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[9px] font-black uppercase tracking-widest text-[var(--dashboard-primary)]">
-                  Credentials
-                </p>
+        <PasswordField
+          label="New Password"
+          value={
+            newPassword
+          }
+          onChange={
+            setNewPassword
+          }
+          visible={
+            showNew
+          }
+          onToggle={() =>
+            setShowNew(
+              (value) =>
+                !value
+            )
+          }
+        />
 
-                <h3 className="mt-1 text-2xl font-black text-card-foreground">
-                  Change Password
-                </h3>
+        <PasswordField
+          label="Confirm New Password"
+          value={
+            confirmPassword
+          }
+          onChange={
+            setConfirmPassword
+          }
+          visible={
+            showConfirm
+          }
+          onToggle={() =>
+            setShowConfirm(
+              (value) =>
+                !value
+            )
+          }
+        />
+      </div>
 
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Verify your current password
-                  before choosing a new one.
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-xl bg-muted p-2 text-muted-foreground hover:bg-muted/80"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="mt-6 space-y-4">
-              <PasswordInput
-                label="Current Password"
-                value={
-                  currentPassword
-                }
-                onChange={
-                  setCurrentPassword
-                }
-                visible={
-                  showCurrent
-                }
-                onToggleVisible={() =>
-                  setShowCurrent(
-                    (
-                      current
-                    ) =>
-                      !current
-                  )
-                }
-              />
-
-              <PasswordInput
-                label="New Password"
-                value={
-                  newPassword
-                }
-                onChange={
-                  setNewPassword
-                }
-                visible={
-                  showNew
-                }
-                onToggleVisible={() =>
-                  setShowNew(
-                    (
-                      current
-                    ) =>
-                      !current
-                  )
-                }
-              />
-
-              <PasswordInput
-                label="Confirm New Password"
-                value={
-                  confirmPassword
-                }
-                onChange={
-                  setConfirmPassword
-                }
-                visible={
-                  showConfirm
-                }
-                onToggleVisible={() =>
-                  setShowConfirm(
-                    (
-                      current
-                    ) =>
-                      !current
-                  )
-                }
-              />
-            </div>
-
-            {error && (
-              <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-600 dark:border-rose-500/20 dark:bg-rose-500/10 dark:text-rose-300">
-                {error}
-              </div>
-            )}
-
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 rounded-xl bg-muted py-3 text-sm font-black text-card-foreground hover:bg-muted/80"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                onClick={submit}
-                className="flex-1 rounded-xl bg-[var(--dashboard-primary)] py-3 text-sm font-black text-white hover:opacity-90"
-              >
-                Update Password
-              </button>
-            </div>
-          </motion.div>
-        </div>
+      {error && (
+        <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-700 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-200">
+          {error}
+        </p>
       )}
-    </AnimatePresence>
+
+      <ModalActions
+        busy={busy}
+        cancelLabel="Cancel"
+        confirmLabel={
+          busy
+            ? "Updating..."
+            : "Update Password"
+        }
+        onCancel={
+          onClose
+        }
+        onConfirm={() =>
+          void submit()
+        }
+      />
+    </Modal>
   );
 }
 
 /* =========================================================
-   PASSWORD INPUT
+   2FA MODAL
 ========================================================= */
 
-function PasswordInput({
+function TwoFAModal({
+  mode,
+  enabled,
+  busy,
+  password,
+  setPassword,
+  showPassword,
+  setShowPassword,
+  secret,
+  uri,
+  code,
+  setCode,
+  selectedMethod,
+  setSelectedMethod,
+  availability,
+  backupCodes,
+  onClose,
+  onStart,
+  onVerify,
+  onDisable,
+  onUpdateMethod,
+  onRegenerate,
+  onCopySecret,
+  copied,
+  onCopyBackupCodes,
+}: {
+  mode: TwoFAModalMode;
+
+  enabled: boolean;
+
+  busy: boolean;
+
+  password: string;
+
+  setPassword: (
+    value: string
+  ) => void;
+
+  showPassword: boolean;
+
+  setShowPassword: (
+    value: boolean
+  ) => void;
+
+  secret: string;
+
+  uri: string;
+
+  code: string;
+
+  setCode: (
+    value: string
+  ) => void;
+
+  selectedMethod: TwoFAMethod;
+
+  setSelectedMethod: (
+    value: TwoFAMethod
+  ) => void;
+
+  availability: DeliveryAvailability;
+
+  backupCodes: string[];
+
+  onClose: () => void;
+
+  onStart: () => Promise<void>;
+
+  onVerify: () => Promise<void>;
+
+  onDisable: () => Promise<void>;
+
+  onUpdateMethod: () => Promise<void>;
+
+  onRegenerate: () => Promise<void>;
+
+  onCopySecret: () => Promise<void>;
+
+  copied: boolean;
+
+  onCopyBackupCodes: () => Promise<void>;
+}) {
+  /* =======================================================
+     SETUP - STEP 2
+  ======================================================= */
+
+  if (
+    mode === "setup" &&
+    secret
+  ) {
+    return (
+      <Modal
+        title="Finish 2FA Setup"
+        onClose={
+          onClose
+        }
+      >
+        <div className="space-y-5">
+          <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4 dark:border-violet-400/20 dark:bg-violet-400/10">
+            <p className="text-sm font-bold text-violet-950 dark:text-violet-100">
+              Add this secret to your
+              authenticator app
+            </p>
+
+            <p className="mt-1 text-xs leading-5 text-violet-900/70 dark:text-violet-100/60">
+              Open Google Authenticator,
+              Microsoft Authenticator,
+              Authy or another TOTP
+              application.
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-border bg-muted/40 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-wide text-muted-foreground">
+                  Secret
+                </p>
+
+                <p className="mt-1 break-all font-mono text-sm font-black text-card-foreground">
+                  {secret}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={
+                  onCopySecret
+                }
+                className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-xs font-bold text-card-foreground transition hover:bg-muted"
+              >
+                <Copy className="h-3.5 w-3.5" />
+
+                {copied
+                  ? "Copied"
+                  : "Copy"}
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-2 text-xs font-black text-card-foreground">
+              OTP Auth URI
+            </p>
+
+            <textarea
+              readOnly
+              value={uri}
+              className="h-28 w-full resize-none rounded-xl border border-border bg-muted/40 p-3 font-mono text-[10px] leading-5 text-muted-foreground outline-none"
+            />
+          </div>
+
+          <div>
+            <label className="mb-2 block text-xs font-black text-card-foreground">
+              Enter the 6-digit
+              authenticator code
+            </label>
+
+            <input
+              value={code}
+              onChange={(
+                event
+              ) =>
+                setCode(
+                  event.target.value
+                    .replace(
+                      /\D/g,
+                      ""
+                    )
+                    .slice(
+                      0,
+                      6
+                    )
+                )
+              }
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              placeholder="123456"
+              className="h-14 w-full rounded-xl border border-border bg-muted/40 px-4 text-center text-xl font-black tracking-[0.35em] text-foreground outline-none transition focus:border-violet-600 focus:ring-4 focus:ring-violet-600/10"
+            />
+          </div>
+
+          <ModalActions
+            busy={
+              busy
+            }
+            cancelLabel="Cancel"
+            confirmLabel={
+              busy
+                ? "Verifying..."
+                : "Verify & Enable"
+            }
+            onCancel={
+              onClose
+            }
+            onConfirm={() =>
+              void onVerify()
+            }
+          />
+        </div>
+      </Modal>
+    );
+  }
+
+  /* =======================================================
+     SETUP - STEP 1
+  ======================================================= */
+
+  if (
+    mode === "setup"
+  ) {
+    return (
+      <Modal
+        title="Enable Two-Factor Authentication"
+        onClose={
+          onClose
+        }
+      >
+        <p className="text-sm leading-6 text-muted-foreground">
+          Enter your current password
+          to securely start the 2FA
+          setup process.
+        </p>
+
+        <div className="mt-5">
+          <PasswordField
+            label="Current Password"
+            value={
+              password
+            }
+            onChange={
+              setPassword
+            }
+            visible={
+              showPassword
+            }
+            onToggle={() =>
+              setShowPassword(
+                !showPassword
+              )
+            }
+          />
+        </div>
+
+        <ModalActions
+          busy={
+            busy
+          }
+          cancelLabel="Cancel"
+          confirmLabel={
+            busy
+              ? "Starting..."
+              : "Start Setup"
+          }
+          onCancel={
+            onClose
+          }
+          onConfirm={() =>
+            void onStart()
+          }
+        />
+      </Modal>
+    );
+  }
+
+  /* =======================================================
+     DISABLE
+  ======================================================= */
+
+  if (
+    mode ===
+    "disable"
+  ) {
+    return (
+      <Modal
+        title="Disable Two-Factor Authentication"
+        onClose={
+          onClose
+        }
+      >
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-800 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-200">
+          Disabling 2FA removes the
+          stored authenticator secret
+          and backup codes. You will
+          need to set up 2FA again
+          later.
+        </div>
+
+        <div className="mt-5">
+          <PasswordField
+            label="Current Password"
+            value={
+              password
+            }
+            onChange={
+              setPassword
+            }
+            visible={
+              showPassword
+            }
+            onToggle={() =>
+              setShowPassword(
+                !showPassword
+              )
+            }
+          />
+        </div>
+
+        <ModalActions
+          busy={
+            busy
+          }
+          cancelLabel="Cancel"
+          confirmLabel={
+            busy
+              ? "Disabling..."
+              : "Disable 2FA"
+          }
+          danger
+          onCancel={
+            onClose
+          }
+          onConfirm={() =>
+            void onDisable()
+          }
+        />
+      </Modal>
+    );
+  }
+
+  /* =======================================================
+     CHANGE METHOD
+  ======================================================= */
+
+  if (
+    mode ===
+    "method"
+  ) {
+    const methods: Array<{
+      id: TwoFAMethod;
+      label: string;
+      icon: React.ElementType;
+      available: boolean;
+      description: string;
+    }> = [
+      {
+        id: "app",
+        label: "Authenticator",
+        icon: Fingerprint,
+        available:
+          availability.app,
+        description:
+          "Time-based 6-digit code",
+      },
+
+      {
+        id: "sms",
+        label: "SMS",
+        icon: Smartphone,
+        available:
+          availability.sms,
+        description:
+          "Verification code by SMS",
+      },
+
+      {
+        id: "email",
+        label: "Email",
+        icon: Mail,
+        available:
+          availability.email,
+        description:
+          "Verification code by email",
+      },
+    ];
+
+    return (
+      <Modal
+        title="Change Primary 2FA Method"
+        onClose={
+          onClose
+        }
+      >
+        <p className="text-sm leading-6 text-muted-foreground">
+          Choose the method that the
+          backend will use for your
+          next sign-in challenge.
+        </p>
+
+        <div className="mt-5 grid gap-3">
+          {methods.map(
+            (
+              item
+            ) => {
+              const Icon =
+                item.icon;
+
+              const active =
+                selectedMethod ===
+                item.id;
+
+              return (
+                <button
+                  key={
+                    item.id
+                  }
+                  type="button"
+                  disabled={
+                    !item.available
+                  }
+                  onClick={() =>
+                    setSelectedMethod(
+                      item.id
+                    )
+                  }
+                  className={`flex items-center justify-between rounded-2xl border p-4 text-left transition ${
+                    active
+                      ? "border-violet-600 bg-violet-50 dark:border-violet-400 dark:bg-violet-400/10"
+                      : item.available
+                        ? "border-border bg-card hover:bg-muted/50"
+                        : "cursor-not-allowed border-border bg-muted/30 opacity-50"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+                        active
+                          ? "bg-violet-700 text-white"
+                          : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-bold text-card-foreground">
+                        {
+                          item.label
+                        }
+                      </p>
+
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {
+                          item.description
+                        }
+                      </p>
+
+                      {!item.available && (
+                        <p className="mt-1 text-[10px] font-bold text-rose-500">
+                          Not configured on
+                          server
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {active && (
+                    <CheckCircle2 className="h-4 w-4 text-violet-700 dark:text-violet-300" />
+                  )}
+                </button>
+              );
+            }
+          )}
+        </div>
+
+        <div className="mt-5">
+          <PasswordField
+            label="Current Password"
+            value={
+              password
+            }
+            onChange={
+              setPassword
+            }
+            visible={
+              showPassword
+            }
+            onToggle={() =>
+              setShowPassword(
+                !showPassword
+              )
+            }
+          />
+        </div>
+
+        <ModalActions
+          busy={
+            busy
+          }
+          cancelLabel="Cancel"
+          confirmLabel={
+            busy
+              ? "Updating..."
+              : "Save Method"
+          }
+          onCancel={
+            onClose
+          }
+          onConfirm={() =>
+            void onUpdateMethod()
+          }
+        />
+      </Modal>
+    );
+  }
+
+  /* =======================================================
+     BACKUP CODES
+  ======================================================= */
+
+  return (
+    <Modal
+      title="Regenerate Backup Codes"
+      onClose={
+        onClose
+      }
+    >
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-400/20 dark:bg-amber-400/10">
+        <p className="text-sm font-bold text-amber-900 dark:text-amber-200">
+          Save your new codes
+        </p>
+
+        <p className="mt-1 text-xs leading-5 text-amber-800/80 dark:text-amber-100/70">
+          The old backup codes will
+          stop working immediately.
+        </p>
+      </div>
+
+      <div className="mt-5">
+        <PasswordField
+          label="Current Password"
+          value={
+            password
+          }
+          onChange={
+            setPassword
+          }
+          visible={
+            showPassword
+          }
+          onToggle={() =>
+            setShowPassword(
+              !showPassword
+            )
+          }
+        />
+      </div>
+
+      <ModalActions
+        busy={
+          busy
+        }
+        cancelLabel="Cancel"
+        confirmLabel={
+          busy
+            ? "Generating..."
+            : "Generate New Codes"
+        }
+        onCancel={
+          onClose
+        }
+        onConfirm={() =>
+          void onRegenerate()
+        }
+      />
+    </Modal>
+  );
+}
+
+/* =========================================================
+   FREEZE MODAL
+========================================================= */
+
+function FreezeWalletModal({
+  frozen,
+  busy,
+  password,
+  setPassword,
+  showPassword,
+  setShowPassword,
+  onClose,
+  onConfirm,
+}: {
+  frozen: boolean;
+  busy: boolean;
+  password: string;
+  setPassword: (
+    value: string
+  ) => void;
+  showPassword: boolean;
+  setShowPassword: (
+    value: boolean
+  ) => void;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Modal
+      title={
+        frozen
+          ? "Unfreeze Wallet"
+          : "Freeze Wallet"
+      }
+      onClose={
+        onClose
+      }
+    >
+      <div
+        className={`rounded-2xl border p-4 ${
+          frozen
+            ? "border-emerald-200 bg-emerald-50 dark:border-emerald-400/20 dark:bg-emerald-400/10"
+            : "border-rose-200 bg-rose-50 dark:border-rose-400/20 dark:bg-rose-400/10"
+        }`}
+      >
+        <div className="flex items-start gap-3">
+          <Snowflake
+            className={`mt-0.5 h-5 w-5 shrink-0 ${
+              frozen
+                ? "text-emerald-600 dark:text-emerald-300"
+                : "text-rose-600 dark:text-rose-300"
+            }`}
+          />
+
+          <p
+            className={`text-sm leading-6 ${
+              frozen
+                ? "text-emerald-800 dark:text-emerald-200"
+                : "text-rose-800 dark:text-rose-200"
+            }`}
+          >
+            {frozen
+              ? "This will remove the server-side wallet security lock."
+              : "This will create a server-side wallet security lock that blocks outbound wallet actions."}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5">
+        <PasswordField
+          label="Current Password"
+          value={
+            password
+          }
+          onChange={
+            setPassword
+          }
+          visible={
+            showPassword
+          }
+          onToggle={() =>
+            setShowPassword(
+              !showPassword
+            )
+          }
+        />
+      </div>
+
+      <ModalActions
+        busy={
+          busy
+        }
+        cancelLabel="Cancel"
+        confirmLabel={
+          busy
+            ? frozen
+              ? "Unfreezing..."
+              : "Freezing..."
+            : frozen
+              ? "Unfreeze Wallet"
+              : "Freeze Wallet"
+        }
+        danger={
+          !frozen
+        }
+        onCancel={
+          onClose
+        }
+        onConfirm={
+          onConfirm
+        }
+      />
+    </Modal>
+  );
+}
+
+/* =========================================================
+   BACKUP CODES MODAL
+========================================================= */
+
+function BackupCodesModal({
+  codes,
+  onCopy,
+  onClose,
+}: {
+  codes: string[];
+  onCopy: () => Promise<void>;
+  onClose: () => void;
+}) {
+  return (
+    <Modal
+      title="Backup Codes"
+      onClose={
+        onClose
+      }
+    >
+      <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-400/20 dark:bg-amber-400/10">
+        <p className="text-sm font-bold text-amber-900 dark:text-amber-200">
+          Save these codes now
+        </p>
+
+        <p className="mt-1 text-xs leading-5 text-amber-800/80 dark:text-amber-100/70">
+          These codes are displayed
+          only once. Store them in a
+          secure place.
+        </p>
+      </div>
+
+      <div className="mt-5 grid grid-cols-2 gap-2 rounded-2xl border border-border bg-muted/40 p-4 font-mono text-xs font-bold text-card-foreground">
+        {codes.map(
+          (code) => (
+            <span
+              key={
+                code
+              }
+              className="rounded-lg bg-card px-3 py-2 text-center shadow-sm"
+            >
+              {
+                code
+              }
+            </span>
+          )
+        )}
+      </div>
+
+      <div className="mt-5 flex gap-3">
+        <button
+          type="button"
+          onClick={() =>
+            void onCopy()
+          }
+          className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-violet-700 py-3 text-sm font-bold text-white transition hover:bg-violet-800"
+        >
+          <Copy className="h-4 w-4" />
+
+          Copy Codes
+        </button>
+
+        <button
+          type="button"
+          onClick={
+            onClose
+          }
+          className="flex-1 rounded-xl bg-muted py-3 text-sm font-bold text-card-foreground transition hover:bg-muted/80"
+        >
+          Done
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+/* =========================================================
+   SHARED CARD
+========================================================= */
+
+function Card({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`rounded-[28px] border border-border bg-card text-card-foreground shadow-[0_10px_35px_rgba(15,23,42,0.05)] ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+/* =========================================================
+   STATUS PILL
+========================================================= */
+
+function StatusPill({
+  text,
+  tone,
+}: {
+  text: string;
+  tone:
+    | "green"
+    | "blue"
+    | "amber";
+}) {
+  return (
+    <span
+      className={`inline-flex rounded-full border px-3 py-1.5 text-[10px] font-black ${
+        tone ===
+        "green"
+          ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-100"
+          : tone ===
+              "amber"
+            ? "border-amber-300/20 bg-amber-300/10 text-amber-100"
+            : "border-violet-200/15 bg-white/10 text-violet-100"
+      }`}
+    >
+      {text}
+    </span>
+  );
+}
+
+/* =========================================================
+   TOGGLE
+========================================================= */
+
+function Toggle({
+  checked,
+  disabled,
+  onChange,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  onChange: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={
+        checked
+      }
+      disabled={
+        disabled
+      }
+      onClick={
+        onChange
+      }
+      className={`relative h-7 w-12 shrink-0 rounded-full transition ${
+        checked
+          ? "bg-violet-700"
+          : "bg-slate-300 dark:bg-slate-700"
+      } ${
+        disabled
+          ? "cursor-not-allowed opacity-50"
+          : ""
+      }`}
+    >
+      <span
+        className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-all ${
+          checked
+            ? "left-6"
+            : "left-1"
+        }`}
+      />
+    </button>
+  );
+}
+
+/* =========================================================
+   PASSWORD FIELD
+========================================================= */
+
+function PasswordField({
   label,
   value,
   onChange,
   visible,
-  onToggleVisible,
+  onToggle,
 }: {
   label: string;
   value: string;
@@ -3332,11 +5323,11 @@ function PasswordInput({
     value: string
   ) => void;
   visible: boolean;
-  onToggleVisible: () => void;
+  onToggle: () => void;
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-black text-card-foreground">
+      <label className="mb-1.5 block text-sm font-semibold text-card-foreground">
         {label}
       </label>
 
@@ -3347,20 +5338,25 @@ function PasswordInput({
               ? "text"
               : "password"
           }
-          value={value}
-          onChange={(event) =>
+          value={
+            value
+          }
+          onChange={(
+            event
+          ) =>
             onChange(
-              event.target.value
+              event.target
+                .value
             )
           }
-          placeholder="••••••••"
-          className="h-12 w-full rounded-xl border border-border bg-muted/40 px-4 pr-11 text-sm font-semibold text-foreground outline-none transition focus:border-[var(--dashboard-primary)] focus:ring-4 focus:ring-[var(--dashboard-primary)]/10"
+          autoComplete="current-password"
+          className="w-full rounded-xl border border-border bg-muted/40 px-4 py-3 pr-11 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-violet-600 focus:bg-card focus:ring-4 focus:ring-violet-600/10"
         />
 
         <button
           type="button"
           onClick={
-            onToggleVisible
+            onToggle
           }
           className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
         >
@@ -3376,108 +5372,133 @@ function PasswordInput({
 }
 
 /* =========================================================
-   FREEZE WALLET MODAL
+   MODAL
 ========================================================= */
 
-function FreezeWalletModal({
-  open,
+function Modal({
+  title,
+  children,
   onClose,
+}: {
+  title: string;
+  children: React.ReactNode;
+  onClose: () => void;
+}) {
+  return (
+    <motion.div
+      initial={{
+        opacity: 0,
+      }}
+      animate={{
+        opacity: 1,
+      }}
+      exit={{
+        opacity: 0,
+      }}
+      className="fixed inset-0 z-[150] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm"
+    >
+      <button
+        type="button"
+        aria-label="Close modal"
+        className="absolute inset-0"
+        onClick={
+          onClose
+        }
+      />
+
+      <motion.div
+        initial={{
+          opacity: 0,
+          y: 18,
+          scale: 0.96,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          scale: 1,
+        }}
+        exit={{
+          opacity: 0,
+          y: 18,
+          scale: 0.96,
+        }}
+        className="relative z-10 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-[28px] border border-border bg-card p-6 text-foreground shadow-2xl sm:p-8"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <h3 className="text-2xl font-black text-foreground">
+            {title}
+          </h3>
+
+          <button
+            type="button"
+            onClick={
+              onClose
+            }
+            className="rounded-xl bg-muted p-2 text-muted-foreground transition hover:bg-muted/80"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-5">
+          {children}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+/* =========================================================
+   MODAL ACTIONS
+========================================================= */
+
+function ModalActions({
+  busy,
+  cancelLabel,
+  confirmLabel,
+  danger = false,
+  onCancel,
   onConfirm,
 }: {
-  open: boolean;
-  onClose: () => void;
+  busy: boolean;
+  cancelLabel: string;
+  confirmLabel: string;
+  danger?: boolean;
+  onCancel: () => void;
   onConfirm: () => void;
 }) {
   return (
-    <AnimatePresence>
-      {open && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <motion.button
-            type="button"
-            aria-label="Close freeze wallet modal"
-            initial={{
-              opacity: 0,
-            }}
-            animate={{
-              opacity: 1,
-            }}
-            exit={{
-              opacity: 0,
-            }}
-            onClick={onClose}
-            className="absolute inset-0 bg-rose-950/70 backdrop-blur-md"
-          />
+    <div className="mt-7 flex gap-3">
+      <button
+        type="button"
+        disabled={
+          busy
+        }
+        onClick={
+          onCancel
+        }
+        className="flex-1 rounded-xl bg-muted py-3 text-sm font-bold text-card-foreground transition hover:bg-muted/80 disabled:opacity-50"
+      >
+        {cancelLabel}
+      </button>
 
-          <motion.div
-            initial={{
-              opacity: 0,
-              y: 20,
-              scale: 0.96,
-            }}
-            animate={{
-              opacity: 1,
-              y: 0,
-              scale: 1,
-            }}
-            exit={{
-              opacity: 0,
-              y: 20,
-              scale: 0.96,
-            }}
-            className="relative z-10 w-full max-w-md rounded-[30px] border border-border bg-card p-7 text-center shadow-2xl"
-          >
-            <motion.div
-              animate={{
-                boxShadow: [
-                  "0 0 0 0 rgba(244,63,94,.10)",
-                  "0 0 0 16px rgba(244,63,94,0)",
-                ],
-              }}
-              transition={{
-                repeat:
-                  Infinity,
-                duration: 1.8,
-              }}
-              className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-rose-100 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300"
-            >
-              <ShieldAlert className="h-8 w-8" />
-            </motion.div>
-
-            <p className="mt-5 text-[9px] font-black uppercase tracking-widest text-rose-500">
-              Emergency Action
-            </p>
-
-            <h3 className="mt-1 text-2xl font-black text-card-foreground">
-              Freeze Wallet?
-            </h3>
-
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              This should only be used when you
-              suspect unauthorized account
-              activity.
-            </p>
-
-            <div className="mt-7 flex gap-3">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 rounded-xl bg-muted py-3 text-sm font-black text-card-foreground hover:bg-muted/80"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="button"
-                onClick={onConfirm}
-                className="flex-1 rounded-xl bg-rose-600 py-3 text-sm font-black text-white hover:bg-rose-700"
-              >
-                Yes, Freeze
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
-    </AnimatePresence>
+      <button
+        type="button"
+        disabled={
+          busy
+        }
+        onClick={
+          onConfirm
+        }
+        className={`flex-1 rounded-xl py-3 text-sm font-bold text-white transition disabled:opacity-50 ${
+          danger
+            ? "bg-rose-600 hover:bg-rose-700"
+            : "bg-violet-700 hover:bg-violet-800"
+        }`}
+      >
+        {confirmLabel}
+      </button>
+    </div>
   );
 }
 
@@ -3489,11 +5510,7 @@ function Toast({
   toast,
   onClose,
 }: {
-  toast: {
-    message: string;
-    type: ToastType;
-  } | null;
-
+  toast: ToastState | null;
   onClose: () => void;
 }) {
   return (
@@ -3515,31 +5532,31 @@ function Toast({
             y: 20,
             scale: 0.95,
           }}
-          className="fixed bottom-5 right-5 z-[120] flex w-[calc(100%-2.5rem)] max-w-sm items-center gap-3 rounded-2xl border border-border bg-card px-4 py-4 shadow-2xl"
+          className="fixed bottom-6 right-6 z-[170] flex max-w-sm items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 text-foreground shadow-2xl"
         >
-          <div
-            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+          <span
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
               toast.type ===
               "success"
-                ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300"
+                ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-400/10 dark:text-emerald-300"
                 : toast.type ===
                     "error"
-                  ? "bg-rose-100 text-rose-600 dark:bg-rose-500/10 dark:text-rose-300"
-                  : "bg-blue-100 text-blue-600 dark:bg-cyan-500/10 dark:text-cyan-300"
+                  ? "bg-rose-100 text-rose-600 dark:bg-rose-400/10 dark:text-rose-300"
+                  : "bg-violet-100 text-violet-600 dark:bg-violet-400/10 dark:text-violet-300"
             }`}
           >
             {toast.type ===
             "success" ? (
-              <CheckCircle2 className="h-5 w-5" />
+              <CheckCircle2 className="h-4 w-4" />
             ) : toast.type ===
               "error" ? (
-              <AlertTriangle className="h-5 w-5" />
+              <AlertTriangle className="h-4 w-4" />
             ) : (
-              <Activity className="h-5 w-5" />
+              <Activity className="h-4 w-4" />
             )}
-          </div>
+          </span>
 
-          <p className="min-w-0 flex-1 text-xs font-black text-card-foreground">
+          <p className="min-w-0 flex-1 text-sm font-semibold text-card-foreground">
             {
               toast.message
             }
@@ -3547,8 +5564,10 @@ function Toast({
 
           <button
             type="button"
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground"
+            onClick={
+              onClose
+            }
+            className="text-muted-foreground transition hover:text-foreground"
           >
             <XCircle className="h-5 w-5" />
           </button>
@@ -3556,89 +5575,4 @@ function Toast({
       )}
     </AnimatePresence>
   );
-}
-
-/* =========================================================
-   TOGGLE
-========================================================= */
-
-function Toggle({
-  checked,
-  onChange,
-}: {
-  checked: boolean;
-  onChange: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={
-        checked
-      }
-      onClick={onChange}
-      className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${
-        checked
-          ? "bg-[var(--dashboard-primary)]"
-          : "bg-muted"
-      }`}
-    >
-      <motion.span
-        className="absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm"
-        animate={{
-          x: checked
-            ? 20
-            : 0,
-        }}
-        transition={{
-          type: "spring",
-          stiffness: 450,
-          damping: 28,
-        }}
-      />
-    </button>
-  );
-}
-
-/* =========================================================
-   CARD
-========================================================= */
-
-function Card({
-  children,
-  className = "",
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div
-      className={`rounded-[28px] border border-border bg-card text-card-foreground shadow-[0_10px_35px_rgba(15,23,42,0.045)] transition-colors duration-300 ${className}`}
-    >
-      {children}
-    </div>
-  );
-}
-
-/* =========================================================
-   ALERT LABEL
-========================================================= */
-
-function formatSettingName(
-  key: keyof AlertSettings
-) {
-  if (
-    key === "newDevice"
-  ) {
-    return "New device";
-  }
-
-  if (
-    key ===
-    "suspiciousActivity"
-  ) {
-    return "Suspicious activity";
-  }
-
-  return "Failed login";
 }
