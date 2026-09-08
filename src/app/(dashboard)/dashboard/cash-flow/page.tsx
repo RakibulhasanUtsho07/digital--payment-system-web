@@ -5,10 +5,12 @@ import React, {
   useMemo,
   useState,
 } from "react";
+
 import {
   AnimatePresence,
   motion,
 } from "framer-motion";
+
 import {
   Activity,
   AlertTriangle,
@@ -106,19 +108,15 @@ interface ToastInfo {
    CASH-FLOW CONSTANTS
 ========================================================= */
 
-const BUFFER_AMOUNT =
-  5000;
+const BUFFER_AMOUNT = 5000;
 
-const DAY_MS =
-  86400000;
+const DAY_MS = 86400000;
 
 /* =========================================================
    HELPERS
 ========================================================= */
 
-function formatCurrency(
-  amount: number
-) {
+function formatCurrency(amount: number) {
   const sign =
     amount < 0
       ? "-"
@@ -126,12 +124,9 @@ function formatCurrency(
 
   return `${sign}৳ ${Math.abs(
     amount
-  ).toLocaleString(
-    "en-BD",
-    {
-      maximumFractionDigits: 0,
-    }
-  )}`;
+  ).toLocaleString("en-BD", {
+    maximumFractionDigits: 0,
+  })}`;
 }
 
 function addDays(
@@ -166,18 +161,11 @@ function dateKey(
   return [
     date.getFullYear(),
     String(
-      date.getMonth() +
-        1
-    ).padStart(
-      2,
-      "0"
-    ),
+      date.getMonth() + 1
+    ).padStart(2, "0"),
     String(
       date.getDate()
-    ).padStart(
-      2,
-      "0"
-    ),
+    ).padStart(2, "0"),
   ].join("-");
 }
 
@@ -218,19 +206,14 @@ function getRecurringOccurrences(
   start: Date,
   end: Date
 ) {
-  const occurrenceDates:
-    Date[] = [];
+  const occurrenceDates: Date[] = [];
 
   const eventDate =
     startOfDay(
-      new Date(
-        event.date
-      )
+      new Date(event.date)
     );
 
-  if (
-    !event.isRecurring
-  ) {
+  if (!event.isRecurring) {
     if (
       eventDate >= start &&
       eventDate <= end
@@ -244,34 +227,28 @@ function getRecurringOccurrences(
   }
 
   let cursor =
-    new Date(
-      eventDate
-    );
+    new Date(eventDate);
 
   while (
     cursor < start
   ) {
-    cursor =
-      addDays(
-        cursor,
-        30
-      );
+    cursor = addDays(
+      cursor,
+      30
+    );
   }
 
   while (
     cursor <= end
   ) {
     occurrenceDates.push(
-      new Date(
-        cursor
-      )
+      new Date(cursor)
     );
 
-    cursor =
-      addDays(
-        cursor,
-        30
-      );
+    cursor = addDays(
+      cursor,
+      30
+    );
   }
 
   return occurrenceDates;
@@ -285,275 +262,225 @@ export default function CashFlowPage() {
   const [
     isMounted,
     setIsMounted,
-  ] =
-    useState(false);
+  ] = useState(false);
 
   const [
     events,
     setEvents,
-  ] =
-    useState<CashFlowEvent[]>(
-      []
-    );
+  ] = useState<CashFlowEvent[]>(
+    []
+  );
 
   const [
     balance,
     setBalance,
-  ] =
-    useState(0);
+  ] = useState(0);
 
   const [
     isLoading,
     setIsLoading,
-  ] =
-    useState(true);
+  ] = useState(true);
 
   const [
     isRefreshing,
     setIsRefreshing,
-  ] =
-    useState(false);
+  ] = useState(false);
 
   const [
     isSavingPlan,
     setIsSavingPlan,
-  ] =
-    useState(false);
+  ] = useState(false);
 
   const [
     deletingPlanId,
     setDeletingPlanId,
-  ] =
-    useState<string | null>(
-      null
-    );
+  ] = useState<string | null>(
+    null
+  );
 
   const [
     errorMessage,
     setErrorMessage,
-  ] =
-    useState("");
+  ] = useState("");
 
   const [
     timeframe,
     setTimeframe,
-  ] =
-    useState<Timeframe>(
-      "30D"
-    );
+  ] = useState<Timeframe>(
+    "30D"
+  );
 
   const [
     showSafeToSpendDetails,
     setShowSafeToSpendDetails,
-  ] =
-    useState(false);
+  ] = useState(false);
 
   const [
     addEventModalOpen,
     setAddEventModalOpen,
-  ] =
-    useState(false);
+  ] = useState(false);
 
   const [
     selectedScheduleDate,
     setSelectedScheduleDate,
-  ] =
-    useState<string | null>(
-      null
-    );
+  ] = useState<string | null>(
+    null
+  );
 
   const [
     showAllUpcoming,
     setShowAllUpcoming,
-  ] =
-    useState(false);
+  ] = useState(false);
 
   const [
     hoveredPoint,
     setHoveredPoint,
-  ] =
-    useState<ChartPoint | null>(
-      null
-    );
+  ] = useState<ChartPoint | null>(
+    null
+  );
 
   const [
     toast,
     setToast,
-  ] =
-    useState<ToastInfo | null>(
-      null
-    );
+  ] = useState<ToastInfo | null>(
+    null
+  );
 
   const [
     simulator,
     setSimulator,
-  ] =
-    useState<SimulatorState>({
-      active: false,
-      amount: 5000,
-      type: "expense",
-      daysFromNow: 5,
-    });
+  ] = useState<SimulatorState>({
+    active: false,
+    amount: 5000,
+    type: "expense",
+    daysFromNow: 5,
+  });
 
   const [
     formTitle,
     setFormTitle,
-  ] =
-    useState("");
+  ] = useState("");
 
   const [
     formAmount,
     setFormAmount,
-  ] =
-    useState("");
+  ] = useState("");
 
   const [
     formType,
     setFormType,
-  ] =
-    useState<TransactionType>(
-      "expense"
-    );
+  ] = useState<TransactionType>(
+    "expense"
+  );
 
   const [
     formDate,
     setFormDate,
-  ] =
-    useState("");
+  ] = useState("");
 
   const [
     formCategory,
     setFormCategory,
-  ] =
-    useState("");
+  ] = useState("");
 
   const [
     formRecurring,
     setFormRecurring,
-  ] =
-    useState(false);
+  ] = useState(false);
 
   /* =======================================================
      BACKEND DATA
   ======================================================= */
 
-  const getUserIdFromRef =
-    (
-      value:
-        | string
-        | {
-            _id: string;
-          }
-    ) =>
-      typeof value ===
-      "string"
-        ? value
-        : value._id;
+  const getUserIdFromRef = (
+    value:
+      | string
+      | {
+          _id: string;
+        }
+  ) =>
+    typeof value === "string"
+      ? value
+      : value._id;
 
-  const transactionToEvent =
-    (
-      transaction:
-        CashFlowTransaction,
-      userId: string
-    ):
-      CashFlowEvent | null => {
-      if (
-        transaction.status !==
-          "COMPLETED" ||
-        !transaction.createdAt
-      ) {
-        return null;
-      }
+  const transactionToEvent = (
+    transaction: CashFlowTransaction,
+    userId: string
+  ): CashFlowEvent | null => {
+    if (
+      transaction.status !==
+        "COMPLETED" ||
+      !transaction.createdAt
+    ) {
+      return null;
+    }
 
-      let type:
-        TransactionType;
+    let type: TransactionType;
+    let title: string;
 
-      let title:
-        string;
+    if (
+      transaction.type ===
+      "DEPOSIT"
+    ) {
+      type = "income";
 
-      if (
-        transaction.type ===
-        "DEPOSIT"
-      ) {
-        type =
-          "income";
+      title =
+        transaction.reference ||
+        "Wallet Deposit";
+    } else if (
+      transaction.type ===
+      "WITHDRAW"
+    ) {
+      type = "expense";
 
-        title =
-          transaction.reference ||
-          "Wallet Deposit";
-      } else if (
-        transaction.type ===
-        "WITHDRAW"
-      ) {
-        type =
-          "expense";
+      title =
+        transaction.reference ||
+        "Wallet Withdrawal";
+    } else {
+      const senderId =
+        getUserIdFromRef(
+          transaction.senderId
+        );
 
-        title =
-          transaction.reference ||
-          "Wallet Withdrawal";
-      } else {
-        const senderId =
-          getUserIdFromRef(
-            transaction.senderId
-          );
+      const receiverId =
+        getUserIdFromRef(
+          transaction.receiverId
+        );
 
-        const receiverId =
-          getUserIdFromRef(
-            transaction.receiverId
-          );
+      const incoming =
+        transaction.direction ===
+          "IN" ||
+        (transaction.direction ===
+          undefined &&
+          receiverId === userId &&
+          senderId !== userId);
 
-        const incoming =
-          transaction.direction ===
-            "IN" ||
-          (
-            transaction.direction ===
-              undefined &&
-            receiverId ===
-              userId &&
-            senderId !==
-              userId
-          );
+      type = incoming
+        ? "income"
+        : "expense";
 
-        type =
-          incoming
-            ? "income"
-            : "expense";
+      title =
+        transaction.reference ||
+        (incoming
+          ? "Received Transfer"
+          : "Sent Transfer");
+    }
 
-        title =
-          transaction.reference ||
-          (
-            incoming
-              ? "Received Transfer"
-              : "Sent Transfer"
-          );
-      }
-
-      return {
-        id:
-          `txn_${transaction._id}`,
-
-        title,
-
-        amount:
-          Number(
-            transaction.amount
-          ) || 0,
-
-        type,
-
-        category:
-          "Wallet",
-
-        date:
-          transaction.createdAt,
-
-        isRecurring:
-          false,
-
-        status:
-          "completed",
-      };
+    return {
+      id: `txn_${transaction._id}`,
+      title,
+      amount:
+        Number(
+          transaction.amount
+        ) || 0,
+      type,
+      category: "Wallet",
+      date:
+        transaction.createdAt,
+      isRecurring: false,
+      status: "completed",
     };
+  };
 
   const loadCashFlow =
     async (
@@ -561,18 +488,12 @@ export default function CashFlowPage() {
     ) => {
       try {
         if (silent) {
-          setIsRefreshing(
-            true
-          );
+          setIsRefreshing(true);
         } else {
-          setIsLoading(
-            true
-          );
+          setIsLoading(true);
         }
 
-        setErrorMessage(
-          ""
-        );
+        setErrorMessage("");
 
         const [
           walletResponse,
@@ -586,51 +507,42 @@ export default function CashFlowPage() {
           ]);
 
         if (
-          !walletResponse
-            ?.success ||
-          !walletResponse
-            .wallet
+          !walletResponse?.success ||
+          !walletResponse.wallet
         ) {
           throw new Error(
-            walletResponse
-              ?.message ||
+            walletResponse?.message ||
               "Unable to load wallet."
           );
         }
 
         if (
-          !transactionResponse
-            ?.success
+          !transactionResponse?.success
         ) {
           throw new Error(
-            transactionResponse
-              ?.message ||
+            transactionResponse?.message ||
               "Unable to load transaction history."
           );
         }
 
         if (
-          !planResponse
-            ?.success
+          !planResponse?.success
         ) {
           throw new Error(
-            planResponse
-              ?.message ||
+            planResponse?.message ||
               "Unable to load cash-flow plans."
           );
         }
 
         const userId =
           String(
-            walletResponse
-              .wallet
+            walletResponse.wallet
               .userId
           );
 
         const completedEvents =
           (
-            transactionResponse
-              .transactions ||
+            transactionResponse.transactions ||
             []
           )
             .map(
@@ -645,22 +557,17 @@ export default function CashFlowPage() {
             .filter(
               (
                 event
-              ):
-                event is CashFlowEvent =>
-                  event !==
-                    null
+              ): event is CashFlowEvent =>
+                event !== null
             );
 
         const plannedEvents:
           CashFlowEvent[] =
           (
-            planResponse
-              .plans ||
+            planResponse.plans ||
             []
           ).map(
-            (
-              plan
-            ) => ({
+            (plan) => ({
               ...plan,
               status:
                 "pending",
@@ -669,8 +576,7 @@ export default function CashFlowPage() {
 
         setBalance(
           Number(
-            walletResponse
-              .wallet
+            walletResponse.wallet
               .balance
           ) || 0
         );
@@ -680,12 +586,8 @@ export default function CashFlowPage() {
           ...plannedEvents,
         ]);
 
-        setIsMounted(
-          true
-        );
-      } catch (
-        error
-      ) {
+        setIsMounted(true);
+      } catch (error) {
         console.error(
           "Cash flow loading error:",
           error
@@ -697,17 +599,10 @@ export default function CashFlowPage() {
             : "Unable to load cash-flow data."
         );
 
-        setIsMounted(
-          true
-        );
+        setIsMounted(true);
       } finally {
-        setIsLoading(
-          false
-        );
-
-        setIsRefreshing(
-          false
-        );
+        setIsLoading(false);
+        setIsRefreshing(false);
       }
     };
 
@@ -719,63 +614,49 @@ export default function CashFlowPage() {
      TOAST
   ======================================================= */
 
-  const showToast =
-    (
-      message: string,
-      type:
-        ToastInfo["type"] =
-        "success"
-    ) => {
-      setToast({
-        message,
-        type,
-      });
+  const showToast = (
+    message: string,
+    type:
+      ToastInfo["type"] =
+      "success"
+  ) => {
+    setToast({
+      message,
+      type,
+    });
 
-      window.setTimeout(
-        () =>
-          setToast(null),
-        3200
-      );
-    };
+    window.setTimeout(
+      () => setToast(null),
+      3200
+    );
+  };
 
   /* =======================================================
      CORE CALCULATIONS
   ======================================================= */
 
-  const now =
-    useMemo(
-      () =>
-        new Date(),
-      []
-    );
+  const now = useMemo(
+    () => new Date(),
+    []
+  );
 
-  const today =
-    useMemo(
-      () =>
-        startOfDay(
-          now
-        ),
-      [
-        now,
-      ]
-    );
+  const today = useMemo(
+    () =>
+      startOfDay(now),
+    [now]
+  );
 
   const upcomingEvents =
     useMemo(
       () =>
         events
           .filter(
-            (
-              event
-            ) =>
+            (event) =>
               event.status ===
               "pending"
           )
           .sort(
-            (
-              a,
-              b
-            ) =>
+            (a, b) =>
               new Date(
                 a.date
               ).getTime() -
@@ -783,9 +664,7 @@ export default function CashFlowPage() {
                 b.date
               ).getTime()
           ),
-      [
-        events,
-      ]
+      [events]
     );
 
   const upcomingExpensesAmount =
@@ -796,23 +675,16 @@ export default function CashFlowPage() {
 
       return upcomingEvents
         .filter(
-          (
-            event
-          ) =>
+          (event) =>
             event.type ===
               "expense" &&
             new Date(
               event.date
-            ).getTime() <=
-              limit
+            ).getTime() <= limit
         )
         .reduce(
-          (
-            total,
-            event
-          ) =>
-            total +
-            event.amount,
+          (total, event) =>
+            total + event.amount,
           0
         );
     }, [
@@ -838,15 +710,10 @@ export default function CashFlowPage() {
   const completedLast30Days =
     useMemo(() => {
       const start =
-        addDays(
-          today,
-          -30
-        );
+        addDays(today, -30);
 
       return events.filter(
-        (
-          event
-        ) => {
+        (event) => {
           if (
             event.status !==
             "completed"
@@ -855,9 +722,7 @@ export default function CashFlowPage() {
           }
 
           const date =
-            new Date(
-              event.date
-            );
+            new Date(event.date);
 
           return (
             date >= start &&
@@ -871,60 +736,40 @@ export default function CashFlowPage() {
       now,
     ]);
 
-  const netFlow =
-    useMemo(() => {
-      const income =
-        completedLast30Days
-          .filter(
-            (
-              event
-            ) =>
-              event.type ===
-              "income"
-          )
-          .reduce(
-            (
-              total,
-              event
-            ) =>
-              total +
-              event.amount,
-            0
-          );
+  const netFlow = useMemo(() => {
+    const income =
+      completedLast30Days
+        .filter(
+          (event) =>
+            event.type ===
+            "income"
+        )
+        .reduce(
+          (total, event) =>
+            total + event.amount,
+          0
+        );
 
-      const expense =
-        completedLast30Days
-          .filter(
-            (
-              event
-            ) =>
-              event.type ===
-              "expense"
-          )
-          .reduce(
-            (
-              total,
-              event
-            ) =>
-              total +
-              event.amount,
-            0
-          );
+    const expense =
+      completedLast30Days
+        .filter(
+          (event) =>
+            event.type ===
+            "expense"
+        )
+        .reduce(
+          (total, event) =>
+            total + event.amount,
+          0
+        );
 
-      return (
-        income -
-        expense
-      );
-    }, [
-      completedLast30Days,
-    ]);
+    return income - expense;
+  }, [
+    completedLast30Days,
+  ]);
 
   /* =======================================================
      FORECAST ENGINE
-
-     Historical balance is reconstructed backward from
-     current balance using completed events from the past.
-     Forecast uses upcoming events and 30-day recurrence.
   ======================================================= */
 
   const forecastData =
@@ -935,8 +780,7 @@ export default function CashFlowPage() {
         );
 
       const points:
-        ForecastPoint[] =
-        [];
+        ForecastPoint[] = [];
 
       const completedByDate =
         new Map<
@@ -946,16 +790,12 @@ export default function CashFlowPage() {
 
       events
         .filter(
-          (
-            event
-          ) =>
+          (event) =>
             event.status ===
             "completed"
         )
         .forEach(
-          (
-            event
-          ) => {
+          (event) => {
             const key =
               dateKey(
                 new Date(
@@ -968,9 +808,7 @@ export default function CashFlowPage() {
                 key
               ) || [];
 
-            existing.push(
-              event
-            );
+            existing.push(event);
 
             completedByDate.set(
               key,
@@ -979,15 +817,11 @@ export default function CashFlowPage() {
           }
         );
 
-      /*
-       * Reconstruct the previous seven closing balances.
-       */
       let backwardBalance =
         balance;
 
       const historical:
-        ForecastPoint[] =
-        [];
+        ForecastPoint[] = [];
 
       for (
         let day = -1;
@@ -1002,14 +836,12 @@ export default function CashFlowPage() {
 
         const eventsOnDate =
           completedByDate.get(
-            dateKey(
-              date
-            )
+            dateKey(date)
           ) || [];
 
         for (
-          const event
-          of eventsOnDate
+          const event of
+          eventsOnDate
         ) {
           if (
             event.type ===
@@ -1033,34 +865,23 @@ export default function CashFlowPage() {
           hasEvent:
             eventsOnDate.length >
             0,
-          simulated:
-            false,
+          simulated: false,
         });
       }
 
-      historical
-        .reverse()
-        .forEach(
-          (
-            point
-          ) =>
-            points.push(
-              point
-            )
-        );
+      historical.reverse().forEach(
+        (point) =>
+          points.push(point)
+      );
 
       points.push({
         day: 0,
-        date:
-          new Date(
-            today
-          ),
+        date: new Date(today),
         balance,
         phase:
           "projected",
         hasEvent: false,
-        simulated:
-          false,
+        simulated: false,
       });
 
       const forecastEnd =
@@ -1076,17 +897,13 @@ export default function CashFlowPage() {
         >();
 
       upcomingEvents.forEach(
-        (
-          event
-        ) => {
+        (event) => {
           getRecurringOccurrences(
             event,
             today,
             forecastEnd
           ).forEach(
-            (
-              occurrence
-            ) => {
+            (occurrence) => {
               const key =
                 dateKey(
                   occurrence
@@ -1097,9 +914,7 @@ export default function CashFlowPage() {
                   key
                 ) || [];
 
-              existing.push(
-                event
-              );
+              existing.push(event);
 
               occurrenceMap.set(
                 key,
@@ -1126,14 +941,12 @@ export default function CashFlowPage() {
 
         const eventsOnDate =
           occurrenceMap.get(
-            dateKey(
-              date
-            )
+            dateKey(date)
           ) || [];
 
         for (
-          const event
-          of eventsOnDate
+          const event of
+          eventsOnDate
         ) {
           projectedBalance +=
             event.type ===
@@ -1179,359 +992,283 @@ export default function CashFlowPage() {
       today,
     ]);
 
-  const chart =
-    useMemo(() => {
-      const width =
-        1000;
+  /* =======================================================
+     CHART
+  ======================================================= */
 
-      const height =
-        300;
+  const chart = useMemo(() => {
+    const width = 1000;
+    const height = 300;
+    const left = 64;
+    const right = 22;
+    const top = 20;
+    const bottom = 42;
 
-      const left =
-        64;
+    const plotWidth =
+      width - left - right;
 
-      const right =
-        22;
+    const plotHeight =
+      height - top - bottom;
 
-      const top =
-        20;
-
-      const bottom =
-        42;
-
-      const plotWidth =
-        width -
-        left -
-        right;
-
-      const plotHeight =
-        height -
-        top -
-        bottom;
-
-      const values =
-        forecastData.map(
-          (
-            point
-          ) =>
-            point.balance
-        );
-
-      values.push(
-        BUFFER_AMOUNT
+    const values =
+      forecastData.map(
+        (point) =>
+          point.balance
       );
 
-      const rawMin =
-        Math.min(
-          ...values
-        );
+    values.push(
+      BUFFER_AMOUNT
+    );
 
-      const rawMax =
-        Math.max(
-          ...values
-        );
+    const rawMin =
+      Math.min(...values);
 
-      const spread =
-        Math.max(
-          rawMax -
-            rawMin,
-          1000
-        );
+    const rawMax =
+      Math.max(...values);
 
-      const minBalance =
-        Math.floor(
+    const spread =
+      Math.max(
+        rawMax - rawMin,
+        1000
+      );
+
+    const minBalance =
+      Math.floor(
+        (
+          rawMin -
+          spread * 0.14
+        ) / 1000
+      ) * 1000;
+
+    const maxBalance =
+      Math.ceil(
+        (
+          rawMax +
+          spread * 0.14
+        ) / 1000
+      ) * 1000;
+
+    const minDay = -7;
+
+    const maxDay =
+      timeframeDays(
+        timeframe
+      );
+
+    const xForDay =
+      (day: number) =>
+        left +
+        (
+          (day - minDay) /
+          (maxDay - minDay)
+        ) *
+          plotWidth;
+
+    const yForBalance =
+      (value: number) =>
+        top +
+        (
+          1 -
           (
-            rawMin -
-            spread * 0.14
+            value -
+            minBalance
           ) /
-            1000
-        ) * 1000;
-
-      const maxBalance =
-        Math.ceil(
-          (
-            rawMax +
-            spread * 0.14
-          ) /
-            1000
-        ) * 1000;
-
-      const minDay =
-        -7;
-
-      const maxDay =
-        timeframeDays(
-          timeframe
-        );
-
-      const xForDay =
-        (
-          day: number
-        ) =>
-          left +
-          (
-            (day -
-              minDay) /
-            (maxDay -
-              minDay)
-          ) *
-            plotWidth;
-
-      const yForBalance =
-        (
-          value: number
-        ) =>
-          top +
-          (
-            1 -
-            (
-              value -
-              minBalance
-            ) /
-              Math.max(
-                maxBalance -
-                  minBalance,
-                1
-              )
-          ) *
-            plotHeight;
-
-      const points:
-        ChartPoint[] =
-        forecastData.map(
-          (
-            point
-          ) => ({
-            ...point,
-            x:
-              xForDay(
-                point.day
-              ),
-            y:
-              yForBalance(
-                point.balance
-              ),
-          })
-        );
-
-      const historical =
-        points.filter(
-          (
-            point
-          ) =>
-            point.day <= 0
-        );
-
-      const projected =
-        points.filter(
-          (
-            point
-          ) =>
-            point.day >= 0
-        );
-
-      const linePath =
-        (
-          items:
-            ChartPoint[]
-        ) =>
-          items
-            .map(
-              (
-                point,
-                index
-              ) =>
-                `${index === 0 ? "M" : "L"} ${point.x.toFixed(
-                  2
-                )} ${point.y.toFixed(
-                  2
-                )}`
-            )
-            .join(
-              " "
-            );
-
-      const projectedLine =
-        linePath(
-          projected
-        );
-
-      const projectedArea =
-        projected.length >
-        0
-          ? `${projectedLine} L ${projected[
-              projected.length -
-                1
-            ].x.toFixed(
-              2
-            )} ${(top + plotHeight).toFixed(
-              2
-            )} L ${projected[
-              0
-            ].x.toFixed(
-              2
-            )} ${(top + plotHeight).toFixed(
-              2
-            )} Z`
-          : "";
-
-      const yTicks =
-        Array.from(
-          {
-            length: 5,
-          },
-          (
-            _,
-            index
-          ) => {
-            const ratio =
-              index /
-              4;
-
-            const value =
+            Math.max(
               maxBalance -
-              (
-                maxBalance -
-                minBalance
-              ) *
-                ratio;
+                minBalance,
+              1
+            )
+        ) *
+          plotHeight;
 
-            return {
-              value,
-              y:
-                top +
-                plotHeight *
-                  ratio,
-            };
-          }
-        );
+    const points:
+      ChartPoint[] =
+      forecastData.map(
+        (point) => ({
+          ...point,
+          x: xForDay(
+            point.day
+          ),
+          y: yForBalance(
+            point.balance
+          ),
+        })
+      );
 
-      const futureDays =
-        timeframeDays(
-          timeframe
-        );
+    const historical =
+      points.filter(
+        (point) =>
+          point.day <= 0
+      );
 
-      const xTickDays =
-        timeframe === "30D"
-          ? [
+    const projected =
+      points.filter(
+        (point) =>
+          point.day >= 0
+      );
+
+    const linePath = (
+      items: ChartPoint[]
+    ) =>
+      items
+        .map(
+          (
+            point,
+            index
+          ) =>
+            `${
+              index === 0
+                ? "M"
+                : "L"
+            } ${point.x.toFixed(
+              2
+            )} ${point.y.toFixed(
+              2
+            )}`
+        )
+        .join(" ");
+
+    const projectedLine =
+      linePath(projected);
+
+    const projectedArea =
+      projected.length > 0
+        ? `${projectedLine} L ${projected[
+            projected.length -
+              1
+          ].x.toFixed(
+            2
+          )} ${(top + plotHeight).toFixed(
+            2
+          )} L ${projected[
+            0
+          ].x.toFixed(
+            2
+          )} ${(top + plotHeight).toFixed(
+            2
+          )} Z`
+        : "";
+
+    const yTicks =
+      Array.from(
+        {
+          length: 5,
+        },
+        (_, index) => {
+          const ratio =
+            index / 4;
+
+          const value =
+            maxBalance -
+            (
+              maxBalance -
+              minBalance
+            ) * ratio;
+
+          return {
+            value,
+            y:
+              top +
+              plotHeight *
+                ratio,
+          };
+        }
+      );
+
+    const xTickDays =
+      timeframe === "30D"
+        ? [-7, 0, 7, 14, 21, 30]
+        : timeframe === "90D"
+          ? [-7, 0, 30, 60, 90]
+          : [
               -7,
               0,
-              7,
-              14,
-              21,
               30,
-            ]
-          : timeframe ===
-              "90D"
-            ? [
-                -7,
-                0,
-                30,
-                60,
-                90,
-              ]
-            : [
-                -7,
-                0,
-                30,
-                60,
-                90,
-                120,
-                150,
-                180,
-              ];
+              60,
+              90,
+              120,
+              150,
+              180,
+            ];
 
-      const xTicks =
-        xTickDays.map(
-          (
+    const xTicks =
+      xTickDays.map(
+        (day) => ({
+          day,
+          x: xForDay(day),
+          date: addDays(
+            today,
             day
-          ) => ({
-            day,
-            x:
-              xForDay(
-                day
-              ),
-            date:
-              addDays(
-                today,
-                day
-              ),
-          })
-        );
-
-      const lowestProjected =
-        projected.reduce(
-          (
-            lowest,
-            point
-          ) =>
-            point.balance <
-            lowest.balance
-              ? point
-              : lowest,
-          projected[0]
-        );
-
-      const highestProjected =
-        projected.reduce(
-          (
-            highest,
-            point
-          ) =>
-            point.balance >
-            highest.balance
-              ? point
-              : highest,
-          projected[0]
-        );
-
-      const endPoint =
-        projected[
-          projected.length -
-            1
-        ];
-
-      return {
-        width,
-        height,
-        left,
-        right,
-        top,
-        bottom,
-        plotWidth,
-        plotHeight,
-        minBalance,
-        maxBalance,
-        points,
-        historical,
-        projected,
-        historicalPath:
-          linePath(
-            historical
           ),
-        projectedPath:
-          projectedLine,
-        projectedArea,
-        yTicks,
-        xTicks,
-        todayX:
-          xForDay(
-            0
-          ),
-        bufferY:
-          yForBalance(
-            BUFFER_AMOUNT
-          ),
-        lowestProjected,
-        highestProjected,
-        endPoint,
-        futureDays,
-      };
-    }, [
-      forecastData,
-      timeframe,
-      today,
-    ]);
+        })
+      );
+
+    const lowestProjected =
+      projected.reduce(
+        (lowest, point) =>
+          point.balance <
+          lowest.balance
+            ? point
+            : lowest,
+        projected[0]
+      );
+
+    const highestProjected =
+      projected.reduce(
+        (highest, point) =>
+          point.balance >
+          highest.balance
+            ? point
+            : highest,
+        projected[0]
+      );
+
+    const endPoint =
+      projected[
+        projected.length - 1
+      ];
+
+    return {
+      width,
+      height,
+      left,
+      right,
+      top,
+      bottom,
+      plotWidth,
+      plotHeight,
+      minBalance,
+      maxBalance,
+      points,
+      historical,
+      projected,
+      historicalPath:
+        linePath(
+          historical
+        ),
+      projectedPath:
+        projectedLine,
+      projectedArea,
+      yTicks,
+      xTicks,
+      todayX: xForDay(0),
+      bufferY:
+        yForBalance(
+          BUFFER_AMOUNT
+        ),
+      lowestProjected,
+      highestProjected,
+      endPoint,
+      futureDays:
+        timeframeDays(
+          timeframe
+        ),
+    };
+  }, [
+    forecastData,
+    timeframe,
+    today,
+  ]);
 
   const projectedChange =
     chart.endPoint
@@ -1543,11 +1280,8 @@ export default function CashFlowPage() {
     balance !== 0
       ? (
           projectedChange /
-          Math.abs(
-            balance
-          )
-        ) *
-        100
+          Math.abs(balance)
+        ) * 100
       : 0;
 
   const projectedBelowBuffer =
@@ -1560,8 +1294,7 @@ export default function CashFlowPage() {
   const projectedBelowZero =
     chart.lowestProjected
       ? chart.lowestProjected
-          .balance <
-        0
+          .balance < 0
       : false;
 
   const upcomingWithinTimeframe =
@@ -1575,9 +1308,7 @@ export default function CashFlowPage() {
         );
 
       return upcomingEvents.filter(
-        (
-          event
-        ) => {
+        (event) => {
           const date =
             new Date(
               event.date
@@ -1595,21 +1326,15 @@ export default function CashFlowPage() {
       today,
     ]);
 
-  const healthScore =
-    useMemo(() => {
-      let score =
-        100;
+  const healthScore = useMemo(
+    () => {
+      let score = 100;
 
-      if (
-        netFlow < 0
-      ) {
+      if (netFlow < 0) {
         score -= 20;
       }
 
-      if (
-        safeToSpend <
-        2000
-      ) {
+      if (safeToSpend < 2000) {
         score -= 15;
       }
 
@@ -1620,15 +1345,11 @@ export default function CashFlowPage() {
         score -= 15;
       }
 
-      if (
-        projectedBelowBuffer
-      ) {
+      if (projectedBelowBuffer) {
         score -= 15;
       }
 
-      if (
-        projectedBelowZero
-      ) {
+      if (projectedBelowZero) {
         score -= 25;
       }
 
@@ -1637,14 +1358,16 @@ export default function CashFlowPage() {
         0,
         100
       );
-    }, [
+    },
+    [
       netFlow,
       safeToSpend,
       upcomingExpensesAmount,
       balance,
       projectedBelowBuffer,
       projectedBelowZero,
-    ]);
+    ]
+  );
 
   /* =======================================================
      SCHEDULE
@@ -1657,18 +1380,13 @@ export default function CashFlowPage() {
           {
             length: 14,
           },
-          (
-            _,
-            index
-          ) =>
+          (_, index) =>
             addDays(
               today,
               index
             )
         ),
-      [
-        today,
-      ]
+      [today]
     );
 
   const filteredUpcomingEvents =
@@ -1677,9 +1395,7 @@ export default function CashFlowPage() {
         selectedScheduleDate
       ) {
         return upcomingEvents.filter(
-          (
-            event
-          ) =>
+          (event) =>
             dateKey(
               new Date(
                 event.date
@@ -1707,114 +1423,92 @@ export default function CashFlowPage() {
      CHART INTERACTION
   ======================================================= */
 
-  const handleChartMove =
-    (
-      event:
-        React.MouseEvent<
-          SVGSVGElement
-        >
-    ) => {
-      const rect =
-        event.currentTarget.getBoundingClientRect();
+  const handleChartMove = (
+    event: React.MouseEvent<
+      SVGSVGElement
+    >
+  ) => {
+    const rect =
+      event.currentTarget.getBoundingClientRect();
 
-      const viewX =
-        (
-          (event.clientX -
-            rect.left) /
-          rect.width
-        ) *
-        chart.width;
+    const viewX =
+      (
+        (event.clientX -
+          rect.left) /
+        rect.width
+      ) * chart.width;
 
-      const candidates =
-        chart.points;
+    const candidates =
+      chart.points;
 
-      if (
-        candidates.length ===
-        0
-      ) {
-        return;
-      }
+    if (
+      candidates.length === 0
+    ) {
+      return;
+    }
 
-      let nearest =
-        candidates[0];
+    let nearest =
+      candidates[0];
 
-      let distance =
+    let distance =
+      Math.abs(
+        nearest.x - viewX
+      );
+
+    for (
+      const point of candidates
+    ) {
+      const nextDistance =
         Math.abs(
-          nearest.x -
-            viewX
+          point.x - viewX
         );
 
-      for (
-        const point
-        of candidates
+      if (
+        nextDistance < distance
       ) {
-        const nextDistance =
-          Math.abs(
-            point.x -
-              viewX
-          );
-
-        if (
-          nextDistance <
-          distance
-        ) {
-          nearest =
-            point;
-
-          distance =
-            nextDistance;
-        }
+        nearest = point;
+        distance =
+          nextDistance;
       }
+    }
 
-      setHoveredPoint(
-        nearest
-      );
-    };
+    setHoveredPoint(
+      nearest
+    );
+  };
 
   /* =======================================================
      FORM HANDLERS
   ======================================================= */
 
-  const openAddEvent =
-    (
-      type:
-        TransactionType
-    ) => {
-      setFormType(
-        type
-      );
+  const openAddEvent = (
+    type: TransactionType
+  ) => {
+    setFormType(type);
 
-      setFormDate(
-        dateKey(
-          addDays(
-            today,
-            1
-          )
-        )
-      );
+    setFormDate(
+      dateKey(
+        addDays(today, 1)
+      )
+    );
 
-      setAddEventModalOpen(
-        true
-      );
-    };
+    setAddEventModalOpen(
+      true
+    );
+  };
 
   const handleAddEvent =
     async (
-      event:
-        React.FormEvent
+      event: React.FormEvent
     ) => {
       event.preventDefault();
 
-      if (
-        isSavingPlan
-      ) {
+      if (isSavingPlan) {
         return;
       }
 
       const amount =
-        Number(
-          formAmount
-        );
+        Number(formAmount);
 
       const title =
         formTitle.trim();
@@ -1847,8 +1541,7 @@ export default function CashFlowPage() {
         );
 
       if (
-        selectedDate <
-        today
+        selectedDate < today
       ) {
         showToast(
           "Planned cash-flow events cannot be added in the past.",
@@ -1859,28 +1552,22 @@ export default function CashFlowPage() {
       }
 
       try {
-        setIsSavingPlan(
-          true
-        );
+        setIsSavingPlan(true);
 
         const response =
-          await createCashFlowPlan(
-            {
-              title,
-              amount,
-              type:
-                formType,
-              category,
-              date:
-                selectedDate.toISOString(),
-              isRecurring:
-                formRecurring,
-            }
-          );
+          await createCashFlowPlan({
+            title,
+            amount,
+            type: formType,
+            category,
+            date:
+              selectedDate.toISOString(),
+            isRecurring:
+              formRecurring,
+          });
 
         if (
-          !response
-            ?.success ||
+          !response?.success ||
           !response.plan
         ) {
           throw new Error(
@@ -1890,14 +1577,11 @@ export default function CashFlowPage() {
         }
 
         setEvents(
-          (
-            current
-          ) => [
+          (current) => [
             ...current,
             {
               ...response.plan,
-              status:
-                "pending",
+              status: "pending",
             },
           ]
         );
@@ -1909,17 +1593,13 @@ export default function CashFlowPage() {
         setFormTitle("");
         setFormAmount("");
         setFormCategory("");
-        setFormRecurring(
-          false
-        );
+        setFormRecurring(false);
 
         showToast(
           response.message ||
             "Cash-flow plan created."
         );
-      } catch (
-        error
-      ) {
+      } catch (error) {
         showToast(
           error instanceof Error
             ? error.message
@@ -1927,29 +1607,21 @@ export default function CashFlowPage() {
           "error"
         );
       } finally {
-        setIsSavingPlan(
-          false
-        );
+        setIsSavingPlan(false);
       }
     };
 
   const handleDeletePlan =
-    async (
-      id: string
-    ) => {
+    async (id: string) => {
       if (
-        id.startsWith(
-          "txn_"
-        ) ||
+        id.startsWith("txn_") ||
         deletingPlanId
       ) {
         return;
       }
 
       try {
-        setDeletingPlanId(
-          id
-        );
+        setDeletingPlanId(id);
 
         const response =
           await deleteCashFlowPlan(
@@ -1957,8 +1629,7 @@ export default function CashFlowPage() {
           );
 
         if (
-          !response
-            ?.success
+          !response?.success
         ) {
           throw new Error(
             response?.message ||
@@ -1967,15 +1638,10 @@ export default function CashFlowPage() {
         }
 
         setEvents(
-          (
-            current
-          ) =>
+          (current) =>
             current.filter(
-              (
-                event
-              ) =>
-                event.id !==
-                id
+              (event) =>
+                event.id !== id
             )
         );
 
@@ -1984,9 +1650,7 @@ export default function CashFlowPage() {
             "Cash-flow plan deleted.",
           "info"
         );
-      } catch (
-        error
-      ) {
+      } catch (error) {
         showToast(
           error instanceof Error
             ? error.message
@@ -2000,25 +1664,20 @@ export default function CashFlowPage() {
       }
     };
 
-  const refreshCashFlow =
-    () => {
-      setSimulator(
-        (
-          current
-        ) => ({
-          ...current,
-          active: false,
-        })
-      );
+  const refreshCashFlow = () => {
+    setSimulator(
+      (current) => ({
+        ...current,
+        active: false,
+      })
+    );
 
-      setSelectedScheduleDate(
-        null
-      );
+    setSelectedScheduleDate(
+      null
+    );
 
-      void loadCashFlow(
-        true
-      );
-    };
+    void loadCashFlow(true);
+  };
 
   /* =======================================================
      RENDER
@@ -2029,17 +1688,17 @@ export default function CashFlowPage() {
     isLoading
   ) {
     return (
-      <main className="flex min-h-[70vh] items-center justify-center bg-[#F6F8FB] px-4">
+      <main className="flex min-h-[70vh] items-center justify-center bg-background px-4">
         <div className="flex flex-col items-center text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-blue-100 bg-white shadow-sm">
-            <Loader2 className="h-6 w-6 animate-spin text-[#1F5EA8]" />
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card shadow-sm">
+            <Loader2 className="h-6 w-6 animate-spin text-indigo-600 dark:text-violet-400" />
           </div>
 
-          <p className="mt-4 text-sm font-black text-[#0F2745]">
+          <p className="mt-4 text-sm font-black text-foreground">
             Loading cash flow
           </p>
 
-          <p className="mt-1 text-xs text-slate-400">
+          <p className="mt-1 text-xs text-muted-foreground">
             Syncing wallet balance, transactions, and future plans.
           </p>
         </div>
@@ -2049,21 +1708,20 @@ export default function CashFlowPage() {
 
   if (
     errorMessage &&
-    events.length ===
-      0
+    events.length === 0
   ) {
     return (
-      <main className="flex min-h-[70vh] items-center justify-center bg-[#F6F8FB] px-4">
-        <div className="w-full max-w-md rounded-[28px] border border-rose-100 bg-white p-7 text-center shadow-sm">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-50 text-rose-500">
+      <main className="flex min-h-[70vh] items-center justify-center bg-background px-4">
+        <div className="w-full max-w-md rounded-[28px] border border-rose-200 bg-card p-7 text-center shadow-sm dark:border-rose-500/20">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-100 text-rose-500 dark:bg-rose-500/10 dark:text-rose-400">
             <AlertTriangle className="h-5 w-5" />
           </div>
 
-          <h1 className="mt-4 text-lg font-black text-[#0F2745]">
+          <h1 className="mt-4 text-lg font-black text-foreground">
             Cash flow unavailable
           </h1>
 
-          <p className="mt-2 text-sm leading-6 text-slate-500">
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
             {errorMessage}
           </p>
 
@@ -2072,7 +1730,7 @@ export default function CashFlowPage() {
             onClick={() =>
               void loadCashFlow()
             }
-            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#1F5EA8] px-5 py-3 text-sm font-black text-white transition hover:bg-[#173F6D]"
+            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-black text-white transition hover:bg-violet-600"
           >
             <RefreshCw className="h-4 w-4" />
             Try Again
@@ -2097,14 +1755,14 @@ export default function CashFlowPage() {
     projectedBelowBuffer;
 
   return (
-    <main className="min-h-screen bg-[#F6F8FB] pb-16">
+    <main className="min-h-screen bg-background pb-16 text-foreground transition-colors duration-300">
       <div className="mx-auto w-full max-w-[1400px] space-y-6 px-4 sm:px-6 lg:px-8">
         {errorMessage && (
-          <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-500/20 dark:bg-amber-500/10 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-start gap-3">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
 
-              <p className="text-xs font-semibold leading-5 text-amber-800">
+              <p className="text-xs font-semibold leading-5 text-amber-800 dark:text-amber-200">
                 {errorMessage}
               </p>
             </div>
@@ -2112,9 +1770,15 @@ export default function CashFlowPage() {
             <button
               type="button"
               onClick={refreshCashFlow}
-              className="inline-flex shrink-0 items-center gap-2 text-xs font-black text-amber-800"
+              className="inline-flex shrink-0 items-center gap-2 text-xs font-black text-amber-800 dark:text-amber-200"
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+              <RefreshCw
+                className={`h-3.5 w-3.5 ${
+                  isRefreshing
+                    ? "animate-spin"
+                    : ""
+                }`}
+              />
               Refresh
             </button>
           </div>
@@ -2136,11 +1800,13 @@ export default function CashFlowPage() {
           transition={{
             duration: 0.45,
           }}
-          className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-[#0F2745] via-[#173F6D] to-[#1F5EA8] p-7 text-white shadow-[0_24px_70px_rgba(15,39,69,0.18)] md:p-10"
+          className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-[#1E1B4B] via-[#4338CA] to-[#7C3AED] p-7 text-white shadow-[0_24px_70px_rgba(49,46,129,0.28)] md:p-10"
         >
-          <div className="absolute -right-20 -top-28 h-80 w-80 rounded-full bg-cyan-300/15 blur-3xl" />
+          <div className="absolute -right-20 -top-28 h-80 w-80 rounded-full bg-fuchsia-300/15 blur-3xl" />
 
-          <div className="absolute -bottom-24 left-1/3 h-72 w-72 rounded-full bg-blue-300/10 blur-3xl" />
+          <div className="absolute -bottom-24 left-1/3 h-72 w-72 rounded-full bg-indigo-300/15 blur-3xl" />
+
+          <div className="absolute left-1/3 top-10 h-40 w-40 rounded-full border border-white/10" />
 
           <svg
             className="pointer-events-none absolute right-0 top-0 h-full w-[58%] opacity-25"
@@ -2157,19 +1823,19 @@ export default function CashFlowPage() {
               >
                 <stop
                   offset="0%"
-                  stopColor="#67e8f9"
+                  stopColor="#c4b5fd"
                   stopOpacity="0"
                 />
 
                 <stop
                   offset="50%"
-                  stopColor="#67e8f9"
+                  stopColor="#c4b5fd"
                   stopOpacity="0.9"
                 />
 
                 <stop
                   offset="100%"
-                  stopColor="#60a5fa"
+                  stopColor="#a78bfa"
                   stopOpacity="0"
                 />
               </linearGradient>
@@ -2181,15 +1847,12 @@ export default function CashFlowPage() {
                 index
               ) => (
                 <motion.path
-                  key={
-                    y
-                  }
+                  key={y}
                   d={`M 0 ${y} C 120 ${y - 55} 235 ${y + 45} 350 ${y - 5} S 500 ${y + 25} 600 ${y - 18}`}
                   fill="none"
                   stroke="url(#heroFlow)"
                   strokeWidth={
-                    index ===
-                    1
+                    index === 1
                       ? 3
                       : 1.4
                   }
@@ -2200,19 +1863,16 @@ export default function CashFlowPage() {
                   animate={{
                     pathLength: 1,
                     opacity:
-                      index ===
-                      1
+                      index === 1
                         ? 0.9
                         : 0.45,
                   }}
                   transition={{
                     duration:
                       1.8 +
-                      index *
-                        0.2,
+                      index * 0.2,
                     delay:
-                      index *
-                      0.08,
+                      index * 0.08,
                     ease:
                       "easeOut",
                   }}
@@ -2223,7 +1883,7 @@ export default function CashFlowPage() {
 
           <div className="relative z-10 grid items-center gap-8 xl:grid-cols-[1fr_auto]">
             <div>
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.16em] text-blue-100 backdrop-blur">
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-[0.16em] text-violet-100 backdrop-blur">
                 <Activity className="h-3.5 w-3.5" />
                 Cash Flow Intelligence
               </div>
@@ -2232,7 +1892,7 @@ export default function CashFlowPage() {
                 See where your money is heading.
               </h1>
 
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-blue-100/80 md:text-base">
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-violet-100/80 md:text-base">
                 Track commitments, forecast future balance,
                 simulate decisions, and keep a healthy cash
                 buffer before money leaves your wallet.
@@ -2240,7 +1900,7 @@ export default function CashFlowPage() {
 
               <div className="mt-7 flex flex-wrap items-center gap-x-8 gap-y-5">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.13em] text-blue-200/80">
+                  <p className="text-xs font-semibold uppercase tracking-[0.13em] text-violet-200/80">
                     Current Balance
                   </p>
 
@@ -2254,27 +1914,24 @@ export default function CashFlowPage() {
                 <div className="hidden h-12 w-px bg-white/15 sm:block" />
 
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.13em] text-blue-200/80">
+                  <p className="text-xs font-semibold uppercase tracking-[0.13em] text-violet-200/80">
                     Net Flow • 30 Days
                   </p>
 
                   <div
                     className={`mt-1 flex items-center gap-2 text-xl font-black ${
-                      netFlow >=
-                      0
+                      netFlow >= 0
                         ? "text-emerald-300"
                         : "text-rose-300"
                     }`}
                   >
-                    {netFlow >=
-                    0 ? (
+                    {netFlow >= 0 ? (
                       <TrendingUp className="h-5 w-5" />
                     ) : (
                       <TrendingDown className="h-5 w-5" />
                     )}
 
-                    {netFlow >=
-                    0
+                    {netFlow >= 0
                       ? "+"
                       : "-"}
 
@@ -2295,7 +1952,7 @@ export default function CashFlowPage() {
                       "income"
                     )
                   }
-                  className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-extrabold text-[#1F5EA8] shadow-lg transition hover:-translate-y-0.5 hover:bg-blue-50 active:translate-y-0"
+                  className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-extrabold text-indigo-900 shadow-lg transition hover:-translate-y-0.5 hover:bg-violet-50 active:translate-y-0"
                 >
                   <Plus className="h-4 w-4" />
                   Plan Income
@@ -2319,9 +1976,15 @@ export default function CashFlowPage() {
                   onClick={
                     refreshCashFlow
                   }
-                  className="inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-blue-100 transition hover:bg-white/10"
+                  className="inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-violet-100 transition hover:bg-white/10 hover:text-white"
                 >
-                  <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+                  <RefreshCw
+                    className={`h-4 w-4 ${
+                      isRefreshing
+                        ? "animate-spin"
+                        : ""
+                    }`}
+                  />
                   Refresh
                 </button>
               </div>
@@ -2337,7 +2000,7 @@ export default function CashFlowPage() {
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-cyan-300">
+                  <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-violet-200">
                     <ShieldCheck className="h-4 w-4" />
                     Safe to Spend
                   </div>
@@ -2353,19 +2016,17 @@ export default function CashFlowPage() {
                   type="button"
                   onClick={() =>
                     setShowSafeToSpendDetails(
-                      (
-                        current
-                      ) =>
+                      (current) =>
                         !current
                     )
                   }
-                  className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-blue-100 transition hover:bg-white/15"
+                  className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-violet-100 transition hover:bg-white/15"
                 >
                   <Info className="h-4 w-4" />
                 </button>
               </div>
 
-              <p className="mt-3 text-sm leading-6 text-blue-100/75">
+              <p className="mt-3 text-sm leading-6 text-violet-100/75">
                 Estimated amount available after near-term
                 expenses and your safety buffer.
               </p>
@@ -2392,7 +2053,7 @@ export default function CashFlowPage() {
                   transition={{
                     duration: 0.9,
                   }}
-                  className="h-full rounded-full bg-gradient-to-r from-cyan-300 to-emerald-300"
+                  className="h-full rounded-full bg-gradient-to-r from-violet-300 via-fuchsia-300 to-emerald-300"
                 />
               </div>
 
@@ -2417,7 +2078,7 @@ export default function CashFlowPage() {
                     className="overflow-hidden"
                   >
                     <div className="mt-5 space-y-2.5 border-t border-white/10 pt-4 text-sm">
-                      <div className="flex justify-between gap-4 text-blue-100/80">
+                      <div className="flex justify-between gap-4 text-violet-100/80">
                         <span>
                           Current Balance
                         </span>
@@ -2502,8 +2163,8 @@ export default function CashFlowPage() {
               tone:
                 projectedChange >=
                 0
-                  ? "text-emerald-600"
-                  : "text-rose-600",
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-rose-600 dark:text-rose-400",
               icon:
                 projectedChange >=
                 0
@@ -2525,33 +2186,28 @@ export default function CashFlowPage() {
                   ? chart.lowestProjected.date.toLocaleDateString(
                       "en-US",
                       {
-                        month:
-                          "short",
-                        day:
-                          "numeric",
+                        month: "short",
+                        day: "numeric",
                       }
                     )
                   : "No data",
               tone:
                 projectedBelowBuffer
-                  ? "text-amber-600"
-                  : "text-[#1F5EA8]",
-              icon:
-                AlertTriangle,
+                  ? "text-amber-600 dark:text-amber-400"
+                  : "text-indigo-600 dark:text-violet-400",
+              icon: AlertTriangle,
             },
             {
               label:
                 "Upcoming Commitments",
-              value:
-                String(
-                  upcomingWithinTimeframe.length
-                ),
+              value: String(
+                upcomingWithinTimeframe.length
+              ),
               detail:
                 `within ${timeframe}`,
               tone:
-                "text-[#1F5EA8]",
-              icon:
-                Clock,
+                "text-indigo-600 dark:text-violet-400",
+              icon: Clock,
             },
             {
               label:
@@ -2565,15 +2221,12 @@ export default function CashFlowPage() {
               tone:
                 healthScore >=
                 60
-                  ? "text-emerald-600"
-                  : "text-amber-600",
-              icon:
-                ShieldCheck,
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : "text-amber-600 dark:text-amber-400",
+              icon: ShieldCheck,
             },
           ].map(
-            (
-              item
-            ) => {
+            (item) => {
               const Icon =
                 item.icon;
 
@@ -2593,10 +2246,10 @@ export default function CashFlowPage() {
                   whileHover={{
                     y: -3,
                   }}
-                  className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.035)]"
+                  className="rounded-2xl border border-border bg-card p-5 shadow-[0_10px_35px_rgba(15,23,42,0.035)] transition-colors dark:shadow-none"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-400">
+                    <p className="text-[11px] font-black uppercase tracking-[0.12em] text-muted-foreground">
                       {
                         item.label
                       }
@@ -2607,7 +2260,7 @@ export default function CashFlowPage() {
                     />
                   </div>
 
-                  <p className="mt-3 text-2xl font-black text-[#0F2745]">
+                  <p className="mt-3 text-2xl font-black text-foreground">
                     {
                       item.value
                     }
@@ -2648,22 +2301,22 @@ export default function CashFlowPage() {
               transition={{
                 delay: 0.08,
               }}
-              className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_14px_45px_rgba(15,23,42,0.045)]"
+              className="overflow-hidden rounded-[28px] border border-border bg-card shadow-[0_14px_45px_rgba(15,23,42,0.045)] dark:shadow-none"
             >
-              <div className="border-b border-slate-100 px-6 py-5 md:px-7">
+              <div className="border-b border-border px-6 py-5 md:px-7">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <div>
                     <div className="flex items-center gap-2">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-[#1F5EA8]">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-violet-500/10 dark:text-violet-300">
                         <Activity className="h-5 w-5" />
                       </div>
 
                       <div>
-                        <h2 className="text-xl font-black text-[#0F2745]">
+                        <h2 className="text-xl font-black text-foreground">
                           Balance Forecast
                         </h2>
 
-                        <p className="mt-0.5 text-xs font-medium text-slate-400">
+                        <p className="mt-0.5 text-xs font-medium text-muted-foreground">
                           Historical balance + scheduled
                           commitments + simulation
                         </p>
@@ -2671,7 +2324,7 @@ export default function CashFlowPage() {
                     </div>
                   </div>
 
-                  <div className="flex rounded-xl border border-slate-200 bg-slate-100/80 p-1">
+                  <div className="flex rounded-xl border border-border bg-muted p-1">
                     {(
                       [
                         "30D",
@@ -2679,9 +2332,7 @@ export default function CashFlowPage() {
                         "6M",
                       ] as Timeframe[]
                     ).map(
-                      (
-                        option
-                      ) => (
+                      (option) => (
                         <button
                           key={
                             option
@@ -2699,22 +2350,19 @@ export default function CashFlowPage() {
                           className={`relative rounded-lg px-4 py-2 text-xs font-black transition ${
                             timeframe ===
                             option
-                              ? "text-[#1F5EA8]"
-                              : "text-slate-500 hover:text-slate-700"
+                              ? "text-indigo-700 dark:text-violet-300"
+                              : "text-muted-foreground hover:text-foreground"
                           }`}
                         >
                           {timeframe ===
                             option && (
                             <motion.span
                               layoutId="forecast-timeframe"
-                              className="absolute inset-0 rounded-lg bg-white shadow-sm"
+                              className="absolute inset-0 rounded-lg bg-card shadow-sm dark:shadow-none"
                               transition={{
-                                type:
-                                  "spring",
-                                stiffness:
-                                  400,
-                                damping:
-                                  32,
+                                type: "spring",
+                                stiffness: 400,
+                                damping: 32,
                               }}
                             />
                           )}
@@ -2730,9 +2378,9 @@ export default function CashFlowPage() {
                   </div>
                 </div>
 
-                <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] font-bold text-slate-400">
+                <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-[11px] font-bold text-muted-foreground">
                   <span className="flex items-center gap-2">
-                    <span className="h-0.5 w-5 rounded-full bg-[#1F5EA8]" />
+                    <span className="h-0.5 w-5 rounded-full bg-indigo-600 dark:bg-indigo-400" />
                     Historical
                   </span>
 
@@ -2747,7 +2395,7 @@ export default function CashFlowPage() {
                   </span>
 
                   {simulator.active && (
-                    <span className="flex items-center gap-2 text-violet-500">
+                    <span className="flex items-center gap-2 text-violet-600 dark:text-violet-400">
                       <span className="h-2 w-2 rounded-full bg-violet-500" />
                       Simulation active
                     </span>
@@ -2756,7 +2404,7 @@ export default function CashFlowPage() {
               </div>
 
               <div className="relative px-3 pb-4 pt-3 sm:px-5">
-                <div className="relative overflow-hidden rounded-2xl border border-slate-100 bg-gradient-to-b from-white to-slate-50/70">
+                <div className="relative overflow-hidden rounded-2xl border border-border bg-muted/50">
                   <svg
                     viewBox={`0 0 ${chart.width} ${chart.height}`}
                     className="h-[330px] w-full cursor-crosshair select-none"
@@ -2780,7 +2428,7 @@ export default function CashFlowPage() {
                       >
                         <stop
                           offset="0%"
-                          stopColor="#06b6d4"
+                          stopColor="#8b5cf6"
                           stopOpacity="0.22"
                         />
 
@@ -2800,12 +2448,12 @@ export default function CashFlowPage() {
                       >
                         <stop
                           offset="0%"
-                          stopColor="#0891b2"
+                          stopColor="#6366f1"
                         />
 
                         <stop
                           offset="100%"
-                          stopColor="#22d3ee"
+                          stopColor="#c084fc"
                         />
                       </linearGradient>
 
@@ -2822,18 +2470,11 @@ export default function CashFlowPage() {
                         />
 
                         <feMerge>
-                          <feMergeNode
-                            in="blur"
-                          />
-
-                          <feMergeNode
-                            in="SourceGraphic"
-                          />
+                          <feMergeNode in="blur" />
+                          <feMergeNode in="SourceGraphic" />
                         </feMerge>
                       </filter>
                     </defs>
-
-                    {/* horizontal grid + y labels */}
 
                     {chart.yTicks.map(
                       (
@@ -2858,7 +2499,8 @@ export default function CashFlowPage() {
                             y2={
                               tick.y
                             }
-                            stroke="#e8eef5"
+                            stroke="currentColor"
+                            className="text-border"
                             strokeWidth="1"
                           />
 
@@ -2869,7 +2511,8 @@ export default function CashFlowPage() {
                               4
                             }
                             fontSize="11"
-                            fill="#94a3b8"
+                            fill="currentColor"
+                            className="text-muted-foreground"
                             fontWeight="700"
                           >
                             {Math.abs(
@@ -2892,12 +2535,8 @@ export default function CashFlowPage() {
                       )
                     )}
 
-                    {/* x labels */}
-
                     {chart.xTicks.map(
-                      (
-                        tick
-                      ) => (
+                      (tick) => (
                         <g
                           key={
                             tick.day
@@ -2917,8 +2556,10 @@ export default function CashFlowPage() {
                               chart.top +
                               chart.plotHeight
                             }
-                            stroke="#f1f5f9"
+                            stroke="currentColor"
+                            className="text-border"
                             strokeWidth="1"
+                            opacity="0.7"
                           />
 
                           <text
@@ -2931,7 +2572,8 @@ export default function CashFlowPage() {
                             }
                             textAnchor="middle"
                             fontSize="10"
-                            fill="#94a3b8"
+                            fill="currentColor"
+                            className="text-muted-foreground"
                             fontWeight="700"
                           >
                             {tick.day ===
@@ -2950,8 +2592,6 @@ export default function CashFlowPage() {
                         </g>
                       )
                     )}
-
-                    {/* safety buffer */}
 
                     <line
                       x1={
@@ -2991,8 +2631,6 @@ export default function CashFlowPage() {
                       Safety buffer
                     </text>
 
-                    {/* projected area */}
-
                     <motion.path
                       key={`area-${timeframe}-${simulator.active}-${simulator.amount}-${simulator.daysFromNow}-${simulator.type}`}
                       d={
@@ -3010,15 +2648,13 @@ export default function CashFlowPage() {
                       }}
                     />
 
-                    {/* historical line */}
-
                     <motion.path
                       key={`historical-${timeframe}`}
                       d={
                         chart.historicalPath
                       }
                       fill="none"
-                      stroke="#1F5EA8"
+                      stroke="#6366f1"
                       strokeWidth="4"
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -3035,8 +2671,6 @@ export default function CashFlowPage() {
                         ease: "easeOut",
                       }}
                     />
-
-                    {/* projected line */}
 
                     <motion.path
                       key={`projected-${timeframe}-${simulator.active}-${simulator.amount}-${simulator.daysFromNow}-${simulator.type}`}
@@ -3063,8 +2697,6 @@ export default function CashFlowPage() {
                         delay: 0.12,
                       }}
                     />
-
-                    {/* today marker */}
 
                     <line
                       x1={
@@ -3100,12 +2732,10 @@ export default function CashFlowPage() {
                         0
                       }
                       r="6"
-                      fill="#ffffff"
-                      stroke="#06b6d4"
+                      fill="white"
+                      stroke="#8b5cf6"
                       strokeWidth="4"
                     />
-
-                    {/* event markers */}
 
                     {chart.projected
                       .filter(
@@ -3142,11 +2772,7 @@ export default function CashFlowPage() {
                                 ? "#ffffff"
                                 : "#06b6d4"
                             }
-                            strokeWidth={
-                              point.simulated
-                                ? 3
-                                : 3
-                            }
+                            strokeWidth="3"
                             initial={{
                               scale: 0,
                             }}
@@ -3166,8 +2792,6 @@ export default function CashFlowPage() {
                           />
                         )
                       )}
-
-                    {/* hover crosshair */}
 
                     {hoveredPoint && (
                       <>
@@ -3203,15 +2827,13 @@ export default function CashFlowPage() {
                           stroke={
                             hoveredPoint.phase ===
                             "historical"
-                              ? "#1F5EA8"
+                              ? "#6366f1"
                               : "#06b6d4"
                           }
                           strokeWidth="4"
                         />
                       </>
                     )}
-
-                    {/* transparent interaction surface */}
 
                     <rect
                       x={
@@ -3249,15 +2871,15 @@ export default function CashFlowPage() {
                           y: 6,
                           scale: 0.98,
                         }}
-                        className="pointer-events-none absolute right-4 top-4 min-w-[185px] rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-xl backdrop-blur"
+                        className="pointer-events-none absolute right-4 top-4 min-w-[185px] rounded-2xl border border-border bg-popover/95 p-4 text-popover-foreground shadow-xl backdrop-blur"
                       >
                         <div className="flex items-center justify-between gap-4">
                           <span
                             className={`rounded-full px-2 py-1 text-[9px] font-black uppercase tracking-[0.12em] ${
                               hoveredPoint.phase ===
                               "historical"
-                                ? "bg-blue-50 text-[#1F5EA8]"
-                                : "bg-cyan-50 text-cyan-700"
+                                ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300"
+                                : "bg-cyan-100 text-cyan-700 dark:bg-cyan-500/10 dark:text-cyan-300"
                             }`}
                           >
                             {
@@ -3266,19 +2888,19 @@ export default function CashFlowPage() {
                           </span>
 
                           {hoveredPoint.simulated && (
-                            <span className="text-[9px] font-black uppercase text-violet-600">
+                            <span className="text-[9px] font-black uppercase text-violet-600 dark:text-violet-400">
                               Simulation
                             </span>
                           )}
                         </div>
 
-                        <p className="mt-3 text-xl font-black text-[#0F2745]">
+                        <p className="mt-3 text-xl font-black text-foreground">
                           {formatCurrency(
                             hoveredPoint.balance
                           )}
                         </p>
 
-                        <p className="mt-1 text-xs font-semibold text-slate-400">
+                        <p className="mt-1 text-xs font-semibold text-muted-foreground">
                           {hoveredPoint.date.toLocaleDateString(
                             "en-US",
                             {
@@ -3295,7 +2917,7 @@ export default function CashFlowPage() {
                         </p>
 
                         {hoveredPoint.hasEvent && (
-                          <p className="mt-2 flex items-center gap-1.5 text-[10px] font-bold text-cyan-700">
+                          <p className="mt-2 flex items-center gap-1.5 text-[10px] font-bold text-cyan-700 dark:text-cyan-300">
                             <Zap className="h-3 w-3" />
                             Scheduled cash-flow event
                           </p>
@@ -3306,8 +2928,8 @@ export default function CashFlowPage() {
                 </div>
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
-                    <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+                  <div className="rounded-xl border border-border bg-muted/60 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
                       Projected Change
                     </p>
 
@@ -3315,8 +2937,8 @@ export default function CashFlowPage() {
                       className={`mt-1 text-lg font-black ${
                         projectedChange >=
                         0
-                          ? "text-emerald-600"
-                          : "text-rose-600"
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : "text-rose-600 dark:text-rose-400"
                       }`}
                     >
                       {projectedChange >=
@@ -3330,16 +2952,16 @@ export default function CashFlowPage() {
                     </p>
                   </div>
 
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
-                    <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+                  <div className="rounded-xl border border-border bg-muted/60 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
                       Forecast Low
                     </p>
 
                     <p
                       className={`mt-1 text-lg font-black ${
                         projectedBelowBuffer
-                          ? "text-amber-600"
-                          : "text-[#0F2745]"
+                          ? "text-amber-600 dark:text-amber-400"
+                          : "text-foreground"
                       }`}
                     >
                       {chart.lowestProjected
@@ -3351,12 +2973,12 @@ export default function CashFlowPage() {
                     </p>
                   </div>
 
-                  <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
-                    <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+                  <div className="rounded-xl border border-border bg-muted/60 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
                       Forecast High
                     </p>
 
-                    <p className="mt-1 text-lg font-black text-[#0F2745]">
+                    <p className="mt-1 text-lg font-black text-foreground">
                       {chart.highestProjected
                         ? formatCurrency(
                             chart.highestProjected
@@ -3367,7 +2989,7 @@ export default function CashFlowPage() {
                   </div>
                 </div>
 
-                <p className="mt-3 text-[10px] leading-5 text-slate-400">
+                <p className="mt-3 text-[10px] leading-5 text-muted-foreground">
                   Recurring commitments are projected every
                   30 days for planning purposes. The simulator
                   changes forecast only and does not save a
@@ -3392,20 +3014,20 @@ export default function CashFlowPage() {
               transition={{
                 delay: 0.14,
               }}
-              className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_40px_rgba(15,23,42,0.04)] md:p-7"
+              className="rounded-[28px] border border-border bg-card p-6 shadow-[0_12px_40px_rgba(15,23,42,0.04)] dark:shadow-none md:p-7"
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-[#1F5EA8]">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-violet-500/10 dark:text-violet-300">
                     <CalendarIcon className="h-5 w-5" />
                   </div>
 
                   <div>
-                    <h2 className="text-xl font-black text-[#0F2745]">
+                    <h2 className="text-xl font-black text-foreground">
                       Upcoming Schedule
                     </h2>
 
-                    <p className="mt-0.5 text-xs font-medium text-slate-400">
+                    <p className="mt-0.5 text-xs font-medium text-muted-foreground">
                       Select a date to filter commitments
                     </p>
                   </div>
@@ -3419,7 +3041,7 @@ export default function CashFlowPage() {
                         null
                       )
                     }
-                    className="inline-flex items-center gap-1.5 text-xs font-black text-[#1F5EA8]"
+                    className="inline-flex items-center gap-1.5 text-xs font-black text-indigo-600 dark:text-violet-400"
                   >
                     Clear date filter
                     <X className="h-3.5 w-3.5" />
@@ -3427,52 +3049,40 @@ export default function CashFlowPage() {
                 )}
               </div>
 
-              <div className="-mx-1 mt-6 flex gap-2 overflow-x-auto px-1 pb-3">
+              {/* No horizontal scrollbar */}
+              <div className="mt-6 flex flex-wrap gap-2 px-1">
                 {scheduleDays.map(
-                  (
-                    date
-                  ) => {
+                  (date) => {
                     const key =
-                      dateKey(
-                        date
-                      );
+                      dateKey(date);
 
                     const dayEvents =
                       upcomingEvents.filter(
-                        (
-                          event
-                        ) =>
+                        (event) =>
                           dateKey(
                             new Date(
                               event.date
                             )
-                          ) ===
-                          key
+                          ) === key
                       );
 
                     const hasIncome =
                       dayEvents.some(
-                        (
-                          event
-                        ) =>
+                        (event) =>
                           event.type ===
                           "income"
                       );
 
                     const hasExpense =
                       dayEvents.some(
-                        (
-                          event
-                        ) =>
+                        (event) =>
                           event.type ===
                           "expense"
                       );
 
                     const isToday =
                       key ===
-                      dateKey(
-                        today
-                      );
+                      dateKey(today);
 
                     const selected =
                       selectedScheduleDate ===
@@ -3480,9 +3090,7 @@ export default function CashFlowPage() {
 
                     return (
                       <button
-                        key={
-                          key
-                        }
+                        key={key}
                         type="button"
                         onClick={() =>
                           setSelectedScheduleDate(
@@ -3491,19 +3099,19 @@ export default function CashFlowPage() {
                               : key
                           )
                         }
-                        className={`relative flex h-[88px] w-[68px] shrink-0 flex-col items-center justify-center rounded-2xl border transition ${
+                        className={`relative flex h-[78px] min-w-[64px] flex-1 basis-[64px] flex-col items-center justify-center rounded-2xl border transition sm:max-w-[82px] ${
                           selected
-                            ? "border-[#1F5EA8] bg-[#1F5EA8] text-white shadow-lg shadow-blue-200"
+                            ? "border-indigo-600 bg-indigo-600 text-white shadow-lg shadow-indigo-500/20 dark:border-violet-500 dark:bg-violet-600"
                             : isToday
-                              ? "border-blue-200 bg-blue-50 text-[#1F5EA8]"
-                              : "border-slate-100 bg-slate-50/60 text-[#0F2745] hover:-translate-y-0.5 hover:border-slate-200 hover:bg-white"
+                              ? "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-500/20 dark:bg-indigo-500/10 dark:text-indigo-300"
+                              : "border-border bg-muted/50 text-foreground hover:-translate-y-0.5 hover:border-indigo-200 hover:bg-accent dark:hover:border-violet-500/30"
                         }`}
                       >
                         <span
                           className={`text-[10px] font-black uppercase ${
                             selected
-                              ? "text-blue-100"
-                              : "text-slate-400"
+                              ? "text-indigo-100"
+                              : "text-muted-foreground"
                           }`}
                         >
                           {date.toLocaleDateString(
@@ -3534,11 +3142,9 @@ export default function CashFlowPage() {
                 )}
               </div>
 
-              <div className="mt-3 divide-y divide-slate-100">
+              <div className="mt-5 divide-y divide-border">
                 {visibleUpcomingEvents.map(
-                  (
-                    event
-                  ) => (
+                  (event) => (
                     <div
                       key={
                         event.id
@@ -3550,8 +3156,8 @@ export default function CashFlowPage() {
                           className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
                             event.type ===
                             "income"
-                              ? "bg-emerald-50 text-emerald-600"
-                              : "bg-rose-50 text-rose-600"
+                              ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400"
+                              : "bg-rose-100 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400"
                           }`}
                         >
                           {event.type ===
@@ -3563,13 +3169,13 @@ export default function CashFlowPage() {
                         </div>
 
                         <div className="min-w-0">
-                          <p className="truncate font-black text-[#0F2745]">
+                          <p className="truncate font-black text-foreground">
                             {
                               event.title
                             }
                           </p>
 
-                          <p className="mt-1 truncate text-[11px] font-semibold text-slate-400">
+                          <p className="mt-1 truncate text-[11px] font-semibold text-muted-foreground">
                             {new Date(
                               event.date
                             ).toLocaleDateString(
@@ -3600,8 +3206,8 @@ export default function CashFlowPage() {
                           className={`text-right font-black ${
                             event.type ===
                             "income"
-                              ? "text-emerald-600"
-                              : "text-rose-600"
+                              ? "text-emerald-600 dark:text-emerald-400"
+                              : "text-rose-600 dark:text-rose-400"
                           }`}
                         >
                           {event.type ===
@@ -3629,7 +3235,7 @@ export default function CashFlowPage() {
                               event.id
                             }
                             aria-label="Delete planned event"
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-300 transition hover:bg-rose-50 hover:text-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
+                            className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-rose-100 hover:text-rose-500 dark:hover:bg-rose-500/10 disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             {deletingPlanId ===
                             event.id ? (
@@ -3647,13 +3253,13 @@ export default function CashFlowPage() {
                 {visibleUpcomingEvents.length ===
                   0 && (
                   <div className="flex min-h-36 flex-col items-center justify-center text-center">
-                    <CalendarIcon className="h-6 w-6 text-slate-300" />
+                    <CalendarIcon className="h-6 w-6 text-muted-foreground" />
 
-                    <p className="mt-2 text-sm font-black text-slate-600">
+                    <p className="mt-2 text-sm font-black text-foreground">
                       No commitments on this date
                     </p>
 
-                    <p className="mt-1 text-xs text-slate-400">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       Choose another day or clear the date filter.
                     </p>
                   </div>
@@ -3666,13 +3272,11 @@ export default function CashFlowPage() {
                   type="button"
                   onClick={() =>
                     setShowAllUpcoming(
-                      (
-                        current
-                      ) =>
+                      (current) =>
                         !current
                     )
                   }
-                  className="mt-3 inline-flex items-center gap-1 text-xs font-black text-[#1F5EA8]"
+                  className="mt-3 inline-flex items-center gap-1 text-xs font-black text-indigo-600 dark:text-violet-400"
                 >
                   {showAllUpcoming
                     ? "Show Less"
@@ -3703,16 +3307,16 @@ export default function CashFlowPage() {
               transition={{
                 delay: 0.1,
               }}
-              className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_40px_rgba(15,23,42,0.04)]"
+              className="rounded-[28px] border border-border bg-card p-6 shadow-[0_12px_40px_rgba(15,23,42,0.04)] dark:shadow-none"
             >
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <h3 className="flex items-center gap-2 font-black text-[#0F2745]">
+                  <h3 className="flex items-center gap-2 font-black text-foreground">
                     <Target className="h-5 w-5 text-emerald-500" />
                     Cash Flow Health
                   </h3>
 
-                  <p className="mt-1 text-xs text-slate-400">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     Based on balance, commitments and forecast
                   </p>
                 </div>
@@ -3721,11 +3325,11 @@ export default function CashFlowPage() {
                   className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.1em] ${
                     healthScore >=
                     80
-                      ? "bg-emerald-50 text-emerald-600"
+                      ? "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400"
                       : healthScore >=
                           60
-                        ? "bg-blue-50 text-blue-600"
-                        : "bg-amber-50 text-amber-600"
+                        ? "bg-blue-100 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400"
+                        : "bg-amber-100 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400"
                   }`}
                 >
                   {
@@ -3745,7 +3349,8 @@ export default function CashFlowPage() {
                       cy="50"
                       r="42"
                       fill="none"
-                      stroke="#f1f5f9"
+                      stroke="currentColor"
+                      className="text-muted"
                       strokeWidth="11"
                     />
 
@@ -3760,7 +3365,7 @@ export default function CashFlowPage() {
                           ? "#10b981"
                           : healthScore >=
                               60
-                            ? "#3b82f6"
+                            ? "#6366f1"
                             : "#f59e0b"
                       }
                       strokeWidth="11"
@@ -3793,7 +3398,7 @@ export default function CashFlowPage() {
                   </svg>
 
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <span className="text-2xl font-black text-[#0F2745]">
+                    <span className="text-2xl font-black text-foreground">
                       {Math.round(
                         healthScore
                       )}
@@ -3802,7 +3407,7 @@ export default function CashFlowPage() {
                 </div>
 
                 <div className="min-w-0 space-y-2.5">
-                  <div className="flex items-start gap-2 text-xs font-semibold text-slate-600">
+                  <div className="flex items-start gap-2 text-xs font-semibold text-muted-foreground">
                     {netFlow >=
                     0 ? (
                       <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
@@ -3818,7 +3423,7 @@ export default function CashFlowPage() {
                     </span>
                   </div>
 
-                  <div className="flex items-start gap-2 text-xs font-semibold text-slate-600">
+                  <div className="flex items-start gap-2 text-xs font-semibold text-muted-foreground">
                     {projectedBelowBuffer ? (
                       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
                     ) : (
@@ -3832,7 +3437,7 @@ export default function CashFlowPage() {
                     </span>
                   </div>
 
-                  <div className="flex items-start gap-2 text-xs font-semibold text-slate-600">
+                  <div className="flex items-start gap-2 text-xs font-semibold text-muted-foreground">
                     {projectedBelowZero ? (
                       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-500" />
                     ) : (
@@ -3863,44 +3468,41 @@ export default function CashFlowPage() {
               transition={{
                 delay: 0.16,
               }}
-              className="overflow-hidden rounded-[28px] border border-blue-100 bg-gradient-to-br from-blue-50 to-cyan-50/70 p-6 shadow-[0_12px_40px_rgba(15,23,42,0.04)]"
+              className="overflow-hidden rounded-[28px] border border-indigo-200 bg-indigo-50 p-6 shadow-[0_12px_40px_rgba(15,23,42,0.04)] dark:border-violet-500/20 dark:bg-violet-500/10 dark:shadow-none"
             >
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#1F5EA8] text-white shadow-lg shadow-blue-200">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-500/20">
                   <Calculator className="h-5 w-5" />
                 </div>
 
                 <div>
-                  <h3 className="font-black text-[#0F2745]">
+                  <h3 className="font-black text-foreground">
                     What-If Simulator
                   </h3>
 
-                  <p className="text-xs font-medium text-[#1F5EA8]">
+                  <p className="text-xs font-medium text-indigo-700 dark:text-violet-300">
                     Preview a future income or expense
                   </p>
                 </div>
               </div>
 
               <div className="mt-5 space-y-4">
-                <div className="grid grid-cols-2 rounded-xl border border-blue-100 bg-white p-1">
+                <div className="grid grid-cols-2 rounded-xl border border-border bg-card p-1">
                   <button
                     type="button"
                     onClick={() =>
                       setSimulator(
-                        (
-                          current
-                        ) => ({
+                        (current) => ({
                           ...current,
-                          type:
-                            "expense",
+                          type: "expense",
                         })
                       )
                     }
                     className={`rounded-lg py-2 text-xs font-black transition ${
                       simulator.type ===
                       "expense"
-                        ? "bg-rose-100 text-rose-700"
-                        : "text-slate-400 hover:text-slate-600"
+                        ? "bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300"
+                        : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     Expense
@@ -3910,20 +3512,17 @@ export default function CashFlowPage() {
                     type="button"
                     onClick={() =>
                       setSimulator(
-                        (
-                          current
-                        ) => ({
+                        (current) => ({
                           ...current,
-                          type:
-                            "income",
+                          type: "income",
                         })
                       )
                     }
                     className={`rounded-lg py-2 text-xs font-black transition ${
                       simulator.type ===
                       "income"
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "text-slate-400 hover:text-slate-600"
+                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300"
+                        : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     Income
@@ -3931,7 +3530,7 @@ export default function CashFlowPage() {
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-xs font-black text-slate-600">
+                  <label className="mb-1.5 block text-xs font-black text-foreground">
                     Amount (৳)
                   </label>
 
@@ -3945,32 +3544,30 @@ export default function CashFlowPage() {
                       event
                     ) =>
                       setSimulator(
-                        (
-                          current
-                        ) => ({
+                        (current) => ({
                           ...current,
                           amount:
                             Math.max(
                               Number(
-                                event.target.value
-                              ) ||
-                                0,
+                                event.target
+                                  .value
+                              ) || 0,
                               0
                             ),
                         })
                       )
                     }
-                    className="w-full rounded-xl border border-blue-100 bg-white px-3 py-2.5 text-sm font-black text-[#0F2745] outline-none transition focus:border-[#1F5EA8] focus:ring-2 focus:ring-blue-100"
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-black text-foreground outline-none transition placeholder:text-muted-foreground focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 dark:focus:border-violet-500"
                   />
                 </div>
 
                 <div>
                   <div className="mb-2 flex items-center justify-between gap-3">
-                    <label className="text-xs font-black text-slate-600">
+                    <label className="text-xs font-black text-foreground">
                       Days from now
                     </label>
 
-                    <span className="rounded-lg bg-white px-2 py-1 text-[10px] font-black text-[#1F5EA8] shadow-sm">
+                    <span className="rounded-lg bg-card px-2 py-1 text-[10px] font-black text-indigo-700 shadow-sm dark:text-violet-300">
                       In{" "}
                       {
                         simulator.daysFromNow
@@ -3982,37 +3579,32 @@ export default function CashFlowPage() {
                   <input
                     type="range"
                     min="1"
-                    max={
+                    max={Math.min(
+                      chart.futureDays,
+                      90
+                    )}
+                    value={Math.min(
+                      simulator.daysFromNow,
                       Math.min(
                         chart.futureDays,
                         90
                       )
-                    }
-                    value={
-                      Math.min(
-                        simulator.daysFromNow,
-                        Math.min(
-                          chart.futureDays,
-                          90
-                        )
-                      )
-                    }
+                    )}
                     onChange={(
                       event
                     ) =>
                       setSimulator(
-                        (
-                          current
-                        ) => ({
+                        (current) => ({
                           ...current,
                           daysFromNow:
                             Number(
-                              event.target.value
+                              event.target
+                                .value
                             ),
                         })
                       )
                     }
-                    className="w-full accent-[#1F5EA8]"
+                    className="w-full accent-indigo-600"
                   />
                 </div>
 
@@ -4033,9 +3625,7 @@ export default function CashFlowPage() {
                     }
 
                     setSimulator(
-                      (
-                        current
-                      ) => ({
+                      (current) => ({
                         ...current,
                         active:
                           !current.active,
@@ -4045,7 +3635,7 @@ export default function CashFlowPage() {
                   className={`w-full rounded-xl py-3 text-sm font-black text-white shadow-sm transition ${
                     simulator.active
                       ? "bg-violet-600 hover:bg-violet-700"
-                      : "bg-[#1F5EA8] hover:bg-[#173F6D]"
+                      : "bg-indigo-600 hover:bg-violet-600"
                   }`}
                 >
                   {simulator.active
@@ -4072,22 +3662,22 @@ export default function CashFlowPage() {
                     }}
                     className="overflow-hidden"
                   >
-                    <div className="mt-4 rounded-2xl border border-violet-100 bg-white p-4">
+                    <div className="mt-4 rounded-2xl border border-violet-200 bg-card p-4 dark:border-violet-500/20">
                       <div className="flex items-center gap-2">
                         <Sparkles className="h-4 w-4 text-violet-500" />
 
-                        <p className="text-xs font-black text-violet-700">
+                        <p className="text-xs font-black text-violet-700 dark:text-violet-300">
                           Simulation Impact
                         </p>
                       </div>
 
-                      <p className="mt-2 text-sm leading-6 text-slate-600">
+                      <p className="mt-2 text-sm leading-6 text-muted-foreground">
                         A{" "}
-                        <span className="font-black">
+                        <span className="font-black text-foreground">
                           {simulator.type}
                         </span>{" "}
                         of{" "}
-                        <span className="font-black text-[#0F2745]">
+                        <span className="font-black text-indigo-700 dark:text-violet-300">
                           {formatCurrency(
                             simulator.amount
                           )}
@@ -4120,23 +3710,23 @@ export default function CashFlowPage() {
               }}
               className={`rounded-[24px] border p-5 ${
                 lowBalanceRisk
-                  ? "border-amber-200 bg-amber-50"
-                  : "border-emerald-100 bg-emerald-50"
+                  ? "border-amber-200 bg-amber-50 dark:border-amber-500/20 dark:bg-amber-500/10"
+                  : "border-emerald-200 bg-emerald-50 dark:border-emerald-500/20 dark:bg-emerald-500/10"
               }`}
             >
               <div className="flex gap-3">
                 {lowBalanceRisk ? (
                   <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
                 ) : (
-                  <Zap className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+                  <Zap className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
                 )}
 
                 <div>
                   <h4
                     className={`font-black ${
                       lowBalanceRisk
-                        ? "text-amber-900"
-                        : "text-emerald-900"
+                        ? "text-amber-900 dark:text-amber-200"
+                        : "text-emerald-900 dark:text-emerald-200"
                     }`}
                   >
                     {lowBalanceRisk
@@ -4147,8 +3737,8 @@ export default function CashFlowPage() {
                   <p
                     className={`mt-1 text-sm leading-6 ${
                       lowBalanceRisk
-                        ? "text-amber-700"
-                        : "text-emerald-700"
+                        ? "text-amber-700 dark:text-amber-300"
+                        : "text-emerald-700 dark:text-emerald-300"
                     }`}
                   >
                     {lowBalanceRisk
@@ -4168,7 +3758,7 @@ export default function CashFlowPage() {
 
       <AnimatePresence>
         {addEventModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
             <motion.div
               initial={{
                 opacity: 0,
@@ -4185,15 +3775,15 @@ export default function CashFlowPage() {
                 scale: 0.96,
                 y: 14,
               }}
-              className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-[28px] border border-white bg-white p-6 shadow-2xl md:p-8"
+              className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-[28px] border border-border bg-card p-6 text-card-foreground shadow-2xl md:p-8"
             >
               <div className="mb-6 flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1F5EA8]">
+                  <p className="text-[10px] font-black uppercase tracking-[0.14em] text-indigo-600 dark:text-violet-400">
                     Planned Cash Flow
                   </p>
 
-                  <h3 className="mt-1 text-xl font-black capitalize text-[#0F2745]">
+                  <h3 className="mt-1 text-xl font-black capitalize text-foreground">
                     Plan{" "}
                     {
                       formType
@@ -4208,7 +3798,7 @@ export default function CashFlowPage() {
                       false
                     )
                   }
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
                 >
                   <X className="h-5 w-5" />
                 </button>
@@ -4221,7 +3811,7 @@ export default function CashFlowPage() {
                 className="space-y-4"
               >
                 <div>
-                  <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                  <label className="mb-1.5 block text-sm font-bold text-foreground">
                     Title
                   </label>
 
@@ -4239,12 +3829,12 @@ export default function CashFlowPage() {
                     }
                     type="text"
                     placeholder="e.g. Salary, Rent"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-800 outline-none transition focus:border-[#1F5EA8] focus:bg-white focus:ring-2 focus:ring-[#1F5EA8]/15"
+                    className="w-full rounded-xl border border-border bg-background px-4 py-3 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 dark:focus:border-violet-500"
                   />
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                  <label className="mb-1.5 block text-sm font-bold text-foreground">
                     Amount (৳)
                   </label>
 
@@ -4264,12 +3854,12 @@ export default function CashFlowPage() {
                     min="1"
                     step="1"
                     placeholder="0"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-800 outline-none transition focus:border-[#1F5EA8] focus:bg-white focus:ring-2 focus:ring-[#1F5EA8]/15"
+                    className="w-full rounded-xl border border-border bg-background px-4 py-3 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 dark:focus:border-violet-500"
                   />
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                  <label className="mb-1.5 block text-sm font-bold text-foreground">
                     Category
                   </label>
 
@@ -4286,12 +3876,12 @@ export default function CashFlowPage() {
                     }
                     type="text"
                     placeholder="e.g. Salary, Bills, Food"
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-800 outline-none transition focus:border-[#1F5EA8] focus:bg-white focus:ring-2 focus:ring-[#1F5EA8]/15"
+                    className="w-full rounded-xl border border-border bg-background px-4 py-3 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 dark:focus:border-violet-500"
                   />
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-sm font-bold text-slate-700">
+                  <label className="mb-1.5 block text-sm font-bold text-foreground">
                     Date
                   </label>
 
@@ -4309,17 +3899,17 @@ export default function CashFlowPage() {
                     }
                     type="date"
                     min={dateKey(today)}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-800 outline-none transition focus:border-[#1F5EA8] focus:bg-white focus:ring-2 focus:ring-[#1F5EA8]/15"
+                    className="w-full rounded-xl border border-border bg-background px-4 py-3 text-foreground outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/15 dark:focus:border-violet-500"
                   />
                 </div>
 
-                <label className="flex cursor-pointer items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <label className="flex cursor-pointer items-center justify-between rounded-2xl border border-border bg-muted/50 p-4">
                   <div>
-                    <p className="text-sm font-black text-[#0F2745]">
+                    <p className="text-sm font-black text-foreground">
                       Recurring Event
                     </p>
 
-                    <p className="mt-1 text-xs text-slate-400">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       Repeat every 30 days in the forecast only.
                     </p>
                   </div>
@@ -4333,14 +3923,15 @@ export default function CashFlowPage() {
                       event
                     ) =>
                       setFormRecurring(
-                        event.target.checked
+                        event.target
+                          .checked
                       )
                     }
-                    className="h-5 w-5 accent-[#1F5EA8]"
+                    className="h-5 w-5 accent-indigo-600"
                   />
                 </label>
 
-                <div className="flex gap-3 border-t border-slate-100 pt-5">
+                <div className="flex gap-3 border-t border-border pt-5">
                   <button
                     type="button"
                     onClick={() =>
@@ -4348,15 +3939,17 @@ export default function CashFlowPage() {
                         false
                       )
                     }
-                    className="flex-1 rounded-xl bg-slate-100 py-3.5 text-sm font-bold text-slate-700 transition hover:bg-slate-200"
+                    className="flex-1 rounded-xl bg-muted py-3.5 text-sm font-bold text-foreground transition hover:bg-accent"
                   >
                     Cancel
                   </button>
 
                   <button
                     type="submit"
-                    disabled={isSavingPlan}
-                    className="flex-1 rounded-xl bg-[#1F5EA8] py-3.5 text-sm font-black text-white shadow-lg shadow-blue-900/15 transition hover:bg-[#173F6D] disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={
+                      isSavingPlan
+                    }
+                    className="flex-1 rounded-xl bg-indigo-600 py-3.5 text-sm font-black text-white shadow-lg shadow-indigo-900/15 transition hover:bg-violet-600 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {isSavingPlan
                       ? "Saving..."
@@ -4391,20 +3984,20 @@ export default function CashFlowPage() {
               y: 24,
               scale: 0.96,
             }}
-            className="fixed bottom-6 right-6 z-[120] flex max-w-[calc(100vw-3rem)] items-center gap-3 rounded-2xl border border-slate-100 bg-white px-5 py-4 shadow-[0_20px_60px_rgba(15,23,42,0.16)]"
+            className="fixed bottom-6 right-6 z-[120] flex max-w-[calc(100vw-3rem)] items-center gap-3 rounded-2xl border border-border bg-card px-5 py-4 text-card-foreground shadow-[0_20px_60px_rgba(15,23,42,0.16)]"
           >
             <div
               className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
                 toast.type ===
                 "error"
-                  ? "bg-rose-100 text-rose-600"
+                  ? "bg-rose-100 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400"
                   : toast.type ===
                       "warning"
-                    ? "bg-amber-100 text-amber-600"
+                    ? "bg-amber-100 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400"
                     : toast.type ===
                         "info"
-                      ? "bg-blue-100 text-blue-600"
-                      : "bg-emerald-100 text-emerald-600"
+                      ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-300"
+                      : "bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400"
               }`}
             >
               {toast.type ===
@@ -4421,7 +4014,7 @@ export default function CashFlowPage() {
               )}
             </div>
 
-            <p className="text-sm font-bold text-slate-700">
+            <p className="text-sm font-bold text-foreground">
               {
                 toast.message
               }
@@ -4430,11 +4023,9 @@ export default function CashFlowPage() {
             <button
               type="button"
               onClick={() =>
-                setToast(
-                  null
-                )
+                setToast(null)
               }
-              className="ml-1 text-slate-400 transition hover:text-slate-700"
+              className="ml-1 text-muted-foreground transition hover:text-foreground"
             >
               <X className="h-4 w-4" />
             </button>
