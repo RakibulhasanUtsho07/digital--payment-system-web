@@ -25,6 +25,7 @@ import {
   ChevronRight,
   Clock3,
   Download,
+  FileText,
   Lightbulb,
   Loader2,
   LockKeyhole,
@@ -34,6 +35,7 @@ import {
   TrendingDown,
   TrendingUp,
   Unlock,
+  UserRound,
   Wallet,
   WalletCards,
 } from "lucide-react";
@@ -176,14 +178,14 @@ interface ActivityView {
 }
 
 /* =========================================================
-   SHARED LAYOUT CONSTANTS
+   SHARED LAYOUT
 ========================================================= */
 
 const TWO_COLUMN_TEMPLATE =
   "xl:grid-cols-[minmax(0,1.55fr)_minmax(320px,1fr)]";
 
 const NARROW_CARD_MIN_HEIGHT =
-  "min-h-[232px]";
+  "min-h-[250px]";
 
 /* =========================================================
    MAIN COMPONENT
@@ -195,52 +197,45 @@ export default function UserDashboardOverview({
   transactions,
 }: UserDashboardOverviewProps) {
   /* =======================================================
-     EXISTING UI STATE
+     GREETING
   ======================================================== */
 
   const [
     timeGreeting,
     setTimeGreeting,
-  ] =
-    useState(
-      "Good afternoon"
-    );
+  ] = useState(
+    "Good afternoon"
+  );
+
+  /* =======================================================
+     REVEAL STATES
+  ======================================================== */
 
   const [
     revealed,
     setRevealed,
-  ] =
-    useState<
-      Record<
-        string,
-        boolean
-      >
-    >({});
+  ] = useState<
+    Record<string, boolean>
+  >({});
 
   /* =======================================================
-     BUDGET EXPENSE STATE
-
-     Budget expenses are stored in a separate
-     BudgetExpense collection, so User Overview
-     must fetch them explicitly.
+     BUDGET
   ======================================================== */
 
   const [
     budgetExpenses,
     setBudgetExpenses,
-  ] =
-    useState<
-      BudgetExpense[]
-    >([]);
+  ] = useState<
+    BudgetExpense[]
+  >([]);
 
   const [
     budgetExpensesLoading,
     setBudgetExpensesLoading,
-  ] =
-    useState(true);
+  ] = useState(true);
 
   /* =======================================================
-     GREETING
+     GREETING EFFECT
   ======================================================== */
 
   useEffect(() => {
@@ -267,7 +262,7 @@ export default function UserDashboardOverview({
     ) || 0;
 
   /* =======================================================
-     REVEAL
+     REVEAL HANDLER
   ======================================================== */
 
   const toggleReveal = (
@@ -282,16 +277,9 @@ export default function UserDashboardOverview({
     );
   };
 
-  /* =========================================================
-     LOAD CURRENT MONTH BUDGET EXPENSES
-     
-     This is the important sync fix.
-     
-     Budget expenses do not exist inside the Transaction
-     collection. They exist inside BudgetExpense, so
-     User Overview fetches the current month's budget
-     dashboard and reads response.expenses.
-  ========================================================== */
+  /* =======================================================
+     LOAD BUDGET EXPENSES
+  ======================================================== */
 
   const loadBudgetExpenses =
     useCallback(
@@ -337,13 +325,6 @@ export default function UserDashboardOverview({
             error
           );
 
-          /*
-           * Do not break the dashboard if the
-           * optional budget source fails.
-           *
-           * Existing transaction data will
-           * continue to render.
-           */
           setBudgetExpenses(
             []
           );
@@ -356,9 +337,9 @@ export default function UserDashboardOverview({
       []
     );
 
-  /* =========================================================
+  /* =======================================================
      INITIAL BUDGET LOAD
-  ========================================================== */
+  ======================================================== */
 
   useEffect(() => {
     void loadBudgetExpenses();
@@ -366,16 +347,9 @@ export default function UserDashboardOverview({
     loadBudgetExpenses,
   ]);
 
-  /* =========================================================
-     REFRESH BUDGET DATA WHEN DASHBOARD BECOMES ACTIVE
-
-     This solves the case where:
-     Budget page -> add expense -> navigate back to dashboard
-
-     or:
-
-     another tab/page updates a budget expense.
-  ========================================================== */
+  /* =======================================================
+     AUTO REFRESH
+  ======================================================== */
 
   useEffect(() => {
     const handleFocus =
@@ -418,9 +392,9 @@ export default function UserDashboardOverview({
     loadBudgetExpenses,
   ]);
 
-  /* =========================================================
+  /* =======================================================
      COMPLETED TRANSACTIONS
-  ========================================================== */
+  ======================================================== */
 
   const completedTransactions =
     useMemo(
@@ -435,13 +409,9 @@ export default function UserDashboardOverview({
       [transactions]
     );
 
-  /* =========================================================
+  /* =======================================================
      TOTAL RECEIVED
-     
-     Only wallet transactions count as received money.
-     Budget expenses are expenses, so they must NOT affect
-     total received.
-  ========================================================== */
+  ======================================================== */
 
   const totalReceived =
     useMemo(
@@ -474,11 +444,9 @@ export default function UserDashboardOverview({
       ]
     );
 
-  /* =========================================================
+  /* =======================================================
      TOTAL SENT
-     
-     Existing wallet transaction calculation.
-  ========================================================== */
+  ======================================================== */
 
   const totalSent =
     useMemo(
@@ -511,9 +479,9 @@ export default function UserDashboardOverview({
       ]
     );
 
-  /* =========================================================
+  /* =======================================================
      CURRENT MONTH BUDGET EXPENSES
-  ========================================================== */
+  ======================================================== */
 
   const currentMonthBudgetExpenses =
     useMemo(
@@ -556,9 +524,9 @@ export default function UserDashboardOverview({
       [budgetExpenses]
     );
 
-  /* =========================================================
-     BUDGET EXPENSE TOTAL
-  ========================================================== */
+  /* =======================================================
+     BUDGET TOTAL
+  ======================================================== */
 
   const totalBudgetExpenses =
     useMemo(
@@ -580,14 +548,9 @@ export default function UserDashboardOverview({
       ]
     );
 
-  /* =========================================================
+  /* =======================================================
      MONTHLY SPENDING
-
-     IMPORTANT:
-     Existing transaction spending
-     +
-     Budget manual expenses
-  ========================================================== */
+  ======================================================== */
 
   const monthlySpending =
     useMemo(() => {
@@ -662,15 +625,9 @@ export default function UserDashboardOverview({
       totalBudgetExpenses,
     ]);
 
-  /* =========================================================
-     RECENT UNIFIED ACTIVITY
-
-     Combines:
-     - Wallet transactions
-     - Budget expenses
-
-     Sorted by actual timestamp.
-  ========================================================== */
+  /* =======================================================
+     RECENT ACTIVITY
+  ======================================================== */
 
   const recentTransactions =
     useMemo<
@@ -772,13 +729,9 @@ export default function UserDashboardOverview({
       budgetExpenses,
     ]);
 
-  /* =========================================================
+  /* =======================================================
      SPENDING CHART
-
-     Wallet outgoing transactions
-     +
-     Budget expenses
-  ========================================================== */
+  ======================================================== */
 
   const spendingChart =
     useMemo(
@@ -829,9 +782,9 @@ export default function UserDashboardOverview({
         ? "down"
         : "same";
 
-  /* =========================================================
-     TOTAL LAST 7 DAYS
-  ========================================================== */
+  /* =======================================================
+     SEVEN DAY TOTAL
+  ======================================================== */
 
   const lastSevenDaysTotal =
     useMemo(
@@ -848,9 +801,9 @@ export default function UserDashboardOverview({
       [spendingChart]
     );
 
-  /* =========================================================
+  /* =======================================================
      RENDER
-  ========================================================== */
+  ======================================================== */
 
   return (
     <div className="min-w-0 space-y-6 overflow-x-hidden pb-10">
@@ -858,7 +811,7 @@ export default function UserDashboardOverview({
           HERO
       ===================================================== */}
 
-      <section className="relative isolate overflow-hidden rounded-[30px] border border-white/10 bg-gradient-to-br from-[#09051B] via-[#160A36] to-[#2D1168] px-5 py-7 text-white shadow-[0_24px_80px_rgba(56,24,120,0.28)] sm:px-7 sm:py-8 lg:px-9 lg:py-9">
+      <section className="relative isolate overflow-hidden rounded-[30px] border border-violet-900/20 bg-gradient-to-br from-[#080414] via-[#160A36] to-[#35127B] px-5 py-7 text-white shadow-[0_24px_80px_rgba(76,29,149,0.22)] sm:px-7 sm:py-8 lg:px-9 lg:py-9">
         <div className="pointer-events-none absolute -left-24 -top-24 h-72 w-72 rounded-full bg-fuchsia-500/10 blur-3xl" />
 
         <div className="pointer-events-none absolute -right-24 -bottom-24 h-80 w-80 rounded-full bg-violet-400/15 blur-3xl" />
@@ -877,7 +830,7 @@ export default function UserDashboardOverview({
             repeat: Infinity,
             ease: "easeInOut",
           }}
-          className="pointer-events-none absolute right-[14%] top-7 h-2.5 w-2.5 rounded-full bg-cyan-300 shadow-[0_0_20px_rgba(34,211,238,0.7)]"
+          className="pointer-events-none absolute right-[14%] top-7 h-2.5 w-2.5 rounded-full bg-violet-200 shadow-[0_0_20px_rgba(196,181,253,0.7)]"
         />
 
         <motion.div
@@ -914,8 +867,8 @@ export default function UserDashboardOverview({
               }}
               className="mb-6 inline-flex items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.07] px-3.5 py-2 text-[10px] font-bold uppercase tracking-[0.12em] text-violet-50 shadow-[0_8px_30px_rgba(0,0,0,0.12)] backdrop-blur-xl"
             >
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-cyan-300/10 ring-1 ring-cyan-200/10">
-                <WalletCards className="h-3.5 w-3.5 text-cyan-200" />
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-violet-300/10 ring-1 ring-violet-200/10">
+                <WalletCards className="h-3.5 w-3.5 text-violet-200" />
               </span>
 
               Smart Wallet Overview
@@ -947,7 +900,7 @@ export default function UserDashboardOverview({
               </p>
 
               <div className="mt-2 flex min-w-0 items-center gap-2.5 sm:gap-3">
-                <h1 className="min-w-0 truncate bg-gradient-to-r from-white via-cyan-100 to-fuchsia-200 bg-clip-text text-[2.55rem] font-black leading-[0.98] tracking-[-0.055em] text-transparent sm:text-[3.6rem]">
+                <h1 className="min-w-0 truncate bg-gradient-to-r from-white via-violet-100 to-fuchsia-200 bg-clip-text text-[2.55rem] font-black leading-[0.98] tracking-[-0.055em] text-transparent sm:text-[3.6rem]">
                   {user.name ||
                     "User"}
                 </h1>
@@ -972,9 +925,9 @@ export default function UserDashboardOverview({
                     repeat: Infinity,
                     ease: "easeInOut",
                   }}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-cyan-200/10 bg-white/[0.06] text-cyan-200 shadow-[0_0_24px_rgba(34,211,238,0.15)] sm:h-11 sm:w-11"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-violet-200/10 bg-white/[0.06] text-violet-200 shadow-[0_0_24px_rgba(139,92,246,0.15)] sm:h-11 sm:w-11"
                 >
-                  <Sparkles className="h-4.5 w-4.5 sm:h-5 w-5" />
+                  <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" />
                 </motion.span>
               </div>
 
@@ -991,7 +944,7 @@ export default function UserDashboardOverview({
                   duration: 0.65,
                   delay: 0.2,
                 }}
-                className="mt-3 h-[3px] rounded-full bg-gradient-to-r from-cyan-300 via-violet-300 to-fuchsia-300"
+                className="mt-3 h-[3px] rounded-full bg-gradient-to-r from-violet-300 via-fuchsia-300 to-indigo-300"
               />
 
               <motion.p
@@ -1033,7 +986,7 @@ export default function UserDashboardOverview({
                   Wallet active
                 </span>
 
-                <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-[10px] font-semibold text-violet-100/70">
+                <span className="inline-flex items-center gap-2 rounded-full border border-violet-200/10 bg-violet-300/5 px-3 py-1.5 text-[10px] font-semibold text-violet-100/70">
                   <LockKeyhole className="h-3 w-3" />
                   Secure session
                 </span>
@@ -1058,9 +1011,9 @@ export default function UserDashboardOverview({
           >
             <Link
               href="/dashboard/send"
-              className="group inline-flex h-12 items-center gap-2 rounded-2xl bg-white px-5 text-xs font-extrabold text-[#221046] shadow-[0_12px_30px_rgba(0,0,0,0.18)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_38px_rgba(0,0,0,0.25)]"
+              className="group inline-flex h-12 items-center gap-2 rounded-2xl bg-white px-5 text-xs font-extrabold text-violet-950 shadow-[0_12px_30px_rgba(0,0,0,0.18)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_18px_38px_rgba(0,0,0,0.25)]"
             >
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#2D1168]/10">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100 text-violet-700">
                 <Send className="h-3.5 w-3.5" />
               </span>
 
@@ -1071,7 +1024,7 @@ export default function UserDashboardOverview({
 
             <Link
               href="/dashboard/receive"
-              className="inline-flex h-12 items-center gap-2 rounded-2xl border border-white/15 bg-white/[0.08] px-5 text-xs font-extrabold text-white backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:bg-white/[0.13]"
+              className="inline-flex h-12 items-center gap-2 rounded-2xl border border-violet-200/15 bg-white/[0.08] px-5 text-xs font-extrabold text-white backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:bg-white/[0.13]"
             >
               <ArrowDownLeft className="h-4 w-4" />
               Receive
@@ -1092,8 +1045,8 @@ export default function UserDashboardOverview({
           )}
           subtitle="Current wallet balance"
           icon={Wallet}
-          iconClass="from-cyan-400/20 to-violet-500/20 text-cyan-200 ring-cyan-300/15"
-          accent="cyan"
+          iconClass="from-violet-400/20 to-indigo-500/20 text-violet-200 ring-violet-300/15"
+          accent="violet"
           revealed={Boolean(
             revealed.balance
           )}
@@ -1111,7 +1064,7 @@ export default function UserDashboardOverview({
           )}
           subtitle={`${completedTransactions.length} completed transactions`}
           icon={ArrowDownLeft}
-          iconClass="from-emerald-400/20 to-cyan-400/10 text-emerald-200 ring-emerald-300/15"
+          iconClass="from-emerald-400/20 to-violet-400/10 text-emerald-200 ring-emerald-300/15"
           accent="emerald"
           valueClass="text-emerald-100"
           revealed={Boolean(
@@ -1131,7 +1084,7 @@ export default function UserDashboardOverview({
           )}
           subtitle="Completed outgoing payments"
           icon={ArrowUpRight}
-          iconClass="from-fuchsia-400/20 to-rose-500/10 text-fuchsia-200 ring-fuchsia-300/15"
+          iconClass="from-fuchsia-400/20 to-violet-500/10 text-fuchsia-200 ring-fuchsia-300/15"
           accent="fuchsia"
           valueClass="text-fuchsia-100"
           revealed={Boolean(
@@ -1151,7 +1104,7 @@ export default function UserDashboardOverview({
           )}
           subtitle="Wallet + budget expenses"
           icon={TrendingUp}
-          iconClass="from-violet-400/20 to-cyan-400/10 text-violet-200 ring-violet-300/15"
+          iconClass="from-violet-400/20 to-indigo-400/10 text-violet-200 ring-violet-300/15"
           accent="violet"
           valueClass="text-violet-100"
           revealed={Boolean(
@@ -1166,38 +1119,63 @@ export default function UserDashboardOverview({
       </section>
 
       {/* ====================================================
-          TRANSACTIONS
+          TRANSACTIONS + QUICK SNAPSHOT
       ===================================================== */}
 
       <section
-        className={`grid min-w-0 items-start gap-6 ${TWO_COLUMN_TEMPLATE}`}
+        className={`grid min-w-0 items-stretch gap-6 ${TWO_COLUMN_TEMPLATE}`}
       >
-        <div className="min-w-0 rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.04)] sm:p-6">
+        {/* ==================================================
+            RECENT TRANSACTIONS
+        ================================================== */}
+
+        <motion.div
+          initial={{
+            opacity: 0,
+            y: 12,
+          }}
+          whileInView={{
+            opacity: 1,
+            y: 0,
+          }}
+          viewport={{
+            once: true,
+            amount: 0.12,
+          }}
+          transition={{
+            duration: 0.45,
+          }}
+          className="min-w-0 rounded-[28px] border border-border bg-card p-5 text-card-foreground shadow-[var(--dashboard-shadow)] sm:p-6"
+        >
           <div className="mb-5 flex items-center justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-[10px] font-extrabold uppercase tracking-[0.17em] text-slate-400">
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.17em] text-muted-foreground">
                 Activity
               </p>
 
-              <h2 className="mt-1 text-lg font-black text-slate-900">
+              <h2 className="mt-1 text-lg font-black text-foreground">
                 Recent Transactions
               </h2>
+
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                Your latest wallet and budget activity.
+              </p>
             </div>
 
             <Link
               href="/dashboard/transactions"
-              className="inline-flex shrink-0 items-center gap-1 text-xs font-extrabold text-[#1F5EA8] transition hover:text-[#123B66]"
+              className="group inline-flex shrink-0 items-center gap-1 text-xs font-extrabold text-violet-600 transition hover:text-violet-700 dark:text-violet-300 dark:hover:text-violet-200"
             >
               View all
 
-              <ChevronRight className="h-3.5 w-3.5" />
+              <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
             </Link>
           </div>
 
           {budgetExpensesLoading &&
           transactions.length ===
             0 ? (
-            <div className="flex items-center justify-center rounded-2xl bg-slate-50 p-8">
+            <div className="flex items-center justify-center rounded-2xl border border-border bg-muted/50 p-8">
               <Loader2 className="h-5 w-5 animate-spin text-violet-500" />
             </div>
           ) : recentTransactions.length ===
@@ -1222,9 +1200,12 @@ export default function UserDashboardOverview({
                         opacity: 0,
                         y: 8,
                       }}
-                      animate={{
+                      whileInView={{
                         opacity: 1,
                         y: 0,
+                      }}
+                      viewport={{
+                        once: true,
                       }}
                       transition={{
                         duration: 0.35,
@@ -1232,30 +1213,33 @@ export default function UserDashboardOverview({
                           index *
                           0.05,
                       }}
-                      className="group flex min-w-0 items-center justify-between rounded-2xl border border-transparent p-3 transition-all duration-300 hover:border-slate-200 hover:bg-slate-50"
+                      whileHover={{
+                        x: 2,
+                      }}
+                      className="group flex min-w-0 items-center justify-between rounded-2xl border border-transparent p-3 transition-all duration-300 hover:border-violet-200 hover:bg-violet-50/50 dark:hover:border-violet-800 dark:hover:bg-violet-950/20"
                     >
                       <div className="flex min-w-0 items-center gap-3">
                         <div
                           className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
                             transaction.isCredit
-                              ? "bg-emerald-50 text-emerald-600"
+                              ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-300"
                               : transaction.source ===
                                   "budget"
-                                ? "bg-violet-50 text-violet-600"
-                                : "bg-rose-50 text-rose-600"
+                                ? "bg-violet-50 text-violet-600 dark:bg-violet-950/30 dark:text-violet-300"
+                                : "bg-rose-50 text-rose-600 dark:bg-rose-950/30 dark:text-rose-300"
                           }`}
                         >
                           <Icon className="h-5 w-5" />
                         </div>
 
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-extrabold text-slate-900">
+                          <p className="truncate text-sm font-extrabold text-foreground">
                             {
                               transaction.title
                             }
                           </p>
 
-                          <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-400">
+                          <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
                             <Clock3 className="h-3.5 w-3.5 shrink-0" />
 
                             <span className="truncate">
@@ -1270,8 +1254,11 @@ export default function UserDashboardOverview({
                       <div
                         className={`shrink-0 pl-4 text-sm font-black ${
                           transaction.isCredit
-                            ? "text-emerald-600"
-                            : "text-slate-900"
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : transaction.source ===
+                                "budget"
+                              ? "text-violet-600 dark:text-violet-300"
+                              : "text-foreground"
                         }`}
                       >
                         {
@@ -1284,73 +1271,147 @@ export default function UserDashboardOverview({
               )}
             </div>
           )}
-        </div>
+        </motion.div>
 
-        <div className="min-w-0 rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.04)] sm:p-6">
-          <div className="mb-5">
-            <p className="text-[10px] font-extrabold uppercase tracking-[0.17em] text-slate-400">
-              Wallet
-            </p>
+        {/* ==================================================
+            QUICK SNAPSHOT
+        ================================================== */}
 
-            <h2 className="mt-1 text-lg font-black text-slate-900">
-              Quick Snapshot
-            </h2>
+        <motion.div
+          initial={{
+            opacity: 0,
+            y: 12,
+          }}
+          whileInView={{
+            opacity: 1,
+            y: 0,
+          }}
+          viewport={{
+            once: true,
+            amount: 0.12,
+          }}
+          transition={{
+            duration: 0.45,
+            delay: 0.06,
+          }}
+          className="min-w-0 rounded-[28px] border border-border bg-card p-5 text-card-foreground shadow-[var(--dashboard-shadow)] sm:p-6"
+        >
+          <div className="mb-5 flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[10px] font-extrabold uppercase tracking-[0.17em] text-muted-foreground">
+                Wallet
+              </p>
+
+              <h2 className="mt-1 text-lg font-black text-foreground">
+                Quick Snapshot
+              </h2>
+
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                A compact view of your balance, wallet state and activity.
+              </p>
+            </div>
+
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-300">
+              <WalletCards className="h-4 w-4" />
+            </div>
           </div>
 
-          <div className="relative overflow-hidden rounded-[22px] bg-gradient-to-br from-[#09051B] via-[#160A36] to-[#2D1168] p-5 text-white">
-            <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-fuchsia-400/10 blur-2xl" />
+          <div className="relative overflow-hidden rounded-[24px] border border-violet-300/20 bg-gradient-to-br from-[#120729] via-[#24104F] to-[#4C1D95] p-5 text-white shadow-[0_18px_50px_rgba(76,29,149,0.22)]">
+            <div className="pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full bg-fuchsia-400/15 blur-3xl" />
 
-            <div className="pointer-events-none absolute -bottom-10 -left-10 h-28 w-28 rounded-full bg-violet-400/10 blur-2xl" />
+            <div className="pointer-events-none absolute -bottom-14 -left-10 h-32 w-32 rounded-full bg-violet-400/15 blur-3xl" />
 
-            <div className="relative z-10 flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-violet-100/60">
-                  Current Balance
-                </p>
+            <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-violet-200/40 to-transparent" />
 
-                <RevealAmount
-                  value={formatCurrency(
-                    balance
-                  )}
-                  revealed={Boolean(
-                    revealed.snapshot
-                  )}
-                  compact
-                  dark
-                />
+            <div className="relative z-10">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="text-[9px] font-black uppercase tracking-[0.16em] text-violet-200/60">
+                    Current Balance
+                  </p>
 
-                <div className="mt-4 flex items-center gap-2 text-[10px] font-bold text-emerald-200">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-300/10">
-                    <CheckCircle2 className="h-3 w-3" />
-                  </span>
+                  <RevealAmount
+                    value={formatCurrency(
+                      balance
+                    )}
+                    revealed={Boolean(
+                      revealed.snapshot
+                    )}
+                    compact
+                    dark
+                    valueClass="text-white"
+                  />
 
-                  Wallet is active
+                  <div className="mt-4 flex items-center gap-2 text-[10px] font-bold text-emerald-200">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-300/10">
+                      <CheckCircle2 className="h-3 w-3" />
+                    </span>
+
+                    Wallet is active
+                  </div>
                 </div>
+
+                <motion.button
+                  type="button"
+                  whileTap={{
+                    scale: 0.92,
+                  }}
+                  whileHover={{
+                    scale: 1.04,
+                  }}
+                  onClick={() =>
+                    toggleReveal(
+                      "snapshot"
+                    )
+                  }
+                  aria-label={
+                    revealed.snapshot
+                      ? "Hide balance"
+                      : "Show balance"
+                  }
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-violet-100 backdrop-blur-md transition hover:bg-white/15"
+                >
+                  <RevealIcon
+                    visible={Boolean(
+                      revealed.snapshot
+                    )}
+                  />
+                </motion.button>
               </div>
 
-              <motion.button
-                type="button"
-                whileTap={{
-                  scale: 0.92,
-                }}
-                onClick={() =>
-                  toggleReveal(
-                    "snapshot"
-                  )
-                }
-                aria-label={
-                  revealed.snapshot
-                    ? "Hide balance"
-                    : "Show balance"
-                }
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-violet-100 backdrop-blur-md transition hover:bg-white/15"
-              >
-                <RevealIcon
-                  visible={Boolean(
-                    revealed.snapshot
-                  )}
+              <div className="mt-6 grid grid-cols-2 gap-3">
+                <SnapshotMetric
+                  label="Wallet status"
+                  value="Active"
+                  icon={CheckCircle2}
+                  tone="emerald"
                 />
-              </motion.button>
+
+                <SnapshotMetric
+                  label="Security"
+                  value="Protected"
+                  icon={ShieldCheck}
+                  tone="violet"
+                />
+
+                <SnapshotMetric
+                  label="This month"
+                  value={formatCurrency(
+                    monthlySpending
+                  )}
+                  icon={BarChart3}
+                  tone="fuchsia"
+                />
+
+                <SnapshotMetric
+                  label="Last 7 days"
+                  value={formatCurrency(
+                    lastSevenDaysTotal
+                  )}
+                  icon={Clock3}
+                  tone="indigo"
+                />
+              </div>
             </div>
           </div>
 
@@ -1367,7 +1428,24 @@ export default function UserDashboardOverview({
               label="Statements"
             />
           </div>
-        </div>
+
+          <Link
+            href="/dashboard/insights"
+            className="group mt-3 flex items-center justify-between rounded-2xl border border-violet-200 bg-violet-50/60 px-4 py-3 transition hover:-translate-y-0.5 hover:border-violet-300 hover:bg-violet-100/70 dark:border-violet-800 dark:bg-violet-950/20 dark:hover:border-violet-700 dark:hover:bg-violet-950/35"
+          >
+            <div className="min-w-0">
+              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-violet-600 dark:text-violet-300">
+                Smart insights
+              </p>
+
+              <p className="mt-1 truncate text-xs font-black text-foreground">
+                Explore your spending patterns
+              </p>
+            </div>
+
+            <ChevronRight className="h-4 w-4 shrink-0 text-violet-500 transition-transform group-hover:translate-x-1 dark:text-violet-300" />
+          </Link>
+        </motion.div>
       </section>
 
       {/* ====================================================
@@ -1375,21 +1453,42 @@ export default function UserDashboardOverview({
       ===================================================== */}
 
       <section
-        className={`grid min-w-0 items-start gap-6 ${TWO_COLUMN_TEMPLATE}`}
+        className={`grid min-w-0 items-stretch gap-6 ${TWO_COLUMN_TEMPLATE}`}
       >
-        <div className="min-w-0 overflow-hidden rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.04)] sm:p-6">
+        {/* ==================================================
+            SPENDING INSIGHTS
+        ================================================== */}
+
+        <motion.div
+          initial={{
+            opacity: 0,
+            y: 16,
+          }}
+          whileInView={{
+            opacity: 1,
+            y: 0,
+          }}
+          viewport={{
+            once: true,
+            amount: 0.12,
+          }}
+          transition={{
+            duration: 0.45,
+          }}
+          className="min-w-0 overflow-hidden rounded-[28px] border border-border bg-card p-5 text-card-foreground shadow-[var(--dashboard-shadow)] sm:p-6"
+        >
           <div className="flex min-w-0 items-start justify-between gap-4">
             <div className="flex min-w-0 items-center gap-2">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#1F5EA8]">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-950/30 dark:text-violet-300">
                 <BarChart3 className="h-[18px] w-[18px]" />
               </div>
 
               <div className="min-w-0">
-                <p className="text-[10px] font-extrabold uppercase tracking-[0.17em] text-slate-400">
+                <p className="text-[10px] font-extrabold uppercase tracking-[0.17em] text-muted-foreground">
                   Analytics
                 </p>
 
-                <h2 className="mt-0.5 truncate text-lg font-black text-slate-900">
+                <h2 className="mt-0.5 truncate text-lg font-black text-foreground">
                   Spending Insights
                 </h2>
               </div>
@@ -1397,21 +1496,21 @@ export default function UserDashboardOverview({
 
             <Link
               href="/dashboard/insights"
-              className="inline-flex shrink-0 items-center gap-1 text-xs font-extrabold text-[#1F5EA8] hover:underline"
+              className="group inline-flex shrink-0 items-center gap-1 text-xs font-extrabold text-violet-600 dark:text-violet-300"
             >
               Open insights
 
-              <ChevronRight className="h-3.5 w-3.5" />
+              <ChevronRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
             </Link>
           </div>
 
-          <div className="mt-5 flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-4 py-3">
+          <div className="mt-5 flex items-center justify-between gap-3 rounded-2xl border border-border bg-muted/50 px-4 py-3">
             <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                 Last 7 days
               </p>
 
-              <p className="mt-1 text-sm font-black text-slate-900">
+              <p className="mt-1 text-sm font-black text-foreground">
                 {formatCurrency(
                   lastSevenDaysTotal
                 )}
@@ -1422,11 +1521,11 @@ export default function UserDashboardOverview({
               className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[10px] font-extrabold ${
                 spendingTrend ===
                 "up"
-                  ? "bg-rose-50 text-rose-600"
+                  ? "bg-rose-50 text-rose-600 dark:bg-rose-950/30 dark:text-rose-300"
                   : spendingTrend ===
                       "down"
-                    ? "bg-emerald-50 text-emerald-600"
-                    : "bg-slate-100 text-slate-500"
+                    ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-300"
+                    : "bg-muted text-muted-foreground"
               }`}
             >
               {spendingTrend ===
@@ -1485,37 +1584,56 @@ export default function UserDashboardOverview({
               value={formatCurrency(
                 monthlySpending
               )}
-              tone="blue"
+              tone="violet"
             />
           </div>
-        </div>
+        </motion.div>
 
-        <div className="min-w-0 space-y-6">
-          <div
-            className={`min-w-0 ${NARROW_CARD_MIN_HEIGHT} flex flex-col rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.04)] sm:p-6`}
+        {/* ==================================================
+            RIGHT COLUMN
+        ================================================== */}
+
+        <div className="grid min-w-0 gap-5">
+          {/* IDENTITY VERIFICATION */}
+
+          <motion.div
+            initial={{
+              opacity: 0,
+              y: 16,
+            }}
+            whileInView={{
+              opacity: 1,
+              y: 0,
+            }}
+            viewport={{
+              once: true,
+              amount: 0.12,
+            }}
+            transition={{
+              duration: 0.45,
+            }}
+            className={`min-w-0 ${NARROW_CARD_MIN_HEIGHT} flex flex-col rounded-[28px] border border-border bg-card p-5 text-card-foreground shadow-[var(--dashboard-shadow)] sm:p-6`}
           >
             <div className="flex min-w-0 items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-950/30 dark:text-violet-300">
                     <ShieldCheck className="h-[18px] w-[18px]" />
                   </div>
 
                   <div className="min-w-0">
-                    <p className="truncate text-[10px] font-extrabold uppercase tracking-[0.15em] text-slate-400">
+                    <p className="truncate text-[10px] font-extrabold uppercase tracking-[0.15em] text-muted-foreground">
                       Account security
                     </p>
 
-                    <h2 className="mt-0.5 truncate text-base font-black text-slate-900">
+                    <h2 className="mt-0.5 truncate text-base font-black text-foreground">
                       Identity Verification
                     </h2>
                   </div>
                 </div>
 
-                <p className="mt-3 line-clamp-2 text-xs leading-5 text-slate-500">
-                  Keep your identity verified
-                  to access secure wallet
-                  features.
+                <p className="mt-3 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                  Keep your identity verified to unlock secure wallet functionality.
                 </p>
               </div>
 
@@ -1530,56 +1648,96 @@ export default function UserDashboardOverview({
               "verified" && (
               <Link
                 href="/dashboard/kyc"
-                className="group mt-4 flex min-w-0 items-center justify-between gap-2 rounded-2xl border border-blue-100 bg-blue-50/70 p-3.5 transition-all duration-300 hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50"
+                className="group mt-4 flex min-w-0 items-center justify-between gap-2 rounded-2xl border border-violet-200 bg-violet-50/70 p-3.5 transition-all duration-300 hover:-translate-y-0.5 hover:border-violet-300 hover:bg-violet-100 dark:border-violet-800 dark:bg-violet-950/20 dark:hover:border-violet-700 dark:hover:bg-violet-950/35"
               >
                 <div className="min-w-0">
-                  <p className="truncate text-xs font-extrabold text-[#173F6D]">
-                    Complete KYC
-                    verification
+                  <p className="truncate text-xs font-extrabold text-foreground">
+                    Complete KYC verification
                   </p>
 
-                  <p className="mt-1 truncate text-[10px] text-blue-700/70">
-                    Submit your identity
-                    documents.
+                  <p className="mt-1 truncate text-[10px] text-muted-foreground">
+                    Submit your identity documents to unlock protected actions.
                   </p>
                 </div>
 
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-[#1F5EA8] shadow-sm transition-transform duration-300 group-hover:translate-x-1">
-                  <ChevronRight className="h-4 w-4" />
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-background text-violet-600 shadow-sm dark:text-violet-300">
+                  <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </div>
               </Link>
             )}
 
             {kycStatus ===
               "verified" && (
-              <div className="mt-4 flex items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 p-3.5">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-600 shadow-sm">
-                  <ShieldCheck className="h-4.5 w-4.5" />
+              <div className="mt-4 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-3.5 dark:border-emerald-800 dark:bg-emerald-950/25">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-background text-emerald-600 shadow-sm dark:text-emerald-300">
+                  <ShieldCheck className="h-4 w-4" />
                 </div>
 
                 <div className="min-w-0">
-                  <p className="truncate text-xs font-extrabold text-emerald-800">
+                  <p className="truncate text-xs font-extrabold text-emerald-800 dark:text-emerald-200">
                     Identity verified
                   </p>
 
-                  <p className="mt-0.5 truncate text-[10px] text-emerald-700">
-                    Your account is fully
-                    verified.
+                  <p className="mt-0.5 truncate text-[10px] text-emerald-700 dark:text-emerald-300">
+                    Your protected wallet actions are available.
                   </p>
                 </div>
               </div>
             )}
-          </div>
 
-          <div
-            className={`relative min-w-0 ${NARROW_CARD_MIN_HEIGHT} flex flex-col overflow-hidden rounded-[28px] border border-cyan-100 bg-gradient-to-br from-[#ECFBFF] via-[#F3FCFF] to-[#EFF6FF] p-5 sm:p-6`}
+            <div className="mt-auto pt-4">
+              <div className="grid grid-cols-2 gap-2">
+                <MiniSecurityStat
+                  label="Session"
+                  value="Protected"
+                />
+
+                <MiniSecurityStat
+                  label="Verification"
+                  value={
+                    kycStatus ===
+                    "verified"
+                      ? "Complete"
+                      : "Required"
+                  }
+                />
+              </div>
+            </div>
+          </motion.div>
+
+          {/* SMART WALLET TIP */}
+
+          <motion.div
+            initial={{
+              opacity: 0,
+              y: 16,
+            }}
+            whileInView={{
+              opacity: 1,
+              y: 0,
+            }}
+            viewport={{
+              once: true,
+              amount: 0.12,
+            }}
+            transition={{
+              duration: 0.45,
+              delay: 0.06,
+            }}
+            className={`relative min-w-0 ${NARROW_CARD_MIN_HEIGHT} flex flex-col overflow-hidden rounded-[28px] border border-violet-200 bg-gradient-to-br from-violet-50 via-background to-indigo-50 p-5 text-foreground shadow-[var(--dashboard-shadow)] dark:border-violet-800 dark:from-violet-950/25 dark:via-card dark:to-indigo-950/20 sm:p-6`}
           >
-            <div className="pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full bg-cyan-200/25 blur-3xl" />
+            <div className="pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full bg-violet-300/20 blur-3xl dark:bg-violet-500/10" />
+
+            <div className="pointer-events-none absolute -bottom-16 -left-10 h-32 w-32 rounded-full bg-fuchsia-300/10 blur-3xl dark:bg-fuchsia-500/10" />
 
             <div className="relative z-10 flex min-w-0 gap-4">
               <motion.div
                 animate={{
-                  y: [0, -3, 0],
+                  y: [
+                    0,
+                    -3,
+                    0,
+                  ],
                   rotate: [
                     0,
                     -4,
@@ -1592,38 +1750,35 @@ export default function UserDashboardOverview({
                   repeat: Infinity,
                   ease: "easeInOut",
                 }}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-cyan-100 bg-white text-cyan-600 shadow-sm"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-violet-200 bg-background text-violet-600 shadow-sm dark:border-violet-800 dark:text-violet-300"
               >
                 <Lightbulb className="h-5 w-5" />
               </motion.div>
 
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <p className="truncate text-sm font-black text-slate-900">
+                  <p className="truncate text-sm font-black text-foreground">
                     Smart Wallet Tip
                   </p>
 
-                  <span className="shrink-0 rounded-full bg-cyan-100 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-cyan-700">
+                  <span className="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-violet-700 dark:bg-violet-950/40 dark:text-violet-300">
                     Tip
                   </span>
                 </div>
 
-                <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-600">
-                  Your current monthly
-                  spending is{" "}
-                  <span className="font-extrabold text-slate-800">
+                <p className="mt-2 line-clamp-3 text-xs leading-5 text-muted-foreground">
+                  Your current monthly spending is{" "}
+                  <span className="font-extrabold text-foreground">
                     {formatCurrency(
                       monthlySpending
                     )}
                   </span>
-                  . Staying within budget
-                  helps improve your
-                  savings.
+                  . Keeping spending visible helps you make better saving decisions.
                 </p>
 
                 <Link
                   href="/dashboard/budgeting"
-                  className="group mt-3 inline-flex items-center gap-1 text-xs font-extrabold text-[#1F5EA8]"
+                  className="group mt-3 inline-flex items-center gap-1 text-xs font-extrabold text-violet-600 dark:text-violet-300"
                 >
                   Open budgeting
 
@@ -1631,9 +1786,106 @@ export default function UserDashboardOverview({
                 </Link>
               </div>
             </div>
-          </div>
+
+            <div className="relative z-10 mt-auto pt-5">
+              <div className="grid grid-cols-2 gap-2">
+                <MiniSecurityStat
+                  label="Monthly spending"
+                  value={formatCurrency(
+                    monthlySpending
+                  )}
+                />
+
+                <MiniSecurityStat
+                  label="7 day spending"
+                  value={formatCurrency(
+                    lastSevenDaysTotal
+                  )}
+                />
+              </div>
+            </div>
+          </motion.div>
         </div>
       </section>
+    </div>
+  );
+}
+
+/* =========================================================
+   SNAPSHOT METRIC
+========================================================= */
+
+function SnapshotMetric({
+  label,
+  value,
+  icon: Icon,
+  tone,
+}: {
+  label: string;
+  value: string;
+  icon: React.ElementType;
+  tone:
+    | "emerald"
+    | "violet"
+    | "fuchsia"
+    | "indigo";
+}) {
+  const toneClasses = {
+    emerald:
+      "bg-emerald-400/10 text-emerald-200 border-emerald-300/10",
+
+    violet:
+      "bg-violet-400/10 text-violet-200 border-violet-300/10",
+
+    fuchsia:
+      "bg-fuchsia-400/10 text-fuchsia-200 border-fuchsia-300/10",
+
+    indigo:
+      "bg-indigo-400/10 text-indigo-200 border-indigo-300/10",
+  };
+
+  return (
+    <motion.div
+      whileHover={{
+        y: -2,
+      }}
+      className={`rounded-[16px] border p-3 ${toneClasses[tone]}`}
+    >
+      <div className="flex items-center gap-2">
+        <Icon className="h-3.5 w-3.5 shrink-0" />
+
+        <p className="truncate text-[8px] font-black uppercase tracking-[0.12em] text-white/45">
+          {label}
+        </p>
+      </div>
+
+      <p className="mt-1 truncate text-[11px] font-black text-white">
+        {value}
+      </p>
+    </motion.div>
+  );
+}
+
+/* =========================================================
+   MINI SECURITY STAT
+========================================================= */
+
+function MiniSecurityStat({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-muted/50 px-3 py-2.5">
+      <p className="text-[8px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+        {label}
+      </p>
+
+      <p className="mt-1 truncate text-[10px] font-black text-foreground">
+        {value}
+      </p>
     </div>
   );
 }
@@ -1644,16 +1896,16 @@ export default function UserDashboardOverview({
 
 function EmptyTransactions() {
   return (
-    <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50/80 p-10 text-center">
-      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-slate-300 shadow-sm">
+    <div className="rounded-[22px] border border-dashed border-border bg-muted/50 p-10 text-center">
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-background text-muted-foreground shadow-sm">
         <Activity className="h-5 w-5" />
       </div>
 
-      <p className="mt-4 text-sm font-extrabold text-slate-700">
+      <p className="mt-4 text-sm font-extrabold text-foreground">
         No transactions yet
       </p>
 
-      <p className="mt-1 text-xs text-slate-400">
+      <p className="mt-1 text-xs text-muted-foreground">
         Your recent wallet activity will
         appear here.
       </p>
@@ -1679,16 +1931,16 @@ function RevealStatCard({
 }: RevealStatCardProps) {
   const accentMap = {
     cyan:
-      "from-cyan-300 via-sky-400 to-violet-500",
+      "from-violet-300 via-indigo-400 to-violet-500",
 
     emerald:
-      "from-emerald-300 via-cyan-300 to-teal-400",
+      "from-emerald-300 via-teal-300 to-violet-400",
 
     fuchsia:
       "from-fuchsia-300 via-pink-400 to-violet-500",
 
     violet:
-      "from-violet-300 via-fuchsia-300 to-cyan-300",
+      "from-violet-300 via-fuchsia-300 to-indigo-300",
   } as const;
 
   return (
@@ -1712,7 +1964,7 @@ function RevealStatCard({
       transition={{
         duration: 0.28,
       }}
-      className="group relative min-h-[182px] w-full overflow-hidden rounded-[26px] border border-white/10 bg-gradient-to-br from-[#0A071C] via-[#140A2D] to-[#24104E] p-5 text-left shadow-[0_18px_45px_rgba(25,8,63,0.22)] outline-none transition-shadow duration-300 hover:shadow-[0_24px_55px_rgba(74,24,145,0.32)] focus-visible:ring-2 focus-visible:ring-violet-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+      className="group relative min-h-[182px] w-full overflow-hidden rounded-[26px] border border-violet-900/10 bg-gradient-to-br from-[#0A071C] via-[#140A2D] to-[#2A1156] p-5 text-left shadow-[0_18px_45px_rgba(25,8,63,0.22)] outline-none transition-shadow duration-300 hover:shadow-[0_24px_55px_rgba(74,24,145,0.32)] focus-visible:ring-2 focus-visible:ring-violet-300/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       aria-label={`${revealed ? "Hide" : "Reveal"} ${title}`}
     >
       <motion.div
@@ -1730,7 +1982,7 @@ function RevealStatCard({
 
       <div className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-violet-500/10 blur-2xl transition-all duration-500 group-hover:scale-125 group-hover:bg-fuchsia-400/10" />
 
-      <div className="pointer-events-none absolute -bottom-12 -left-8 h-28 w-28 rounded-full bg-cyan-400/5 blur-2xl" />
+      <div className="pointer-events-none absolute -bottom-12 -left-8 h-28 w-28 rounded-full bg-indigo-400/5 blur-2xl" />
 
       <div className="relative z-10 flex min-w-0 items-start justify-between gap-4">
         <div className="min-w-0">
@@ -1818,11 +2070,10 @@ function RevealStatCard({
         </div>
       </div>
 
-      <AnimatePresence
-        initial={false}
-      >
-        {!revealed && (
+      <AnimatePresence initial={false}>
+        {!revealed ? (
           <motion.div
+            key="hidden-status"
             initial={{
               opacity: 0,
               y: 5,
@@ -1838,13 +2089,11 @@ function RevealStatCard({
             className="relative z-10 mt-6 inline-flex items-center gap-1.5 text-[9px] font-bold text-violet-100/45"
           >
             <LockKeyhole className="h-3 w-3" />
-
             Click card to reveal amount
           </motion.div>
-        )}
-
-        {revealed && (
+        ) : (
           <motion.div
+            key="visible-status"
             initial={{
               opacity: 0,
               y: 4,
@@ -1860,7 +2109,6 @@ function RevealStatCard({
             className="relative z-10 mt-6 inline-flex items-center gap-1.5 text-[9px] font-bold text-emerald-200/70"
           >
             <Unlock className="h-3 w-3" />
-
             Balance visible
           </motion.div>
         )}
@@ -1893,7 +2141,7 @@ function RevealAmount({
   value,
   revealed,
   valueClass =
-    "text-slate-900",
+    "text-foreground",
   compact = false,
   dark = false,
 }: {
@@ -1904,13 +2152,13 @@ function RevealAmount({
   dark?: boolean;
 }) {
   const maskedPlaceholder =
-    "\u09F3 \u2022\u2022\u2022\u2022\u2022";
+    "৳ •••••";
 
   return (
     <div
       className={`relative ${
         compact
-          ? "text-2xl"
+          ? "text-2xl sm:text-[2rem]"
           : "text-[1.75rem]"
       } font-black tracking-tight`}
     >
@@ -1942,7 +2190,11 @@ function RevealAmount({
             transition={{
               duration: 0.3,
             }}
-            className={`inline-block ${valueClass}`}
+            className={`inline-block ${
+              dark
+                ? "text-white"
+                : valueClass
+            }`}
           >
             {value}
           </motion.span>
@@ -1968,10 +2220,9 @@ function RevealAmount({
               duration: 0.25,
             }}
             className={`inline-block ${
-              dark ||
-              compact
+              dark
                 ? "text-violet-100/90"
-                : "text-slate-700"
+                : "text-foreground"
             } tracking-[0.14em]`}
           >
             {
@@ -1983,6 +2234,10 @@ function RevealAmount({
     </div>
   );
 }
+
+/* =========================================================
+   REVEAL ICON
+========================================================= */
 
 function RevealIcon({
   visible,
@@ -2095,8 +2350,7 @@ function SpendingChart({
           paddingX +
           (index /
             Math.max(
-              data.length -
-                1,
+              data.length - 1,
               1
             )) *
             chartWidth;
@@ -2158,13 +2412,13 @@ function SpendingChart({
     <div className="relative mt-5 min-w-0">
       {!hasData && (
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
-          <div className="rounded-full border border-slate-200 bg-white/85 px-4 py-2 text-[10px] font-bold text-slate-400 shadow-sm backdrop-blur">
+          <div className="rounded-full border border-border bg-background/90 px-4 py-2 text-[10px] font-bold text-muted-foreground shadow-sm backdrop-blur">
             No spending activity yet
           </div>
         </div>
       )}
 
-      <div className="relative min-w-0 overflow-hidden rounded-[22px] border border-slate-100 bg-gradient-to-b from-slate-50/90 to-white p-3">
+      <div className="relative min-w-0 overflow-hidden rounded-[22px] border border-border bg-gradient-to-b from-violet-50/70 to-background p-3 dark:from-violet-950/20 dark:to-card">
         <svg
           viewBox={`0 0 ${width} ${height}`}
           className="block h-auto w-full max-w-full"
@@ -2181,13 +2435,13 @@ function SpendingChart({
             >
               <stop
                 offset="0%"
-                stopColor="#1F5EA8"
-                stopOpacity="0.22"
+                stopColor="#7C3AED"
+                stopOpacity="0.25"
               />
 
               <stop
                 offset="100%"
-                stopColor="#1F5EA8"
+                stopColor="#7C3AED"
                 stopOpacity="0"
               />
             </linearGradient>
@@ -2218,7 +2472,7 @@ function SpendingChart({
                   }
                   y1={y}
                   y2={y}
-                  stroke="#E8EEF5"
+                  stroke="#E9D5FF"
                   strokeWidth="1"
                   strokeDasharray="4 6"
                 />
@@ -2246,7 +2500,7 @@ function SpendingChart({
           <motion.path
             d={linePath}
             fill="none"
-            stroke="#1F5EA8"
+            stroke="#7C3AED"
             strokeWidth="4"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -2273,7 +2527,7 @@ function SpendingChart({
                 cy={point.y}
                 r="5"
                 fill="#FFFFFF"
-                stroke="#1F5EA8"
+                stroke="#7C3AED"
                 strokeWidth="3"
                 initial={{
                   scale: 0,
@@ -2306,7 +2560,7 @@ function SpendingChart({
                 key={`${item.shortLabel}-${index}`}
                 className="min-w-0 text-center"
               >
-                <span className="text-[9px] font-bold text-slate-400">
+                <span className="text-[9px] font-bold text-muted-foreground">
                   {
                     item.shortLabel
                   }
@@ -2334,22 +2588,22 @@ function MiniMetric({
   tone:
     | "emerald"
     | "rose"
-    | "blue";
+    | "violet";
 }) {
   const styles = {
     emerald:
-      "bg-emerald-50 text-emerald-700",
+      "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300",
 
     rose:
-      "bg-rose-50 text-rose-700",
+      "bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-300",
 
-    blue:
-      "bg-blue-50 text-blue-700",
+    violet:
+      "bg-violet-50 text-violet-700 dark:bg-violet-950/30 dark:text-violet-300",
   } as const;
 
   return (
-    <div className="min-w-0 rounded-2xl bg-slate-50 p-3">
-      <p className="truncate text-[9px] font-extrabold uppercase tracking-[0.12em] text-slate-400">
+    <div className="min-w-0 rounded-2xl bg-muted/60 p-3">
+      <p className="truncate text-[9px] font-extrabold uppercase tracking-[0.12em] text-muted-foreground">
         {label}
       </p>
 
@@ -2378,7 +2632,7 @@ function QuickAction({
   return (
     <Link
       href={href}
-      className="group flex min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-3 text-xs font-bold text-slate-700 transition-all duration-300 hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50 hover:text-[#1F5EA8]"
+      className="group flex min-w-0 items-center gap-2 rounded-xl border border-border bg-background px-3 py-3 text-xs font-bold text-muted-foreground transition-all duration-300 hover:-translate-y-0.5 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 dark:hover:border-violet-800 dark:hover:bg-violet-950/20 dark:hover:text-violet-300"
     >
       <Icon className="h-4 w-4 shrink-0 transition-transform duration-300 group-hover:scale-110" />
 
@@ -2408,31 +2662,31 @@ function KycBadge({
     not_started: {
       label: "Not Started",
       className:
-        "bg-slate-100 text-slate-600",
+        "bg-muted text-muted-foreground",
     },
 
     pending: {
       label: "Pending",
       className:
-        "bg-amber-50 text-amber-700",
+        "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300",
     },
 
     under_review: {
       label: "Under Review",
       className:
-        "bg-blue-50 text-blue-700",
+        "bg-violet-50 text-violet-700 dark:bg-violet-950/30 dark:text-violet-300",
     },
 
     verified: {
       label: "Verified",
       className:
-        "bg-emerald-50 text-emerald-700",
+        "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300",
     },
 
     rejected: {
       label: "Rejected",
       className:
-        "bg-red-50 text-red-700",
+        "bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-300",
     },
   };
 
@@ -2529,9 +2783,6 @@ function createTransactionView(
 
 /* =========================================================
    7 DAYS SPENDING
-
-   Combines wallet outgoing transactions
-   and manual Budget expenses.
 ========================================================= */
 
 function getLastSevenDaysSpending(
@@ -2717,7 +2968,7 @@ function getLastSevenDaysSpending(
 }
 
 /* =========================================================
-   HELPERS
+   USER ID
 ========================================================= */
 
 function getUserId(
@@ -2737,6 +2988,10 @@ function getUserId(
   );
 }
 
+/* =========================================================
+   USER NAME
+========================================================= */
+
 function getUserName(
   value:
     | string
@@ -2752,6 +3007,10 @@ function getUserName(
 
   return "another user";
 }
+
+/* =========================================================
+   DATE
+========================================================= */
 
 function formatDate(
   value?: string
@@ -2783,6 +3042,10 @@ function formatDate(
   );
 }
 
+/* =========================================================
+   TIMESTAMP
+========================================================= */
+
 function getTimestamp(
   value?: string
 ): number {
@@ -2802,10 +3065,14 @@ function getTimestamp(
     : 0;
 }
 
+/* =========================================================
+   CURRENCY
+========================================================= */
+
 function formatCurrency(
   amount: number
 ): string {
-  return `\u09F3 ${Number(
+  return `৳ ${Number(
     amount || 0
   ).toLocaleString(
     "en-BD",
@@ -2815,6 +3082,10 @@ function formatCurrency(
     }
   )}`;
 }
+
+/* =========================================================
+   GREETING
+========================================================= */
 
 function getGreeting(): string {
   const hour =

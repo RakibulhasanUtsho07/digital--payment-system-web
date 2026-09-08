@@ -3,7 +3,16 @@ import {
 } from "@/lib/api/client";
 
 /* =========================================================
-   TYPES
+   WALLET STATUS
+========================================================= */
+
+export type WalletStatus =
+  | "ACTIVE"
+  | "FROZEN"
+  | "BLOCKED";
+
+/* =========================================================
+   WALLET DATA
 ========================================================= */
 
 export interface WalletData {
@@ -11,12 +20,34 @@ export interface WalletData {
 
   userId: string;
 
+  /*
+   * Current available wallet balance.
+   */
   balance: number;
 
-  createdAt?: string;
+  /*
+   * Funds currently pending settlement.
+   */
+  pendingBalance: number;
 
-  updatedAt?: string;
+  /*
+   * Current wallet status.
+   */
+  status: WalletStatus;
+
+  /*
+   * Wallet currency.
+   */
+  currency: string;
+
+  createdAt: string;
+
+  updatedAt: string;
 }
+
+/* =========================================================
+   WALLET RESPONSE
+========================================================= */
 
 export interface WalletResponse {
   success: boolean;
