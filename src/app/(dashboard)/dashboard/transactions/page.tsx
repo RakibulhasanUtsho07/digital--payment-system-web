@@ -125,6 +125,12 @@ interface TransactionView {
 }
 
 /* =========================================================
+   CONSTANTS
+========================================================= */
+
+const ITEMS_PER_PAGE = 8;
+
+/* =========================================================
    PAGE
 ========================================================= */
 
@@ -169,6 +175,13 @@ export default function TransactionsPage() {
 
   const statusDropdownRef =
     useRef<HTMLDivElement | null>(null);
+
+  /* =======================================================
+     PAGINATION
+  ======================================================== */
+
+  const [currentPage, setCurrentPage] =
+    useState(1);
 
   /* =======================================================
      DETAILS
@@ -253,7 +266,7 @@ export default function TransactionsPage() {
   }, [loadTransactions]);
 
   /* =========================================================
-     OUTSIDE CLICK FOR DROPDOWNS
+     OUTSIDE CLICK
   ========================================================== */
 
   useEffect(() => {
@@ -296,8 +309,7 @@ export default function TransactionsPage() {
   }, []);
 
   /* =========================================================
-     LOAD SINGLE TRANSACTION DETAILS
-     GET /api/transactions/:id
+     TRANSACTION DETAILS
   ========================================================== */
 
   const openTransactionDetails =
@@ -354,7 +366,7 @@ export default function TransactionsPage() {
     );
 
   /* =========================================================
-     FILTER TRANSACTIONS
+     FILTER
   ========================================================== */
 
   const filteredTransactions =
@@ -365,13 +377,18 @@ export default function TransactionsPage() {
       return transactions.filter(
         (transaction) => {
           const senderName =
-            getUserName(
+            getUserSearchValue(
               transaction.senderId
             ).toLowerCase();
 
           const receiverName =
-            getUserName(
+            getUserSearchValue(
               transaction.receiverId
+            ).toLowerCase();
+
+          const counterparty =
+            getUserSearchValue(
+              transaction.counterparty
             ).toLowerCase();
 
           const reference =
@@ -391,10 +408,18 @@ export default function TransactionsPage() {
             receiverName.includes(
               query
             ) ||
+            counterparty.includes(
+              query
+            ) ||
             reference.includes(
               query
             ) ||
-            type.includes(query);
+            type.includes(
+              query
+            ) ||
+            transaction.status
+              .toLowerCase()
+              .includes(query);
 
           const matchesType =
             typeFilter === "ALL" ||
@@ -419,6 +444,117 @@ export default function TransactionsPage() {
       typeFilter,
       statusFilter,
     ]);
+
+  /* =========================================================
+     RESET PAGE WHEN FILTERS CHANGE
+  ========================================================== */
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    search,
+    typeFilter,
+    statusFilter,
+  ]);
+
+  /* =========================================================
+     PAGINATION DERIVED
+  ========================================================== */
+
+  const totalPages =
+    Math.max(
+      1,
+      Math.ceil(
+        filteredTransactions.length /
+          ITEMS_PER_PAGE
+      )
+    );
+
+  useEffect(() => {
+    if (
+      currentPage >
+      totalPages
+    ) {
+      setCurrentPage(
+        totalPages
+      );
+    }
+  }, [
+    currentPage,
+    totalPages,
+  ]);
+
+  const paginatedTransactions =
+    useMemo(() => {
+      const start =
+        (currentPage - 1) *
+        ITEMS_PER_PAGE;
+
+      return filteredTransactions.slice(
+        start,
+        start + ITEMS_PER_PAGE
+      );
+    }, [
+      filteredTransactions,
+      currentPage,
+    ]);
+
+  const transactionViews =
+    useMemo(
+      () =>
+        paginatedTransactions.map(
+          (transaction) =>
+            createTransactionView(
+              transaction
+            )
+        ),
+      [paginatedTransactions]
+    );
+
+  const paginationPages =
+    useMemo(() => {
+      const pages: number[] = [];
+
+      const start =
+        Math.max(
+          1,
+          currentPage - 2
+        );
+
+      const end =
+        Math.min(
+          totalPages,
+          currentPage + 2
+        );
+
+      for (
+        let page = start;
+        page <= end;
+        page++
+      ) {
+        pages.push(page);
+      }
+
+      return pages;
+    }, [
+      currentPage,
+      totalPages,
+    ]);
+
+  const firstVisibleItem =
+    filteredTransactions.length ===
+    0
+      ? 0
+      : (currentPage - 1) *
+          ITEMS_PER_PAGE +
+        1;
+
+  const lastVisibleItem =
+    Math.min(
+      currentPage *
+        ITEMS_PER_PAGE,
+      filteredTransactions.length
+    );
 
   /* =========================================================
      SUMMARY
@@ -470,22 +606,6 @@ export default function TransactionsPage() {
     }, [transactions]);
 
   /* =========================================================
-     VIEW MODEL
-  ========================================================== */
-
-  const transactionViews =
-    useMemo(
-      () =>
-        filteredTransactions.map(
-          (transaction) =>
-            createTransactionView(
-              transaction
-            )
-        ),
-      [filteredTransactions]
-    );
-
-  /* =========================================================
      CLEAR FILTERS
   ========================================================== */
 
@@ -495,6 +615,7 @@ export default function TransactionsPage() {
     setStatusFilter("ALL");
     setTypeOpen(false);
     setStatusOpen(false);
+    setCurrentPage(1);
   };
 
   const hasFilters =
@@ -510,18 +631,18 @@ export default function TransactionsPage() {
     return (
       <div className="flex min-h-[70vh] items-center justify-center px-4">
         <div className="flex flex-col items-center gap-4">
-          <div className="relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-[18px] bg-gradient-to-br from-[#173F63] to-[#2B78BA] text-white shadow-[0_14px_35px_rgba(43,120,186,0.22)]">
+          <div className="relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-[18px] bg-gradient-to-br from-violet-900 via-violet-700 to-indigo-600 text-white shadow-[0_14px_35px_rgba(109,40,217,.22)]">
             <div className="absolute inset-0 bg-gradient-to-br from-white/15 to-transparent" />
 
             <Loader2 className="relative h-6 w-6 animate-spin" />
           </div>
 
           <div className="text-center">
-            <p className="text-sm font-black text-slate-800">
+            <p className="text-sm font-black text-foreground">
               Loading transactions
             </p>
 
-            <p className="mt-1 text-xs text-slate-400">
+            <p className="mt-1 text-xs text-muted-foreground">
               Fetching your transaction history...
             </p>
           </div>
@@ -535,19 +656,21 @@ export default function TransactionsPage() {
   ========================================================== */
 
   return (
-    <main className="space-y-6 pb-10">
+    <main className="min-w-0 space-y-6 overflow-x-hidden pb-10 text-foreground">
       {/* ===================================================
-          PREMIUM HEADER
+          TOP HEADER
       ==================================================== */}
 
-      <section className="relative overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-[0_16px_50px_rgba(15,23,42,0.055)]">
-        {/* Glows */}
-        <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-blue-400/10 blur-3xl" />
+      <section className="relative overflow-hidden rounded-[30px] border border-violet-900/30 bg-gradient-to-br from-[#12082F] via-[#291158] to-[#5B21B6] text-white shadow-[0_20px_65px_rgba(76,29,149,.22)]">
+        {/* glow */}
+        <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-fuchsia-400/10 blur-3xl" />
 
-        <div className="pointer-events-none absolute -bottom-28 -left-10 h-56 w-56 rounded-full bg-indigo-400/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-28 -left-16 h-64 w-64 rounded-full bg-violet-300/10 blur-3xl" />
+
+        <div className="pointer-events-none absolute left-1/3 top-8 h-1 w-32 rounded-full bg-gradient-to-r from-transparent via-violet-200/40 to-transparent" />
 
         {/* Decorative dots */}
-        <div className="pointer-events-none absolute right-8 top-8 hidden opacity-50 sm:block">
+        <div className="pointer-events-none absolute right-8 top-8 hidden opacity-60 sm:block">
           <div className="grid grid-cols-5 gap-2">
             {Array.from({
               length: 25,
@@ -555,66 +678,63 @@ export default function TransactionsPage() {
               (_, index) => (
                 <span
                   key={index}
-                  className="h-1 w-1 rounded-full bg-blue-300"
+                  className="h-1 w-1 rounded-full bg-violet-200/60"
                 />
               )
             )}
           </div>
         </div>
 
-        <div className="relative px-5 py-6 sm:px-7 sm:py-7 lg:px-8 lg:py-8">
+        <div className="relative z-10 px-5 py-6 sm:px-7 sm:py-7 lg:px-8 lg:py-8">
           <div className="flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between">
             {/* LEFT */}
             <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3.5 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-[#1F5EA8] shadow-sm">
-                <span className="flex h-5 w-5 items-center justify-center rounded-md bg-white text-[#1F5EA8] shadow-sm">
+              <div className="inline-flex items-center gap-2 rounded-full border border-violet-200/15 bg-white/[0.07] px-3.5 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-violet-100 shadow-sm backdrop-blur-xl">
+                <span className="flex h-5 w-5 items-center justify-center rounded-md bg-violet-300/10 text-violet-200">
                   <CreditCard className="h-3 w-3" />
                 </span>
 
                 Wallet Activity
               </div>
 
-              <h1 className="mt-4 text-[2rem] font-black tracking-[-0.045em] text-slate-950 sm:text-[2.4rem] lg:text-[2.6rem]">
+              <h1 className="mt-4 text-[2rem] font-black tracking-[-0.045em] text-white sm:text-[2.4rem] lg:text-[2.7rem]">
                 Transactions
               </h1>
 
-              <p className="mt-2 max-w-2xl text-[13px] leading-6 text-slate-500 sm:text-sm">
-                Review your incoming and
-                outgoing payments,
-                transaction status,
-                references, and complete
-                wallet activity history.
+              <p className="mt-2 max-w-2xl text-[13px] leading-6 text-violet-100/70 sm:text-sm">
+                Review your incoming and outgoing payments, transaction status,
+                references, and complete wallet activity history.
               </p>
 
               <div className="mt-5 flex flex-wrap items-center gap-2.5">
                 <HeaderPill
                   icon={ArrowDownLeft}
                   label="Incoming"
-                  iconClass="bg-emerald-50 text-emerald-600"
+                  iconClass="bg-emerald-400/15 text-emerald-300"
                 />
 
                 <HeaderPill
                   icon={ArrowUpRight}
                   label="Outgoing"
-                  iconClass="bg-blue-50 text-blue-600"
+                  iconClass="bg-violet-300/15 text-violet-200"
                 />
 
                 <HeaderPill
                   icon={ShieldCheck}
                   label="Secure Records"
-                  iconClass="bg-violet-50 text-violet-600"
+                  iconClass="bg-fuchsia-300/15 text-fuchsia-200"
                 />
               </div>
             </div>
 
             {/* RIGHT */}
             <div className="flex shrink-0 flex-col gap-3 sm:flex-row sm:items-center lg:flex-col lg:items-end">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 shadow-sm lg:text-right">
-                <p className="text-[9px] font-extrabold uppercase tracking-[0.16em] text-slate-400">
+              <div className="rounded-2xl border border-white/10 bg-white/[0.07] px-4 py-3 shadow-sm backdrop-blur-xl lg:text-right">
+                <p className="text-[9px] font-extrabold uppercase tracking-[0.16em] text-violet-200/55">
                   Total Records
                 </p>
 
-                <p className="mt-1 text-xl font-black tracking-tight text-slate-900">
+                <p className="mt-1 text-xl font-black tracking-tight text-white">
                   {transactions.length}
                 </p>
               </div>
@@ -627,7 +747,7 @@ export default function TransactionsPage() {
                   )
                 }
                 disabled={refreshing}
-                className="group inline-flex h-11 items-center justify-center gap-2 rounded-[14px] border border-slate-200 bg-white px-4 text-xs font-extrabold text-slate-700 shadow-[0_5px_18px_rgba(15,23,42,0.05)] transition duration-300 hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50 hover:text-[#1F5EA8] disabled:cursor-not-allowed disabled:opacity-60"
+                className="group inline-flex h-11 items-center justify-center gap-2 rounded-[14px] border border-white/10 bg-white/[0.08] px-4 text-xs font-extrabold text-white shadow-sm backdrop-blur-xl transition duration-300 hover:-translate-y-0.5 hover:bg-white/[0.14] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <RefreshCw
                   className={
@@ -651,14 +771,14 @@ export default function TransactionsPage() {
       ==================================================== */}
 
       {errorMessage && (
-        <section className="rounded-[20px] border border-red-200 bg-red-50 p-4">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <section className="rounded-[20px] border border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/60 dark:bg-rose-950/25 dark:text-rose-100">
+          <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-bold text-red-800">
+              <p className="text-sm font-bold">
                 Could not load transactions
               </p>
 
-              <p className="mt-1 text-xs text-red-600">
+              <p className="mt-1 text-xs text-rose-700 dark:text-rose-300">
                 {errorMessage}
               </p>
             </div>
@@ -670,7 +790,7 @@ export default function TransactionsPage() {
                   true
                 )
               }
-              className="rounded-xl bg-red-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-red-700"
+              className="rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-rose-700"
             >
               Try Again
             </button>
@@ -690,7 +810,7 @@ export default function TransactionsPage() {
           )}
           subtitle="Successful transactions"
           icon={CheckCircle2}
-          iconClass="bg-emerald-50 text-emerald-600"
+          iconClass="bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-300"
         />
 
         <SummaryCard
@@ -700,7 +820,7 @@ export default function TransactionsPage() {
           )}
           subtitle="Awaiting completion"
           icon={Clock3}
-          iconClass="bg-amber-50 text-amber-600"
+          iconClass="bg-amber-50 text-amber-600 dark:bg-amber-950/30 dark:text-amber-300"
         />
 
         <SummaryCard
@@ -710,7 +830,7 @@ export default function TransactionsPage() {
           )}
           subtitle="Unsuccessful transactions"
           icon={XCircle}
-          iconClass="bg-red-50 text-red-600"
+          iconClass="bg-rose-50 text-rose-600 dark:bg-rose-950/30 dark:text-rose-300"
         />
 
         <SummaryCard
@@ -720,31 +840,29 @@ export default function TransactionsPage() {
           )}
           subtitle="Completed activity"
           icon={CreditCard}
-          iconClass="bg-blue-50 text-blue-600"
+          iconClass="bg-violet-50 text-violet-700 dark:bg-violet-950/30 dark:text-violet-300"
         />
       </section>
 
       {/* ===================================================
-          PREMIUM FILTERS
+          FILTERS
       ==================================================== */}
 
-      <section className="relative z-30 rounded-[28px] border border-slate-200 bg-white shadow-[0_14px_45px_rgba(15,23,42,0.05)]">
+      <section className="relative z-30 rounded-[28px] border border-border bg-card text-card-foreground shadow-[0_14px_45px_rgba(15,23,42,0.05)]">
         <div className="relative p-5 sm:p-6">
-          {/* Header */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.17em] text-[#1F5EA8]">
+              <div className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.17em] text-violet-700 dark:border-violet-800/70 dark:bg-violet-950/30 dark:text-violet-300">
                 <Filter className="h-3 w-3" />
                 Smart Filters
               </div>
 
-              <h2 className="mt-2 text-lg font-black tracking-[-0.025em] text-slate-950 sm:text-xl">
+              <h2 className="mt-2 text-lg font-black tracking-[-0.025em] text-foreground sm:text-xl">
                 Find a transaction
               </h2>
 
-              <p className="mt-1 text-[11px] leading-5 text-slate-400">
-                Search and refine your wallet
-                activity by type or status.
+              <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
+                Search and refine your wallet activity by type or status.
               </p>
             </div>
 
@@ -753,8 +871,8 @@ export default function TransactionsPage() {
               onClick={clearFilters}
               className={`inline-flex h-9 items-center justify-center gap-1.5 self-start rounded-xl px-3 text-[10px] font-extrabold transition sm:self-auto ${
                 hasFilters
-                  ? "bg-blue-50 text-[#1F5EA8] hover:bg-blue-100"
-                  : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+                  ? "bg-violet-50 text-violet-700 hover:bg-violet-100 dark:bg-violet-950/30 dark:text-violet-300 dark:hover:bg-violet-950/50"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
               }`}
             >
               <RefreshCw className="h-3.5 w-3.5" />
@@ -762,24 +880,23 @@ export default function TransactionsPage() {
             </button>
           </div>
 
-          {/* Controls */}
           <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px_180px]">
             {/* SEARCH */}
+
             <div className="group relative">
-              <Search className="pointer-events-none absolute left-4 top-1/2 h-[17px] w-[17px] -translate-y-1/2 text-slate-400 transition group-focus-within:text-[#1F5EA8]" />
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-[17px] w-[17px] -translate-y-1/2 text-muted-foreground transition group-focus-within:text-violet-600 dark:group-focus-within:text-violet-300" />
 
               <input
                 type="text"
                 value={search}
                 onChange={(event) =>
                   setSearch(
-                    event.target
-                      .value
+                    event.target.value
                   )
                 }
                 placeholder="Search by name, reference or type..."
                 aria-label="Search transactions"
-                className="h-12 w-full rounded-[15px] border border-slate-200 bg-slate-50 pl-11 pr-11 text-xs font-semibold text-slate-900 outline-none transition duration-200 placeholder:text-slate-400 hover:border-slate-300 focus:border-[#4A90C8] focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+                className="h-12 w-full rounded-[15px] border border-border bg-muted pl-11 pr-11 text-xs font-semibold text-foreground outline-none transition duration-200 placeholder:text-muted-foreground hover:border-violet-300 focus:border-violet-500 focus:bg-background focus:ring-4 focus:ring-violet-500/10 dark:hover:border-violet-700"
               />
 
               {search ? (
@@ -789,18 +906,19 @@ export default function TransactionsPage() {
                     setSearch("")
                   }
                   aria-label="Clear search"
-                  className="absolute right-2.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-[10px] text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                  className="absolute right-2.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-[10px] text-muted-foreground transition hover:bg-background hover:text-foreground"
                 >
                   <X className="h-4 w-4" />
                 </button>
               ) : (
-                <div className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-lg bg-white px-2 py-1 text-[8px] font-bold text-slate-400 ring-1 ring-slate-200 sm:block">
+                <div className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-lg bg-background px-2 py-1 text-[8px] font-bold text-muted-foreground ring-1 ring-border sm:block">
                   SEARCH
                 </div>
               )}
             </div>
 
             {/* TYPE */}
+
             <CustomTypeDropdown
               value={typeFilter}
               open={typeOpen}
@@ -814,19 +932,14 @@ export default function TransactionsPage() {
                 );
                 setStatusOpen(false);
               }}
-              onChange={(
-                value
-              ) => {
-                setTypeFilter(
-                  value
-                );
-                setTypeOpen(
-                  false
-                );
+              onChange={(value) => {
+                setTypeFilter(value);
+                setTypeOpen(false);
               }}
             />
 
             {/* STATUS */}
+
             <CustomStatusDropdown
               value={statusFilter}
               open={statusOpen}
@@ -840,75 +953,58 @@ export default function TransactionsPage() {
                 );
                 setTypeOpen(false);
               }}
-              onChange={(
-                value
-              ) => {
+              onChange={(value) => {
                 setStatusFilter(
                   value
                 );
-                setStatusOpen(
-                  false
-                );
+                setStatusOpen(false);
               }}
             />
           </div>
 
-          {/* Active filters */}
-          <div className="mt-4 flex flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-4 flex flex-col gap-3 border-t border-border pt-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex flex-wrap items-center gap-2">
               {hasFilters ? (
                 <>
-                  <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                  <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                     Active:
                   </span>
 
                   {search && (
-                    <span className="inline-flex max-w-[260px] items-center gap-1.5 truncate rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1.5 text-[9px] font-bold text-[#1F5EA8]">
-                      Search:{" "}
-                      {search}
+                    <span className="inline-flex max-w-[260px] items-center gap-1.5 truncate rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-[9px] font-bold text-violet-700 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-300">
+                      Search: {search}
                     </span>
                   )}
 
-                  {typeFilter !==
-                    "ALL" && (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-100 bg-violet-50 px-2.5 py-1.5 text-[9px] font-bold text-violet-700">
-                      {
-                        getTypeFilterLabel(
-                          typeFilter
-                        )
-                      }
+                  {typeFilter !== "ALL" && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-fuchsia-200 bg-fuchsia-50 px-2.5 py-1.5 text-[9px] font-bold text-fuchsia-700 dark:border-fuchsia-800 dark:bg-fuchsia-950/30 dark:text-fuchsia-300">
+                      {getTypeFilterLabel(
+                        typeFilter
+                      )}
                     </span>
                   )}
 
-                  {statusFilter !==
-                    "ALL" && (
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1.5 text-[9px] font-bold text-emerald-700">
-                      {
-                        getStatusFilterLabel(
-                          statusFilter
-                        )
-                      }
+                  {statusFilter !== "ALL" && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[9px] font-bold text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
+                      {getStatusFilterLabel(
+                        statusFilter
+                      )}
                     </span>
                   )}
                 </>
               ) : (
-                <span className="text-[10px] text-slate-400">
-                  Showing all transaction
-                  activity
+                <span className="text-[10px] text-muted-foreground">
+                  Showing all transaction activity
                 </span>
               )}
             </div>
 
-            <div className="inline-flex w-fit items-center gap-2 rounded-full bg-slate-50 px-3 py-1.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#1F5EA8]" />
+            <div className="inline-flex w-fit items-center gap-2 rounded-full bg-muted px-3 py-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-violet-600 dark:bg-violet-400" />
 
-              <span className="text-[9px] font-extrabold text-slate-500">
-                {
-                  filteredTransactions.length
-                }{" "}
-                result
-                {filteredTransactions.length ===
-                1
+              <span className="text-[9px] font-extrabold text-muted-foreground">
+                {filteredTransactions.length} result
+                {filteredTransactions.length === 1
                   ? ""
                   : "s"}
               </span>
@@ -921,54 +1017,86 @@ export default function TransactionsPage() {
           TRANSACTION HISTORY
       ==================================================== */}
 
-      <section className="relative z-10 overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_14px_45px_rgba(15,23,42,0.045)]">
-        <div className="border-b border-slate-100 px-5 py-5 sm:px-6">
-          <div className="flex items-center justify-between gap-3">
+      <section className="relative z-10 overflow-hidden rounded-[28px] border border-border bg-card text-card-foreground shadow-[0_14px_45px_rgba(15,23,42,0.045)]">
+        <div className="border-b border-border px-5 py-5 sm:px-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-[9px] font-black uppercase tracking-[0.17em] text-[#2B78BA]">
+              <p className="text-[9px] font-black uppercase tracking-[0.17em] text-violet-600 dark:text-violet-300">
                 History
               </p>
 
-              <h2 className="mt-1 text-lg font-black tracking-[-0.025em] text-slate-950">
+              <h2 className="mt-1 text-lg font-black tracking-[-0.025em] text-foreground">
                 Transaction History
               </h2>
+
+              {filteredTransactions.length > 0 && (
+                <p className="mt-1 text-[10px] text-muted-foreground">
+                  Showing{" "}
+                  <span className="font-black text-foreground">
+                    {firstVisibleItem}
+                  </span>
+                  –
+                  <span className="font-black text-foreground">
+                    {lastVisibleItem}
+                  </span>{" "}
+                  of{" "}
+                  <span className="font-black text-foreground">
+                    {filteredTransactions.length}
+                  </span>
+                </p>
+              )}
             </div>
 
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[10px] font-bold text-slate-600">
-              {
-                filteredTransactions.length
-              }{" "}
-              shown
+            <span className="rounded-full border border-border bg-muted px-3 py-1.5 text-[10px] font-bold text-muted-foreground">
+              {filteredTransactions.length} shown
             </span>
           </div>
         </div>
 
-        {filteredTransactions.length ===
-        0 ? (
+        {filteredTransactions.length === 0 ? (
           <EmptyState
             hasFilters={hasFilters}
             onClear={clearFilters}
           />
         ) : (
-          <div className="divide-y divide-slate-100">
-            {transactionViews.map(
-              (item) => (
-                <TransactionRow
-                  key={item.id}
-                  item={item}
-                  loading={
-                    loadingTransactionId ===
-                    item.id
-                  }
-                  onView={() =>
-                    void openTransactionDetails(
+          <>
+            <div className="divide-y divide-border">
+              {transactionViews.map(
+                (item) => (
+                  <TransactionRow
+                    key={item.id}
+                    item={item}
+                    loading={
+                      loadingTransactionId ===
                       item.id
-                    )
-                  }
-                />
-              )
+                    }
+                    onView={() =>
+                      void openTransactionDetails(
+                        item.id
+                      )
+                    }
+                  />
+                )
+              )}
+            </div>
+
+            {totalPages > 1 && (
+              <TransactionPagination
+                currentPage={
+                  currentPage
+                }
+                totalPages={
+                  totalPages
+                }
+                pages={
+                  paginationPages
+                }
+                onPageChange={
+                  setCurrentPage
+                }
+              />
             )}
-          </div>
+          </>
         )}
       </section>
 
@@ -1006,16 +1134,176 @@ function HeaderPill({
   iconClass: string;
 }) {
   return (
-    <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2">
+    <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3 py-2 backdrop-blur-xl">
       <span
         className={`flex h-5 w-5 items-center justify-center rounded-full ${iconClass}`}
       >
         <Icon className="h-3 w-3" />
       </span>
 
-      <span className="text-[10px] font-bold text-slate-600">
+      <span className="text-[10px] font-bold text-violet-100/80">
         {label}
       </span>
+    </div>
+  );
+}
+
+/* =========================================================
+   PAGINATION
+========================================================= */
+
+function TransactionPagination({
+  currentPage,
+  totalPages,
+  pages,
+  onPageChange,
+}: {
+  currentPage: number;
+  totalPages: number;
+  pages: number[];
+  onPageChange: (
+    page: number
+  ) => void;
+}) {
+  return (
+    <div className="border-t border-border bg-muted/30 px-4 py-4 sm:px-6">
+      <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
+        <p className="text-[10px] font-semibold text-muted-foreground">
+          Page{" "}
+          <span className="font-black text-foreground">
+            {currentPage}
+          </span>{" "}
+          of{" "}
+          <span className="font-black text-foreground">
+            {totalPages}
+          </span>
+        </p>
+
+        <div className="flex items-center gap-1.5">
+          {/* Previous */}
+
+          <button
+            type="button"
+            disabled={
+              currentPage === 1
+            }
+            onClick={() =>
+              onPageChange(
+                Math.max(
+                  1,
+                  currentPage - 1
+                )
+              )
+            }
+            aria-label="Previous page"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:border-violet-700 dark:hover:bg-violet-950/30 dark:hover:text-violet-300"
+          >
+            <ChevronRight className="h-4 w-4 rotate-180" />
+          </button>
+
+          {/* First page */}
+
+          {pages[0] > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={() =>
+                  onPageChange(1)
+                }
+                className="h-9 min-w-9 rounded-xl border border-border bg-card px-2.5 text-[10px] font-black text-muted-foreground transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 dark:hover:border-violet-700 dark:hover:bg-violet-950/30 dark:hover:text-violet-300"
+              >
+                1
+              </button>
+
+              {pages[0] > 2 && (
+                <span className="px-1 text-muted-foreground">
+                  ...
+                </span>
+              )}
+            </>
+          )}
+
+          {/* Number pages */}
+
+          {pages.map(
+            (page) => (
+              <button
+                key={page}
+                type="button"
+                onClick={() =>
+                  onPageChange(
+                    page
+                  )
+                }
+                aria-current={
+                  currentPage ===
+                  page
+                    ? "page"
+                    : undefined
+                }
+                className={`h-9 min-w-9 rounded-xl px-2.5 text-[10px] font-black transition ${
+                  currentPage === page
+                    ? "border border-violet-600 bg-violet-700 text-white shadow-[0_8px_20px_rgba(109,40,217,.20)]"
+                    : "border border-border bg-card text-muted-foreground hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 dark:hover:border-violet-700 dark:hover:bg-violet-950/30 dark:hover:text-violet-300"
+                }`}
+              >
+                {page}
+              </button>
+            )
+          )}
+
+          {/* Last page */}
+
+          {pages[
+            pages.length - 1
+          ] < totalPages && (
+            <>
+              {pages[
+                pages.length - 1
+              ] <
+                totalPages - 1 && (
+                <span className="px-1 text-muted-foreground">
+                  ...
+                </span>
+              )}
+
+              <button
+                type="button"
+                onClick={() =>
+                  onPageChange(
+                    totalPages
+                  )
+                }
+                className="h-9 min-w-9 rounded-xl border border-border bg-card px-2.5 text-[10px] font-black text-muted-foreground transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 dark:hover:border-violet-700 dark:hover:bg-violet-950/30 dark:hover:text-violet-300"
+              >
+                {totalPages}
+              </button>
+            </>
+          )}
+
+          {/* Next */}
+
+          <button
+            type="button"
+            disabled={
+              currentPage ===
+              totalPages
+            }
+            onClick={() =>
+              onPageChange(
+                Math.min(
+                  totalPages,
+                  currentPage + 1
+                )
+              )
+            }
+            aria-label="Next page"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:border-violet-700 dark:hover:bg-violet-950/30 dark:hover:text-violet-300"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1033,9 +1321,13 @@ function CustomTypeDropdown({
 }: {
   value: TypeFilter;
   open: boolean;
-  dropdownRef: React.RefObject<HTMLDivElement | null>;
+  dropdownRef: React.RefObject<
+    HTMLDivElement | null
+  >;
   onToggle: () => void;
-  onChange: (value: TypeFilter) => void;
+  onChange: (
+    value: TypeFilter
+  ) => void;
 }) {
   const options: TypeFilter[] = [
     "ALL",
@@ -1054,23 +1346,23 @@ function CustomTypeDropdown({
         onClick={onToggle}
         aria-expanded={open}
         aria-haspopup="listbox"
-        className={`flex h-12 w-full items-center justify-between rounded-[15px] border bg-slate-50 px-3.5 transition duration-200 ${
+        className={`flex h-12 w-full items-center justify-between rounded-[15px] border bg-muted px-3.5 transition duration-200 ${
           open
-            ? "border-[#4A90C8] bg-white ring-4 ring-blue-500/10"
-            : "border-slate-200 hover:border-slate-300"
+            ? "border-violet-500 bg-background ring-4 ring-violet-500/10"
+            : "border-border hover:border-violet-300"
         }`}
       >
         <span className="flex items-center gap-2.5">
-          <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-white text-[#1F5EA8] shadow-sm ring-1 ring-slate-100">
+          <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-background text-violet-700 shadow-sm ring-1 ring-border dark:text-violet-300">
             <CreditCard className="h-3.5 w-3.5" />
           </span>
 
           <span className="text-left">
-            <span className="block text-[8px] font-extrabold uppercase tracking-[0.13em] text-slate-400">
+            <span className="block text-[8px] font-extrabold uppercase tracking-[0.13em] text-muted-foreground">
               Type
             </span>
 
-            <span className="mt-0.5 block text-[11px] font-extrabold text-slate-800">
+            <span className="mt-0.5 block text-[11px] font-extrabold text-foreground">
               {getTypeFilterLabel(
                 value
               )}
@@ -1079,9 +1371,9 @@ function CustomTypeDropdown({
         </span>
 
         <ChevronRight
-          className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${
+          className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
             open
-              ? "-rotate-90 text-[#1F5EA8]"
+              ? "-rotate-90 text-violet-600 dark:text-violet-300"
               : "rotate-90"
           }`}
         />
@@ -1090,10 +1382,10 @@ function CustomTypeDropdown({
       {open && (
         <div
           role="listbox"
-          className="absolute left-0 top-[calc(100%+8px)] z-[90] w-full min-w-[205px] overflow-hidden rounded-[18px] border border-slate-200 bg-white p-1.5 shadow-[0_20px_55px_rgba(15,23,42,0.15)]"
+          className="absolute left-0 top-[calc(100%+8px)] z-[90] w-full min-w-[205px] overflow-hidden rounded-[18px] border border-border bg-popover p-1.5 text-popover-foreground shadow-[0_20px_55px_rgba(15,23,42,0.15)]"
         >
           <div className="px-2.5 pb-1.5 pt-2">
-            <p className="text-[8px] font-black uppercase tracking-[0.14em] text-slate-400">
+            <p className="text-[8px] font-black uppercase tracking-[0.14em] text-muted-foreground">
               Transaction Type
             </p>
           </div>
@@ -1101,8 +1393,7 @@ function CustomTypeDropdown({
           {options.map(
             (option) => {
               const active =
-                value ===
-                option;
+                value === option;
 
               return (
                 <button
@@ -1119,16 +1410,16 @@ function CustomTypeDropdown({
                   }
                   className={`flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left transition ${
                     active
-                      ? "bg-blue-50 text-[#1F5EA8]"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                      ? "bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                 >
                   <span className="flex items-center gap-2.5">
                     <span
                       className={`flex h-7 w-7 items-center justify-center rounded-[9px] ${
                         active
-                          ? "bg-white text-[#1F5EA8] shadow-sm"
-                          : "bg-slate-100 text-slate-400"
+                          ? "bg-background text-violet-700 shadow-sm dark:text-violet-300"
+                          : "bg-muted text-muted-foreground"
                       }`}
                     >
                       {getTypeFilterIcon(
@@ -1144,7 +1435,7 @@ function CustomTypeDropdown({
                   </span>
 
                   {active && (
-                    <CheckCircle2 className="h-4 w-4 text-[#1F5EA8]" />
+                    <CheckCircle2 className="h-4 w-4 text-violet-600 dark:text-violet-300" />
                   )}
                 </button>
               );
@@ -1169,7 +1460,9 @@ function CustomStatusDropdown({
 }: {
   value: StatusFilter;
   open: boolean;
-  dropdownRef: React.RefObject<HTMLDivElement | null>;
+  dropdownRef: React.RefObject<
+    HTMLDivElement | null
+  >;
   onToggle: () => void;
   onChange: (
     value: StatusFilter
@@ -1192,23 +1485,23 @@ function CustomStatusDropdown({
         onClick={onToggle}
         aria-expanded={open}
         aria-haspopup="listbox"
-        className={`flex h-12 w-full items-center justify-between rounded-[15px] border bg-slate-50 px-3.5 transition duration-200 ${
+        className={`flex h-12 w-full items-center justify-between rounded-[15px] border bg-muted px-3.5 transition duration-200 ${
           open
-            ? "border-[#4A90C8] bg-white ring-4 ring-blue-500/10"
-            : "border-slate-200 hover:border-slate-300"
+            ? "border-violet-500 bg-background ring-4 ring-violet-500/10"
+            : "border-border hover:border-violet-300"
         }`}
       >
         <span className="flex items-center gap-2.5">
-          <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-white text-slate-500 shadow-sm ring-1 ring-slate-100">
+          <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-background text-muted-foreground shadow-sm ring-1 ring-border">
             <ShieldCheck className="h-3.5 w-3.5" />
           </span>
 
           <span className="text-left">
-            <span className="block text-[8px] font-extrabold uppercase tracking-[0.13em] text-slate-400">
+            <span className="block text-[8px] font-extrabold uppercase tracking-[0.13em] text-muted-foreground">
               Status
             </span>
 
-            <span className="mt-0.5 block text-[11px] font-extrabold text-slate-800">
+            <span className="mt-0.5 block text-[11px] font-extrabold text-foreground">
               {getStatusFilterLabel(
                 value
               )}
@@ -1217,9 +1510,9 @@ function CustomStatusDropdown({
         </span>
 
         <ChevronRight
-          className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${
+          className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
             open
-              ? "-rotate-90 text-[#1F5EA8]"
+              ? "-rotate-90 text-violet-600 dark:text-violet-300"
               : "rotate-90"
           }`}
         />
@@ -1228,10 +1521,10 @@ function CustomStatusDropdown({
       {open && (
         <div
           role="listbox"
-          className="absolute right-0 top-[calc(100%+8px)] z-[90] w-full min-w-[205px] overflow-hidden rounded-[18px] border border-slate-200 bg-white p-1.5 shadow-[0_20px_55px_rgba(15,23,42,0.15)]"
+          className="absolute right-0 top-[calc(100%+8px)] z-[90] w-full min-w-[205px] overflow-hidden rounded-[18px] border border-border bg-popover p-1.5 text-popover-foreground shadow-[0_20px_55px_rgba(15,23,42,0.15)]"
         >
           <div className="px-2.5 pb-1.5 pt-2">
-            <p className="text-[8px] font-black uppercase tracking-[0.14em] text-slate-400">
+            <p className="text-[8px] font-black uppercase tracking-[0.14em] text-muted-foreground">
               Transaction Status
             </p>
           </div>
@@ -1239,8 +1532,7 @@ function CustomStatusDropdown({
           {options.map(
             (option) => {
               const active =
-                value ===
-                option;
+                value === option;
 
               return (
                 <button
@@ -1257,8 +1549,8 @@ function CustomStatusDropdown({
                   }
                   className={`flex w-full items-center justify-between rounded-[12px] px-3 py-2.5 text-left transition ${
                     active
-                      ? "bg-blue-50 text-[#1F5EA8]"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+                      ? "bg-violet-50 text-violet-700 dark:bg-violet-950/40 dark:text-violet-300"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                 >
                   <span className="flex items-center gap-2.5">
@@ -1273,7 +1565,7 @@ function CustomStatusDropdown({
                           : option ===
                             "FAILED"
                           ? "bg-rose-500"
-                          : "bg-slate-400"
+                          : "bg-muted-foreground"
                       }`}
                     />
 
@@ -1285,7 +1577,7 @@ function CustomStatusDropdown({
                   </span>
 
                   {active && (
-                    <CheckCircle2 className="h-4 w-4 text-[#1F5EA8]" />
+                    <CheckCircle2 className="h-4 w-4 text-violet-600 dark:text-violet-300" />
                   )}
                 </button>
               );
@@ -1315,18 +1607,18 @@ function SummaryCard({
   iconClass: string;
 }) {
   return (
-    <div className="group rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.04)] transition duration-300 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_18px_45px_rgba(15,23,42,0.07)]">
+    <div className="group rounded-[24px] border border-border bg-card p-5 text-card-foreground shadow-sm transition duration-300 hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-[0_18px_45px_rgba(15,23,42,0.08)] dark:hover:border-violet-700">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
+          <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-muted-foreground">
             {title}
           </p>
 
-          <p className="mt-3 truncate text-2xl font-black tracking-tight text-slate-900">
+          <p className="mt-3 truncate text-2xl font-black tracking-tight text-foreground">
             {value}
           </p>
 
-          <p className="mt-1 text-[11px] text-slate-400">
+          <p className="mt-1 text-[11px] text-muted-foreground">
             {subtitle}
           </p>
         </div>
@@ -1357,7 +1649,7 @@ function TransactionRow({
   const Icon = item.icon;
 
   return (
-    <div className="group flex flex-col gap-4 p-4 transition hover:bg-slate-50/80 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+    <div className="group flex min-w-0 flex-col gap-4 p-4 text-card-foreground transition hover:bg-muted/60 sm:flex-row sm:items-center sm:justify-between sm:p-5">
       <div className="flex min-w-0 items-center gap-3">
         <div
           className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] transition-transform duration-300 group-hover:scale-105 ${item.iconClass}`}
@@ -1366,12 +1658,12 @@ function TransactionRow({
         </div>
 
         <div className="min-w-0">
-          <p className="truncate text-sm font-extrabold text-slate-900">
+          <p className="truncate text-sm font-extrabold text-foreground">
             {item.title}
           </p>
 
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-400">
-            <span className="inline-flex items-center gap-1">
+          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+            <span className="inline-flex shrink-0 items-center gap-1">
               <Clock3 className="h-3.5 w-3.5" />
               {item.date}
             </span>
@@ -1403,7 +1695,7 @@ function TransactionRow({
           type="button"
           onClick={onView}
           disabled={loading}
-          className="inline-flex h-10 min-w-[104px] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-[#1F5EA8] disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex h-10 min-w-[104px] items-center justify-center gap-2 rounded-xl border border-border bg-background px-3 text-xs font-bold text-foreground transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:border-violet-700 dark:hover:bg-violet-950/30 dark:hover:text-violet-300"
         >
           {loading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -1464,13 +1756,13 @@ function createTransactionView(
 
   let iconClass =
     isCredit
-      ? "bg-emerald-50 text-emerald-600"
-      : "bg-blue-50 text-blue-600";
+      ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-300"
+      : "bg-violet-50 text-violet-700 dark:bg-violet-950/30 dark:text-violet-300";
 
   let amountClass =
     isCredit
-      ? "text-emerald-600"
-      : "text-slate-900";
+      ? "text-emerald-600 dark:text-emerald-400"
+      : "text-foreground";
 
   if (isDeposit) {
     title =
@@ -1485,10 +1777,10 @@ function createTransactionView(
       ArrowDownLeft;
 
     iconClass =
-      "bg-emerald-50 text-emerald-600";
+      "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-300";
 
     amountClass =
-      "text-emerald-600";
+      "text-emerald-600 dark:text-emerald-400";
   }
 
   if (isWithdraw) {
@@ -1504,10 +1796,10 @@ function createTransactionView(
       ArrowUpRight;
 
     iconClass =
-      "bg-rose-50 text-rose-600";
+      "bg-rose-50 text-rose-600 dark:bg-rose-950/30 dark:text-rose-300";
 
     amountClass =
-      "text-rose-600";
+      "text-rose-600 dark:text-rose-400";
   }
 
   if (isTransfer) {
@@ -1539,13 +1831,13 @@ function createTransactionView(
 
     iconClass =
       direction === "IN"
-        ? "bg-emerald-50 text-emerald-600"
-        : "bg-blue-50 text-blue-600";
+        ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-300"
+        : "bg-violet-50 text-violet-700 dark:bg-violet-950/30 dark:text-violet-300";
 
     amountClass =
       direction === "IN"
-        ? "text-emerald-600"
-        : "text-slate-900";
+        ? "text-emerald-600 dark:text-emerald-400"
+        : "text-foreground";
   }
 
   return {
@@ -1592,17 +1884,17 @@ function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
         <CreditCard className="h-6 w-6" />
       </div>
 
-      <h3 className="mt-4 text-base font-extrabold text-slate-900">
+      <h3 className="mt-4 text-base font-extrabold text-foreground">
         {hasFilters
           ? "No matching transactions"
           : "No transactions yet"}
       </h3>
 
-      <p className="mt-1 max-w-md text-xs leading-5 text-slate-400">
+      <p className="mt-1 max-w-md text-xs leading-5 text-muted-foreground">
         {hasFilters
           ? "Try changing your search or filters to find another transaction."
           : "Your transactions will appear here once you send, receive, deposit, or withdraw money."}
@@ -1612,7 +1904,7 @@ function EmptyState({
         <button
           type="button"
           onClick={onClear}
-          className="mt-5 rounded-xl bg-[#1F5EA8] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#17466F]"
+          className="mt-5 rounded-xl bg-violet-700 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-violet-800"
         >
           Clear Filters
         </button>
@@ -1680,9 +1972,7 @@ function TransactionModal({
 
         window.setTimeout(
           () =>
-            setCopied(
-              false
-            ),
+            setCopied(false),
           1600
         );
       } catch (error) {
@@ -1785,30 +2075,31 @@ function TransactionModal({
         type="button"
         onClick={onClose}
         aria-label="Close transaction receipt"
-        className="absolute inset-0 bg-slate-950/55 backdrop-blur-sm"
+        className="absolute inset-0 bg-slate-950/65 backdrop-blur-sm"
       />
 
-      <div className="relative z-10 max-h-[92vh] w-full max-w-[590px] overflow-y-auto rounded-[30px] border border-slate-200 bg-white shadow-[0_28px_90px_rgba(15,23,42,0.24)]">
+      <div className="relative z-10 max-h-[92vh] w-full max-w-[590px] overflow-y-auto rounded-[30px] border border-border bg-card text-card-foreground shadow-[0_28px_90px_rgba(15,23,42,0.24)]">
         {/* HEADER */}
-        <div className="relative overflow-hidden border-b border-slate-100 bg-[linear-gradient(135deg,#F8FCFF_0%,#FFFFFF_58%,#F1F8FE_100%)] p-6 sm:p-7">
-          <div className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-blue-400/10 blur-[70px]" />
+
+        <div className="relative overflow-hidden border-b border-border bg-gradient-to-br from-violet-50 via-card to-indigo-50 p-6 dark:from-violet-950/40 dark:via-card dark:to-indigo-950/30 sm:p-7">
+          <div className="pointer-events-none absolute -right-20 -top-24 h-56 w-56 rounded-full bg-violet-400/10 blur-[70px]" />
 
           <div className="relative flex items-start justify-between gap-4">
             <div className="flex items-start gap-3.5">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-[#123E67] text-white shadow-[0_10px_25px_rgba(18,62,103,0.18)]">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[16px] bg-violet-800 text-white shadow-[0_10px_25px_rgba(109,40,217,.18)]">
                 <ReceiptText className="h-5 w-5" />
               </div>
 
-              <div>
-                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#2B78BA]">
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-violet-600 dark:text-violet-300">
                   Coffer receipt
                 </p>
 
-                <h2 className="mt-1 text-xl font-black tracking-[-0.025em] text-[#17344D]">
+                <h2 className="mt-1 text-xl font-black tracking-[-0.025em] text-foreground">
                   Transaction Receipt
                 </h2>
 
-                <p className="mt-1 text-[11px] font-semibold text-slate-400">
+                <p className="mt-1 text-[11px] font-semibold text-muted-foreground">
                   {receiptNumber}
                 </p>
               </div>
@@ -1818,7 +2109,7 @@ function TransactionModal({
               type="button"
               onClick={onClose}
               aria-label="Close"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border bg-background text-muted-foreground transition hover:bg-muted hover:text-foreground"
             >
               <X className="h-4 w-4" />
             </button>
@@ -1827,8 +2118,9 @@ function TransactionModal({
 
         <div className="p-6 sm:p-7">
           {/* AMOUNT */}
-          <div className="rounded-[24px] border border-[#E4ECF3] bg-[#F8FBFD] p-5 text-center">
-            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-[13px] bg-white text-[#1F5EA8] shadow-sm">
+
+          <div className="rounded-[24px] border border-border bg-muted p-5 text-center">
+            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-[13px] bg-background text-violet-700 shadow-sm dark:text-violet-300">
               {direction ===
               "IN" ? (
                 <ArrowDownLeft className="h-4 w-4" />
@@ -1837,14 +2129,14 @@ function TransactionModal({
               )}
             </div>
 
-            <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+            <p className="mt-3 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground">
               {direction ===
               "IN"
                 ? "Money received"
                 : "Money sent"}
             </p>
 
-            <p className="mt-2 text-3xl font-black tracking-[-0.035em] text-[#17344D] sm:text-4xl">
+            <p className="mt-2 text-3xl font-black tracking-[-0.035em] text-foreground sm:text-4xl">
               {formatCurrency(
                 transaction.amount
               )}
@@ -1860,25 +2152,24 @@ function TransactionModal({
           </div>
 
           {/* VERIFIED */}
-          <div className="mt-5 flex items-start gap-3 rounded-[18px] border border-emerald-100 bg-emerald-50/70 px-4 py-3">
-            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+
+          <div className="mt-5 flex items-start gap-3 rounded-[18px] border border-emerald-200 bg-emerald-50 px-4 py-3 dark:border-emerald-900/60 dark:bg-emerald-950/25">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
 
             <div>
-              <p className="text-[11px] font-extrabold text-emerald-800">
-                Secure transaction
-                record
+              <p className="text-[11px] font-extrabold text-emerald-800 dark:text-emerald-200">
+                Secure transaction record
               </p>
 
-              <p className="mt-0.5 text-[10px] leading-4 text-emerald-700/75">
-                Receipt details are
-                loaded from your
-                authenticated transaction
+              <p className="mt-0.5 text-[10px] leading-4 text-emerald-700/80 dark:text-emerald-300/75">
+                Receipt details are loaded from your authenticated transaction
                 record.
               </p>
             </div>
           </div>
 
           {/* DETAILS */}
+
           <div className="mt-6 space-y-4">
             <DetailRow
               label="Transaction ID"
@@ -1946,26 +2237,27 @@ function TransactionModal({
           </div>
 
           {/* COPY */}
+
           <button
             type="button"
             onClick={() =>
               void handleCopyId()
             }
-            className="mt-5 flex w-full items-center justify-between gap-3 rounded-[16px] border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:border-blue-200 hover:bg-blue-50/50"
+            className="mt-5 flex w-full items-center justify-between gap-3 rounded-[16px] border border-border bg-muted px-4 py-3 text-left transition hover:border-violet-300 hover:bg-violet-50 dark:hover:border-violet-700 dark:hover:bg-violet-950/30"
           >
             <div className="min-w-0">
-              <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-slate-400">
+              <p className="text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
                 Transaction identifier
               </p>
 
-              <p className="mt-1 truncate text-[11px] font-bold text-slate-700">
+              <p className="mt-1 truncate text-[11px] font-bold text-foreground">
                 {transaction._id}
               </p>
             </div>
 
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-[#1F5EA8] shadow-sm">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-background text-violet-700 shadow-sm dark:text-violet-300">
               {copied ? (
-                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
               ) : (
                 <Copy className="h-4 w-4" />
               )}
@@ -1973,11 +2265,12 @@ function TransactionModal({
           </button>
 
           {/* ACTIONS */}
+
           <div className="mt-6 grid gap-2.5 sm:grid-cols-2">
             <button
               type="button"
               onClick={handlePrint}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-[14px] bg-[#173F63] px-4 text-xs font-extrabold text-white shadow-[0_10px_25px_rgba(23,63,99,0.16)] transition hover:bg-[#103553]"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-[14px] bg-violet-700 px-4 text-xs font-extrabold text-white shadow-[0_10px_25px_rgba(109,40,217,.16)] transition hover:bg-violet-800"
             >
               <Printer className="h-4 w-4" />
               Print / Save PDF
@@ -1988,17 +2281,15 @@ function TransactionModal({
               onClick={
                 handleDownload
               }
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-[14px] border border-slate-200 bg-white px-4 text-xs font-extrabold text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-[#1F5EA8]"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-[14px] border border-border bg-background px-4 text-xs font-extrabold text-foreground transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 dark:hover:border-violet-700 dark:hover:bg-violet-950/30 dark:hover:text-violet-300"
             >
               <Download className="h-4 w-4" />
               Download Receipt
             </button>
           </div>
 
-          <p className="mt-4 text-center text-[9px] leading-4 text-slate-400">
-            Use “Print / Save PDF”
-            to save a PDF copy from
-            your browser.
+          <p className="mt-4 text-center text-[9px] leading-4 text-muted-foreground">
+            Use “Print / Save PDF” to save a PDF copy from your browser.
           </p>
         </div>
       </div>
@@ -2025,19 +2316,19 @@ function StatusBadge({
     PENDING: {
       label: "Pending",
       className:
-        "bg-amber-50 text-amber-700",
+        "bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300",
     },
 
     COMPLETED: {
       label: "Completed",
       className:
-        "bg-emerald-50 text-emerald-700",
+        "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300",
     },
 
     FAILED: {
       label: "Failed",
       className:
-        "bg-red-50 text-red-700",
+        "bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-300",
     },
   };
 
@@ -2065,12 +2356,12 @@ function DetailRow({
   value: string;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-3">
-      <span className="shrink-0 text-xs font-semibold text-slate-400">
+    <div className="flex items-start justify-between gap-4 border-b border-border pb-3">
+      <span className="shrink-0 text-xs font-semibold text-muted-foreground">
         {label}
       </span>
 
-      <span className="max-w-[68%] break-all text-right text-xs font-bold text-slate-700">
+      <span className="max-w-[68%] break-all text-right text-xs font-bold text-foreground">
         {value}
       </span>
     </div>
@@ -2085,6 +2376,8 @@ function getUserName(
   user:
     | string
     | UserRef
+    | null
+    | undefined
 ): string {
   if (
     typeof user ===
@@ -2098,13 +2391,40 @@ function getUserName(
     );
   }
 
-  return "User";
+  return "another user";
+}
+
+function getUserSearchValue(
+  user:
+    | string
+    | UserRef
+    | null
+    | undefined
+): string {
+  if (
+    typeof user ===
+      "object" &&
+    user !== null
+  ) {
+    return [
+      user.name,
+      user.email,
+      user.phone,
+      user._id,
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  return user || "";
 }
 
 function getUserDisplay(
   user:
     | string
     | UserRef
+    | null
+    | undefined
 ): string {
   if (
     typeof user ===
@@ -2121,11 +2441,12 @@ function getUserDisplay(
     return (
       user.name ||
       user.email ||
+      user.phone ||
       user._id
     );
   }
 
-  return user;
+  return user || "N/A";
 }
 
 /* =========================================================
@@ -2356,7 +2677,7 @@ function buildReceiptHtml(
       margin: 0;
       padding: 36px 20px;
       background: #f4f7fa;
-      color: #17344d;
+      color: #24104f;
       font-family: Arial, Helvetica, sans-serif;
     }
 
@@ -2364,20 +2685,25 @@ function buildReceiptHtml(
       max-width: 700px;
       margin: 0 auto;
       overflow: hidden;
-      border: 1px solid #dde7ef;
+      border: 1px solid #ddd5f3;
       border-radius: 24px;
       background: #ffffff;
     }
 
     .header {
       padding: 28px 30px;
-      border-bottom: 1px solid #e8eef3;
-      background: #f8fbfd;
+      border-bottom: 1px solid #ece8f7;
+      background: linear-gradient(
+        135deg,
+        #f7f2ff 0%,
+        #ffffff 58%,
+        #f2ecff 100%
+      );
     }
 
     .eyebrow {
       margin: 0 0 6px;
-      color: #2b78ba;
+      color: #6d28d9;
       font-size: 10px;
       font-weight: 800;
       letter-spacing: .16em;
@@ -2392,7 +2718,7 @@ function buildReceiptHtml(
 
     .receipt-no {
       margin-top: 8px;
-      color: #7890a4;
+      color: #89789f;
       font-size: 12px;
       font-weight: 700;
     }
@@ -2400,16 +2726,16 @@ function buildReceiptHtml(
     .amount {
       margin: 24px 30px 0;
       padding: 24px;
-      border: 1px solid #e3ebf1;
+      border: 1px solid #e5ddf4;
       border-radius: 18px;
-      background: #f8fbfd;
+      background: #faf8ff;
       text-align: center;
     }
 
     .amount small {
       display: block;
       margin-bottom: 8px;
-      color: #8194a5;
+      color: #8c7c9e;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: .12em;
