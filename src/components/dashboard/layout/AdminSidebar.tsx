@@ -121,11 +121,15 @@ export default function AdminSidebar({
 
         border-r
         border-sidebar-border
+        dark:border-white/10
 
         bg-sidebar
-        text-sidebar-foreground
+        dark:bg-[#070B14]
 
-        shadow-[15px_0_50px_rgba(2,8,18,0.08)]
+        text-sidebar-foreground
+        dark:text-slate-100
+
+        shadow-[15px_0_50px_rgba(2,8,18,0.12)]
 
         transition-colors
         duration-300
@@ -166,7 +170,7 @@ export default function AdminSidebar({
         "
         style={{
           background:
-            "var(--dashboard-primary)",
+            "var(--dashboard-primary-violet)",
           opacity: 0.045,
         }}
       />
@@ -186,8 +190,12 @@ export default function AdminSidebar({
 
           border-b
           border-sidebar-border
+          dark:border-white/10
 
           px-5
+
+          transition-colors
+          duration-300
         "
       >
         <Link
@@ -223,16 +231,41 @@ export default function AdminSidebar({
             "
             style={{
               background:
-                "linear-gradient(135deg, var(--dashboard-primary), color-mix(in srgb, var(--dashboard-primary) 60%, #6d28d9))",
+                "linear-gradient(135deg, #0f0c1b 0%, #130f26 42%, #2e1f4f 72%, #3b2368 100%)",
             }}
           >
-            <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent" />
+            <div
+              className="
+                absolute
+                inset-0
+                bg-gradient-to-br
+                from-white/20
+                to-transparent
+              "
+            />
 
-            <ShieldCheck className="relative z-10 h-[21px] w-[21px]" />
+            <ShieldCheck
+              className="
+                relative
+                z-10
+                h-[21px]
+                w-[21px]
+              "
+            />
           </motion.div>
 
           <div className="min-w-0">
-            <h1 className="truncate text-[18px] font-black tracking-[-0.03em] text-sidebar-foreground">
+            <h1
+              className="
+                truncate
+                text-[18px]
+                font-black
+                tracking-[-0.03em]
+
+                text-slate-900
+                dark:text-slate-100
+              "
+            >
               Admin Panel
             </h1>
 
@@ -256,11 +289,10 @@ export default function AdminSidebar({
                   font-extrabold
                   uppercase
                   tracking-[0.22em]
+
+                  text-[#5b3a8f]
+                  dark:text-violet-300
                 "
-                style={{
-                  color:
-                    "var(--dashboard-primary)",
-                }}
               >
                 System Control
               </span>
@@ -270,7 +302,7 @@ export default function AdminSidebar({
       </div>
 
       {/* =====================================================
-          SCROLLABLE NAVIGATION
+          NAVIGATION
       ====================================================== */}
 
       <div
@@ -289,7 +321,6 @@ export default function AdminSidebar({
 
           [scrollbar-width:none]
           [-ms-overflow-style:none]
-
           [&::-webkit-scrollbar]:hidden
         "
       >
@@ -301,7 +332,9 @@ export default function AdminSidebar({
               font-extrabold
               uppercase
               tracking-[0.18em]
-              text-muted-foreground
+
+              text-slate-500
+              dark:text-slate-500
             "
           >
             Management
@@ -310,11 +343,15 @@ export default function AdminSidebar({
 
         <nav className="space-y-1 pb-4">
           {adminNavItems.map(
-            (item, index) => {
+            (
+              item,
+              index
+            ) => {
               const Icon = item.icon;
 
               const active =
-                item.href === "/dashboard"
+                item.href ===
+                "/dashboard"
                   ? pathname ===
                     "/dashboard"
                   : pathname.startsWith(
@@ -323,7 +360,9 @@ export default function AdminSidebar({
 
               return (
                 <motion.div
-                  key={item.href}
+                  key={
+                    item.href
+                  }
                   initial={{
                     opacity: 0,
                     x: -10,
@@ -336,7 +375,8 @@ export default function AdminSidebar({
                     duration: 0.32,
                     delay:
                       0.04 +
-                      index * 0.025,
+                      index *
+                        0.025,
                     ease: [
                       0.22,
                       1,
@@ -346,18 +386,18 @@ export default function AdminSidebar({
                   }}
                 >
                   <Link
-                    href={item.href}
-                    className="
+                    href={
+                      item.href
+                    }
+                    className={`
                       group
                       relative
-
                       flex
                       min-h-[48px]
                       items-center
                       gap-2.5
 
                       overflow-hidden
-
                       rounded-[14px]
 
                       px-2.5
@@ -368,45 +408,41 @@ export default function AdminSidebar({
 
                       transition-all
                       duration-300
-                    "
-                    style={{
-                      color: active
-                        ? "var(--dashboard-primary)"
-                        : "var(--muted-foreground)",
-                    }}
-                  >
-                    {/* =================================================
-                        ACTIVE BACKGROUND
-                    ================================================== */}
 
+                      ${
+                        active
+                          ? "text-[#5b3a8f] dark:text-violet-300"
+                          : "text-slate-600 dark:text-slate-300 hover:text-[#3b2368] dark:hover:text-white"
+                      }
+                    `}
+                  >
                     {active && (
                       <motion.span
                         layoutId="admin-sidebar-active"
                         transition={{
-                          type: "spring",
-                          stiffness: 300,
-                          damping: 28,
+                          type:
+                            "spring",
+                          stiffness:
+                            300,
+                          damping:
+                            28,
                         }}
                         className="
                           absolute
                           inset-0
-
                           rounded-[14px]
+
+                          bg-violet-50/80
+                          dark:bg-violet-500/[0.10]
+
+                          border
+                          border-violet-100
+                          dark:border-violet-400/20
+
+                          shadow-[inset_0_1px_0_rgba(255,255,255,0.035)]
                         "
-                        style={{
-                          background:
-                            "var(--dashboard-primary-soft)",
-                          border:
-                            "1px solid var(--border)",
-                          boxShadow:
-                            "inset 0 1px 0 rgba(255,255,255,0.035)",
-                        }}
                       />
                     )}
-
-                    {/* =================================================
-                        HOVER BACKGROUND
-                    ================================================== */}
 
                     {!active && (
                       <span
@@ -416,7 +452,8 @@ export default function AdminSidebar({
 
                           rounded-[14px]
 
-                          bg-foreground/[0.035]
+                          bg-slate-900/[0.035]
+                          dark:bg-white/[0.06]
 
                           opacity-0
 
@@ -427,10 +464,6 @@ export default function AdminSidebar({
                         "
                       />
                     )}
-
-                    {/* =================================================
-                        ACTIVE LEFT GLOW
-                    ================================================== */}
 
                     {active && (
                       <motion.span
@@ -449,22 +482,18 @@ export default function AdminSidebar({
                         "
                         style={{
                           background:
-                            "var(--dashboard-primary)",
+                            "linear-gradient(180deg, #5b3a8f, #8b5cf6)",
                           boxShadow:
-                            "0 0 15px color-mix(in srgb, var(--dashboard-primary) 70%, transparent)",
+                            "0 0 15px rgba(109,63,214,0.55)",
                         }}
                       />
                     )}
-
-                    {/* =================================================
-                        ICON
-                    ================================================== */}
 
                     <motion.span
                       whileHover={{
                         scale: 1.08,
                       }}
-                      className="
+                      className={`
                         relative
                         z-10
 
@@ -479,27 +508,23 @@ export default function AdminSidebar({
 
                         transition-all
                         duration-300
-                      "
-                      style={{
-                        background: active
-                          ? "var(--dashboard-primary-soft)"
-                          : "transparent",
 
-                        color: active
-                          ? "var(--dashboard-primary)"
-                          : "var(--muted-foreground)",
-
-                        boxShadow: active
-                          ? "0 5px 16px color-mix(in srgb, var(--dashboard-primary) 12%, transparent)"
-                          : "none",
-                      }}
+                        ${
+                          active
+                            ? "bg-violet-100/70 dark:bg-violet-500/[0.14]"
+                            : "bg-transparent"
+                        }
+                      `}
                     >
-                      <Icon className="h-[18px] w-[18px]" />
+                      <Icon
+                        className="h-[18px] w-[18px]"
+                        strokeWidth={
+                          active
+                            ? 2.2
+                            : 1.9
+                        }
+                      />
                     </motion.span>
-
-                    {/* =================================================
-                        LABEL
-                    ================================================== */}
 
                     <span
                       className="
@@ -510,12 +535,10 @@ export default function AdminSidebar({
                         truncate
                       "
                     >
-                      {item.label}
+                      {
+                        item.label
+                      }
                     </span>
-
-                    {/* =================================================
-                        ACTIVE ARROW
-                    ================================================== */}
 
                     {active && (
                       <motion.span
@@ -530,11 +553,12 @@ export default function AdminSidebar({
                         className="relative z-10"
                       >
                         <ChevronRight
-                          className="h-4 w-4"
-                          style={{
-                            color:
-                              "var(--dashboard-primary)",
-                          }}
+                          className="
+                            h-4
+                            w-4
+                            text-[#5b3a8f]
+                            dark:text-violet-300
+                          "
                         />
                       </motion.span>
                     )}
@@ -560,12 +584,15 @@ export default function AdminSidebar({
 
           border-t
           border-sidebar-border
+          dark:border-white/10
 
           bg-sidebar
+          dark:bg-[#070B14]
 
           p-3.5
 
-          backdrop-blur-xl
+          transition-colors
+          duration-300
         "
       >
         <motion.button
@@ -593,15 +620,15 @@ export default function AdminSidebar({
             text-[13px]
             font-bold
 
+            text-slate-600
+            dark:text-slate-300
+
             transition-all
             duration-300
 
             hover:text-rose-500
+            dark:hover:text-rose-400
           "
-          style={{
-            color:
-              "var(--muted-foreground)",
-          }}
         >
           <span
             className="
@@ -611,6 +638,7 @@ export default function AdminSidebar({
               rounded-[14px]
 
               bg-rose-500/[0.08]
+              dark:bg-rose-500/[0.12]
 
               opacity-0
 
@@ -639,14 +667,20 @@ export default function AdminSidebar({
 
               group-hover:scale-105
               group-hover:bg-rose-500/10
-              group-hover:text-rose-400
             "
-            style={{
-              color:
-                "var(--muted-foreground)",
-            }}
           >
-            <LogOut className="h-[18px] w-[18px]" />
+            <LogOut
+              className="
+                h-[18px]
+                w-[18px]
+
+                text-slate-500
+                dark:text-slate-300
+
+                group-hover:text-rose-500
+                dark:group-hover:text-rose-400
+              "
+            />
           </span>
 
           <span className="relative z-10">

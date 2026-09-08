@@ -25,13 +25,6 @@ import { motion } from "framer-motion";
 
 /* =========================================================
    FIXED COFFER BRAND PALETTE
-
-   Background stays theme-controlled (bg-sidebar,
-   var(--sidebar-border), etc. below). Only TEXT, labels, and
-   icons use these colors, so the reading experience matches
-   the reference image's navy -> indigo -> violet tone
-   without changing the page's light/dark background
-   behavior.
 ========================================================= */
 
 const BRAND = {
@@ -43,8 +36,6 @@ const BRAND = {
 } as const;
 
 const TEXT_STRONG = BRAND.violet;
-const TEXT_MUTED = "rgba(46, 31, 79, 0.6)";
-const TEXT_FAINT = "rgba(46, 31, 79, 0.4)";
 const ACCENT = BRAND.highlight;
 
 /* =========================================================
@@ -156,16 +147,20 @@ export default function UserSidebar({
 
         border-r
         border-sidebar-border
+        dark:border-white/10
 
         bg-sidebar
+        dark:bg-[#070B14]
+
         text-sidebar-foreground
+        dark:text-slate-100
 
         transition-colors
         duration-300
       "
       style={{
         boxShadow:
-          "10px 0 45px rgba(15, 12, 27, 0.10)",
+          "10px 0 45px rgba(15, 12, 27, 0.18)",
       }}
     >
       {/* =====================================================
@@ -186,7 +181,7 @@ export default function UserSidebar({
         style={{
           background:
             "var(--dashboard-primary)",
-          opacity: 0.10,
+          opacity: 0.1,
         }}
       />
 
@@ -204,7 +199,7 @@ export default function UserSidebar({
         style={{
           background:
             "var(--dashboard-primary-violet)",
-          opacity: 0.10,
+          opacity: 0.1,
         }}
       />
 
@@ -220,9 +215,15 @@ export default function UserSidebar({
           h-[76px]
           shrink-0
           items-center
+
           border-b
           border-sidebar-border
+          dark:border-white/10
+
           px-5
+
+          transition-colors
+          duration-300
         "
       >
         <Link
@@ -235,9 +236,7 @@ export default function UserSidebar({
             gap-3
           "
         >
-          {/* =================================================
-              COFFER ICON
-          ================================================== */}
+          {/* COFFER ICON */}
 
           <motion.div
             whileHover={{
@@ -266,10 +265,6 @@ export default function UserSidebar({
               text-white
             "
             style={{
-              /*
-               * Exact brand direction:
-               * Midnight blue → deep indigo → violet
-               */
               background:
                 "linear-gradient(135deg, #0f0c1b 0%, #130f26 42%, #2e1f4f 72%, #3b2368 100%)",
 
@@ -277,8 +272,6 @@ export default function UserSidebar({
                 "0 12px 30px rgba(59,35,104,0.35)",
             }}
           >
-            {/* soft glass highlight */}
-
             <span
               className="
                 pointer-events-none
@@ -292,24 +285,20 @@ export default function UserSidebar({
               }}
             />
 
-            {/* top shine */}
-
             <span
               className="
                 pointer-events-none
                 absolute
                 inset-x-0
                 top-0
-                h-1/2
                 z-0
+                h-1/2
               "
               style={{
                 background:
                   "linear-gradient(to bottom, rgba(255,255,255,0.16), transparent)",
               }}
             />
-
-            {/* ACTUAL COFFER ICON */}
 
             <WalletCards
               className="
@@ -323,9 +312,7 @@ export default function UserSidebar({
             />
           </motion.div>
 
-          {/* =================================================
-              BRAND TEXT
-          ================================================== */}
+          {/* BRAND TEXT */}
 
           <div className="min-w-0">
             <h1
@@ -334,10 +321,10 @@ export default function UserSidebar({
                 text-[18px]
                 font-black
                 tracking-[-0.03em]
+
+                text-[#2e1f4f]
+                dark:text-slate-100
               "
-              style={{
-                color: TEXT_STRONG,
-              }}
             >
               Coffer
             </h1>
@@ -345,16 +332,8 @@ export default function UserSidebar({
             <div className="mt-0.5 flex items-center gap-1.5">
               <motion.span
                 animate={{
-                  opacity: [
-                    0.55,
-                    1,
-                    0.55,
-                  ],
-                  scale: [
-                    0.9,
-                    1,
-                    0.9,
-                  ],
+                  opacity: [0.55, 1, 0.55],
+                  scale: [0.9, 1, 0.9],
                 }}
                 transition={{
                   duration: 2.6,
@@ -375,10 +354,9 @@ export default function UserSidebar({
                   font-extrabold
                   uppercase
                   tracking-[0.22em]
+                  text-[#5b3a8f]
+                  dark:text-violet-300
                 "
-                style={{
-                  color: ACCENT,
-                }}
               >
                 User Portal
               </span>
@@ -399,6 +377,7 @@ export default function UserSidebar({
           flex-1
           overflow-y-auto
           overscroll-contain
+
           px-3.5
           py-5
 
@@ -407,8 +386,6 @@ export default function UserSidebar({
           [&::-webkit-scrollbar]:hidden
         "
       >
-        {/* MENU TITLE */}
-
         <div className="px-2.5">
           <p
             className="
@@ -417,16 +394,14 @@ export default function UserSidebar({
               font-extrabold
               uppercase
               tracking-[0.18em]
+
+              text-slate-500
+              dark:text-slate-500
             "
-            style={{
-              color: TEXT_FAINT,
-            }}
           >
             Main Menu
           </p>
         </div>
-
-        {/* NAV */}
 
         <nav className="space-y-1 pb-4">
           {navItems.map(
@@ -434,8 +409,7 @@ export default function UserSidebar({
               item,
               index
             ) => {
-              const Icon =
-                item.icon;
+              const Icon = item.icon;
 
               const active =
                 item.href ===
@@ -477,7 +451,7 @@ export default function UserSidebar({
                     href={
                       item.href
                     }
-                    className="
+                    className={`
                       group
                       relative
                       flex
@@ -492,12 +466,13 @@ export default function UserSidebar({
                       font-bold
                       transition-all
                       duration-300
-                    "
-                    style={{
-                      color: active
-                        ? ACCENT
-                        : TEXT_MUTED,
-                    }}
+
+                      ${
+                        active
+                          ? "text-[#5b3a8f] dark:text-violet-300"
+                          : "text-slate-600 dark:text-slate-300 hover:text-[#3b2368] dark:hover:text-white"
+                      }
+                    `}
                   >
                     {/* ACTIVE BACKGROUND */}
 
@@ -505,22 +480,25 @@ export default function UserSidebar({
                       <motion.span
                         layoutId="user-sidebar-active"
                         transition={{
-                          type: "spring",
-                          stiffness: 300,
-                          damping: 28,
+                          type:
+                            "spring",
+                          stiffness:
+                            300,
+                          damping:
+                            28,
                         }}
                         className="
                           absolute
                           inset-0
                           rounded-[14px]
-                        "
-                        style={{
-                          background:
-                            "var(--dashboard-gradient-soft)",
 
-                          border:
-                            "1px solid rgba(109,63,214,0.18)",
-                        }}
+                          bg-violet-50/80
+                          dark:bg-violet-500/[0.10]
+
+                          border
+                          border-violet-100
+                          dark:border-violet-400/20
+                        "
                       />
                     )}
 
@@ -532,15 +510,17 @@ export default function UserSidebar({
                           absolute
                           inset-0
                           rounded-[14px]
+
+                          bg-slate-900/[0.035]
+                          dark:bg-white/[0.06]
+
                           opacity-0
+
                           transition-all
                           duration-300
+
                           group-hover:opacity-100
                         "
-                        style={{
-                          background:
-                            "linear-gradient(90deg, rgba(46,31,79,0.08), rgba(59,35,104,0.10))",
-                        }}
                       />
                     )}
 
@@ -560,8 +540,7 @@ export default function UserSidebar({
                         "
                         style={{
                           background:
-                            "var(--dashboard-gradient)",
-
+                            "linear-gradient(180deg, #5b3a8f, #8b5cf6)",
                           boxShadow:
                             "0 0 15px rgba(109,63,214,0.55)",
                         }}
@@ -575,11 +554,13 @@ export default function UserSidebar({
                         scale: 1.08,
                       }}
                       transition={{
-                        type: "spring",
-                        stiffness: 350,
+                        type:
+                          "spring",
+                        stiffness:
+                          350,
                         damping: 20,
                       }}
-                      className="
+                      className={`
                         relative
                         z-10
                         flex
@@ -591,15 +572,17 @@ export default function UserSidebar({
                         rounded-[11px]
                         transition-all
                         duration-300
-                      "
-                      style={{
-                        background: active
-                          ? "var(--dashboard-primary-soft)"
-                          : "transparent",
 
+                        ${
+                          active
+                            ? "bg-violet-100/70 dark:bg-violet-500/[0.14]"
+                            : "bg-transparent"
+                        }
+                      `}
+                      style={{
                         color: active
-                          ? ACCENT
-                          : TEXT_MUTED,
+                          ? undefined
+                          : undefined,
                       }}
                     >
                       <Icon
@@ -640,13 +623,18 @@ export default function UserSidebar({
                           opacity: 1,
                           x: 0,
                         }}
-                        className="relative z-10"
+                        className="
+                          relative
+                          z-10
+                        "
                       >
                         <ChevronRight
-                          className="h-4 w-4"
-                          style={{
-                            color: ACCENT,
-                          }}
+                          className="
+                            h-4
+                            w-4
+                            text-[#5b3a8f]
+                            dark:text-violet-300
+                          "
                         />
                       </motion.span>
                     )}
@@ -667,10 +655,16 @@ export default function UserSidebar({
           relative
           z-20
           shrink-0
+
           border-t
           border-sidebar-border
+          dark:border-white/10
+
           bg-sidebar
+          dark:bg-[#070B14]
+
           p-3.5
+
           transition-colors
           duration-300
         "
@@ -696,13 +690,16 @@ export default function UserSidebar({
             py-2
             text-[13px]
             font-bold
+
+            text-slate-600
+            dark:text-slate-300
+
             transition-all
             duration-300
+
             hover:text-rose-500
+            dark:hover:text-rose-400
           "
-          style={{
-            color: TEXT_MUTED,
-          }}
         >
           <span
             className="
@@ -710,6 +707,7 @@ export default function UserSidebar({
               inset-0
               rounded-[14px]
               bg-rose-500/[0.08]
+              dark:bg-rose-500/[0.12]
               opacity-0
               transition-opacity
               duration-300
@@ -727,19 +725,25 @@ export default function UserSidebar({
               items-center
               justify-center
               rounded-[11px]
+
               transition-all
               duration-300
+
               group-hover:scale-105
               group-hover:bg-rose-500/10
-              group-hover:text-rose-400
             "
-            style={{
-              color: TEXT_MUTED,
-            }}
           >
             <LogOut
-              className="h-[18px] w-[18px]"
-              strokeWidth={2}
+              className="
+                h-[18px]
+                w-[18px]
+
+                text-slate-500
+                dark:text-slate-300
+
+                group-hover:text-rose-500
+                dark:group-hover:text-rose-400
+              "
             />
           </span>
 

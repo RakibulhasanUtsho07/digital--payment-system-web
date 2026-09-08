@@ -61,13 +61,7 @@ interface SearchItem {
 }
 
 /* =========================================================
-   FIXED COFFER BRAND PALETTE
-
-   Background stays theme-controlled (bg-card, var(--border),
-   etc. below). Only TEXT, labels, and icons use these colors,
-   so the reading experience matches the reference image's
-   navy -> indigo -> violet tone without changing the page's
-   light/dark background behavior.
+   BRAND
 ========================================================= */
 
 const BRAND = {
@@ -96,13 +90,6 @@ const BRAND_SOFT = `
   )
 `;
 
-/*
- * Text colors derived from the same brand hue, at strengths
- * that stay readable on the existing light theme background.
- */
-const TEXT_STRONG = BRAND.violet;
-const TEXT_MUTED = "rgba(46, 31, 79, 0.6)";
-const TEXT_FAINT = "rgba(46, 31, 79, 0.4)";
 const ACCENT = BRAND.highlight;
 
 /* =========================================================
@@ -195,15 +182,19 @@ const pageTitles: Record<string, string> = {
   "/dashboard": "Dashboard Overview",
   "/dashboard/wallet": "Wallet",
   "/dashboard/transactions": "Transactions",
-  "/dashboard/all-transactions": "System Transactions",
+  "/dashboard/all-transactions":
+    "System Transactions",
   "/dashboard/users": "User Management",
   "/dashboard/kyc": "KYC Verification",
-  "/dashboard/kyc-requests": "KYC Management",
-  "/dashboard/analytics": "Analytics & Reports",
+  "/dashboard/kyc-requests":
+    "KYC Management",
+  "/dashboard/analytics":
+    "Analytics & Reports",
   "/dashboard/insights": "AI Insights",
   "/dashboard/logs": "System Logs",
   "/dashboard/receipts": "Receipts",
-  "/dashboard/notifications": "Notifications",
+  "/dashboard/notifications":
+    "Notifications",
   "/dashboard/settings": "Settings",
 };
 
@@ -265,10 +256,15 @@ function ProfileAvatar({
         className={`
           relative
           ${containerClassName}
+
           overflow-hidden
+
           border
           border-border
+          dark:border-white/10
+
           bg-muted
+          dark:bg-slate-800
         `}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -314,7 +310,7 @@ function ProfileAvatar({
         background:
           BRAND_GRADIENT,
         boxShadow:
-          `0 6px 18px rgba(59,35,104,0.30)`,
+          "0 6px 18px rgba(59,35,104,0.30)",
       }}
     >
       {getInitials(name)}
@@ -323,7 +319,7 @@ function ProfileAvatar({
 }
 
 /* =========================================================
-   COMPONENT
+   TOP NAVBAR
 ========================================================= */
 
 export default function TopNavbar({
@@ -333,11 +329,9 @@ export default function TopNavbar({
   userRole,
   avatarUrl,
 }: TopNavbarProps) {
-  const router =
-    useRouter();
+  const router = useRouter();
 
-  const pathname =
-    usePathname();
+  const pathname = usePathname();
 
   const inputRef =
     useRef<HTMLInputElement | null>(
@@ -359,17 +353,9 @@ export default function TopNavbar({
     setProfileOpen,
   ] = useState(false);
 
-  /* =======================================================
-     PAGE TITLE
-  ======================================================= */
-
   const currentPageTitle =
     pageTitles[pathname] ??
     "Dashboard";
-
-  /* =======================================================
-     ROLE
-  ======================================================= */
 
   const roleLabel =
     userRole === "admin"
@@ -377,7 +363,7 @@ export default function TopNavbar({
       : "Wallet User";
 
   /* =======================================================
-     SEARCH FILTER
+     SEARCH
   ======================================================= */
 
   const filteredItems =
@@ -414,46 +400,21 @@ export default function TopNavbar({
       userRole,
     ]);
 
-  /* =======================================================
-     SEARCH OPEN
-  ======================================================= */
-
   const openSearch = () => {
-    setSearchOpen(
-      true
-    );
-
-    setProfileOpen(
-      false
-    );
+    setSearchOpen(true);
+    setProfileOpen(false);
   };
-
-  /* =======================================================
-     SEARCH CLOSE
-  ======================================================= */
 
   const closeSearch = () => {
-    setSearchOpen(
-      false
-    );
-
-    setSearchQuery(
-      ""
-    );
+    setSearchOpen(false);
+    setSearchQuery("");
   };
-
-  /* =======================================================
-     NAVIGATE
-  ======================================================= */
 
   const navigateTo = (
     href: string
   ) => {
     closeSearch();
-
-    router.push(
-      href
-    );
+    router.push(href);
   };
 
   /* =======================================================
@@ -466,10 +427,8 @@ export default function TopNavbar({
         event: KeyboardEvent
       ) => {
         if (
-          (
-            event.ctrlKey ||
-            event.metaKey
-          ) &&
+          (event.ctrlKey ||
+            event.metaKey) &&
           event.key.toLowerCase() ===
             "k"
         ) {
@@ -480,26 +439,16 @@ export default function TopNavbar({
               !current
           );
 
-          setProfileOpen(
-            false
-          );
+          setProfileOpen(false);
         }
 
         if (
           event.key ===
           "Escape"
         ) {
-          setSearchOpen(
-            false
-          );
-
-          setSearchQuery(
-            ""
-          );
-
-          setProfileOpen(
-            false
-          );
+          setSearchOpen(false);
+          setSearchQuery("");
+          setProfileOpen(false);
         }
       };
 
@@ -537,9 +486,7 @@ export default function TopNavbar({
       window.clearTimeout(
         timer
       );
-  }, [
-    searchOpen,
-  ]);
+  }, [searchOpen]);
 
   /* =======================================================
      UI
@@ -547,10 +494,6 @@ export default function TopNavbar({
 
   return (
     <>
-      {/* =====================================================
-          TOP NAVBAR
-      ====================================================== */}
-
       <motion.header
         initial={{
           opacity: 0,
@@ -581,10 +524,13 @@ export default function TopNavbar({
 
           border-b
           border-border
+          dark:border-white/10
 
           bg-card/95
+          dark:bg-[#070B14]/95
 
           text-card-foreground
+          dark:text-slate-100
 
           px-4
 
@@ -607,9 +553,7 @@ export default function TopNavbar({
             xl:gap-6
           "
         >
-          {/* =================================================
-              LEFT / PAGE INFO
-          ================================================== */}
+          {/* LEFT */}
 
           <div
             className="
@@ -622,8 +566,6 @@ export default function TopNavbar({
               xl:w-[210px]
             "
           >
-            {/* MOBILE MENU */}
-
             <motion.button
               type="button"
               aria-label="Open menu"
@@ -641,25 +583,36 @@ export default function TopNavbar({
                 shrink-0
                 items-center
                 justify-center
+
                 rounded-xl
+
                 border
                 border-border
+                dark:border-white/10
+
                 bg-card
+                dark:bg-[#0B0F19]
+
                 shadow-sm
+
                 transition-all
+
                 hover:bg-muted
+                dark:hover:bg-white/10
+
                 lg:hidden
               "
             >
               <Menu
-                className="h-[18px] w-[18px]"
-                style={{
-                  color: TEXT_STRONG,
-                }}
+                className="
+                  h-[18px]
+                  w-[18px]
+
+                  text-[#2e1f4f]
+                  dark:text-slate-200
+                "
               />
             </motion.button>
-
-            {/* PAGE INFO */}
 
             <div className="min-w-0">
               <div
@@ -677,10 +630,10 @@ export default function TopNavbar({
                     font-extrabold
                     uppercase
                     tracking-[0.17em]
+
+                    text-slate-500
+                    dark:text-slate-400
                   "
-                  style={{
-                    color: TEXT_MUTED,
-                  }}
                 >
                   Digital Wallet
                 </span>
@@ -691,11 +644,10 @@ export default function TopNavbar({
                     w-1
                     shrink-0
                     rounded-full
+
+                    bg-[#3b2368]
+                    dark:bg-violet-400
                   "
-                  style={{
-                    background:
-                      BRAND.purple,
-                  }}
                 />
 
                 <span
@@ -705,11 +657,10 @@ export default function TopNavbar({
                     font-extrabold
                     uppercase
                     tracking-[0.17em]
+
+                    text-[#5b3a8f]
+                    dark:text-violet-300
                   "
-                  style={{
-                    color:
-                      ACCENT,
-                  }}
                 >
                   {userRole ===
                   "admin"
@@ -725,22 +676,19 @@ export default function TopNavbar({
                   text-[15px]
                   font-extrabold
                   tracking-[-0.025em]
+
+                  text-[#2e1f4f]
+                  dark:text-slate-100
+
                   sm:text-[16px]
                 "
-                style={{
-                  color: TEXT_STRONG,
-                }}
               >
-                {
-                  currentPageTitle
-                }
+                {currentPageTitle}
               </h1>
             </div>
           </div>
 
-          {/* =================================================
-              CENTER SEARCH
-          ================================================== */}
+          {/* SEARCH */}
 
           <div
             className="
@@ -753,9 +701,7 @@ export default function TopNavbar({
           >
             <motion.button
               type="button"
-              onClick={
-                openSearch
-              }
+              onClick={openSearch}
               whileHover={{
                 y: -1,
               }}
@@ -764,6 +710,7 @@ export default function TopNavbar({
               }}
               className="
                 group
+
                 flex
                 h-[44px]
                 w-full
@@ -775,8 +722,10 @@ export default function TopNavbar({
 
                 border
                 border-border
+                dark:border-white/10
 
                 bg-muted/40
+                dark:bg-white/[0.04]
 
                 px-3
 
@@ -788,10 +737,9 @@ export default function TopNavbar({
                 duration-200
 
                 hover:bg-card
+                dark:hover:bg-white/[0.07]
               "
             >
-              {/* Search icon */}
-
               <span
                 className="
                   flex
@@ -805,23 +753,22 @@ export default function TopNavbar({
 
                   border
                   border-border
+                  dark:border-white/10
 
                   bg-card
+                  dark:bg-[#0B0F19]
 
                   shadow-sm
-
-                  transition
                 "
               >
                 <Search
                   className="
                     h-[16px]
                     w-[16px]
-                    transition-colors
+
+                    text-[#5b3a8f]
+                    dark:text-violet-300
                   "
-                  style={{
-                    color: ACCENT,
-                  }}
                 />
               </span>
 
@@ -833,10 +780,10 @@ export default function TopNavbar({
 
                   text-[12px]
                   font-medium
+
+                  text-slate-500
+                  dark:text-slate-400
                 "
-                style={{
-                  color: TEXT_MUTED,
-                }}
               >
                 Search transactions,
                 users, wallet,
@@ -854,8 +801,10 @@ export default function TopNavbar({
 
                   border
                   border-border
+                  dark:border-white/10
 
                   bg-card
+                  dark:bg-[#0B0F19]
 
                   px-2
                   py-1
@@ -863,11 +812,11 @@ export default function TopNavbar({
                   text-[9px]
                   font-bold
 
+                  text-slate-500
+                  dark:text-slate-400
+
                   shadow-sm
                 "
-                style={{
-                  color: TEXT_MUTED,
-                }}
               >
                 <Command className="h-3 w-3" />
                 K
@@ -875,9 +824,7 @@ export default function TopNavbar({
             </motion.button>
           </div>
 
-          {/* =================================================
-              RIGHT
-          ================================================== */}
+          {/* RIGHT */}
 
           <div
             className="
@@ -893,9 +840,7 @@ export default function TopNavbar({
             <motion.button
               type="button"
               aria-label="Search"
-              onClick={
-                openSearch
-              }
+              onClick={openSearch}
               whileHover={{
                 scale: 1.03,
               }}
@@ -913,14 +858,17 @@ export default function TopNavbar({
 
                 border
                 border-border
+                dark:border-white/10
 
                 bg-card
+                dark:bg-[#0B0F19]
 
                 shadow-sm
 
                 transition-all
 
                 hover:bg-muted
+                dark:hover:bg-white/10
 
                 md:hidden
               "
@@ -929,16 +877,14 @@ export default function TopNavbar({
                 className="
                   h-[17px]
                   w-[17px]
+
+                  text-[#5b3a8f]
+                  dark:text-violet-300
                 "
-                style={{
-                  color: ACCENT,
-                }}
               />
             </motion.button>
 
-            {/* =================================================
-                AI INSIGHTS
-            ================================================== */}
+            {/* AI INSIGHTS */}
 
             <motion.button
               type="button"
@@ -977,43 +923,34 @@ export default function TopNavbar({
                 duration-200
 
                 sm:flex
+
+                border-[#3b2368]/20
+                bg-violet-50/50
+                text-[#5b3a8f]
+
+                dark:border-violet-400/20
+                dark:bg-violet-500/[0.10]
+                dark:text-violet-300
               "
-              style={{
-                background:
-                  BRAND_SOFT,
-
-                borderColor:
-                  "rgba(59,35,104,0.18)",
-
-                color:
-                  ACCENT,
-              }}
             >
               <span
                 className="
                   pointer-events-none
                   absolute
                   inset-0
+                  bg-gradient-to-br
+                  from-white/10
+                  to-transparent
+                  dark:from-white/[0.04]
                 "
-                style={{
-                  background:
-                    "linear-gradient(135deg, rgba(255,255,255,.08), transparent)",
-                }}
               />
 
-              <span
-                className="
-                  relative
-                  z-10
-                "
-              >
+              <span className="relative z-10">
                 AI Insights
               </span>
             </motion.button>
 
-            {/* =================================================
-                NOTIFICATION
-            ================================================== */}
+            {/* NOTIFICATION */}
 
             <motion.button
               type="button"
@@ -1042,8 +979,10 @@ export default function TopNavbar({
 
                 border
                 border-border
+                dark:border-white/10
 
                 bg-card
+                dark:bg-[#0B0F19]
 
                 shadow-sm
 
@@ -1051,16 +990,17 @@ export default function TopNavbar({
                 duration-200
 
                 hover:bg-muted
+                dark:hover:bg-white/10
               "
             >
               <Bell
                 className="
                   h-[16px]
                   w-[16px]
+
+                  text-[#5b3a8f]
+                  dark:text-violet-300
                 "
-                style={{
-                  color: ACCENT,
-                }}
               />
 
               <span
@@ -1068,8 +1008,10 @@ export default function TopNavbar({
                   absolute
                   right-[8px]
                   top-[7px]
+
                   h-[6px]
                   w-[6px]
+
                   rounded-full
                   bg-rose-500
                 "
@@ -1080,9 +1022,7 @@ export default function TopNavbar({
               />
             </motion.button>
 
-            {/* =================================================
-                PROFILE
-            ================================================== */}
+            {/* PROFILE */}
 
             <div className="relative">
               <motion.button
@@ -1093,9 +1033,7 @@ export default function TopNavbar({
                       !current
                   );
 
-                  setSearchOpen(
-                    false
-                  );
+                  setSearchOpen(false);
                 }}
                 whileHover={{
                   y: -1,
@@ -1113,8 +1051,10 @@ export default function TopNavbar({
 
                   border
                   border-border
+                  dark:border-white/10
 
                   bg-card
+                  dark:bg-[#0B0F19]
 
                   p-[5px]
                   pr-2.5
@@ -1125,6 +1065,7 @@ export default function TopNavbar({
                   duration-200
 
                   hover:bg-muted
+                  dark:hover:bg-white/10
                 "
               >
                 <ProfileAvatar
@@ -1143,7 +1084,6 @@ export default function TopNavbar({
                     justify-center
                     rounded-[11px]
                   "
-                  textClassName="text-[13px]"
                 />
 
                 <div
@@ -1159,14 +1099,12 @@ export default function TopNavbar({
                       truncate
                       text-[10px]
                       font-extrabold
+
+                      text-[#2e1f4f]
+                      dark:text-slate-100
                     "
-                    style={{
-                      color: TEXT_STRONG,
-                    }}
                   >
-                    {
-                      userName
-                    }
+                    {userName}
                   </p>
 
                   <p
@@ -1176,14 +1114,12 @@ export default function TopNavbar({
                       font-extrabold
                       uppercase
                       tracking-[0.08em]
+
+                      text-slate-400
+                      dark:text-slate-500
                     "
-                    style={{
-                      color: TEXT_FAINT,
-                    }}
                   >
-                    {
-                      roleLabel
-                    }
+                    {roleLabel}
                   </p>
                 </div>
 
@@ -1194,6 +1130,10 @@ export default function TopNavbar({
                     w-[14px]
                     transition-transform
                     duration-200
+
+                    text-slate-400
+                    dark:text-slate-500
+
                     lg:block
 
                     ${
@@ -1202,15 +1142,10 @@ export default function TopNavbar({
                         : ""
                     }
                   `}
-                  style={{
-                    color: TEXT_FAINT,
-                  }}
                 />
               </motion.button>
 
-              {/* =================================================
-                  PROFILE DROPDOWN
-              ================================================== */}
+              {/* PROFILE DROPDOWN */}
 
               <AnimatePresence>
                 {profileOpen && (
@@ -1258,27 +1193,33 @@ export default function TopNavbar({
                         z-50
                         w-[240px]
                         overflow-hidden
+
                         rounded-[18px]
+
                         border
                         border-border
+                        dark:border-white/10
+
                         bg-card
+                        dark:bg-[#0B0F19]
+
                         p-2
+
                         shadow-2xl
                       "
                     >
-                      {/* USER INFO */}
-
                       <div
                         className="
                           rounded-[14px]
                           p-3
+
+                          border
+                          border-[#3b2368]/10
+                          dark:border-violet-400/10
                         "
                         style={{
                           background:
                             BRAND_SOFT,
-
-                          border:
-                            "1px solid rgba(59,35,104,0.14)",
                         }}
                       >
                         <div className="flex items-center gap-3">
@@ -1307,14 +1248,12 @@ export default function TopNavbar({
                                 truncate
                                 text-[11px]
                                 font-extrabold
+
+                                text-[#2e1f4f]
+                                dark:text-slate-100
                               "
-                              style={{
-                                color: TEXT_STRONG,
-                              }}
                             >
-                              {
-                                userName
-                              }
+                              {userName}
                             </p>
 
                             {userEmail && (
@@ -1323,14 +1262,12 @@ export default function TopNavbar({
                                   mt-0.5
                                   truncate
                                   text-[9px]
+
+                                  text-slate-500
+                                  dark:text-slate-400
                                 "
-                                style={{
-                                  color: TEXT_MUTED,
-                                }}
                               >
-                                {
-                                  userEmail
-                                }
+                                {userEmail}
                               </p>
                             )}
 
@@ -1341,21 +1278,16 @@ export default function TopNavbar({
                                 font-extrabold
                                 uppercase
                                 tracking-[0.1em]
+
+                                text-[#5b3a8f]
+                                dark:text-violet-300
                               "
-                              style={{
-                                color:
-                                  ACCENT,
-                              }}
                             >
-                              {
-                                roleLabel
-                              }
+                              {roleLabel}
                             </p>
                           </div>
                         </div>
                       </div>
-
-                      {/* SETTINGS */}
 
                       <button
                         type="button"
@@ -1386,23 +1318,26 @@ export default function TopNavbar({
                           text-[11px]
                           font-bold
 
+                          text-slate-600
+                          dark:text-slate-300
+
                           transition
 
                           hover:bg-muted
+                          dark:hover:bg-white/[0.06]
+
+                          hover:text-[#5b3a8f]
+                          dark:hover:text-violet-300
                         "
-                        style={{
-                          color: TEXT_MUTED,
-                        }}
                       >
                         <Settings
                           className="
                             h-[15px]
                             w-[15px]
+
+                            text-[#5b3a8f]
+                            dark:text-violet-300
                           "
-                          style={{
-                            color:
-                              ACCENT,
-                          }}
                         />
 
                         Account Settings
@@ -1432,9 +1367,7 @@ export default function TopNavbar({
             exit={{
               opacity: 0,
             }}
-            onMouseDown={
-              closeSearch
-            }
+            onMouseDown={closeSearch}
             className="
               fixed
               inset-0
@@ -1445,6 +1378,7 @@ export default function TopNavbar({
               justify-center
 
               bg-black/40
+              dark:bg-black/65
 
               px-3
               pt-[12vh]
@@ -1496,8 +1430,10 @@ export default function TopNavbar({
 
                 border
                 border-border
+                dark:border-white/10
 
                 bg-card
+                dark:bg-[#0B0F19]
 
                 shadow-2xl
               "
@@ -1506,8 +1442,6 @@ export default function TopNavbar({
                   "0 30px 90px rgba(15,12,27,0.30)",
               }}
             >
-              {/* TOP BRAND LINE */}
-
               <span
                 className="
                   pointer-events-none
@@ -1522,8 +1456,6 @@ export default function TopNavbar({
                 }}
               />
 
-              {/* SEARCH FIELD */}
-
               <div
                 className="
                   flex
@@ -1532,6 +1464,7 @@ export default function TopNavbar({
 
                   border-b
                   border-border
+                  dark:border-white/10
 
                   px-4
                   py-3.5
@@ -1544,16 +1477,14 @@ export default function TopNavbar({
                     h-[18px]
                     w-[18px]
                     shrink-0
+
+                    text-[#5b3a8f]
+                    dark:text-violet-300
                   "
-                  style={{
-                    color: ACCENT,
-                  }}
                 />
 
                 <input
-                  ref={
-                    inputRef
-                  }
+                  ref={inputRef}
                   value={
                     searchQuery
                   }
@@ -1561,8 +1492,7 @@ export default function TopNavbar({
                     event
                   ) =>
                     setSearchQuery(
-                      event
-                        .target
+                      event.target
                         .value
                     )
                   }
@@ -1577,13 +1507,15 @@ export default function TopNavbar({
                     text-[14px]
                     font-semibold
 
+                    text-slate-900
+                    dark:text-slate-100
+
                     outline-none
 
                     placeholder:font-medium
+                    placeholder:text-slate-400
+                    dark:placeholder:text-slate-500
                   "
-                  style={{
-                    color: TEXT_STRONG,
-                  }}
                 />
 
                 {searchQuery && (
@@ -1596,8 +1528,7 @@ export default function TopNavbar({
                       )
                     }
                     whileTap={{
-                      scale:
-                        0.9,
+                      scale: 0.9,
                     }}
                     className="
                       flex
@@ -1607,25 +1538,25 @@ export default function TopNavbar({
                       items-center
                       justify-center
                       rounded-lg
+
                       transition
+
                       hover:bg-muted
+                      dark:hover:bg-white/[0.06]
                     "
                   >
                     <X
                       className="
                         h-[15px]
                         w-[15px]
+
+                        text-[#5b3a8f]
+                        dark:text-violet-300
                       "
-                      style={{
-                        color:
-                          ACCENT,
-                      }}
                     />
                   </motion.button>
                 )}
               </div>
-
-              {/* RESULT LIST */}
 
               <div
                 className="
@@ -1698,6 +1629,7 @@ export default function TopNavbar({
                               duration-150
 
                               hover:bg-muted
+                              dark:hover:bg-white/[0.06]
                             "
                             style={{
                               background:
@@ -1706,12 +1638,9 @@ export default function TopNavbar({
                                   : undefined,
                             }}
                           >
-                            {/* ICON */}
-
                             <motion.span
                               whileHover={{
-                                scale:
-                                  1.05,
+                                scale: 1.05,
                               }}
                               className="
                                 flex
@@ -1732,7 +1661,7 @@ export default function TopNavbar({
                                 color:
                                   active
                                     ? "#ffffff"
-                                    : TEXT_MUTED,
+                                    : undefined,
 
                                 boxShadow:
                                   active
@@ -1744,31 +1673,30 @@ export default function TopNavbar({
                                 className="
                                   h-[16px]
                                   w-[16px]
+
+                                  text-slate-500
+                                  dark:text-slate-300
                                 "
                               />
                             </motion.span>
 
-                            {/* TITLE */}
-
                             <span
-                              className="
+                              className={`
                                 truncate
                                 text-[12px]
                                 font-bold
-                              "
-                              style={{
-                                color:
+
+                                ${
                                   active
-                                    ? ACCENT
-                                    : TEXT_STRONG,
-                              }}
+                                    ? "text-[#5b3a8f] dark:text-violet-300"
+                                    : "text-slate-700 dark:text-slate-200"
+                                }
+                              `}
                             >
                               {
                                 item.title
                               }
                             </span>
-
-                            {/* CURRENT */}
 
                             {active && (
                               <motion.span
@@ -1783,21 +1711,23 @@ export default function TopNavbar({
                                 }}
                                 className="
                                   ml-auto
+
                                   rounded-full
+
+                                  bg-violet-100
+                                  dark:bg-violet-500/10
+
                                   px-2
                                   py-0.5
+
                                   text-[8px]
                                   font-extrabold
                                   uppercase
                                   tracking-wider
-                                "
-                                style={{
-                                  background:
-                                    "rgba(46,31,79,0.10)",
 
-                                  color:
-                                    ACCENT,
-                                }}
+                                  text-[#5b3a8f]
+                                  dark:text-violet-300
+                                "
                               >
                                 Current
                               </motion.span>
@@ -1835,14 +1765,13 @@ export default function TopNavbar({
                         items-center
                         justify-center
                         rounded-xl
-                      "
-                      style={{
-                        background:
-                          BRAND_SOFT,
 
-                        color:
-                          ACCENT,
-                      }}
+                        bg-violet-100
+                        dark:bg-violet-500/10
+
+                        text-[#5b3a8f]
+                        dark:text-violet-300
+                      "
                     >
                       <Search
                         className="
@@ -1855,12 +1784,13 @@ export default function TopNavbar({
                     <p
                       className="
                         mt-3
+
                         text-[13px]
                         font-extrabold
+
+                        text-slate-900
+                        dark:text-slate-100
                       "
-                      style={{
-                        color: TEXT_STRONG,
-                      }}
                     >
                       No results found
                     </p>
@@ -1869,10 +1799,10 @@ export default function TopNavbar({
                       className="
                         mt-1
                         text-[10px]
+
+                        text-slate-500
+                        dark:text-slate-400
                       "
-                      style={{
-                        color: TEXT_MUTED,
-                      }}
                     >
                       Try another keyword.
                     </p>
