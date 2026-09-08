@@ -29,7 +29,6 @@ import {
   IdCard,
   Loader2,
   LockKeyhole,
-  
   RefreshCw,
   ScanFace,
   ShieldCheck,
@@ -37,9 +36,7 @@ import {
   X,
 } from "lucide-react";
 
-import {
-  apiClient,
-} from "@/lib/api/client";
+import { apiClient } from "@/lib/api/client";
 
 /* =========================================================
    TYPES
@@ -59,14 +56,11 @@ type DocumentType =
 
 interface KYCRecord {
   _id?: string;
-
   userId?: string;
 
-  documentType?:
-    DocumentType;
+  documentType?: DocumentType;
 
-  documentNumber?:
-    string;
+  documentNumber?: string;
 
   provider?:
     | "manual"
@@ -75,20 +69,15 @@ interface KYCRecord {
 
   status: KYCStatus;
 
-  rejectionReason?:
-    string;
+  rejectionReason?: string;
 
-  submittedAt?:
-    string;
+  submittedAt?: string;
 
-  verifiedAt?:
-    string;
+  verifiedAt?: string;
 
-  createdAt?:
-    string;
+  createdAt?: string;
 
-  updatedAt?:
-    string;
+  updatedAt?: string;
 }
 
 interface KYCResponse {
@@ -96,14 +85,11 @@ interface KYCResponse {
 
   message?: string;
 
-  status?:
-    KYCStatus;
+  status?: KYCStatus;
 
-  kyc?:
-    Partial<KYCRecord>;
+  kyc?: Partial<KYCRecord>;
 
-  data?:
-    Partial<KYCRecord>;
+  data?: Partial<KYCRecord>;
 }
 
 type WizardStep =
@@ -128,14 +114,17 @@ const ALLOWED_FILE_TYPES = [
 ];
 
 /* =========================================================
-   CLIENT IMAGE COMPRESSION
+   IMAGE HELPERS
 ========================================================= */
 
 const loadImage = (
   objectUrl: string
 ): Promise<HTMLImageElement> => {
   return new Promise(
-    (resolve, reject) => {
+    (
+      resolve,
+      reject
+    ) => {
       const image =
         new Image();
 
@@ -160,7 +149,10 @@ const canvasToBlob = (
   quality: number
 ): Promise<Blob> => {
   return new Promise(
-    (resolve, reject) => {
+    (
+      resolve,
+      reject
+    ) => {
       canvas.toBlob(
         (blob) => {
           if (!blob) {
@@ -319,7 +311,8 @@ const compressKYCImage =
           .replace(
             /[^a-zA-Z0-9-_]/g,
             "-"
-          ) || "kyc-image";
+          ) ||
+        "kyc-image";
 
       return new File(
         [blob],
@@ -388,7 +381,7 @@ const documentOptions = [
 ];
 
 /* =========================================================
-   NORMALIZE RESPONSE
+   RESPONSE NORMALIZER
 ========================================================= */
 
 function normalizeKYCResponse(
@@ -417,102 +410,88 @@ export default function KYCPage() {
   const [
     kyc,
     setKYC,
-  ] =
-    useState<KYCRecord | null>(
-      null
-    );
+  ] = useState<KYCRecord | null>(
+    null
+  );
 
   const [
     loading,
     setLoading,
-  ] =
-    useState(true);
+  ] = useState(true);
 
   const [
     refreshing,
     setRefreshing,
-  ] =
-    useState(false);
+  ] = useState(false);
 
   const [
     starting,
     setStarting,
-  ] =
-    useState(false);
+  ] = useState(false);
 
   const [
     submitting,
     setSubmitting,
-  ] =
-    useState(false);
+  ] = useState(false);
 
   const [
     formOpen,
     setFormOpen,
-  ] =
-    useState(false);
+  ] = useState(false);
 
   const [
     step,
     setStep,
-  ] =
-    useState<WizardStep>(
-      1
-    );
+  ] = useState<WizardStep>(
+    1
+  );
 
   const [
     documentType,
     setDocumentType,
-  ] =
-    useState<DocumentType | "">(
-      ""
-    );
+  ] = useState<
+    DocumentType | ""
+  >("");
 
   const [
     documentNumber,
     setDocumentNumber,
-  ] =
-    useState("");
+  ] = useState("");
 
   const [
     frontImage,
     setFrontImage,
-  ] =
-    useState<File | null>(
-      null
-    );
+  ] = useState<File | null>(
+    null
+  );
 
   const [
     backImage,
     setBackImage,
-  ] =
-    useState<File | null>(
-      null
-    );
+  ] = useState<File | null>(
+    null
+  );
 
   const [
     selfieImage,
     setSelfieImage,
-  ] =
-    useState<File | null>(
-      null
-    );
+  ] = useState<File | null>(
+    null
+  );
 
   const [
     errorMessage,
     setErrorMessage,
-  ] =
-    useState("");
+  ] = useState("");
 
   const [
     successMessage,
     setSuccessMessage,
-  ] =
-    useState("");
+  ] = useState("");
 
-  /* =========================================================
-     LOAD STATUS
-  ========================================================== */
+  /* =======================================================
+     LOAD KYC
+  ======================================================== */
 
   const loadKYC =
     useCallback(
@@ -530,9 +509,7 @@ export default function KYCPage() {
             );
           }
 
-          setErrorMessage(
-            ""
-          );
+          setErrorMessage("");
 
           const response =
             await apiClient<KYCResponse>(
@@ -572,7 +549,9 @@ export default function KYCPage() {
               normalized.documentNumber
             );
           }
-        } catch (error) {
+        } catch (
+          error
+        ) {
           console.error(
             "KYC status error:",
             error
@@ -597,28 +576,24 @@ export default function KYCPage() {
     );
 
   useEffect(() => {
-    loadKYC();
+    void loadKYC();
   }, [
     loadKYC,
   ]);
 
-  /* =========================================================
-     AUTO CLEAR MESSAGES
-  ========================================================== */
+  /* =======================================================
+     SUCCESS AUTO CLEAR
+  ======================================================== */
 
   useEffect(() => {
-    if (
-      !successMessage
-    ) {
+    if (!successMessage) {
       return;
     }
 
     const timer =
       window.setTimeout(
         () => {
-          setSuccessMessage(
-            ""
-          );
+          setSuccessMessage("");
         },
         4000
       );
@@ -632,20 +607,15 @@ export default function KYCPage() {
     successMessage,
   ]);
 
-  /* =========================================================
+  /* =======================================================
      START KYC
-  ========================================================== */
+  ======================================================== */
 
   const handleStartKYC =
     async () => {
       try {
-        setStarting(
-          true
-        );
-
-        setErrorMessage(
-          ""
-        );
+        setStarting(true);
+        setErrorMessage("");
 
         const response =
           await apiClient<KYCResponse>(
@@ -683,7 +653,9 @@ export default function KYCPage() {
         setStep(
           1
         );
-      } catch (error) {
+      } catch (
+        error
+      ) {
         console.error(
           "Start KYC error:",
           error
@@ -701,9 +673,9 @@ export default function KYCPage() {
       }
     };
 
-  /* =========================================================
+  /* =======================================================
      RESUBMIT
-  ========================================================== */
+  ======================================================== */
 
   const handleResubmit =
     async () => {
@@ -718,47 +690,48 @@ export default function KYCPage() {
       );
     };
 
-  /* =========================================================
+  /* =======================================================
      RESET FORM
-  ========================================================== */
+  ======================================================== */
 
-  const resetForm = () => {
-    setDocumentType(
-      ""
-    );
-
-    setDocumentNumber(
-      ""
-    );
-
-    setFrontImage(
-      null
-    );
-
-    setBackImage(
-      null
-    );
-
-    setSelfieImage(
-      null
-    );
-
-    setErrorMessage(
-      ""
-    );
-  };
-
-  /* =========================================================
-     VALIDATE STEP 1
-  ========================================================== */
-
-  const goToDocuments =
+  const resetForm =
     () => {
-      setErrorMessage(
+      setDocumentType(
         ""
       );
 
-      if (!documentType) {
+      setDocumentNumber(
+        ""
+      );
+
+      setFrontImage(
+        null
+      );
+
+      setBackImage(
+        null
+      );
+
+      setSelfieImage(
+        null
+      );
+
+      setErrorMessage(
+        ""
+      );
+    };
+
+  /* =======================================================
+     STEP 1 VALIDATION
+  ======================================================== */
+
+  const goToDocuments =
+    () => {
+      setErrorMessage("");
+
+      if (
+        !documentType
+      ) {
         setErrorMessage(
           "Please select a document type."
         );
@@ -792,9 +765,9 @@ export default function KYCPage() {
       );
     };
 
-  /* =========================================================
-     FILE CHANGE + CLIENT COMPRESSION
-  ========================================================== */
+  /* =======================================================
+     FILE CHANGE
+  ======================================================== */
 
   const handleFileChange =
     async (
@@ -809,9 +782,7 @@ export default function KYCPage() {
       }
 
       try {
-        setErrorMessage(
-          ""
-        );
+        setErrorMessage("");
 
         if (
           !ALLOWED_FILE_TYPES.includes(
@@ -860,7 +831,9 @@ export default function KYCPage() {
             optimizedFile
           );
         }
-      } catch (error) {
+      } catch (
+        error
+      ) {
         console.error(
           "KYC image processing error:",
           error
@@ -874,15 +847,13 @@ export default function KYCPage() {
       }
     };
 
-  /* =========================================================
-     VALIDATE STEP 2
-  ========================================================== */
+  /* =======================================================
+     STEP 2 VALIDATION
+  ======================================================== */
 
   const goToReview =
     () => {
-      setErrorMessage(
-        ""
-      );
+      setErrorMessage("");
 
       if (!frontImage) {
         setErrorMessage(
@@ -922,9 +893,9 @@ export default function KYCPage() {
       );
     };
 
-  /* =========================================================
-     SUBMIT KYC
-  ========================================================== */
+  /* =======================================================
+     SUBMIT
+  ======================================================== */
 
   const handleSubmit =
     async () => {
@@ -979,9 +950,7 @@ export default function KYCPage() {
           true
         );
 
-        setErrorMessage(
-          ""
-        );
+        setErrorMessage("");
 
         const formData =
           new FormData();
@@ -1012,12 +981,6 @@ export default function KYCPage() {
           "selfieImage",
           selfieImage
         );
-
-        /*
-         * IMPORTANT:
-         * Content-Type manually set করো না.
-         * Browser FormData boundary নিজে set করবে.
-         */
 
         const response =
           await apiClient<KYCResponse>(
@@ -1065,7 +1028,9 @@ export default function KYCPage() {
         await loadKYC(
           true
         );
-      } catch (error) {
+      } catch (
+        error
+      ) {
         console.error(
           "KYC submit error:",
           error
@@ -1083,9 +1048,9 @@ export default function KYCPage() {
       }
     };
 
-  /* =========================================================
+  /* =======================================================
      LOADING
-  ========================================================== */
+  ======================================================== */
 
   if (loading) {
     return (
@@ -1093,9 +1058,9 @@ export default function KYCPage() {
     );
   }
 
-  /* =========================================================
+  /* =======================================================
      PAGE
-  ========================================================== */
+  ======================================================== */
 
   return (
     <div
@@ -1103,42 +1068,38 @@ export default function KYCPage() {
         relative
         min-h-full
         overflow-hidden
+        bg-background
       "
     >
-      {/* AMBIENT BACKGROUND */}
+      {/* AMBIENT GLOW */}
 
       <div
+        aria-hidden="true"
         className="
           pointer-events-none
           absolute
           -right-40
           -top-44
-
           h-[420px]
           w-[420px]
-
           rounded-full
-
-          bg-blue-500/[0.07]
-
+          bg-indigo-500/[0.08]
           blur-[100px]
+          dark:bg-violet-500/[0.12]
         "
       />
 
       <div
+        aria-hidden="true"
         className="
           pointer-events-none
           absolute
           -bottom-44
           -left-44
-
           h-[420px]
           w-[420px]
-
           rounded-full
-
           bg-emerald-400/[0.05]
-
           blur-[110px]
         "
       />
@@ -1147,13 +1108,12 @@ export default function KYCPage() {
         className="
           relative
           z-10
-
           space-y-6
         "
       >
-        {/* ===================================================
+        {/* =================================================
             MESSAGE
-        ==================================================== */}
+        ================================================== */}
 
         <AnimatePresence>
           {errorMessage && (
@@ -1163,9 +1123,7 @@ export default function KYCPage() {
                 errorMessage
               }
               onClose={() =>
-                setErrorMessage(
-                  ""
-                )
+                setErrorMessage("")
               }
             />
           )}
@@ -1177,17 +1135,16 @@ export default function KYCPage() {
                 successMessage
               }
               onClose={() =>
-                setSuccessMessage(
-                  ""
-                )
+                setSuccessMessage("")
               }
             />
           )}
         </AnimatePresence>
 
-        {/* ===================================================
+        {/* =================================================
             HERO
-        ==================================================== */}
+            FIXED INDIGO / VIOLET
+        ================================================== */}
 
         <motion.section
           initial={{
@@ -1204,67 +1161,74 @@ export default function KYCPage() {
           className="
             relative
             overflow-hidden
-
             rounded-[28px]
-
-            border
-            border-[#DCE8F3]
-
-            bg-white
-
-            shadow-[0_20px_60px_rgba(17,47,78,0.06)]
+            border border-white/10
+            bg-gradient-to-br
+            from-[#1E1B4B]
+            via-[#4338CA]
+            to-[#7C3AED]
+            text-white
+            shadow-[0_20px_60px_rgba(49,46,129,0.28)]
           "
         >
-          {/* DECORATION */}
+          <div
+            aria-hidden="true"
+            className="
+              pointer-events-none
+              absolute
+              -left-24
+              -top-24
+              h-72
+              w-72
+              rounded-full
+              bg-violet-400/10
+              blur-3xl
+            "
+          />
 
           <div
+            aria-hidden="true"
             className="
               pointer-events-none
               absolute
               right-0
               top-0
-
               h-full
               w-[48%]
-
               bg-gradient-to-l
-              from-[#EEF7FF]
-              via-[#F8FBFE]
+              from-white/[0.06]
+              via-white/[0.02]
               to-transparent
             "
           />
 
           <div
+            aria-hidden="true"
             className="
               pointer-events-none
               absolute
               -right-10
               -top-20
-
               h-56
               w-56
-
               rounded-full
-
               border
-              border-blue-200/40
+              border-white/10
             "
           />
 
           <div
+            aria-hidden="true"
             className="
               pointer-events-none
               absolute
               right-16
               top-10
-
               h-28
               w-28
-
               rounded-full
-
               border
-              border-blue-200/40
+              border-white/10
             "
           />
 
@@ -1272,53 +1236,35 @@ export default function KYCPage() {
             className="
               relative
               z-10
-
               grid
               gap-8
-
               p-6
-
               md:p-8
               lg:grid-cols-[1fr_auto]
               lg:items-center
             "
           >
-            <div
-              className="
-                max-w-2xl
-              "
-            >
+            <div className="max-w-2xl">
               <div
                 className="
                   inline-flex
                   items-center
                   gap-2
-
                   rounded-full
-
                   border
-                  border-blue-100
-
-                  bg-[#EFF7FF]
-
+                  border-white/15
+                  bg-white/10
                   px-3
                   py-1.5
-
                   text-[10px]
                   font-extrabold
                   uppercase
-
                   tracking-[0.15em]
-
-                  text-[#1F5EA8]
+                  text-indigo-100
+                  backdrop-blur-md
                 "
               >
-                <Fingerprint
-                  className="
-                    h-3.5
-                    w-3.5
-                  "
-                />
+                <Fingerprint className="h-3.5 w-3.5" />
 
                 Identity Verification
               </div>
@@ -1326,16 +1272,11 @@ export default function KYCPage() {
               <h1
                 className="
                   mt-4
-
                   max-w-xl
-
                   text-[25px]
                   font-black
-
                   tracking-[-0.035em]
-
-                  text-[#102A43]
-
+                  text-white
                   sm:text-[30px]
                   lg:text-[34px]
                 "
@@ -1347,13 +1288,10 @@ export default function KYCPage() {
               <p
                 className="
                   mt-3
-
                   max-w-xl
-
                   text-sm
                   leading-6
-
-                  text-[#6C7F93]
+                  text-indigo-100/70
                 "
               >
                 Verify your identity to
@@ -1365,99 +1303,70 @@ export default function KYCPage() {
               <div
                 className="
                   mt-5
-
                   flex
                   flex-wrap
                   items-center
                   gap-3
                 "
               >
-                <SecurityPoint
-                  icon={
-                    LockKeyhole
-                  }
+                <HeroSecurityItem
+                  icon={LockKeyhole}
                   text="Private uploads"
                 />
 
-                <SecurityPoint
-                  icon={
-                    ShieldCheck
-                  }
+                <HeroSecurityItem
+                  icon={ShieldCheck}
                   text="Secure review"
                 />
 
-                <SecurityPoint
-                  icon={
-                    BadgeCheck
-                  }
+                <HeroSecurityItem
+                  icon={BadgeCheck}
                   text="Verified access"
                 />
               </div>
             </div>
 
-            <div
-              className="
-                flex
-                items-center
-                gap-3
-              "
-            >
+            <div className="flex items-center gap-3">
               <motion.button
                 type="button"
                 onClick={() =>
-                  loadKYC(
-                    true
-                  )
+                  void loadKYC(true)
                 }
                 disabled={
                   refreshing
                 }
                 whileTap={{
-                  scale:
-                    0.96,
+                  scale: 0.96,
                 }}
                 className="
                   flex
                   h-11
                   items-center
                   gap-2
-
                   rounded-[14px]
-
                   border
-                  border-[#DDE7F0]
-
-                  bg-white
-
+                  border-white/15
+                  bg-white/10
                   px-4
-
                   text-[11px]
                   font-bold
-
-                  text-[#5E7287]
-
+                  text-indigo-100
                   shadow-sm
-
+                  backdrop-blur-md
                   transition
-
-                  hover:border-[#BFD6EC]
-                  hover:text-[#1F5EA8]
-
+                  hover:border-white/25
+                  hover:bg-white/15
+                  hover:text-white
                   disabled:cursor-not-allowed
                   disabled:opacity-60
                 "
               >
                 <RefreshCw
-                  className={`
-                    h-4
-                    w-4
-
-                    ${
-                      refreshing
-                        ? "animate-spin"
-                        : ""
-                    }
-                  `}
+                  className={
+                    refreshing
+                      ? "h-4 w-4 animate-spin"
+                      : "h-4 w-4"
+                  }
                 />
 
                 Refresh
@@ -1466,21 +1375,18 @@ export default function KYCPage() {
           </div>
         </motion.section>
 
-        {/* ===================================================
+        {/* =================================================
             MAIN GRID
-        ==================================================== */}
+        ================================================== */}
 
         <div
           className="
             grid
             gap-6
-
             xl:grid-cols-[360px_minmax(0,1fr)]
           "
         >
-          {/* =================================================
-              LEFT STATUS
-          ================================================== */}
+          {/* LEFT */}
 
           <div
             className="
@@ -1488,12 +1394,8 @@ export default function KYCPage() {
             "
           >
             <KYCStatusCard
-              kyc={
-                kyc
-              }
-              starting={
-                starting
-              }
+              kyc={kyc}
+              starting={starting}
               onStart={
                 handleStartKYC
               }
@@ -1510,9 +1412,7 @@ export default function KYCPage() {
             />
           </div>
 
-          {/* =================================================
-              RIGHT
-          ================================================== */}
+          {/* RIGHT */}
 
           <div>
             <AnimatePresence
@@ -1535,9 +1435,7 @@ export default function KYCPage() {
                   }}
                 >
                   <VerificationWizard
-                    step={
-                      step
-                    }
+                    step={step}
                     setStep={
                       setStep
                     }
@@ -1648,6 +1546,48 @@ export default function KYCPage() {
 }
 
 /* =========================================================
+   HERO SECURITY ITEM
+========================================================= */
+
+function HeroSecurityItem({
+  icon: Icon,
+  text,
+}: {
+  icon: React.ElementType;
+  text: string;
+}) {
+  return (
+    <span
+      className="
+        inline-flex
+        items-center
+        gap-2
+        text-[10px]
+        font-semibold
+        text-indigo-100/80
+      "
+    >
+      <span
+        className="
+          flex
+          h-6
+          w-6
+          items-center
+          justify-center
+          rounded-lg
+          bg-white/10
+          text-indigo-100
+        "
+      >
+        <Icon className="h-3 w-3" />
+      </span>
+
+      {text}
+    </span>
+  );
+}
+
+/* =========================================================
    STATUS CARD
 ========================================================= */
 
@@ -1692,15 +1632,11 @@ function KYCStatusCard({
       }}
       className="
         overflow-hidden
-
         rounded-[24px]
-
-        border
-        border-[#DFE8F1]
-
-        bg-white
-
-        shadow-[0_15px_45px_rgba(17,47,78,0.05)]
+        border border-border
+        bg-card
+        text-card-foreground
+        shadow-[var(--dashboard-shadow)]
       "
     >
       <div
@@ -1725,83 +1661,62 @@ function KYCStatusCard({
               shrink-0
               items-center
               justify-center
-
               rounded-[15px]
-
-              ${config.iconBox}
+              ${getStatusIconTheme(
+                status
+              )}
             `}
           >
-            <Icon
-              className="
-                h-5
-                w-5
-              "
-            />
+            <Icon className="h-5 w-5" />
           </div>
 
           <span
             className={`
               rounded-full
-
               px-3
               py-1.5
-
               text-[9px]
               font-extrabold
               uppercase
-
               tracking-[0.12em]
-
-              ${config.badge}
+              ${getStatusBadgeTheme(
+                status
+              )}
             `}
           >
-            {
-              config.label
-            }
+            {config.label}
           </span>
         </div>
 
         <h2
           className="
             mt-5
-
             text-lg
             font-extrabold
-
             tracking-[-0.02em]
-
-            text-[#142F49]
+            text-card-foreground
           "
         >
-          {
-            config.title
-          }
+          {config.title}
         </h2>
 
         <p
           className="
             mt-2
-
             text-xs
             leading-5
-
-            text-[#74869A]
+            text-muted-foreground
           "
         >
-          {
-            config.description
-          }
+          {config.description}
         </p>
 
         {kyc?.documentType && (
           <div
             className="
               mt-5
-
               rounded-[15px]
-
-              bg-[#F7F9FC]
-
+              bg-muted/60
               p-3.5
             "
           >
@@ -1815,22 +1730,18 @@ function KYCStatusCard({
             {kyc.documentNumber && (
               <InfoRow
                 label="Document No."
-                value={
-                  maskDocumentNumber(
-                    kyc.documentNumber
-                  )
-                }
+                value={maskDocumentNumber(
+                  kyc.documentNumber
+                )}
               />
             )}
 
             {kyc.provider && (
               <InfoRow
                 label="Provider"
-                value={
-                  capitalize(
-                    kyc.provider
-                  )
-                }
+                value={capitalize(
+                  kyc.provider
+                )}
               />
             )}
           </div>
@@ -1840,22 +1751,14 @@ function KYCStatusCard({
           <div
             className="
               mt-4
-
               flex
               items-center
               gap-2
-
               text-[10px]
-
-              text-[#8190A1]
+              text-muted-foreground
             "
           >
-            <Clock3
-              className="
-                h-3.5
-                w-3.5
-              "
-            />
+            <Clock3 className="h-3.5 w-3.5" />
 
             Submitted{" "}
             {formatDate(
@@ -1870,23 +1773,16 @@ function KYCStatusCard({
             <div
               className="
                 mt-3
-
                 flex
                 items-center
                 gap-2
-
                 text-[10px]
                 font-semibold
-
                 text-emerald-600
+                dark:text-emerald-400
               "
             >
-              <BadgeCheck
-                className="
-                  h-3.5
-                  w-3.5
-                "
-              />
+              <BadgeCheck className="h-3.5 w-3.5" />
 
               Verified{" "}
               {formatDate(
@@ -1901,14 +1797,9 @@ function KYCStatusCard({
             <div
               className="
                 mt-4
-
                 rounded-[14px]
-
-                border
-                border-rose-100
-
-                bg-rose-50
-
+                border border-rose-500/15
+                bg-rose-500/5
                 p-3.5
               "
             >
@@ -1917,9 +1808,7 @@ function KYCStatusCard({
                   text-[9px]
                   font-extrabold
                   uppercase
-
                   tracking-[0.12em]
-
                   text-rose-500
                 "
               >
@@ -1929,16 +1818,13 @@ function KYCStatusCard({
               <p
                 className="
                   mt-1.5
-
                   text-xs
                   leading-5
-
                   text-rose-700
+                  dark:text-rose-300
                 "
               >
-                {
-                  kyc.rejectionReason
-                }
+                {kyc.rejectionReason}
               </p>
             </div>
           )}
@@ -1951,10 +1837,8 @@ function KYCStatusCard({
         <div
           className="
             border-t
-            border-[#E9EFF5]
-
-            bg-[#FAFCFE]
-
+            border-border
+            bg-muted/40
             p-4
           "
         >
@@ -1976,37 +1860,22 @@ function KYCStatusCard({
               items-center
               justify-center
               gap-2
-
               rounded-[13px]
-
-              bg-[#1F5EA8]
-
+              bg-primary
               px-4
-
               text-xs
               font-extrabold
-
-              text-white
-
-              shadow-[0_10px_24px_rgba(31,94,168,0.18)]
-
+              text-primary-foreground
+              shadow-[0_10px_24px_rgba(79,70,229,0.18)]
               transition
-
-              hover:bg-[#184F8D]
-
+              hover:brightness-105
               disabled:cursor-not-allowed
               disabled:opacity-60
             "
           >
             {starting ? (
               <>
-                <Loader2
-                  className="
-                    h-4
-                    w-4
-                    animate-spin
-                  "
-                />
+                <Loader2 className="h-4 w-4 animate-spin" />
 
                 Starting...
               </>
@@ -2017,12 +1886,7 @@ function KYCStatusCard({
                   ? "Resubmit Verification"
                   : "Start Verification"}
 
-                <ArrowRight
-                  className="
-                    h-4
-                    w-4
-                  "
-                />
+                <ArrowRight className="h-4 w-4" />
               </>
             )}
           </button>
@@ -2117,34 +1981,63 @@ function VerificationRoadmap({
       }}
       className="
         rounded-[24px]
-
-        border
-        border-[#DFE8F1]
-
-        bg-white
-
+        border border-border
+        bg-card
         p-5
-
-        shadow-[0_15px_45px_rgba(17,47,78,0.045)]
+        text-card-foreground
+        shadow-[var(--dashboard-shadow)]
       "
     >
-      <h3
-        className="
-          text-sm
-          font-extrabold
-
-          text-[#18324A]
-        "
-      >
-        Verification journey
-      </h3>
-
       <div
         className="
-          mt-5
-          space-y-1
+          flex
+          items-center
+          justify-between
+          gap-3
         "
       >
+        <div>
+          <p
+            className="
+              text-[9px]
+              font-black
+              uppercase
+              tracking-[0.16em]
+              text-primary
+            "
+          >
+            Verification flow
+          </p>
+
+          <h3
+            className="
+              mt-1
+              text-sm
+              font-extrabold
+              text-card-foreground
+            "
+          >
+            Verification journey
+          </h3>
+        </div>
+
+        <div
+          className="
+            flex
+            h-9
+            w-9
+            items-center
+            justify-center
+            rounded-xl
+            bg-primary/10
+            text-primary
+          "
+        >
+          <ShieldCheck className="h-4 w-4" />
+        </div>
+      </div>
+
+      <div className="mt-5 space-y-1">
         {steps.map(
           (
             item,
@@ -2158,11 +2051,7 @@ function VerificationRoadmap({
                 key={
                   item.title
                 }
-                className="
-                  relative
-                  flex
-                  gap-3
-                "
+                className="relative flex gap-3"
               >
                 {index <
                   steps.length -
@@ -2172,14 +2061,12 @@ function VerificationRoadmap({
                       absolute
                       left-[17px]
                       top-9
-
                       h-[calc(100%-12px)]
                       w-px
-
                       ${
                         item.complete
-                          ? "bg-emerald-200"
-                          : "bg-[#E4EAF0]"
+                          ? "bg-emerald-500/35"
+                          : "bg-border"
                       }
                     `}
                   />
@@ -2189,52 +2076,33 @@ function VerificationRoadmap({
                   className={`
                     relative
                     z-10
-
                     flex
                     h-9
                     w-9
                     shrink-0
                     items-center
                     justify-center
-
                     rounded-[11px]
-
                     ${
                       item.complete
-                        ? "bg-emerald-50 text-emerald-600"
-                        : "bg-[#F3F6F9] text-[#8B9BAB]"
+                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                        : "bg-muted text-muted-foreground"
                     }
                   `}
                 >
                   {item.complete ? (
-                    <Check
-                      className="
-                        h-4
-                        w-4
-                      "
-                    />
+                    <Check className="h-4 w-4" />
                   ) : (
-                    <Icon
-                      className="
-                        h-4
-                        w-4
-                      "
-                    />
+                    <Icon className="h-4 w-4" />
                   )}
                 </div>
 
-                <div
-                  className="
-                    pb-5
-                    pt-0.5
-                  "
-                >
+                <div className="pb-5 pt-0.5">
                   <p
                     className="
                       text-[11px]
                       font-bold
-
-                      text-[#344B61]
+                      text-card-foreground
                     "
                   >
                     {
@@ -2245,11 +2113,9 @@ function VerificationRoadmap({
                   <p
                     className="
                       mt-1
-
                       text-[9px]
                       leading-4
-
-                      text-[#8A99AA]
+                      text-muted-foreground
                     "
                   >
                     {
@@ -2292,16 +2158,11 @@ function KYCOverview({
     <div
       className="
         rounded-[26px]
-
-        border
-        border-[#DFE8F1]
-
-        bg-white
-
+        border border-border
+        bg-card
         p-5
-
-        shadow-[0_16px_50px_rgba(17,47,78,0.05)]
-
+        text-card-foreground
+        shadow-[var(--dashboard-shadow)]
         sm:p-6
         lg:p-7
       "
@@ -2320,10 +2181,8 @@ function KYCOverview({
               text-[9px]
               font-extrabold
               uppercase
-
               tracking-[0.16em]
-
-              text-[#1F5EA8]
+              text-primary
             "
           >
             Verification Center
@@ -2332,13 +2191,10 @@ function KYCOverview({
           <h2
             className="
               mt-2
-
               text-xl
               font-extrabold
-
               tracking-[-0.025em]
-
-              text-[#173149]
+              text-card-foreground
             "
           >
             What you&apos;ll need
@@ -2352,56 +2208,40 @@ function KYCOverview({
             w-11
             items-center
             justify-center
-
             rounded-[14px]
-
-            bg-[#EEF6FD]
-
-            text-[#1F5EA8]
+            bg-primary/10
+            text-primary
           "
         >
-          <Fingerprint
-            className="
-              h-5
-              w-5
-            "
-          />
+          <Fingerprint className="h-5 w-5" />
         </div>
       </div>
 
       <div
         className="
           mt-6
-
           grid
           gap-4
-
           sm:grid-cols-3
         "
       >
         <RequirementCard
           number="01"
-          icon={
-            IdCard
-          }
+          icon={IdCard}
           title="Identity document"
           description="A valid NID, passport or driving license."
         />
 
         <RequirementCard
           number="02"
-          icon={
-            FileImage
-          }
+          icon={FileImage}
           title="Clear document photos"
           description="Upload readable front and back images where required."
         />
 
         <RequirementCard
           number="03"
-          icon={
-            ScanFace
-          }
+          icon={ScanFace}
           title="Recent selfie"
           description="Use a clear, well-lit photo of your face."
         />
@@ -2410,16 +2250,9 @@ function KYCOverview({
       <div
         className="
           mt-6
-
           rounded-[20px]
-
-          border
-          border-[#DCE9F5]
-
-          bg-gradient-to-r
-          from-[#F5FAFF]
-          to-[#F9FCFF]
-
+          border border-primary/15
+          bg-primary/5
           p-5
         "
       >
@@ -2428,7 +2261,6 @@ function KYCOverview({
             flex
             flex-col
             gap-5
-
             sm:flex-row
             sm:items-center
             sm:justify-between
@@ -2449,22 +2281,15 @@ function KYCOverview({
                 shrink-0
                 items-center
                 justify-center
-
                 rounded-[12px]
-
-                bg-white
-
-                text-[#1F5EA8]
-
+                bg-card
+                text-primary
                 shadow-sm
+                ring-1
+                ring-border
               "
             >
-              <LockKeyhole
-                className="
-                  h-[17px]
-                  w-[17px]
-                "
-              />
+              <LockKeyhole className="h-[17px] w-[17px]" />
             </div>
 
             <div>
@@ -2472,32 +2297,25 @@ function KYCOverview({
                 className="
                   text-xs
                   font-extrabold
-
-                  text-[#243E56]
+                  text-card-foreground
                 "
               >
-                Your documents stay
-                protected
+                Your documents stay protected
               </h3>
 
               <p
                 className="
                   mt-1
-
                   max-w-xl
-
                   text-[10px]
                   leading-5
-
-                  text-[#7C8EA0]
+                  text-muted-foreground
                 "
               >
-                Identity images are
-                uploaded through your
-                protected KYC flow and
-                stored as private
-                Cloudinary assets by the
-                backend.
+                Identity images are uploaded
+                through your protected KYC flow
+                and stored as private Cloudinary
+                assets by the backend.
               </p>
             </div>
           </div>
@@ -2524,33 +2342,19 @@ function KYCOverview({
                 items-center
                 justify-center
                 gap-2
-
                 rounded-[13px]
-
-                bg-[#1F5EA8]
-
+                bg-primary
                 px-5
-
                 text-[11px]
                 font-extrabold
-
-                text-white
-
+                text-primary-foreground
                 transition
-
-                hover:bg-[#184F8D]
-
+                hover:brightness-105
                 disabled:opacity-60
               "
             >
               {starting && (
-                <Loader2
-                  className="
-                    h-4
-                    w-4
-                    animate-spin
-                  "
-                />
+                <Loader2 className="h-4 w-4 animate-spin" />
               )}
 
               {status ===
@@ -2559,12 +2363,7 @@ function KYCOverview({
                 : "Begin Verification"}
 
               {!starting && (
-                <ChevronRight
-                  className="
-                    h-4
-                    w-4
-                  "
-                />
+                <ChevronRight className="h-4 w-4" />
               )}
             </button>
           )}
@@ -2576,25 +2375,16 @@ function KYCOverview({
                 h-11
                 items-center
                 gap-2
-
                 rounded-[13px]
-
-                bg-emerald-50
-
+                bg-emerald-500/10
                 px-4
-
                 text-[11px]
                 font-extrabold
-
                 text-emerald-700
+                dark:text-emerald-300
               "
             >
-              <BadgeCheck
-                className="
-                  h-4
-                  w-4
-                "
-              />
+              <BadgeCheck className="h-4 w-4" />
 
               Identity verified
             </div>
@@ -2631,27 +2421,24 @@ function VerificationWizard({
 }: {
   step: WizardStep;
 
-  setStep:
-    (
-      step: WizardStep
-    ) => void;
+  setStep: (
+    step: WizardStep
+  ) => void;
 
   documentType:
-    DocumentType | "";
+    | DocumentType
+    | "";
 
-  setDocumentType:
-    (
-      type:
-        DocumentType
-    ) => void;
+  setDocumentType: (
+    type: DocumentType
+  ) => void;
 
   documentNumber:
     string;
 
-  setDocumentNumber:
-    (
-      value: string
-    ) => void;
+  setDocumentNumber: (
+    value: string
+  ) => void;
 
   frontImage:
     File | null;
@@ -2662,14 +2449,13 @@ function VerificationWizard({
   selfieImage:
     File | null;
 
-  onFileChange:
-    (
-      file: File | null,
-      type:
-        | "front"
-        | "back"
-        | "selfie"
-    ) => void;
+  onFileChange: (
+    file: File | null,
+    type:
+      | "front"
+      | "back"
+      | "selfie"
+  ) => void;
 
   onRemoveFront:
     () => void;
@@ -2699,27 +2485,19 @@ function VerificationWizard({
     <div
       className="
         overflow-hidden
-
         rounded-[26px]
-
-        border
-        border-[#DFE8F1]
-
-        bg-white
-
-        shadow-[0_16px_50px_rgba(17,47,78,0.05)]
+        border border-border
+        bg-card
+        text-card-foreground
+        shadow-[var(--dashboard-shadow)]
       "
     >
-      {/* HEADER */}
-
       <div
         className="
           border-b
-          border-[#E8EEF4]
-
+          border-border
           px-5
           py-5
-
           sm:px-6
         "
       >
@@ -2737,10 +2515,8 @@ function VerificationWizard({
                 text-[9px]
                 font-extrabold
                 uppercase
-
                 tracking-[0.16em]
-
-                text-[#1F5EA8]
+                text-primary
               "
             >
               Secure verification
@@ -2749,17 +2525,13 @@ function VerificationWizard({
             <h2
               className="
                 mt-1.5
-
                 text-lg
                 font-extrabold
-
                 tracking-[-0.02em]
-
-                text-[#173149]
+                text-card-foreground
               "
             >
-              Complete your identity
-              check
+              Complete your identity check
             </h2>
           </div>
 
@@ -2778,41 +2550,26 @@ function VerificationWizard({
               shrink-0
               items-center
               justify-center
-
               rounded-[11px]
-
-              bg-[#F2F5F8]
-
-              text-[#788A9C]
-
+              bg-muted
+              text-muted-foreground
               transition
-
-              hover:bg-[#E8EEF4]
-              hover:text-[#31475D]
+              hover:bg-muted/80
+              hover:text-foreground
             "
           >
-            <X
-              className="
-                h-4
-                w-4
-              "
-            />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
         <WizardProgress
-          step={
-            step
-          }
+          step={step}
         />
       </div>
-
-      {/* CONTENT */}
 
       <div
         className="
           p-5
-
           sm:p-6
           lg:p-7
         "
@@ -2834,9 +2591,6 @@ function VerificationWizard({
               exit={{
                 opacity: 0,
                 x: -20,
-              }}
-              transition={{
-                duration: 0.25,
               }}
             >
               <StepIdentity
@@ -2874,9 +2628,6 @@ function VerificationWizard({
                 opacity: 0,
                 x: -20,
               }}
-              transition={{
-                duration: 0.25,
-              }}
             >
               <StepDocuments
                 documentType={
@@ -2904,9 +2655,7 @@ function VerificationWizard({
                   onRemoveSelfie
                 }
                 onBack={() =>
-                  setStep(
-                    1
-                  )
+                  setStep(1)
                 }
                 onNext={
                   onNextDocuments
@@ -2930,9 +2679,6 @@ function VerificationWizard({
                 opacity: 0,
                 x: -20,
               }}
-              transition={{
-                duration: 0.25,
-              }}
             >
               <StepReview
                 documentType={
@@ -2951,9 +2697,7 @@ function VerificationWizard({
                   selfieImage
                 }
                 onBack={() =>
-                  setStep(
-                    2
-                  )
+                  setStep(2)
                 }
                 onSubmit={
                   onSubmit
@@ -2982,31 +2726,22 @@ function WizardProgress({
   const items = [
     {
       step: 1,
-      label:
-        "Identity",
+      label: "Identity",
     },
 
     {
       step: 2,
-      label:
-        "Documents",
+      label: "Documents",
     },
 
     {
       step: 3,
-      label:
-        "Review",
+      label: "Review",
     },
   ];
 
   return (
-    <div
-      className="
-        mt-5
-        flex
-        items-center
-      "
-    >
+    <div className="mt-5 flex items-center">
       {items.map(
         (
           item,
@@ -3025,26 +2760,15 @@ function WizardProgress({
               key={
                 item.step
               }
-              className={`
-                flex
-                items-center
-
-                ${
-                  index <
-                  items.length -
-                    1
-                    ? "flex-1"
-                    : ""
-                }
-              `}
+              className={`flex items-center ${
+                index <
+                items.length -
+                  1
+                  ? "flex-1"
+                  : ""
+              }`}
             >
-              <div
-                className="
-                  flex
-                  items-center
-                  gap-2
-                "
-              >
+              <div className="flex items-center gap-2">
                 <div
                   className={`
                     flex
@@ -3053,30 +2777,21 @@ function WizardProgress({
                     shrink-0
                     items-center
                     justify-center
-
                     rounded-full
-
                     text-[9px]
                     font-extrabold
-
                     transition-all
-
                     ${
                       completed
                         ? "bg-emerald-500 text-white"
                         : active
-                        ? "bg-[#1F5EA8] text-white shadow-[0_5px_15px_rgba(31,94,168,0.2)]"
-                        : "bg-[#EEF2F6] text-[#8B99A8]"
+                          ? "bg-primary text-primary-foreground shadow-[0_5px_15px_rgba(79,70,229,0.2)]"
+                          : "bg-muted text-muted-foreground"
                     }
                   `}
                 >
                   {completed ? (
-                    <Check
-                      className="
-                        h-3.5
-                        w-3.5
-                      "
-                    />
+                    <Check className="h-3.5 w-3.5" />
                   ) : (
                     item.step
                   )}
@@ -3085,24 +2800,19 @@ function WizardProgress({
                 <span
                   className={`
                     hidden
-
                     text-[9px]
                     font-bold
-
                     sm:block
-
                     ${
                       active
-                        ? "text-[#1F5EA8]"
+                        ? "text-primary"
                         : completed
-                        ? "text-emerald-600"
-                        : "text-[#93A0AE]"
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : "text-muted-foreground"
                     }
                   `}
                 >
-                  {
-                    item.label
-                  }
+                  {item.label}
                 </span>
               </div>
 
@@ -3114,8 +2824,7 @@ function WizardProgress({
                     mx-3
                     h-px
                     flex-1
-
-                    bg-[#E3E9EF]
+                    bg-border
                   "
                 >
                   <motion.div
@@ -3132,8 +2841,7 @@ function WizardProgress({
                     }}
                     className="
                       h-full
-
-                      bg-emerald-400
+                      bg-emerald-500
                     "
                   />
                 </div>
@@ -3158,24 +2866,21 @@ function StepIdentity({
   onNext,
 }: {
   documentType:
-    DocumentType | "";
+    | DocumentType
+    | "";
 
-  setDocumentType:
-    (
-      type:
-        DocumentType
-    ) => void;
+  setDocumentType: (
+    type: DocumentType
+  ) => void;
 
   documentNumber:
     string;
 
-  setDocumentNumber:
-    (
-      value: string
-    ) => void;
+  setDocumentNumber: (
+    value: string
+  ) => void;
 
-  onNext:
-    () => void;
+  onNext: () => void;
 }) {
   return (
     <div>
@@ -3184,36 +2889,30 @@ function StepIdentity({
           className="
             text-base
             font-extrabold
-
-            text-[#18324A]
+            text-card-foreground
           "
         >
-          Choose your identity
-          document
+          Choose your identity document
         </h3>
 
         <p
           className="
             mt-1
-
             text-xs
             leading-5
-
-            text-[#8190A1]
+            text-muted-foreground
           "
         >
-          Select a valid government
-          issued document.
+          Select a valid government issued
+          document.
         </p>
       </div>
 
       <div
         className="
           mt-5
-
           grid
           gap-3
-
           md:grid-cols-3
         "
       >
@@ -3245,24 +2944,17 @@ function StepIdentity({
                 }
                 className={`
                   relative
-
                   min-h-[145px]
-
                   rounded-[18px]
-
                   border
-
                   p-4
-
                   text-left
-
                   transition-all
                   duration-200
-
                   ${
                     selected
-                      ? "border-[#73AFE3] bg-[#F2F8FE] shadow-[0_8px_24px_rgba(31,94,168,0.08)]"
-                      : "border-[#E1E8EF] bg-white hover:border-[#C1D8EC] hover:bg-[#FAFCFE]"
+                      ? "border-primary/40 bg-primary/10 shadow-[0_8px_24px_rgba(79,70,229,0.08)]"
+                      : "border-border bg-card hover:border-primary/25 hover:bg-muted/50"
                   }
                 `}
               >
@@ -3272,26 +2964,17 @@ function StepIdentity({
                       absolute
                       right-3
                       top-3
-
                       flex
                       h-5
                       w-5
                       items-center
                       justify-center
-
                       rounded-full
-
-                      bg-[#1F5EA8]
-
-                      text-white
+                      bg-primary
+                      text-primary-foreground
                     "
                   >
-                    <Check
-                      className="
-                        h-3
-                        w-3
-                      "
-                    />
+                    <Check className="h-3 w-3" />
                   </span>
                 )}
 
@@ -3302,32 +2985,23 @@ function StepIdentity({
                     w-10
                     items-center
                     justify-center
-
                     rounded-[12px]
-
                     ${
                       selected
-                        ? "bg-[#1F5EA8] text-white"
-                        : "bg-[#F1F5F8] text-[#64788C]"
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground"
                     }
                   `}
                 >
-                  <Icon
-                    className="
-                      h-[18px]
-                      w-[18px]
-                    "
-                  />
+                  <Icon className="h-[18px] w-[18px]" />
                 </div>
 
                 <p
                   className="
                     mt-4
-
                     text-xs
                     font-extrabold
-
-                    text-[#273F55]
+                    text-card-foreground
                   "
                 >
                   {
@@ -3338,11 +3012,9 @@ function StepIdentity({
                 <p
                   className="
                     mt-1
-
                     text-[9px]
                     leading-4
-
-                    text-[#8B99A9]
+                    text-muted-foreground
                   "
                 >
                   {
@@ -3355,41 +3027,28 @@ function StepIdentity({
         )}
       </div>
 
-      <div
-        className="
-          mt-6
-        "
-      >
+      <div className="mt-6">
         <label
           htmlFor="documentNumber"
           className="
             text-[10px]
             font-extrabold
-
-            text-[#43596F]
+            text-muted-foreground
           "
         >
           Document Number
         </label>
 
-        <div
-          className="
-            relative
-            mt-2
-          "
-        >
+        <div className="relative mt-2">
           <FileText
             className="
               absolute
               left-4
               top-1/2
-
               h-4
               w-4
-
               -translate-y-1/2
-
-              text-[#8A9AAB]
+              text-muted-foreground
             "
           />
 
@@ -3403,8 +3062,7 @@ function StepIdentity({
               event
             ) =>
               setDocumentNumber(
-                event.target
-                  .value
+                event.target.value
               )
             }
             autoComplete="off"
@@ -3412,33 +3070,21 @@ function StepIdentity({
             className="
               h-12
               w-full
-
               rounded-[14px]
-
               border
-              border-[#DCE5ED]
-
-              bg-[#FAFCFE]
-
+              border-input
+              bg-background
               pl-11
               pr-4
-
               text-xs
               font-semibold
-
-              text-[#263E55]
-
+              text-foreground
               outline-none
-
               transition
-
-              placeholder:text-[#A1ADBA]
-
-              focus:border-[#7BB5E5]
-              focus:bg-white
-
+              placeholder:text-muted-foreground
+              focus:border-primary
               focus:ring-4
-              focus:ring-blue-500/[0.06]
+              focus:ring-primary/10
             "
           />
         </div>
@@ -3446,62 +3092,21 @@ function StepIdentity({
         <p
           className="
             mt-2
-
             text-[9px]
-
-            text-[#8B99A8]
+            text-muted-foreground
           "
         >
-          Enter the number exactly as
-          shown on your document.
+          Enter the number exactly as shown
+          on your document.
         </p>
       </div>
 
-      <div
-        className="
-          mt-7
-          flex
-          justify-end
-        "
-      >
-        <button
-          type="button"
-          onClick={
-            onNext
-          }
-          className="
-            flex
-            h-11
-            items-center
-            gap-2
-
-            rounded-[13px]
-
-            bg-[#1F5EA8]
-
-            px-5
-
-            text-[11px]
-            font-extrabold
-
-            text-white
-
-            shadow-[0_8px_20px_rgba(31,94,168,0.16)]
-
-            transition
-
-            hover:bg-[#194F8C]
-          "
-        >
+      <div className="mt-7 flex justify-end">
+        <PrimaryButton onClick={onNext}>
           Continue
 
-          <ArrowRight
-            className="
-              h-4
-              w-4
-            "
-          />
-        </button>
+          <ArrowRight className="h-4 w-4" />
+        </PrimaryButton>
       </div>
     </div>
   );
@@ -3524,7 +3129,8 @@ function StepDocuments({
   onNext,
 }: {
   documentType:
-    DocumentType | "";
+    | DocumentType
+    | "";
 
   frontImage:
     File | null;
@@ -3535,14 +3141,13 @@ function StepDocuments({
   selfieImage:
     File | null;
 
-  onFileChange:
-    (
-      file: File | null,
-      type:
-        | "front"
-        | "back"
-        | "selfie"
-    ) => void;
+  onFileChange: (
+    file: File | null,
+    type:
+      | "front"
+      | "back"
+      | "selfie"
+  ) => void;
 
   onRemoveFront:
     () => void;
@@ -3571,8 +3176,7 @@ function StepDocuments({
         className="
           text-base
           font-extrabold
-
-          text-[#18324A]
+          text-card-foreground
         "
       >
         Upload verification images
@@ -3581,41 +3185,33 @@ function StepDocuments({
       <p
         className="
           mt-1
-
           text-xs
           leading-5
-
-          text-[#8190A1]
+          text-muted-foreground
         "
       >
-        Use clear, readable images
-        without glare or blur.
+        Use clear, readable images without
+        glare or blur.
       </p>
 
       <div
         className="
           mt-5
-
           grid
           gap-4
-
           md:grid-cols-2
         "
       >
         <UploadCard
           id="front-image"
-          icon={
-            FileImage
-          }
+          icon={FileImage}
           title="Document front"
           description="Upload the front side"
           required
           file={
             frontImage
           }
-          onChange={(
-            file
-          ) =>
+          onChange={(file) =>
             onFileChange(
               file,
               "front"
@@ -3628,9 +3224,7 @@ function StepDocuments({
 
         <UploadCard
           id="back-image"
-          icon={
-            FileImage
-          }
+          icon={FileImage}
           title="Document back"
           description={
             backRequired
@@ -3643,9 +3237,7 @@ function StepDocuments({
           file={
             backImage
           }
-          onChange={(
-            file
-          ) =>
+          onChange={(file) =>
             onFileChange(
               file,
               "back"
@@ -3656,25 +3248,17 @@ function StepDocuments({
           }
         />
 
-        <div
-          className="
-            md:col-span-2
-          "
-        >
+        <div className="md:col-span-2">
           <UploadCard
             id="selfie-image"
-            icon={
-              Camera
-            }
+            icon={Camera}
             title="Identity selfie"
             description="Upload a recent, clear photo of yourself"
             required
             file={
               selfieImage
             }
-            onChange={(
-              file
-            ) =>
+            onChange={(file) =>
               onFileChange(
                 file,
                 "selfie"
@@ -3691,46 +3275,27 @@ function StepDocuments({
       <div
         className="
           mt-5
-
           rounded-[15px]
-
-          bg-[#F7FAFD]
-
+          bg-muted/40
           p-4
         "
       >
-        <div
-          className="
-            flex
-            items-start
-            gap-3
-          "
-        >
-          <ShieldCheck
-            className="
-              mt-0.5
-
-              h-4
-              w-4
-              shrink-0
-
-              text-[#1F5EA8]
-            "
-          />
+        <div className="flex items-start gap-3">
+          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
 
           <p
             className="
               text-[10px]
               leading-5
-
-              text-[#75889B]
+              text-muted-foreground
             "
           >
-            Accepted formats: JPG,
-            PNG and WEBP. Images are automatically optimized before upload.
-            Maximum processed size: 1 MB per image.
-            Make sure all information
-            is clearly visible.
+            Accepted formats: JPG, PNG and
+            WEBP. Images are automatically
+            optimized before upload. Maximum
+            processed size: 1 MB per image.
+            Make sure all information is
+            clearly visible.
           </p>
         </div>
       </div>
@@ -3738,7 +3303,6 @@ function StepDocuments({
       <div
         className="
           mt-7
-
           flex
           items-center
           justify-between
@@ -3750,12 +3314,7 @@ function StepDocuments({
             onBack
           }
         >
-          <ArrowLeft
-            className="
-              h-4
-              w-4
-            "
-          />
+          <ArrowLeft className="h-4 w-4" />
 
           Back
         </SecondaryButton>
@@ -3767,12 +3326,7 @@ function StepDocuments({
         >
           Review submission
 
-          <ArrowRight
-            className="
-              h-4
-              w-4
-            "
-          />
+          <ArrowRight className="h-4 w-4" />
         </PrimaryButton>
       </div>
     </div>
@@ -3834,20 +3388,13 @@ function StepReview({
             shrink-0
             items-center
             justify-center
-
             rounded-[14px]
-
-            bg-emerald-50
-
+            bg-emerald-500/10
             text-emerald-600
+            dark:text-emerald-400
           "
         >
-          <FileCheck2
-            className="
-              h-5
-              w-5
-            "
-          />
+          <FileCheck2 className="h-5 w-5" />
         </div>
 
         <div>
@@ -3855,8 +3402,7 @@ function StepReview({
             className="
               text-base
               font-extrabold
-
-              text-[#18324A]
+              text-card-foreground
             "
           >
             Review your submission
@@ -3865,15 +3411,12 @@ function StepReview({
           <p
             className="
               mt-1
-
               text-xs
-
-              text-[#8190A1]
+              text-muted-foreground
             "
           >
-            Check your information
-            before submitting it for
-            review.
+            Check your information before
+            submitting it for review.
           </p>
         </div>
       </div>
@@ -3881,14 +3424,10 @@ function StepReview({
       <div
         className="
           mt-6
-
           rounded-[18px]
-
           border
-          border-[#E1E8EF]
-
-          bg-[#FAFCFE]
-
+          border-border
+          bg-muted/30
           p-4
         "
       >
@@ -3935,32 +3474,21 @@ function StepReview({
       <div
         className="
           mt-5
-
           rounded-[16px]
-
           border
-          border-blue-100
-
-          bg-[#F2F8FE]
-
+          border-primary/15
+          bg-primary/5
           p-4
         "
       >
-        <div
-          className="
-            flex
-            gap-3
-          "
-        >
+        <div className="flex gap-3">
           <LockKeyhole
             className="
               mt-0.5
-
               h-4
               w-4
               shrink-0
-
-              text-[#1F5EA8]
+              text-primary
             "
           />
 
@@ -3968,14 +3496,13 @@ function StepReview({
             className="
               text-[10px]
               leading-5
-
-              text-[#627A91]
+              text-muted-foreground
             "
           >
-            By submitting, you confirm
-            that the information and
-            uploaded documents belong
-            to you and are accurate.
+            By submitting, you confirm that
+            the information and uploaded
+            documents belong to you and are
+            accurate.
           </p>
         </div>
       </div>
@@ -3983,11 +3510,9 @@ function StepReview({
       <div
         className="
           mt-7
-
           flex
           flex-col-reverse
           gap-3
-
           sm:flex-row
           sm:items-center
           sm:justify-between
@@ -4001,12 +3526,7 @@ function StepReview({
             submitting
           }
         >
-          <ArrowLeft
-            className="
-              h-4
-              w-4
-            "
-          />
+          <ArrowLeft className="h-4 w-4" />
 
           Back
         </SecondaryButton>
@@ -4025,48 +3545,28 @@ function StepReview({
             items-center
             justify-center
             gap-2
-
             rounded-[14px]
-
-            bg-[#1F5EA8]
-
+            bg-primary
             px-6
-
             text-[11px]
             font-extrabold
-
-            text-white
-
-            shadow-[0_10px_25px_rgba(31,94,168,0.2)]
-
+            text-primary-foreground
+            shadow-[0_10px_25px_rgba(79,70,229,0.2)]
             transition
-
-            hover:bg-[#184F8D]
-
+            hover:brightness-105
             disabled:cursor-not-allowed
             disabled:opacity-60
           "
         >
           {submitting ? (
             <>
-              <Loader2
-                className="
-                  h-4
-                  w-4
-                  animate-spin
-                "
-              />
+              <Loader2 className="h-4 w-4 animate-spin" />
 
               Uploading securely...
             </>
           ) : (
             <>
-              <ShieldCheck
-                className="
-                  h-4
-                  w-4
-                "
-              />
+              <ShieldCheck className="h-4 w-4" />
 
               Submit for Verification
             </>
@@ -4162,26 +3662,19 @@ function UploadCard({
       <div
         className="
           overflow-hidden
-
           rounded-[18px]
-
           border
-          border-emerald-200
-
-          bg-white
-
-          shadow-[0_8px_25px_rgba(16,185,129,0.06)]
+          border-emerald-500/20
+          bg-card
+          shadow-sm
         "
       >
         <div
           className="
             relative
-
             h-[190px]
-
             overflow-hidden
-
-            bg-[#EEF2F5]
+            bg-muted
           "
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -4193,7 +3686,6 @@ function UploadCard({
             className={`
               h-full
               w-full
-
               ${
                 selfie
                   ? "object-cover"
@@ -4207,9 +3699,7 @@ function UploadCard({
               absolute
               inset-x-0
               bottom-0
-
               h-20
-
               bg-gradient-to-t
               from-black/50
               to-transparent
@@ -4225,32 +3715,20 @@ function UploadCard({
               absolute
               right-3
               top-3
-
               flex
               h-8
               w-8
               items-center
               justify-center
-
               rounded-[10px]
-
               bg-black/55
-
               text-white
-
               backdrop-blur-md
-
               transition
-
               hover:bg-rose-500
             "
           >
-            <X
-              className="
-                h-3.5
-                w-3.5
-              "
-            />
+            <X className="h-3.5 w-3.5" />
           </button>
 
           <div
@@ -4259,29 +3737,19 @@ function UploadCard({
               bottom-3
               left-3
               right-3
-
               flex
               items-center
               gap-2
-
               text-white
             "
           >
-            <CheckCircle2
-              className="
-                h-4
-                w-4
-
-                text-emerald-300
-              "
-            />
+            <CheckCircle2 className="h-4 w-4 text-emerald-300" />
 
             <p
               className="
                 min-w-0
                 flex-1
                 truncate
-
                 text-[10px]
                 font-bold
               "
@@ -4298,44 +3766,30 @@ function UploadCard({
 
   return (
     <label
-      htmlFor={
-        id
-      }
+      htmlFor={id}
       className="
         group
-
         flex
         min-h-[190px]
-
         cursor-pointer
-
         flex-col
         items-center
         justify-center
-
         rounded-[18px]
-
         border
         border-dashed
-        border-[#CBD9E6]
-
-        bg-[#FAFCFE]
-
+        border-border
+        bg-muted/20
         p-5
-
         text-center
-
         transition-all
         duration-200
-
-        hover:border-[#7CB6E6]
-        hover:bg-[#F4F9FE]
+        hover:border-primary/40
+        hover:bg-primary/5
       "
     >
       <input
-        id={
-          id
-        }
+        id={id}
         type="file"
         accept="image/jpeg,image/png,image/webp"
         className="hidden"
@@ -4343,8 +3797,7 @@ function UploadCard({
           event
         ) => {
           const selected =
-            event.target
-              .files?.[0] ??
+            event.target.files?.[0] ??
             null;
 
           onChange(
@@ -4357,9 +3810,7 @@ function UploadCard({
       />
 
       <div
-        className="
-          relative
-        "
+        className="relative"
       >
         <div
           className="
@@ -4368,26 +3819,16 @@ function UploadCard({
             w-12
             items-center
             justify-center
-
             rounded-[15px]
-
-            bg-[#EDF5FC]
-
-            text-[#1F5EA8]
-
+            bg-primary/10
+            text-primary
             transition
-
             group-hover:scale-105
-            group-hover:bg-[#1F5EA8]
-            group-hover:text-white
+            group-hover:bg-primary
+            group-hover:text-primary-foreground
           "
         >
-          <Icon
-            className="
-              h-5
-              w-5
-            "
-          />
+          <Icon className="h-5 w-5" />
         </div>
 
         <div
@@ -4395,51 +3836,36 @@ function UploadCard({
             absolute
             -bottom-1
             -right-1
-
             flex
             h-5
             w-5
             items-center
             justify-center
-
             rounded-full
-
             border-2
-            border-white
-
-            bg-[#102A43]
-
+            border-card
+            bg-slate-900
             text-white
+            dark:bg-white
+            dark:text-slate-900
           "
         >
-          <UploadCloud
-            className="
-              h-2.5
-              w-2.5
-            "
-          />
+          <UploadCloud className="h-2.5 w-2.5" />
         </div>
       </div>
 
       <p
         className="
           mt-4
-
           text-xs
           font-extrabold
-
-          text-[#314A60]
+          text-card-foreground
         "
       >
         {title}
 
         {required && (
-          <span
-            className="
-              ml-1
-              text-rose-500
-            "
-          >
+          <span className="ml-1 text-rose-500">
             *
           </span>
         )}
@@ -4448,34 +3874,26 @@ function UploadCard({
       <p
         className="
           mt-1
-
           text-[9px]
-
-          text-[#8B9AAA]
+          text-muted-foreground
         "
       >
-        {
-          description
-        }
+        {description}
       </p>
 
       <span
         className="
           mt-3
-
           rounded-full
-
-          bg-white
-
+          bg-card
           px-3
           py-1.5
-
           text-[8px]
           font-bold
-
-          text-[#74869A]
-
+          text-muted-foreground
           shadow-sm
+          ring-1
+          ring-border
         "
       >
         Click to upload
@@ -4499,7 +3917,8 @@ function RequirementCard({
   icon:
     React.ElementType;
 
-  title: string;
+  title:
+    string;
 
   description:
     string;
@@ -4514,16 +3933,11 @@ function RequirementCard({
       }}
       className="
         rounded-[18px]
-
         border
-        border-[#E1E8EF]
-
-        bg-[#FBFCFE]
-
+        border-border
+        bg-muted/30
         p-4
-
         transition-shadow
-
         hover:shadow-[0_12px_30px_rgba(17,47,78,0.06)]
       "
     >
@@ -4541,121 +3955,47 @@ function RequirementCard({
             w-10
             items-center
             justify-center
-
             rounded-[12px]
-
-            bg-[#EEF6FD]
-
-            text-[#1F5EA8]
+            bg-primary/10
+            text-primary
           "
         >
-          <Icon
-            className="
-              h-[17px]
-              w-[17px]
-            "
-          />
+          <Icon className="h-[17px] w-[17px]" />
         </div>
 
         <span
           className="
             text-[9px]
             font-black
-
-            text-[#C1CDD8]
+            text-muted-foreground/50
           "
         >
-          {
-            number
-          }
+          {number}
         </span>
       </div>
 
       <h3
         className="
           mt-4
-
           text-[11px]
           font-extrabold
-
-          text-[#30495F]
+          text-card-foreground
         "
       >
-        {
-          title
-        }
+        {title}
       </h3>
 
       <p
         className="
           mt-1.5
-
           text-[9px]
           leading-4
-
-          text-[#8796A6]
+          text-muted-foreground
         "
       >
-        {
-          description
-        }
+        {description}
       </p>
     </motion.div>
-  );
-}
-
-/* =========================================================
-   SECURITY POINT
-========================================================= */
-
-function SecurityPoint({
-  icon: Icon,
-  text,
-}: {
-  icon:
-    React.ElementType;
-
-  text:
-    string;
-}) {
-  return (
-    <div
-      className="
-        flex
-        items-center
-        gap-2
-
-        text-[10px]
-        font-semibold
-
-        text-[#677B8F]
-      "
-    >
-      <div
-        className="
-          flex
-          h-6
-          w-6
-          items-center
-          justify-center
-
-          rounded-lg
-
-          bg-emerald-50
-
-          text-emerald-600
-        "
-      >
-        <Icon
-          className="
-            h-3
-            w-3
-          "
-        />
-      </div>
-
-      {text}
-    </div>
   );
 }
 
@@ -4680,38 +4020,29 @@ function InfoRow({
         items-center
         justify-between
         gap-4
-
         py-1
       "
     >
       <span
         className="
           text-[9px]
-
-          text-[#8B99A8]
+          text-muted-foreground
         "
       >
-        {
-          label
-        }
+        {label}
       </span>
 
       <span
         className="
           max-w-[170px]
-
           truncate
-
           text-right
           text-[9px]
           font-bold
-
-          text-[#43596F]
+          text-card-foreground
         "
       >
-        {
-          value
-        }
+        {value}
       </span>
     </div>
   );
@@ -4740,16 +4071,13 @@ function ReviewRow({
         flex
         flex-col
         gap-1.5
-
         py-3
-
         sm:flex-row
         sm:items-center
         sm:justify-between
-
         ${
           !last
-            ? "border-b border-[#E7EDF3]"
+            ? "border-b border-border"
             : ""
         }
       `}
@@ -4757,37 +4085,29 @@ function ReviewRow({
       <span
         className="
           text-[10px]
-
-          text-[#7D8D9E]
+          text-muted-foreground
         "
       >
-        {
-          label
-        }
+        {label}
       </span>
 
       <span
         className="
           max-w-[300px]
-
           truncate
-
           text-[10px]
           font-bold
-
-          text-[#30485E]
+          text-card-foreground
         "
       >
-        {
-          value
-        }
+        {value}
       </span>
     </div>
   );
 }
 
 /* =========================================================
-   BUTTONS
+   PRIMARY BUTTON
 ========================================================= */
 
 function PrimaryButton({
@@ -4819,32 +4139,27 @@ function PrimaryButton({
         items-center
         justify-center
         gap-2
-
         rounded-[13px]
-
-        bg-[#1F5EA8]
-
+        bg-primary
         px-5
-
         text-[11px]
         font-extrabold
-
-        text-white
-
+        text-primary-foreground
+        shadow-[0_8px_20px_rgba(79,70,229,0.16)]
         transition
-
-        hover:bg-[#184F8D]
-
+        hover:brightness-105
         disabled:cursor-not-allowed
         disabled:opacity-60
       "
     >
-      {
-        children
-      }
+      {children}
     </button>
   );
 }
+
+/* =========================================================
+   SECONDARY BUTTON
+========================================================= */
 
 function SecondaryButton({
   children,
@@ -4875,39 +4190,29 @@ function SecondaryButton({
         items-center
         justify-center
         gap-2
-
         rounded-[13px]
-
         border
-        border-[#DCE5ED]
-
-        bg-white
-
+        border-border
+        bg-background
         px-4
-
         text-[11px]
         font-bold
-
-        text-[#64788C]
-
+        text-muted-foreground
         transition
-
-        hover:border-[#BFD5E8]
-        hover:bg-[#F8FBFD]
-        hover:text-[#1F5EA8]
-
+        hover:border-primary/30
+        hover:bg-primary/5
+        hover:text-primary
+        disabled:cursor-not-allowed
         disabled:opacity-60
       "
     >
-      {
-        children
-      }
+      {children}
     </button>
   );
 }
 
 /* =========================================================
-   MESSAGE
+   MESSAGE ALERT
 ========================================================= */
 
 function MessageAlert({
@@ -4952,32 +4257,26 @@ function MessageAlert({
         flex
         items-start
         gap-3
-
         rounded-[16px]
-
         border
-
         p-4
-
         ${
           success
-            ? "border-emerald-200 bg-emerald-50"
-            : "border-rose-200 bg-rose-50"
+            ? "border-emerald-500/20 bg-emerald-500/10"
+            : "border-rose-500/20 bg-rose-500/10"
         }
       `}
     >
       <Icon
         className={`
           mt-0.5
-
           h-4
           w-4
           shrink-0
-
           ${
             success
-              ? "text-emerald-600"
-              : "text-rose-600"
+              ? "text-emerald-600 dark:text-emerald-400"
+              : "text-rose-600 dark:text-rose-400"
           }
         `}
       />
@@ -4986,21 +4285,17 @@ function MessageAlert({
         className={`
           min-w-0
           flex-1
-
           text-xs
           font-semibold
           leading-5
-
           ${
             success
-              ? "text-emerald-700"
-              : "text-rose-700"
+              ? "text-emerald-700 dark:text-emerald-300"
+              : "text-rose-700 dark:text-rose-300"
           }
         `}
       >
-        {
-          message
-        }
+        {message}
       </p>
 
       <button
@@ -5008,16 +4303,9 @@ function MessageAlert({
         onClick={
           onClose
         }
-        className="
-          shrink-0
-        "
+        className="shrink-0 text-muted-foreground"
       >
-        <X
-          className="
-            h-4
-            w-4
-          "
-        />
+        <X className="h-4 w-4" />
       </button>
     </motion.div>
   );
@@ -5035,6 +4323,7 @@ function KYCLoadingState() {
         min-h-[65vh]
         items-center
         justify-center
+        bg-background
       "
     >
       <div
@@ -5042,47 +4331,33 @@ function KYCLoadingState() {
           flex
           flex-col
           items-center
-
           text-center
         "
       >
         <div
           className="
             relative
-
             flex
             h-16
             w-16
             items-center
             justify-center
-
             rounded-[20px]
-
-            bg-[#1F5EA8]
-
-            text-white
-
-            shadow-[0_15px_35px_rgba(31,94,168,0.2)]
+            bg-primary
+            text-primary-foreground
+            shadow-[0_15px_35px_rgba(79,70,229,0.2)]
           "
         >
-          <Fingerprint
-            className="
-              h-7
-              w-7
-            "
-          />
+          <Fingerprint className="h-7 w-7" />
 
           <div
             className="
               absolute
               -inset-2
-
               animate-ping
-
               rounded-[24px]
-
               border
-              border-blue-300/40
+              border-primary/30
             "
           />
         </div>
@@ -5090,11 +4365,9 @@ function KYCLoadingState() {
         <h3
           className="
             mt-5
-
             text-sm
             font-extrabold
-
-            text-[#18324A]
+            text-foreground
           "
         >
           Loading verification
@@ -5103,10 +4376,8 @@ function KYCLoadingState() {
         <p
           className="
             mt-1
-
             text-[10px]
-
-            text-[#8A99A9]
+            text-muted-foreground
           "
         >
           Checking your KYC status...
@@ -5123,7 +4394,9 @@ function KYCLoadingState() {
 function getStatusConfig(
   status: KYCStatus
 ) {
-  switch (status) {
+  switch (
+    status
+  ) {
     case "pending":
       return {
         label:
@@ -5137,12 +4410,6 @@ function getStatusConfig(
 
         icon:
           Clock3,
-
-        iconBox:
-          "bg-amber-50 text-amber-600",
-
-        badge:
-          "bg-amber-50 text-amber-700",
       };
 
     case "under_review":
@@ -5158,12 +4425,6 @@ function getStatusConfig(
 
         icon:
           ScanFace,
-
-        iconBox:
-          "bg-blue-50 text-blue-600",
-
-        badge:
-          "bg-blue-50 text-blue-700",
       };
 
     case "verified":
@@ -5179,12 +4440,6 @@ function getStatusConfig(
 
         icon:
           BadgeCheck,
-
-        iconBox:
-          "bg-emerald-50 text-emerald-600",
-
-        badge:
-          "bg-emerald-50 text-emerald-700",
       };
 
     case "rejected":
@@ -5200,12 +4455,6 @@ function getStatusConfig(
 
         icon:
           AlertCircle,
-
-        iconBox:
-          "bg-rose-50 text-rose-600",
-
-        badge:
-          "bg-rose-50 text-rose-700",
       };
 
     default:
@@ -5221,18 +4470,66 @@ function getStatusConfig(
 
         icon:
           Fingerprint,
-
-        iconBox:
-          "bg-[#EEF6FD] text-[#1F5EA8]",
-
-        badge:
-          "bg-[#F1F5F8] text-[#708397]",
       };
   }
 }
 
 /* =========================================================
-   HELPERS
+   STATUS ICON THEME
+========================================================= */
+
+function getStatusIconTheme(
+  status: KYCStatus
+): string {
+  switch (
+    status
+  ) {
+    case "pending":
+      return "bg-amber-500/10 text-amber-600 dark:text-amber-400";
+
+    case "under_review":
+      return "bg-primary/10 text-primary";
+
+    case "verified":
+      return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+
+    case "rejected":
+      return "bg-rose-500/10 text-rose-600 dark:text-rose-400";
+
+    default:
+      return "bg-primary/10 text-primary";
+  }
+}
+
+/* =========================================================
+   STATUS BADGE THEME
+========================================================= */
+
+function getStatusBadgeTheme(
+  status: KYCStatus
+): string {
+  switch (
+    status
+  ) {
+    case "pending":
+      return "bg-amber-500/10 text-amber-700 dark:text-amber-300";
+
+    case "under_review":
+      return "bg-primary/10 text-primary";
+
+    case "verified":
+      return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
+
+    case "rejected":
+      return "bg-rose-500/10 text-rose-700 dark:text-rose-300";
+
+    default:
+      return "bg-muted text-muted-foreground";
+  }
+}
+
+/* =========================================================
+   DOCUMENT TYPE
 ========================================================= */
 
 function formatDocumentType(
@@ -5255,11 +4552,16 @@ function formatDocumentType(
   return "Passport";
 }
 
+/* =========================================================
+   MASK DOCUMENT
+========================================================= */
+
 function maskDocumentNumber(
   value: string
 ): string {
   if (
-    value.length <= 4
+    value.length <=
+    4
   ) {
     return value;
   }
@@ -5267,10 +4569,17 @@ function maskDocumentNumber(
   return `${"•".repeat(
     Math.min(
       8,
-      value.length - 4
+      value.length -
+        4
     )
-  )}${value.slice(-4)}`;
+  )}${value.slice(
+    -4
+  )}`;
 }
+
+/* =========================================================
+   DATE
+========================================================= */
 
 function formatDate(
   value: string
@@ -5310,6 +4619,10 @@ function formatDate(
     date
   );
 }
+
+/* =========================================================
+   CAPITALIZE
+========================================================= */
 
 function capitalize(
   value: string
