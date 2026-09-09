@@ -1,14 +1,37 @@
 "use client";
 
-import React from "react";
-import { AlertTriangle, ArrowUpRight } from "lucide-react";
-import { motion } from "framer-motion";
+import React, {
+  useMemo,
+} from "react";
 
-import type { UserRecord } from "./UserManagementTypes";
+import {
+  AlertTriangle,
+  ArrowUpRight,
+  CheckCircle2,
+  ShieldAlert,
+  Users,
+} from "lucide-react";
+
+import {
+  motion,
+} from "framer-motion";
+
+import type {
+  UserRecord,
+} from "./UserManagementTypes";
+
+import UserAvatar from "./UserAvatar";
+
+/* =========================================================
+   TYPES
+========================================================= */
 
 interface UserAnalyticsProps {
   users: UserRecord[];
-  onOpenUser: (user: UserRecord) => void;
+
+  onOpenUser: (
+    user: UserRecord
+  ) => void;
 }
 
 interface Segment {
@@ -22,176 +45,815 @@ interface DonutProps {
   segments: Segment[];
 }
 
+/* =========================================================
+   COMPONENT
+========================================================= */
+
 export default function UserAnalytics({
   users,
   onOpenUser,
 }: UserAnalyticsProps) {
-  const total = Math.max(1, users.length);
+  const analytics =
+    useMemo(() => {
+      const safeUsers =
+        Array.isArray(
+          users
+        )
+          ? users
+          : [];
 
-  const healthy = users.filter(
-    (user) =>
-      user.status === "active" &&
-      user.riskLevel === "low" &&
-      user.kycStatus === "verified"
-  ).length;
+      const total =
+        safeUsers.length;
 
-  const pending = users.filter((user) =>
-    ["pending", "under_review"].includes(user.kycStatus)
-  ).length;
+      const healthy =
+        safeUsers.filter(
+          (user) =>
+            user.status ===
+              "active" &&
+            user.riskLevel ===
+              "low" &&
+            user.kycStatus ===
+              "verified"
+        ).length;
 
-  const risky = users.filter((user) => user.riskLevel === "high");
-  const suspended = users.filter((user) => user.status === "suspended").length;
+      const pending =
+        safeUsers.filter(
+          (user) =>
+            user.kycStatus ===
+              "pending" ||
+            user.kycStatus ===
+              "under_review"
+        ).length;
 
-  const initialSegments: Segment[] = [
-    { label: "Healthy", value: healthy, color: "#10B981" },
-    { label: "KYC pending", value: pending, color: "#F59E0B" },
-    { label: "High risk", value: risky.length, color: "#F43F5E" },
-    { label: "Suspended", value: suspended, color: "#94A3B8" },
-  ];
+      const highRisk =
+        safeUsers.filter(
+          (user) =>
+            user.riskLevel ===
+            "high"
+        );
 
-  const allocated = initialSegments.reduce((sum, item) => sum + item.value, 0);
-  const remaining = users.length - allocated;
+      const suspended =
+        safeUsers.filter(
+          (user) =>
+            user.status ===
+            "suspended"
+        ).length;
+
+      return {
+        total,
+        healthy,
+        pending,
+        highRisk,
+        suspended,
+      };
+    }, [users]);
+
+  const safeTotal =
+    Math.max(
+      1,
+      analytics.total
+    );
+
+  const healthyPercent =
+    Math.round(
+      (analytics.healthy /
+        safeTotal) *
+        100
+    );
 
   const segments =
-    remaining > 0
-      ? [
-          ...initialSegments,
-          { label: "Other", value: remaining, color: "#3B82F6" },
-        ]
-      : initialSegments;
+    useMemo<Segment[]>(() => {
+      const base: Segment[] =
+        [
+          {
+            label:
+              "Healthy",
+            value:
+              analytics.healthy,
+            color:
+              "var(--dashboard-success)",
+          },
+          {
+            label:
+              "KYC pending",
+            value:
+              analytics.pending,
+            color:
+              "var(--dashboard-warning)",
+          },
+          {
+            label:
+              "High risk",
+            value:
+              analytics.highRisk
+                .length,
+            color:
+              "var(--dashboard-danger)",
+          },
+          {
+            label:
+              "Suspended",
+            value:
+              analytics.suspended,
+            color:
+              "var(--muted-foreground)",
+          },
+        ];
 
-  const healthyPercent = Math.round((healthy / total) * 100);
+      const allocated =
+        base.reduce(
+          (
+            sum,
+            item
+          ) =>
+            sum +
+            item.value,
+          0
+        );
+
+      const remaining =
+        Math.max(
+          0,
+          analytics.total -
+            allocated
+        );
+
+      if (
+        remaining >
+        0
+      ) {
+        base.push({
+          label:
+            "Other",
+          value:
+            remaining,
+          color:
+            "var(--dashboard-primary)",
+        });
+      }
+
+      return base;
+    }, [
+      analytics,
+    ]);
 
   return (
-    <section className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(340px,.65fr)]">
-      {/* Population Overview Card */}
-      <article className="min-w-0 rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-[10px] font-extrabold uppercase tracking-[.15em] text-slate-400">
-              User base health
-            </p>
-            <h2 className="mt-1 text-xl font-black text-[#0F2745]">
-              Population overview
-            </h2>
-            <p className="mt-1 text-xs text-slate-400">
-              Live distribution of operational account states.
+    <section
+      className="
+        grid
+        min-w-0
+        gap-5
+        xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,.65fr)]
+      "
+    >
+      {/* ===================================================
+          POPULATION OVERVIEW
+      ==================================================== */}
+
+      <motion.article
+        initial={{
+          opacity: 0,
+          y: 14,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        whileHover={{
+          y: -3,
+        }}
+        className="
+          min-w-0
+          overflow-hidden
+          rounded-[28px]
+          border
+          border-border
+          bg-card
+          p-5
+          shadow-[var(--dashboard-shadow)]
+          sm:p-6
+        "
+      >
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span
+                className="
+                  flex
+                  h-10
+                  w-10
+                  items-center
+                  justify-center
+                  rounded-xl
+                "
+                style={{
+                  background:
+                    "var(--dashboard-primary-soft)",
+                  color:
+                    "var(--dashboard-primary)",
+                }}
+              >
+                <Users className="h-4 w-4" />
+              </span>
+
+              <div>
+                <p
+                  className="
+                    text-[9px]
+                    font-black
+                    uppercase
+                    tracking-[0.15em]
+                  "
+                  style={{
+                    color:
+                      "var(--dashboard-primary)",
+                  }}
+                >
+                  User Base Health
+                </p>
+
+                <h2 className="mt-0.5 text-xl font-black tracking-tight text-card-foreground">
+                  Population overview
+                </h2>
+              </div>
+            </div>
+
+            <p className="mt-3 max-w-xl text-xs leading-5 text-muted-foreground">
+              Live distribution of operational account states,
+              verification readiness and risk posture.
             </p>
           </div>
 
-          <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-right">
-            <p className="text-[9px] font-extrabold uppercase text-emerald-600">
+          {/* healthy score */}
+
+          <motion.div
+            animate={{
+              y: [
+                0,
+                -2,
+                0,
+              ],
+            }}
+            transition={{
+              duration: 2.8,
+              repeat:
+                Infinity,
+              ease: "easeInOut",
+            }}
+            className="
+              shrink-0
+              rounded-2xl
+              border
+              px-4
+              py-3
+            "
+            style={{
+              background:
+                "color-mix(in srgb, var(--dashboard-success) 10%, var(--card))",
+              borderColor:
+                "color-mix(in srgb, var(--dashboard-success) 22%, var(--border))",
+            }}
+          >
+            <p
+              className="
+                text-[9px]
+                font-black
+                uppercase
+                tracking-[0.12em]
+              "
+              style={{
+                color:
+                  "var(--dashboard-success)",
+              }}
+            >
               Healthy base
             </p>
-            <p className="text-2xl font-black text-emerald-800">
+
+            <p
+              className="
+                mt-0.5
+                text-2xl
+                font-black
+              "
+              style={{
+                color:
+                  "var(--dashboard-success)",
+              }}
+            >
               {healthyPercent}%
             </p>
-          </div>
+          </motion.div>
         </div>
 
-        <div className="mt-6 grid items-center gap-6 lg:grid-cols-[190px_minmax(0,1fr)]">
-          <Donut total={users.length} segments={segments} />
+        <div className="mt-7 grid items-center gap-7 lg:grid-cols-[190px_minmax(0,1fr)]">
+          <Donut
+            total={
+              analytics.total
+            }
+            segments={
+              segments
+            }
+          />
 
           <div className="grid gap-3 sm:grid-cols-2">
-            {segments.slice(0, 4).map((segment) => (
-              <div
-                key={segment.label}
-                className="flex min-w-0 items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-3.5"
-              >
-                <span className="flex min-w-0 items-center gap-2 text-xs font-semibold text-slate-600">
-                  <i
-                    className="h-2.5 w-2.5 shrink-0 rounded-full"
-                    style={{ background: segment.color }}
-                  />
-                  <span className="truncate">{segment.label}</span>
-                </span>
-                <strong className="text-xs text-slate-900">
-                  {Math.round((segment.value / total) * 100)}%
-                </strong>
-              </div>
-            ))}
+            {segments
+              .slice(
+                0,
+                4
+              )
+              .map(
+                (
+                  segment,
+                  index
+                ) => (
+                  <motion.div
+                    key={
+                      segment.label
+                    }
+                    initial={{
+                      opacity: 0,
+                      x: 8,
+                    }}
+                    animate={{
+                      opacity: 1,
+                      x: 0,
+                    }}
+                    transition={{
+                      delay:
+                        index *
+                        0.06,
+                    }}
+                    className="
+                      flex
+                      min-w-0
+                      items-center
+                      justify-between
+                      gap-3
+                      rounded-2xl
+                      border
+                      border-border
+                      bg-muted/30
+                      p-3.5
+                    "
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span
+                        className="h-2.5 w-2.5 shrink-0 rounded-full"
+                        style={{
+                          background:
+                            segment.color,
+                        }}
+                      />
+
+                      <span className="truncate text-xs font-semibold text-card-foreground">
+                        {segment.label}
+                      </span>
+                    </span>
+
+                    <strong className="shrink-0 text-xs font-black text-card-foreground">
+                      {Math.round(
+                        (segment.value /
+                          safeTotal) *
+                          100
+                      )}
+                      %
+                    </strong>
+                  </motion.div>
+                )
+              )}
           </div>
         </div>
-      </article>
 
-      {/* Risk Watchlist Card */}
-      <article className="min-w-0 rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <div className="flex items-center justify-between gap-3">
+        {/* bottom insight */}
+
+        <div
+          className="
+            mt-6
+            flex
+            items-start
+            gap-3
+            rounded-2xl
+            border
+            border-border
+            p-3.5
+          "
+          style={{
+            background:
+              "var(--dashboard-primary-soft)",
+          }}
+        >
+          <CheckCircle2
+            className="mt-0.5 h-4 w-4 shrink-0"
+            style={{
+              color:
+                "var(--dashboard-primary)",
+            }}
+          />
+
           <div>
-            <p className="text-[10px] font-extrabold uppercase tracking-[.15em] text-slate-400">
-              Risk watchlist
+            <p className="text-xs font-black text-card-foreground">
+              Operational snapshot
             </p>
-            <h2 className="mt-1 text-xl font-black text-[#0F2745]">
+
+            <p className="mt-1 text-[10px] leading-5 text-muted-foreground">
+              {analytics.total.toLocaleString()} accounts are currently
+              loaded from the connected users data source.
+            </p>
+          </div>
+        </div>
+      </motion.article>
+
+      {/* ===================================================
+          RISK WATCHLIST
+      ==================================================== */}
+
+      <motion.article
+        initial={{
+          opacity: 0,
+          y: 14,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        transition={{
+          delay:
+            0.08,
+        }}
+        whileHover={{
+          y: -3,
+        }}
+        className="
+          min-w-0
+          overflow-hidden
+          rounded-[28px]
+          border
+          border-border
+          bg-card
+          p-5
+          shadow-[var(--dashboard-shadow)]
+          sm:p-6
+        "
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p
+              className="
+                text-[9px]
+                font-black
+                uppercase
+                tracking-[0.15em]
+              "
+              style={{
+                color:
+                  "var(--dashboard-warning)",
+              }}
+            >
+              Risk Watchlist
+            </p>
+
+            <h2 className="mt-1 text-xl font-black text-card-foreground">
               Needs attention
             </h2>
+
+            <p className="mt-1 text-xs text-muted-foreground">
+              Highest risk users requiring review.
+            </p>
           </div>
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-500">
+
+          <motion.span
+            animate={{
+              rotate: [
+                0,
+                -5,
+                5,
+                0,
+              ],
+            }}
+            transition={{
+              duration: 3,
+              repeat:
+                Infinity,
+              ease: "easeInOut",
+            }}
+            className="
+              flex
+              h-10
+              w-10
+              shrink-0
+              items-center
+              justify-center
+              rounded-xl
+            "
+            style={{
+              background:
+                "color-mix(in srgb, var(--dashboard-warning) 12%, transparent)",
+              color:
+                "var(--dashboard-warning)",
+            }}
+          >
             <AlertTriangle className="h-5 w-5" />
-          </span>
+          </motion.span>
         </div>
 
         <div className="mt-5 space-y-2.5">
-          {risky.length > 0 ? (
-            risky.slice(0, 4).map((user) => (
-              <motion.button
-                key={user.id}
-                type="button"
-                whileHover={{ x: 3 }}
-                onClick={() => onOpenUser(user)}
-                className="group flex w-full items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-3 text-left transition hover:border-amber-200 hover:bg-amber-50"
-              >
-                <span className="flex min-w-0 items-center gap-3">
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-xs font-black text-rose-600">
-                    {getInitials(user.name)}
-                  </span>
-                  <span className="min-w-0">
-                    <strong className="block truncate text-sm text-slate-900">
-                      {user.name}
-                    </strong>
-                    <small className="text-[10px] text-slate-400">
-                      Risk score {user.riskScore}/100
-                    </small>
-                  </span>
-                </span>
-                <ArrowUpRight className="h-4 w-4 shrink-0 text-slate-300 transition group-hover:text-amber-600" />
-              </motion.button>
-            ))
+          {analytics.highRisk
+            .length >
+          0 ? (
+            analytics.highRisk
+              .slice(
+                0,
+                5
+              )
+              .map(
+                (
+                  user,
+                  index
+                ) => (
+                  <motion.button
+                    key={
+                      user.id
+                    }
+                    type="button"
+                    initial={{
+                      opacity: 0,
+                      x: 8,
+                    }}
+                    animate={{
+                      opacity: 1,
+                      x: 0,
+                    }}
+                    transition={{
+                      delay:
+                        index *
+                        0.05,
+                    }}
+                    whileHover={{
+                      x: 3,
+                    }}
+                    whileTap={{
+                      scale:
+                        0.99,
+                    }}
+                    onClick={() =>
+                      onOpenUser(
+                        user
+                      )
+                    }
+                    className="
+                      group
+                      flex
+                      w-full
+                      items-center
+                      justify-between
+                      gap-3
+                      rounded-2xl
+                      border
+                      border-border
+                      bg-muted/30
+                      p-3
+                      text-left
+                      transition
+                    "
+                  >
+                    <span className="flex min-w-0 items-center gap-3">
+                      <UserAvatar
+                        name={
+                          user.name
+                        }
+                        avatarUrl={
+                          user.avatarUrl
+                        }
+                        status={
+                          user.status
+                        }
+                        size="md"
+                      />
+
+                      <span className="min-w-0">
+                        <strong className="block truncate text-xs font-black text-card-foreground">
+                          {user.name}
+                        </strong>
+
+                        <small className="mt-0.5 block text-[10px] text-muted-foreground">
+                          Risk score{" "}
+                          {user.riskScore}
+                          /100
+                        </small>
+                      </span>
+                    </span>
+
+                    <span
+                      className="
+                        flex
+                        h-8
+                        w-8
+                        shrink-0
+                        items-center
+                        justify-center
+                        rounded-lg
+                      "
+                      style={{
+                        background:
+                          "color-mix(in srgb, var(--dashboard-danger) 10%, transparent)",
+                        color:
+                          "var(--dashboard-danger)",
+                      }}
+                    >
+                      <ArrowUpRight className="h-4 w-4" />
+                    </span>
+                  </motion.button>
+                )
+              )
           ) : (
-            <div className="rounded-2xl bg-emerald-50 p-4 text-xs font-semibold text-emerald-800">
-              No high-risk users right now.
+            <div
+              className="
+                rounded-2xl
+                border
+                border-border
+                p-5
+              "
+              style={{
+                background:
+                  "color-mix(in srgb, var(--dashboard-success) 8%, var(--card))",
+              }}
+            >
+              <ShieldAlert
+                className="h-5 w-5"
+                style={{
+                  color:
+                    "var(--dashboard-success)",
+                }}
+              />
+
+              <p className="mt-3 text-xs font-black text-card-foreground">
+                No high-risk users
+              </p>
+
+              <p className="mt-1 text-[10px] leading-5 text-muted-foreground">
+                Current user population has no accounts flagged as high risk.
+              </p>
             </div>
           )}
         </div>
-      </article>
+
+        <div className="mt-5 grid grid-cols-2 gap-2">
+          <MiniMetric
+            label="KYC pending"
+            value={
+              analytics.pending
+            }
+            tone="warning"
+          />
+
+          <MiniMetric
+            label="Suspended"
+            value={
+              analytics.suspended
+            }
+            tone="danger"
+          />
+        </div>
+      </motion.article>
     </section>
   );
 }
 
-// Sub-component: Donut SVG Chart
-function Donut({ total, segments }: DonutProps) {
-  const safeTotal = Math.max(1, total);
-  const radius = 39;
-  const circumference = 2 * Math.PI * radius;
+/* =========================================================
+   MINI METRIC
+========================================================= */
 
-  // Pure state calculation before rendering map
-  let accumulatedValue = 0;
-  const computedSegments = segments.map((segment) => {
-    const offset = -(accumulatedValue / safeTotal) * circumference;
-    accumulatedValue += segment.value;
-    const dash = (segment.value / safeTotal) * circumference;
-
-    return {
-      ...segment,
-      dash,
-      offset,
-    };
-  });
+function MiniMetric({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number;
+  tone:
+    | "warning"
+    | "danger";
+}) {
+  const isWarning =
+    tone ===
+    "warning";
 
   return (
-    <div className="relative mx-auto h-44 w-44">
+    <div
+      className="
+        rounded-xl
+        border
+        border-border
+        p-3
+      "
+      style={{
+        background:
+          isWarning
+            ? "color-mix(in srgb, var(--dashboard-warning) 7%, var(--card))"
+            : "color-mix(in srgb, var(--dashboard-danger) 7%, var(--card))",
+      }}
+    >
+      <p className="text-[9px] font-black uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+
+      <p
+        className="mt-1 text-lg font-black"
+        style={{
+          color:
+            isWarning
+              ? "var(--dashboard-warning)"
+              : "var(--dashboard-danger)",
+        }}
+      >
+        {value.toLocaleString()}
+      </p>
+    </div>
+  );
+}
+
+/* =========================================================
+   DONUT
+========================================================= */
+
+function Donut({
+  total,
+  segments,
+}: DonutProps) {
+  const safeTotal =
+    Math.max(
+      1,
+      total
+    );
+
+  const radius = 39;
+
+  const circumference =
+    2 *
+    Math.PI *
+    radius;
+
+  let accumulatedValue =
+    0;
+
+  const computedSegments =
+    segments.map(
+      (
+        segment
+      ) => {
+        const offset =
+          -(
+            accumulatedValue /
+            safeTotal
+          ) *
+          circumference;
+
+        accumulatedValue +=
+          segment.value;
+
+        const dash =
+          (segment.value /
+            safeTotal) *
+          circumference;
+
+        return {
+          ...segment,
+          dash,
+          offset,
+        };
+      }
+    );
+
+  return (
+    <motion.div
+      initial={{
+        opacity: 0,
+        scale:
+          0.92,
+      }}
+      animate={{
+        opacity: 1,
+        scale: 1,
+      }}
+      transition={{
+        type: "spring",
+        stiffness: 220,
+        damping: 22,
+      }}
+      className="
+        relative
+        mx-auto
+        h-44
+        w-44
+      "
+    >
       <svg
         viewBox="0 0 100 100"
-        className="h-full w-full -rotate-90"
+        className="
+          h-full
+          w-full
+          -rotate-90
+        "
         role="img"
         aria-label="User population distribution"
       >
@@ -200,46 +862,69 @@ function Donut({ total, segments }: DonutProps) {
           cy="50"
           r={radius}
           fill="none"
-          stroke="#E2E8F0"
+          stroke="var(--muted)"
           strokeWidth="12"
         />
-        {computedSegments.map((segment, index) => (
-          <motion.circle
-            key={segment.label}
-            cx="50"
-            cy="50"
-            r={radius}
-            fill="none"
-            stroke={segment.color}
-            strokeWidth="12"
-            strokeDasharray={`${segment.dash} ${circumference - segment.dash}`}
-            strokeDashoffset={segment.offset}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: index * 0.08 }}
-          />
-        ))}
+
+        {computedSegments.map(
+          (
+            segment,
+            index
+          ) => (
+            <motion.circle
+              key={
+                segment.label
+              }
+              cx="50"
+              cy="50"
+              r={radius}
+              fill="none"
+              stroke={
+                segment.color
+              }
+              strokeWidth="12"
+              strokeLinecap="round"
+              strokeDasharray={`${segment.dash} ${circumference - segment.dash}`}
+              strokeDashoffset={
+                segment.offset
+              }
+              initial={{
+                opacity: 0,
+                pathLength: 0,
+              }}
+              animate={{
+                opacity: 1,
+                pathLength: 1,
+              }}
+              transition={{
+                opacity: {
+                  delay:
+                    index *
+                    0.06,
+                },
+                pathLength: {
+                  duration:
+                    0.8,
+                  delay:
+                    index *
+                    0.06,
+                  ease: "easeOut",
+                },
+              }}
+            />
+          )
+        )}
       </svg>
+
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <strong className="text-3xl font-black text-[#0F2745]">
-          {total}
+        <strong className="text-3xl font-black tracking-tight text-card-foreground">
+          {total.toLocaleString()}
         </strong>
-        <span className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400">
+
+        <span className="text-[9px] font-black uppercase tracking-[0.12em] text-muted-foreground">
           Users
         </span>
       </div>
-    </div>
+    </motion.div>
   );
-}
-
-// Helper: Safe Initials Extractor
-function getInitials(name: string): string {
-  if (!name) return "";
-  return name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase();
 }

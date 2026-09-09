@@ -1,6 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import type {
   ColumnKey,
@@ -18,6 +23,10 @@ import type {
 
 import { usersApi } from "@/lib/api/users-api";
 
+/* =========================================================
+   DEFAULT FILTERS
+========================================================= */
+
 const defaultFilters: UserFilters = {
   status: "all",
   kycStatus: "all",
@@ -26,6 +35,10 @@ const defaultFilters: UserFilters = {
   walletStatus: "all",
   activity: "all",
 };
+
+/* =========================================================
+   DEFAULT COLUMNS
+========================================================= */
 
 const defaultColumns: ColumnVisibility = {
   phone: true,
@@ -37,35 +50,106 @@ const defaultColumns: ColumnVisibility = {
   joined: false,
 };
 
-export function useUsers() {
-  const [users, setUsers] = useState<UserRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+/* =========================================================
+   VALID PAGE SIZES
+========================================================= */
 
-  const [search, setSearchState] = useState("");
+const PAGE_SIZES = [10, 25, 50] as const;
+
+type ValidPageSize = (typeof PAGE_SIZES)[number];
+
+/* =========================================================
+   CONSTANTS
+========================================================= */
+
+const INACTIVE_30_DAYS = 30 * 24 * 60 * 60 * 1000;
+
+const ONE_WEEK = 7 * 24 * 60 * 60 * 1000;
+
+/*
+ * Small polling interval.
+ *
+ * This keeps the admin user list reasonably fresh while
+ * avoiding aggressive API traffic.
+ */
+const POLLING_INTERVAL = 10_000;
+
+/* =========================================================
+   HOOK
+========================================================= */
+
+export function useUsers() {
+  /* =======================================================
+     USER DATA
+  ======================================================= */
+
+  const [users, setUsers] =
+    useState<UserRecord[]>([]);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [refreshing, setRefreshing] =
+    useState(false);
+
+  /* =======================================================
+     FILTER / SEARCH
+  ======================================================= */
+
+  const [search, setSearchState] =
+    useState("");
+
   const [filters, setFilters] =
-    useState<UserFilters>(defaultFilters);
+    useState<UserFilters>(
+      defaultFilters
+    );
+
+  /* =======================================================
+     COLUMNS
+  ======================================================= */
 
   const [columns, setColumns] =
-    useState<ColumnVisibility>(defaultColumns);
+    useState<ColumnVisibility>(
+      defaultColumns
+    );
 
-  const [sort, setSort] = useState<SortState>({
-    field: "lastActive",
-    direction: "desc",
-  });
+  /* =======================================================
+     SORT
+  ======================================================= */
 
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [sort, setSort] =
+    useState<SortState>({
+      field: "lastActive",
+      direction: "desc",
+    });
+
+  /* =======================================================
+     PAGINATION
+  ======================================================= */
+
+  const [page, setPage] =
+    useState(1);
+
+  const [pageSize, setPageSize] =
+    useState<ValidPageSize>(10);
+
+  /* =======================================================
+     TOAST
+  ======================================================= */
 
   const [toast, setToast] =
-    useState<ToastState | null>(null);
+    useState<ToastState | null>(
+      null
+    );
 
-  /* =============================
-     LOAD REAL USERS FROM API
-  ============================== */
+  /* =======================================================
+     LOAD USERS
+  ======================================================= */
 
   const loadUsers = useCallback(
-    async (refresh = false) => {
+    async (
+      refresh = false
+    ) => {
       if (refresh) {
         setRefreshing(true);
       } else {
@@ -73,456 +157,1247 @@ export function useUsers() {
       }
 
       try {
-        const response = await usersApi.list();
+        const response =
+          await usersApi.list();
+
+        const nextUsers =
+          Array.isArray(
+            response?.users
+          )
+            ? response.users
+            : [];
 
         setUsers(
-          Array.isArray(response.users)
-            ? response.users
-            : []
+          nextUsers
+        );
+
+        /*
+         * Keep current page valid
+         * when fresh backend data changes.
+         */
+        const backendTotalPages =
+          Math.max(
+            1,
+            Math.ceil(
+              nextUsers.length /
+                pageSize
+            )
+          );
+
+        setPage(
+          (
+            currentPage
+          ) =>
+            Math.min(
+              currentPage,
+              backendTotalPages
+            )
         );
 
         if (refresh) {
           setToast({
             type: "success",
-            message: "User data refreshed.",
+            message:
+              "User data refreshed successfully.",
           });
         }
       } catch (error) {
-        setUsers([]);
+        /*
+         * During refresh, keep old data visible
+         * instead of wiping a working table.
+         */
+        if (!refresh) {
+          setUsers([]);
+        }
 
         setToast({
           type: "error",
           message:
-            error instanceof Error
-              ? error.message
-              : "Could not load users.",
+            getError(error),
         });
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    []
+    [pageSize]
   );
+
+  /* =======================================================
+     INITIAL LOAD
+  ======================================================= */
 
   useEffect(() => {
     void loadUsers();
   }, [loadUsers]);
 
-  /* =============================
-     FILTER AND SORT
-  ============================== */
+  /* =======================================================
+     AUTO REFRESH / POLLING
+  ======================================================= */
 
-  const filteredUsers = useMemo(() => {
-    const now = Date.now();
-    const normalizedSearch =
-      search.trim().toLowerCase();
+  useEffect(() => {
+    let cancelled = false;
 
-    return users
-      .filter((user) => {
-        const searchableValues = [
-          user.name,
-          user.email,
-          user.phone,
-          user.id,
-        ];
+    const refreshUsers =
+      async () => {
+        if (cancelled) {
+          return;
+        }
 
-        const matchesSearch =
-          !normalizedSearch ||
-          searchableValues.some((value) =>
-            value
-              .toLowerCase()
-              .includes(normalizedSearch)
+        try {
+          /*
+           * Silent refresh:
+           * we intentionally don't trigger
+           * the visible "refreshing" state.
+           */
+          const response =
+            await usersApi.list();
+
+          if (
+            cancelled
+          ) {
+            return;
+          }
+
+          const nextUsers =
+            Array.isArray(
+              response?.users
+            )
+              ? response.users
+              : [];
+
+          setUsers(
+            nextUsers
           );
 
-        const matchesActivity =
-          filters.activity === "all" ||
-          (() => {
-            const lastActiveTime =
-              new Date(user.lastActive).getTime();
+          setPage(
+            (
+              currentPage
+            ) => {
+              const maxPages =
+                Math.max(
+                  1,
+                  Math.ceil(
+                    nextUsers.length /
+                      pageSize
+                  )
+                );
 
-            const age = now - lastActiveTime;
-
-            if (filters.activity === "today") {
-              return age <= 86_400_000;
+              return Math.min(
+                currentPage,
+                maxPages
+              );
             }
+          );
+        } catch (
+          error
+        ) {
+          /*
+           * Polling failures are intentionally
+           * silent so the dashboard does not show
+           * repeated error toasts every 10 seconds.
+           */
+          console.error(
+            "USER POLLING ERROR:",
+            error
+          );
+        }
+      };
 
-            if (filters.activity === "week") {
-              return age <= 604_800_000;
-            }
+    const intervalId =
+      window.setInterval(
+        () => {
+          void refreshUsers();
+        },
+        POLLING_INTERVAL
+      );
 
-            return age > 2_592_000_000;
-          })();
+    const handleFocus =
+      () => {
+        void refreshUsers();
+      };
 
-        return (
-          matchesSearch &&
-          (filters.status === "all" ||
-            user.status === filters.status) &&
-          (filters.kycStatus === "all" ||
-            user.kycStatus ===
-              filters.kycStatus) &&
-          (filters.role === "all" ||
-            user.role === filters.role) &&
-          (filters.riskLevel === "all" ||
-            user.riskLevel ===
-              filters.riskLevel) &&
-          (filters.walletStatus === "all" ||
-            user.walletStatus ===
-              filters.walletStatus) &&
-          matchesActivity
-        );
-      })
-      .sort((firstUser, secondUser) => {
-        const firstValue = valueForSort(
-          firstUser,
-          sort.field
-        );
+    window.addEventListener(
+      "focus",
+      handleFocus
+    );
 
-        const secondValue = valueForSort(
-          secondUser,
-          sort.field
-        );
+    return () => {
+      cancelled = true;
 
-        const result =
-          typeof firstValue === "number" &&
-          typeof secondValue === "number"
-            ? firstValue - secondValue
-            : String(firstValue).localeCompare(
-                String(secondValue)
+      window.clearInterval(
+        intervalId
+      );
+
+      window.removeEventListener(
+        "focus",
+        handleFocus
+      );
+    };
+  }, [pageSize]);
+
+  /* =======================================================
+     FILTER + SEARCH + SORT
+  ======================================================= */
+
+  const filteredUsers =
+    useMemo(() => {
+      const now =
+        Date.now();
+
+      const normalizedSearch =
+        search
+          .trim()
+          .toLowerCase();
+
+      const result =
+        users.filter(
+          (
+            user
+          ) => {
+            /* ---------------------------------------------
+               SEARCH
+            ---------------------------------------------- */
+
+            const searchableValues =
+              [
+                user.name,
+                user.email,
+                user.phone,
+                user.id,
+                user.walletId,
+                user.city,
+                user.country,
+              ];
+
+            const matchesSearch =
+              !normalizedSearch ||
+              searchableValues.some(
+                (
+                  value
+                ) =>
+                  String(
+                    value ??
+                      ""
+                  )
+                    .toLowerCase()
+                    .includes(
+                      normalizedSearch
+                    )
               );
 
-        return sort.direction === "asc"
-          ? result
-          : -result;
-      });
-  }, [filters, search, sort, users]);
+            if (
+              !matchesSearch
+            ) {
+              return false;
+            }
 
-  /* =============================
+            /* ---------------------------------------------
+               STATUS
+            ---------------------------------------------- */
+
+            const matchesStatus =
+              filters.status ===
+                "all" ||
+              user.status ===
+                filters.status;
+
+            if (
+              !matchesStatus
+            ) {
+              return false;
+            }
+
+            /* ---------------------------------------------
+               KYC
+            ---------------------------------------------- */
+
+            const matchesKyc =
+              filters.kycStatus ===
+                "all" ||
+              user.kycStatus ===
+                filters.kycStatus;
+
+            if (
+              !matchesKyc
+            ) {
+              return false;
+            }
+
+            /* ---------------------------------------------
+               ROLE
+            ---------------------------------------------- */
+
+            const matchesRole =
+              filters.role ===
+                "all" ||
+              user.role ===
+                filters.role;
+
+            if (
+              !matchesRole
+            ) {
+              return false;
+            }
+
+            /* ---------------------------------------------
+               RISK
+            ---------------------------------------------- */
+
+            const matchesRisk =
+              filters.riskLevel ===
+                "all" ||
+              user.riskLevel ===
+                filters.riskLevel;
+
+            if (
+              !matchesRisk
+            ) {
+              return false;
+            }
+
+            /* ---------------------------------------------
+               WALLET
+            ---------------------------------------------- */
+
+            const matchesWallet =
+              filters.walletStatus ===
+                "all" ||
+              user.walletStatus ===
+                filters.walletStatus;
+
+            if (
+              !matchesWallet
+            ) {
+              return false;
+            }
+
+            /* ---------------------------------------------
+               ACTIVITY
+            ---------------------------------------------- */
+
+            const matchesActivity =
+              filters.activity ===
+                "all" ||
+              (() => {
+                const lastActive =
+                  new Date(
+                    user.lastActive
+                  ).getTime();
+
+                if (
+                  !Number.isFinite(
+                    lastActive
+                  )
+                ) {
+                  return (
+                    filters.activity ===
+                    "inactive"
+                  );
+                }
+
+                const age =
+                  now -
+                  lastActive;
+
+                if (
+                  filters.activity ===
+                  "today"
+                ) {
+                  return (
+                    age >= 0 &&
+                    age <=
+                      24 *
+                        60 *
+                        60 *
+                        1000
+                  );
+                }
+
+                if (
+                  filters.activity ===
+                  "week"
+                ) {
+                  return (
+                    age >= 0 &&
+                    age <=
+                      ONE_WEEK
+                  );
+                }
+
+                return (
+                  age >
+                  INACTIVE_30_DAYS
+                );
+              })();
+
+            return matchesActivity;
+          }
+        );
+
+      /* ===================================================
+         SORT
+      ==================================================== */
+
+      return result.sort(
+        (
+          firstUser,
+          secondUser
+        ) => {
+          const firstValue =
+            valueForSort(
+              firstUser,
+              sort.field
+            );
+
+          const secondValue =
+            valueForSort(
+              secondUser,
+              sort.field
+            );
+
+          let comparison = 0;
+
+          if (
+            typeof firstValue ===
+              "number" &&
+            typeof secondValue ===
+              "number"
+          ) {
+            comparison =
+              firstValue -
+              secondValue;
+          } else {
+            comparison =
+              String(
+                firstValue ??
+                  ""
+              ).localeCompare(
+                String(
+                  secondValue ??
+                    ""
+                ),
+                undefined,
+                {
+                  numeric: true,
+                  sensitivity:
+                    "base",
+                }
+              );
+          }
+
+          return sort.direction ===
+            "asc"
+            ? comparison
+            : -comparison;
+        }
+      );
+    }, [
+      filters,
+      search,
+      sort,
+      users,
+    ]);
+
+  /* =======================================================
      PAGINATION
-  ============================== */
+  ======================================================= */
 
-  const totalPages = Math.max(
-    1,
-    Math.ceil(filteredUsers.length / pageSize)
-  );
+  const totalPages =
+    Math.max(
+      1,
+      Math.ceil(
+        filteredUsers.length /
+          pageSize
+      )
+    );
+
+  const safePage =
+    Math.min(
+      Math.max(
+        page,
+        1
+      ),
+      totalPages
+    );
 
   const paginatedUsers =
     filteredUsers.slice(
-      (page - 1) * pageSize,
-      page * pageSize
+      (safePage - 1) *
+        pageSize,
+      safePage *
+        pageSize
     );
 
+  /* =======================================================
+     KEEP PAGE VALID
+  ======================================================= */
+
   useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [page, totalPages]);
-
-  /* =============================
-     STATISTICS
-  ============================== */
-
-  const stats = useMemo<UserStats>(() => {
-    const weekAgo =
-      Date.now() - 604_800_000;
-
-    return {
-      totalUsers: users.length,
-
-      activeUsers: users.filter(
-        (user) => user.status === "active"
-      ).length,
-
-      suspended: users.filter(
-        (user) => user.status === "suspended"
-      ).length,
-
-      pendingKyc: users.filter((user) =>
-        ["pending", "under_review"].includes(
-          user.kycStatus
-        )
-      ).length,
-
-      highRisk: users.filter(
-        (user) => user.riskLevel === "high"
-      ).length,
-
-      newThisWeek: users.filter(
-        (user) =>
-          new Date(user.joinedAt).getTime() >=
-          weekAgo
-      ).length,
-    };
-  }, [users]);
-
-  /* =============================
-     UI CONTROLS
-  ============================== */
-
-  const setSearch = (value: string) => {
-    setSearchState(value);
-    setPage(1);
-  };
-
-  const setFilter = <
-    K extends UserFilterKey
-  >(
-    key: K,
-    value: UserFilters[K]
-  ) => {
-    setFilters((current) => ({
-      ...current,
-      [key]: value,
-    }));
-
-    setPage(1);
-  };
-
-  const clearFilters = () => {
-    setFilters(defaultFilters);
-    setSearchState("");
-    setPage(1);
-  };
-
-  const toggleColumn = (
-    key: ColumnKey
-  ) => {
-    setColumns((current) => ({
-      ...current,
-      [key]: !current[key],
-    }));
-  };
-
-  const toggleSort = (
-    field: SortField
-  ) => {
-    setSort((current) => ({
-      field,
-      direction:
-        current.field === field &&
-        current.direction === "asc"
-          ? "desc"
-          : "asc",
-    }));
-  };
-
-  const updatePageSize = (
-    size: number
-  ) => {
-    setPageSize(size);
-    setPage(1);
-  };
-
-  /* =============================
-     CREATE USER
-  ============================== */
-
-  const createUser = async (
-    input: CreateUserInput
-  ) => {
-    try {
-      const createdUser =
-        await usersApi.create(input);
-
-      setUsers((current) => [
-        createdUser,
-        ...current,
-      ]);
-
-      setToast({
-        type: "success",
-        message: `${createdUser.name} was created.`,
-      });
-    } catch (error) {
-      setToast({
-        type: "error",
-        message: getError(error),
-      });
-
-      throw error;
-    }
-  };
-
-  /* =============================
-     UPDATE USER
-  ============================== */
-
-  const updateUser = async (
-    id: string,
-    patch: UpdateUserInput
-  ) => {
-    try {
-      const updatedUser =
-        await usersApi.update(id, patch);
-
-      setUsers((current) =>
-        current.map((user) =>
-          user.id === id
-            ? updatedUser
-            : user
-        )
+    if (
+      page !==
+      safePage
+    ) {
+      setPage(
+        safePage
       );
-
-      setToast({
-        type: "success",
-        message: "User changes saved.",
-      });
-    } catch (error) {
-      setToast({
-        type: "error",
-        message: getError(error),
-      });
-
-      throw error;
     }
-  };
+  }, [
+    page,
+    safePage,
+  ]);
 
-  /* =============================
-     DELETE USER
-  ============================== */
+  /* =======================================================
+     USER STATISTICS
+  ======================================================= */
 
-  const deleteUser = async (
-    id: string
-  ) => {
-    try {
-      await usersApi.remove(id);
+  const stats =
+    useMemo<UserStats>(
+      () => {
+        const weekAgo =
+          Date.now() -
+          ONE_WEEK;
 
-      setUsers((current) =>
-        current.filter(
-          (user) => user.id !== id
-        )
-      );
+        return {
+          totalUsers:
+            users.length,
 
-      setToast({
-        type: "success",
-        message: "User deleted.",
-      });
-    } catch (error) {
-      setToast({
-        type: "error",
-        message: getError(error),
-      });
+          activeUsers:
+            users.filter(
+              (
+                user
+              ) =>
+                user.status ===
+                "active"
+            ).length,
 
-      throw error;
-    }
-  };
+          suspended:
+            users.filter(
+              (
+                user
+              ) =>
+                user.status ===
+                "suspended"
+            ).length,
 
-  /* =============================
-     BULK UPDATE
-  ============================== */
+          pendingKyc:
+            users.filter(
+              (
+                user
+              ) =>
+                user.kycStatus ===
+                  "pending" ||
+                user.kycStatus ===
+                  "under_review"
+            ).length,
 
-  const bulkUpdate = async (
-    ids: string[],
-    patch: UpdateUserInput
-  ) => {
-    try {
-      await usersApi.bulkUpdate(
-        ids,
-        patch
-      );
+          highRisk:
+            users.filter(
+              (
+                user
+              ) =>
+                user.riskLevel ===
+                "high"
+            ).length,
 
-      const selectedIds = new Set(ids);
+          newThisWeek:
+            users.filter(
+              (
+                user
+              ) => {
+                const joined =
+                  new Date(
+                    user.joinedAt
+                  ).getTime();
 
-      setUsers((current) =>
-        current.map((user) =>
-          selectedIds.has(user.id)
-            ? {
-                ...user,
-                ...patch,
+                return (
+                  Number.isFinite(
+                    joined
+                  ) &&
+                  joined >=
+                    weekAgo
+                );
               }
-            : user
-        )
-      );
+            ).length,
+        };
+      },
+      [users]
+    );
 
-      setToast({
-        type: "success",
-        message: `${ids.length} user(s) updated.`,
-      });
-    } catch (error) {
-      setToast({
-        type: "error",
-        message: getError(error),
-      });
+  /* =======================================================
+     SEARCH
+  ======================================================= */
 
-      throw error;
-    }
-  };
+  const setSearch =
+    useCallback(
+      (
+        value: string
+      ) => {
+        setSearchState(
+          value
+        );
 
-  /* =============================
+        setPage(
+          1
+        );
+      },
+      []
+    );
+
+  /* =======================================================
+     FILTER
+  ======================================================= */
+
+  const setFilter =
+    useCallback(
+      <
+        K extends UserFilterKey
+      >(
+        key: K,
+        value: UserFilters[K]
+      ) => {
+        setFilters(
+          (
+            current
+          ) => ({
+            ...current,
+            [key]:
+              value,
+          })
+        );
+
+        setPage(
+          1
+        );
+      },
+      []
+    );
+
+  /* =======================================================
+     CLEAR FILTERS
+  ======================================================= */
+
+  const clearFilters =
+    useCallback(
+      () => {
+        setFilters(
+          defaultFilters
+        );
+
+        setSearchState(
+          ""
+        );
+
+        setPage(
+          1
+        );
+      },
+      []
+    );
+
+  /* =======================================================
+     COLUMN VISIBILITY
+  ======================================================= */
+
+  const toggleColumn =
+    useCallback(
+      (
+        key: ColumnKey
+      ) => {
+        setColumns(
+          (
+            current
+          ) => ({
+            ...current,
+            [key]:
+              !current[key],
+          })
+        );
+      },
+      []
+    );
+
+  /* =======================================================
+     SORT
+  ======================================================= */
+
+  const toggleSort =
+    useCallback(
+      (
+        field: SortField
+      ) => {
+        setSort(
+          (
+            current
+          ) => {
+            if (
+              current.field ===
+              field
+            ) {
+              return {
+                field,
+                direction:
+                  current.direction ===
+                  "asc"
+                    ? "desc"
+                    : "asc",
+              };
+            }
+
+            return {
+              field,
+              direction:
+                "asc",
+            };
+          }
+        );
+
+        setPage(
+          1
+        );
+      },
+      []
+    );
+
+  /* =======================================================
+     PAGE SIZE
+  ======================================================= */
+
+  const updatePageSize =
+    useCallback(
+      (
+        size: number
+      ) => {
+        const nextSize =
+          PAGE_SIZES.includes(
+            size as ValidPageSize
+          )
+            ? (size as ValidPageSize)
+            : 10;
+
+        setPageSize(
+          nextSize
+        );
+
+        setPage(
+          1
+        );
+      },
+      []
+    );
+
+  /* =======================================================
+     CREATE USER
+  ======================================================= */
+
+  const createUser =
+    useCallback(
+      async (
+        input: CreateUserInput
+      ) => {
+        try {
+          const createdUser =
+            await usersApi.create(
+              input
+            );
+
+          /*
+           * Backend remains source of truth.
+           *
+           * We optimistically insert the response,
+           * then silently refresh so server-normalized
+           * values are reflected.
+           */
+          setUsers(
+            (
+              current
+            ) => [
+              createdUser,
+              ...current.filter(
+                (
+                  user
+                ) =>
+                  user.id !==
+                  createdUser.id
+              ),
+            ]
+          );
+
+          setPage(
+            1
+          );
+
+          setToast({
+            type: "success",
+            message: `${createdUser.name} was created successfully.`,
+          });
+
+          /*
+           * Sync again with backend.
+           */
+          try {
+            const response =
+              await usersApi.list();
+
+            if (
+              Array.isArray(
+                response?.users
+              )
+            ) {
+              setUsers(
+                response.users
+              );
+            }
+          } catch (
+            syncError
+          ) {
+            console.error(
+              "CREATE USER SYNC ERROR:",
+              syncError
+            );
+          }
+        } catch (
+          error
+        ) {
+          setToast({
+            type: "error",
+            message:
+              getError(
+                error
+              ),
+          });
+
+          throw error;
+        }
+      },
+      []
+    );
+
+  /* =======================================================
+     UPDATE USER
+  ======================================================= */
+
+  const updateUser =
+    useCallback(
+      async (
+        id: string,
+        patch: UpdateUserInput
+      ) => {
+        try {
+          const updatedUser =
+            await usersApi.update(
+              id,
+              patch
+            );
+
+          setUsers(
+            (
+              current
+            ) =>
+              current.map(
+                (
+                  user
+                ) =>
+                  user.id === id
+                    ? updatedUser
+                    : user
+              )
+          );
+
+          setToast({
+            type: "success",
+            message:
+              "User changes saved successfully.",
+          });
+
+          /*
+           * Re-fetch the list because
+           * backend may normalize/recalculate
+           * wallet, risk, KYC, sessions etc.
+           */
+          try {
+            const response =
+              await usersApi.list();
+
+            if (
+              Array.isArray(
+                response?.users
+              )
+            ) {
+              setUsers(
+                response.users
+              );
+            }
+          } catch (
+            syncError
+          ) {
+            console.error(
+              "UPDATE USER SYNC ERROR:",
+              syncError
+            );
+          }
+        } catch (
+          error
+        ) {
+          setToast({
+            type: "error",
+            message:
+              getError(
+                error
+              ),
+          });
+
+          throw error;
+        }
+      },
+      []
+    );
+
+  /* =======================================================
+     DELETE USER
+  ======================================================= */
+
+  const deleteUser =
+    useCallback(
+      async (
+        id: string
+      ) => {
+        try {
+          await usersApi.remove(
+            id
+          );
+
+          setUsers(
+            (
+              current
+            ) =>
+              current.filter(
+                (
+                  user
+                ) =>
+                  user.id !==
+                  id
+              )
+          );
+
+          setToast({
+            type: "success",
+            message:
+              "User deleted successfully.",
+          });
+        } catch (
+          error
+        ) {
+          setToast({
+            type: "error",
+            message:
+              getError(
+                error
+              ),
+          });
+
+          throw error;
+        }
+      },
+      []
+    );
+
+  /* =======================================================
+     BULK UPDATE
+  ======================================================= */
+
+  const bulkUpdate =
+    useCallback(
+      async (
+        ids: string[],
+        patch: UpdateUserInput
+      ) => {
+        const uniqueIds =
+          [
+            ...new Set(
+              ids.filter(
+                Boolean
+              )
+            ),
+          ];
+
+        if (
+          uniqueIds.length ===
+          0
+        ) {
+          return;
+        }
+
+        try {
+          await usersApi.bulkUpdate(
+            uniqueIds,
+            patch
+          );
+
+          const selectedIds =
+            new Set(
+              uniqueIds
+            );
+
+          setUsers(
+            (
+              current
+            ) =>
+              current.map(
+                (
+                  user
+                ) =>
+                  selectedIds.has(
+                    user.id
+                  )
+                    ? {
+                        ...user,
+                        ...patch,
+                      }
+                    : user
+              )
+          );
+
+          setToast({
+            type: "success",
+            message: `${uniqueIds.length} user(s) updated successfully.`,
+          });
+
+          /*
+           * Important:
+           * Some server-side fields may be recalculated.
+           * Sync after bulk operation.
+           */
+          try {
+            const response =
+              await usersApi.list();
+
+            if (
+              Array.isArray(
+                response?.users
+              )
+            ) {
+              setUsers(
+                response.users
+              );
+            }
+          } catch (
+            syncError
+          ) {
+            console.error(
+              "BULK UPDATE SYNC ERROR:",
+              syncError
+            );
+          }
+        } catch (
+          error
+        ) {
+          setToast({
+            type: "error",
+            message:
+              getError(
+                error
+              ),
+          });
+
+          throw error;
+        }
+      },
+      []
+    );
+
+  /* =======================================================
      CURRENT ADMIN PROFILE
-  ============================== */
+  ======================================================= */
 
   const tryLoadRealProfile =
-    useCallback(async () => {
-      try {
-        const profile =
-          await usersApi.currentProfile();
+    useCallback(
+      async () => {
+        try {
+          const profile =
+            await usersApi.currentProfile();
 
-        return profile.role;
-      } catch {
-        return "User" as const;
-      }
-    }, []);
+          return profile.role;
+        } catch (
+          error
+        ) {
+          console.error(
+            "CURRENT PROFILE LOAD ERROR:",
+            error
+          );
+
+          return "User" as const;
+        }
+      },
+      []
+    );
+
+  /* =======================================================
+     MANUAL REFRESH
+  ======================================================= */
+
+  const refresh =
+    useCallback(
+      async () => {
+        await loadUsers(
+          true
+        );
+      },
+      [loadUsers]
+    );
+
+  /* =======================================================
+     RETURN
+  ======================================================= */
 
   return {
+    /* -----------------------------------------------
+       DATA
+    ----------------------------------------------- */
+
     users,
     filteredUsers,
     paginatedUsers,
     stats,
+
+    /* -----------------------------------------------
+       FILTER / UI STATE
+    ----------------------------------------------- */
+
     filters,
     columns,
     sort,
     search,
-    page,
+
+    /* -----------------------------------------------
+       PAGINATION
+    ----------------------------------------------- */
+
+    page:
+      safePage,
     pageSize,
     totalPages,
+
+    /* -----------------------------------------------
+       LOADING
+    ----------------------------------------------- */
+
     loading,
     refreshing,
-    toast,
 
+    /* -----------------------------------------------
+       TOAST
+    ----------------------------------------------- */
+
+    toast,
     setToast,
+
+    /* -----------------------------------------------
+       SEARCH / FILTERS
+    ----------------------------------------------- */
+
     setSearch,
     setPage,
     updatePageSize,
     setFilter,
     clearFilters,
+
+    /* -----------------------------------------------
+       COLUMNS / SORT
+    ----------------------------------------------- */
+
     toggleColumn,
     toggleSort,
+
+    /* -----------------------------------------------
+       USER CRUD
+    ----------------------------------------------- */
 
     createUser,
     updateUser,
     deleteUser,
     bulkUpdate,
 
-    refresh: () => loadUsers(true),
+    /* -----------------------------------------------
+       REFRESH
+    ----------------------------------------------- */
+
+    refresh,
+
+    /* -----------------------------------------------
+       AUTH / PROFILE
+    ----------------------------------------------- */
+
     tryLoadRealProfile,
   };
 }
+
+/* =========================================================
+   SORT VALUE
+========================================================= */
 
 function valueForSort(
   user: UserRecord,
   field: SortField
 ): string | number {
-  if (field === "riskScore") {
-    return user.riskScore;
-  }
-
-  if (
-    field === "lastActive" ||
-    field === "joinedAt"
+  switch (
+    field
   ) {
-    return new Date(
-      user[field]
-    ).getTime();
-  }
+    case "riskScore":
+      return Number(
+        user.riskScore ?? 0
+      );
 
-  return user[field];
+    case "lastActive":
+    case "joinedAt": {
+      const timestamp =
+        new Date(
+          user[field]
+        ).getTime();
+
+      return Number.isFinite(
+        timestamp
+      )
+        ? timestamp
+        : 0;
+    }
+
+    case "name":
+      return user.name ?? "";
+
+    case "role":
+      return user.role ?? "";
+
+    case "kycStatus":
+      return (
+        user.kycStatus ??
+        ""
+      );
+
+    case "walletStatus":
+      return (
+        user.walletStatus ??
+        ""
+      );
+
+    default:
+      return "";
+  }
 }
+
+/* =========================================================
+   ERROR HELPER
+========================================================= */
 
 function getError(
   error: unknown
-) {
-  return error instanceof Error
-    ? error.message
-    : "Something went wrong.";
+): string {
+  if (
+    error instanceof Error &&
+    error.message.trim()
+  ) {
+    return error.message;
+  }
+
+  return "Something went wrong.";
 }

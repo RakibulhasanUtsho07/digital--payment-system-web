@@ -21,6 +21,42 @@ export type Currency =
   | "EUR";
 
 /* =========================================================
+   VALIDATION HELPERS
+========================================================= */
+
+export function isThemeMode(
+  value: unknown
+): value is ThemeMode {
+  return (
+    value === "light" ||
+    value === "dark" ||
+    value === "eye-care" ||
+    value === "ocean" ||
+    value === "forest"
+  );
+}
+
+export function isDensity(
+  value: unknown
+): value is Density {
+  return (
+    value ===
+      "comfortable" ||
+    value === "compact"
+  );
+}
+
+export function isCurrency(
+  value: unknown
+): value is Currency {
+  return (
+    value === "BDT" ||
+    value === "USD" ||
+    value === "EUR"
+  );
+}
+
+/* =========================================================
    USER SETTINGS PREFERENCES
 ========================================================= */
 
@@ -90,9 +126,13 @@ export interface SettingsWallet {
 
 export interface UserSettingsResponse {
   success: boolean;
+
   profile: SettingsProfile;
+
   preferences: UserSettingsPreferences;
+
   wallet: SettingsWallet | null;
+
   message?: string;
 }
 
@@ -102,7 +142,9 @@ export interface UserSettingsResponse {
 
 export interface UpdatePreferencesResponse {
   success: boolean;
+
   message: string;
+
   preferences: UserSettingsPreferences;
 }
 
@@ -114,12 +156,19 @@ export interface UpdateProfilePayload {
   name: string;
   email: string;
   phone: string;
+
+  /*
+   * Required by backend only when
+   * email or phone is changed.
+   */
   password?: string;
 }
 
 export interface UpdateProfileResponse {
   success: boolean;
+
   message: string;
+
   profile: SettingsProfile;
 }
 
@@ -129,17 +178,25 @@ export interface UpdateProfileResponse {
 
 export interface UserSession {
   id: string;
+
   current: boolean;
+
   device: string;
+
   location: string;
+
   lastActive: string;
+
   ip?: string;
 }
 
 export interface SessionResponse {
   success: boolean;
+
   sessions: UserSession[];
+
   note?: string;
+
   message?: string;
 }
 
@@ -152,7 +209,9 @@ export interface ExportResponse {
 
   export: {
     generatedAt: string;
+
     profile: SettingsProfile;
+
     preferences: UserSettingsPreferences;
   };
 
@@ -165,6 +224,7 @@ export interface ExportResponse {
 
 export interface MessageResponse {
   success: boolean;
+
   message: string;
 }
 
@@ -175,25 +235,31 @@ export interface MessageResponse {
 export const settingsApi = {
   /* =======================================================
      GET SETTINGS
+
      GET /api/settings
   ======================================================= */
 
   get:
-    async (): Promise<UserSettingsResponse> =>
-      apiClient<UserSettingsResponse>(
-        "/settings"
-      ),
+    async (): Promise<UserSettingsResponse> => {
+      return apiClient<UserSettingsResponse>(
+        "/settings",
+        {
+          method: "GET",
+        }
+      );
+    },
 
   /* =======================================================
      UPDATE PREFERENCES
+
      PATCH /api/settings/preferences
   ======================================================= */
 
   updatePreferences:
     async (
       preferences: UserSettingsPreferences
-    ): Promise<UpdatePreferencesResponse> =>
-      apiClient<UpdatePreferencesResponse>(
+    ): Promise<UpdatePreferencesResponse> => {
+      return apiClient<UpdatePreferencesResponse>(
         "/settings/preferences",
         {
           method: "PATCH",
@@ -207,18 +273,68 @@ export const settingsApi = {
             preferences
           ),
         }
-      ),
+      );
+    },
+
+  /* =======================================================
+     UPDATE ONLY THEME
+
+     PATCH /api/settings/preferences
+
+     Payload:
+     {
+       appearance: {
+         theme: "dark"
+       }
+     }
+
+     Useful for ThemeContext.
+  ======================================================= */
+
+  updateTheme:
+    async (
+      theme: ThemeMode
+    ): Promise<UpdatePreferencesResponse> => {
+      if (
+        !isThemeMode(
+          theme
+        )
+      ) {
+        throw new Error(
+          "Invalid theme."
+        );
+      }
+
+      return apiClient<UpdatePreferencesResponse>(
+        "/settings/preferences",
+        {
+          method: "PATCH",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+
+          body: JSON.stringify({
+            appearance: {
+              theme,
+            },
+          }),
+        }
+      );
+    },
 
   /* =======================================================
      UPDATE PROFILE
+
      PATCH /api/settings/profile
   ======================================================= */
 
   updateProfile:
     async (
       payload: UpdateProfilePayload
-    ): Promise<UpdateProfileResponse> =>
-      apiClient<UpdateProfileResponse>(
+    ): Promise<UpdateProfileResponse> => {
+      return apiClient<UpdateProfileResponse>(
         "/settings/profile",
         {
           method: "PATCH",
@@ -232,46 +348,60 @@ export const settingsApi = {
             payload
           ),
         }
-      ),
+      );
+    },
 
   /* =======================================================
      GET ACTIVE SESSION
+
      GET /api/settings/session
   ======================================================= */
 
   getSession:
-    async (): Promise<SessionResponse> =>
-      apiClient<SessionResponse>(
-        "/settings/session"
-      ),
+    async (): Promise<SessionResponse> => {
+      return apiClient<SessionResponse>(
+        "/settings/session",
+        {
+          method: "GET",
+        }
+      );
+    },
 
   /* =======================================================
      LOGOUT ALL OTHER DEVICES
+
      POST /api/settings/logout-all
   ======================================================= */
 
   logoutAll:
-    async (): Promise<MessageResponse> =>
-      apiClient<MessageResponse>(
+    async (): Promise<MessageResponse> => {
+      return apiClient<MessageResponse>(
         "/settings/logout-all",
         {
           method: "POST",
         }
-      ),
+      );
+    },
 
   /* =======================================================
      EXPORT
+
      GET /api/settings/export
   ======================================================= */
 
   exportData:
-    async (): Promise<ExportResponse> =>
-      apiClient<ExportResponse>(
-        "/settings/export"
-      ),
+    async (): Promise<ExportResponse> => {
+      return apiClient<ExportResponse>(
+        "/settings/export",
+        {
+          method: "GET",
+        }
+      );
+    },
 
   /* =======================================================
      DELETE ACCOUNT
+
      DELETE /api/settings/account
   ======================================================= */
 
@@ -281,8 +411,25 @@ export const settingsApi = {
         password: string;
         confirmation: "DELETE";
       }
-    ): Promise<MessageResponse> =>
-      apiClient<MessageResponse>(
+    ): Promise<MessageResponse> => {
+      if (
+        payload.confirmation !==
+        "DELETE"
+      ) {
+        throw new Error(
+          'Confirmation must be "DELETE".'
+        );
+      }
+
+      if (
+        !payload.password.trim()
+      ) {
+        throw new Error(
+          "Password is required."
+        );
+      }
+
+      return apiClient<MessageResponse>(
         "/settings/account",
         {
           method: "DELETE",
@@ -296,5 +443,6 @@ export const settingsApi = {
             payload
           ),
         }
-      ),
+      );
+    },
 };
