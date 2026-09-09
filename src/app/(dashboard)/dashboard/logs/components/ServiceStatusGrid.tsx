@@ -1,573 +1,1492 @@
 "use client";
 
-import React, {
-  useMemo,
-  useState,
-} from "react";
+import React, { useMemo, useState } from "react";
+import { motion } from "framer-motion";
+
 import {
-  motion,
-  AnimatePresence,
-} from "framer-motion";
-import {
-  Search,
+  Activity,
+  AlertTriangle,
+  ArrowUpRight,
+  CheckCircle2,
+  Clock3,
+  Database,
+  Gauge,
+  Globe2,
+  Headphones,
+  Hexagon,
+  RefreshCw,
   Server,
-  X,
+  ShieldAlert,
+  ShieldCheck,
+  TriangleAlert,
+  XCircle,
+  Zap,
 } from "lucide-react";
 
-export interface ServiceHealth {
-  id: string;
-  name: string;
-  category: string;
-  status:
-    | "Operational"
-    | "Degraded"
-    | "Warning"
-    | "Down"
-    | "Maintenance";
-  uptime: string;
-  responseTimeMs: number;
-  errorRate: string;
-  requestCount: string;
-  lastError: string;
+import type {
+  ServiceHealth,
+} from "@/lib/api/systemlogApi";
+
+/* =========================================================
+   TYPES
+========================================================= */
+
+interface ServiceStatusGridProps {
+  services: ServiceHealth[];
+  loading?: boolean;
+  range?: string;
+  onRefresh?: () => void;
+  onSelectService?: (
+    service: ServiceHealth
+  ) => void;
 }
 
-export const DEMO_SERVICES:
-  ServiceHealth[] = [
-  {
-    id: "api",
-    name: "API Gateway",
-    category: "Core",
-    status: "Operational",
-    uptime: "99.99%",
-    responseTimeMs: 42,
-    errorRate: "0.02%",
-    requestCount: "182K",
-    lastError: "None in last 24h",
-  },
-  {
-    id: "auth",
-    name: "Authentication Service",
-    category: "Core",
-    status: "Operational",
-    uptime: "99.98%",
-    responseTimeMs: 28,
-    errorRate: "0.11%",
-    requestCount: "42K",
-    lastError: "AuthTokenExpired",
-  },
-  {
-    id: "transfer",
-    name: "Transfer Service",
-    category: "Finance",
-    status: "Degraded",
-    uptime: "98.84%",
-    responseTimeMs: 380,
-    errorRate: "4.80%",
-    requestCount: "29K",
-    lastError: "WalletLockTimeout",
-  },
-  {
-    id: "wallet",
-    name: "Wallet Core",
-    category: "Finance",
-    status: "Operational",
-    uptime: "99.95%",
-    responseTimeMs: 64,
-    errorRate: "0.20%",
-    requestCount: "94K",
-    lastError: "BalanceCheckFailed",
-  },
-  {
-    id: "db",
-    name: "Primary Database",
-    category: "Data",
-    status: "Warning",
-    uptime: "99.90%",
-    responseTimeMs: 142,
-    errorRate: "1.10%",
-    requestCount: "310K",
-    lastError: "ConnectionPoolExhausted",
-  },
-  {
-    id: "kyc",
-    name: "KYC Verification Engine",
-    category: "Compliance",
-    status: "Operational",
-    uptime: "99.70%",
-    responseTimeMs: 420,
-    errorRate: "0.85%",
-    requestCount: "1.8K",
-    lastError: "OCRTimeout",
-  },
-  {
-    id: "cloudinary",
-    name: "Media & Cloudinary",
-    category: "Storage",
-    status: "Operational",
-    uptime: "100%",
-    responseTimeMs: 88,
-    errorRate: "0.00%",
-    requestCount: "12K",
-    lastError: "None",
-  },
-  {
-    id: "ai",
-    name: "Fraud Detection AI",
-    category: "Security",
-    status: "Operational",
-    uptime: "99.91%",
-    responseTimeMs: 110,
-    errorRate: "0.05%",
-    requestCount: "18K",
-    lastError: "InferenceTimeout",
-  },
-];
-
-const statusTone = (
-  status: ServiceHealth["status"]
-) => {
-  switch (
-    status
-  ) {
-    case "Operational":
-      return "border-emerald-100 bg-emerald-50 text-emerald-700";
-
-    case "Degraded":
-      return "border-amber-100 bg-amber-50 text-amber-700";
-
-    case "Warning":
-      return "border-orange-100 bg-orange-50 text-orange-700";
-
-    case "Down":
-      return "border-rose-100 bg-rose-50 text-rose-700";
-
-    default:
-      return "border-slate-200 bg-slate-100 text-slate-600";
-  }
-};
+/* =========================================================
+   COMPONENT
+========================================================= */
 
 export function ServiceStatusGrid({
-  services =
-    DEMO_SERVICES,
-}: {
-  services?:
-    ServiceHealth[];
-}) {
-  const [
-    selectedService,
-    setSelectedService,
-  ] =
-    useState<ServiceHealth | null>(
-      null
-    );
+  services,
+  loading = false,
+  range,
+  onRefresh,
+  onSelectService,
+}: ServiceStatusGridProps) {
+  const [selectedId, setSelectedId] =
+    useState<string | null>(null);
 
-  const [
-    query,
-    setQuery,
-  ] =
-    useState("");
+  /* =======================================================
+     DERIVED STATS
+  ====================================================== */
 
-  const [
-    filter,
-    setFilter,
-  ] =
-    useState<
-      "all"
-      | "attention"
-      | "healthy"
-    >("all");
+  const stats = useMemo(() => {
+    const operational = services.filter(
+      (service) =>
+        service.status === "Operational"
+    ).length;
 
-  const filtered =
-    useMemo(
-      () =>
-        services.filter(
-          (
-            service
-          ) => {
-            const matchesSearch =
-              `${service.name} ${service.category}`
-                .toLowerCase()
-                .includes(
-                  query
-                    .trim()
-                    .toLowerCase()
-                );
+    const warning = services.filter(
+      (service) =>
+        service.status === "Warning"
+    ).length;
 
-            const matchesFilter =
-              filter ===
-                "all" ||
-              (
-                filter ===
-                  "healthy" &&
-                service.status ===
-                  "Operational"
-              ) ||
-              (
-                filter ===
-                  "attention" &&
-                service.status !==
-                  "Operational"
-              );
+    const degraded = services.filter(
+      (service) =>
+        service.status === "Degraded"
+    ).length;
 
-            return (
-              matchesSearch &&
-              matchesFilter
-            );
+    const down = services.filter(
+      (service) =>
+        service.status === "Down"
+    ).length;
+
+    const totalRequests =
+      services.reduce(
+        (sum, service) =>
+          sum +
+          parseRequestCount(
+            service.requestCount
+          ),
+        0
+      );
+
+    const averageLatency =
+      services.length > 0
+        ? services.reduce(
+            (sum, service) =>
+              sum +
+              safeNumber(
+                service.responseTimeMs
+              ),
+            0
+          ) /
+          services.length
+        : 0;
+
+    return {
+      operational,
+      warning,
+      degraded,
+      down,
+      totalRequests,
+      averageLatency,
+    };
+  }, [services]);
+
+  /* =======================================================
+     SORT LIVE SERVICES
+  ====================================================== */
+
+  const sortedServices =
+    useMemo(() => {
+      const statusPriority: Record<
+        ServiceHealth["status"],
+        number
+      > = {
+        Down: 0,
+        Degraded: 1,
+        Warning: 2,
+        Maintenance: 3,
+        Operational: 4,
+      };
+
+      return [...services].sort(
+        (a, b) => {
+          const statusDifference =
+            statusPriority[
+              a.status
+            ] -
+            statusPriority[
+              b.status
+            ];
+
+          if (
+            statusDifference !==
+            0
+          ) {
+            return statusDifference;
           }
-        ),
-      [
-        filter,
-        query,
-        services,
-      ]
-    );
+
+          return (
+            safeNumber(
+              b.responseTimeMs
+            ) -
+            safeNumber(
+              a.responseTimeMs
+            )
+          );
+        }
+      );
+    }, [services]);
 
   return (
-    <section className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-[0_14px_45px_rgba(15,39,69,0.05)] sm:p-5">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-blue-500">
-            Infrastructure
-          </p>
+    <section
+      className="
+        min-w-0
+        overflow-hidden
+        rounded-[28px]
+        border
+        border-border
+        bg-card
+        shadow-[var(--dashboard-shadow)]
+      "
+    >
+      {/* ===================================================
+          HEADER
+      ==================================================== */}
 
-          <h3 className="mt-1 flex items-center gap-2 text-xl font-black text-[#0F2745]">
-            <Server className="h-5 w-5 text-blue-500" />
-            Service Status
-          </h3>
+      <header
+        className="
+          relative
+          overflow-hidden
+          border-b
+          border-border
+          p-5
+          sm:p-6
+        "
+      >
+        <div
+          className="
+            pointer-events-none
+            absolute
+            -right-16
+            -top-24
+            h-52
+            w-52
+            rounded-full
+            bg-indigo-500/5
+            blur-3xl
+          "
+        />
 
-          <p className="mt-1 text-xs leading-5 text-slate-500">
-            Search, filter and inspect operational service telemetry.
-          </p>
-        </div>
+        <motion.div
+          className="
+            pointer-events-none
+            absolute
+            right-24
+            top-12
+            h-20
+            w-20
+            rounded-full
+            bg-violet-500/5
+            blur-2xl
+          "
+          animate={{
+            scale: [
+              1,
+              1.2,
+              1,
+            ],
+            opacity: [
+              0.35,
+              0.7,
+              0.35,
+            ],
+          }}
+          transition={{
+            duration: 4.5,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+        />
 
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-
-            <input
-              value={query}
-              onChange={(event) =>
-                setQuery(
-                  event.target.value
-                )
-              }
-              placeholder="Find service..."
-              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-xs font-semibold text-slate-800 outline-none transition focus:border-blue-300 focus:bg-white sm:w-56"
-            />
-          </div>
-
-          <div className="flex rounded-xl border border-slate-200 bg-slate-50 p-1">
-            {[
-              [
-                "all",
-                "All",
-              ],
-              [
-                "healthy",
-                "Healthy",
-              ],
-              [
-                "attention",
-                "Attention",
-              ],
-            ].map(
-              (
-                [
-                  value,
-                  label,
-                ]
-              ) => (
-                <button
-                  key={
-                    value
-                  }
-                  type="button"
-                  onClick={() =>
-                    setFilter(
-                      value as typeof filter
-                    )
-                  }
-                  className={`rounded-lg px-3 py-2 text-[10px] font-bold transition ${
-                    filter ===
-                    value
-                      ? "bg-[#0F2745] text-white shadow-sm"
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
+        <div
+          className="
+            relative
+            z-10
+            flex
+            flex-col
+            gap-5
+          "
+        >
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className="
+                    inline-flex
+                    items-center
+                    gap-2
+                    rounded-full
+                    border
+                    border-indigo-500/20
+                    bg-indigo-500/10
+                    px-3
+                    py-1.5
+                    text-[9px]
+                    font-black
+                    uppercase
+                    tracking-[0.15em]
+                    text-indigo-500
+                  "
                 >
-                  {label}
-                </button>
-              )
+                  <Activity className="h-3.5 w-3.5" />
+                  Live telemetry
+                </span>
+
+                {range && (
+                  <span
+                    className="
+                      rounded-full
+                      border
+                      border-border
+                      bg-muted/40
+                      px-3
+                      py-1.5
+                      text-[9px]
+                      font-bold
+                      text-muted-foreground
+                    "
+                  >
+                    {range}
+                  </span>
+                )}
+              </div>
+
+              <h3
+                className="
+                  mt-3
+                  flex
+                  items-center
+                  gap-2
+                  text-xl
+                  font-black
+                  tracking-tight
+                  text-card-foreground
+                  sm:text-2xl
+                "
+              >
+                <span
+                  className="
+                    flex
+                    h-9
+                    w-9
+                    shrink-0
+                    items-center
+                    justify-center
+                    rounded-xl
+                    bg-indigo-500/10
+                    text-indigo-500
+                  "
+                >
+                  <Server className="h-4 w-4" />
+                </span>
+
+                Service Status
+              </h3>
+
+              <p
+                className="
+                  mt-1
+                  max-w-2xl
+                  text-xs
+                  leading-5
+                  text-muted-foreground
+                "
+              >
+                Monitor the real service telemetry recorded
+                by your backend, including response time,
+                error rate, request volume and latest activity.
+              </p>
+            </div>
+
+            {onRefresh && (
+              <motion.button
+                type="button"
+                whileHover={{
+                  y: -1,
+                }}
+                whileTap={{
+                  scale: 0.97,
+                }}
+                onClick={onRefresh}
+                disabled={loading}
+                className="
+                  inline-flex
+                  h-10
+                  shrink-0
+                  items-center
+                  gap-2
+                  rounded-xl
+                  border
+                  border-border
+                  bg-card
+                  px-3
+                  text-[10px]
+                  font-black
+                  text-muted-foreground
+                  transition
+                  hover:bg-muted
+                  hover:text-foreground
+                  disabled:cursor-not-allowed
+                  disabled:opacity-50
+                "
+              >
+                <RefreshCw
+                  className={
+                    loading
+                      ? "h-3.5 w-3.5 animate-spin"
+                      : "h-3.5 w-3.5"
+                  }
+                />
+
+                Refresh
+              </motion.button>
             )}
           </div>
-        </div>
-      </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {filtered.map(
-          (
-            service,
-            index
-          ) => (
-            <motion.button
-              key={
-                service.id
-              }
-              type="button"
-              initial={{
-                opacity: 0,
-                y: 10,
-              }}
-              animate={{
-                opacity: 1,
-                y: 0,
-              }}
-              transition={{
-                delay:
-                  index *
-                  0.03,
-              }}
-              whileHover={{
-                y: -4,
-              }}
-              onClick={() =>
-                setSelectedService(
-                  service
-                )
-              }
-              className="rounded-[22px] border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 text-left transition hover:border-blue-200 hover:shadow-[0_12px_32px_rgba(30,94,168,0.08)]"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
-                    {service.category}
-                  </p>
+          {/* =================================================
+              SUMMARY
+          ================================================== */}
 
-                  <h4 className="mt-1 truncate text-sm font-black text-slate-800">
-                    {service.name}
-                  </h4>
-                </div>
-
-                <span
-                  className={`shrink-0 rounded-full border px-2 py-1 text-[9px] font-black ${statusTone(
-                    service.status
-                  )}`}
-                >
-                  {service.status}
-                </span>
-              </div>
-
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <MiniMetric
-                  label="Response"
-                  value={`${service.responseTimeMs}ms`}
-                />
-
-                <MiniMetric
-                  label="Error"
-                  value={
-                    service.errorRate
-                  }
-                />
-              </div>
-
-              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className={`h-full rounded-full ${
-                    service.status ===
-                    "Operational"
-                      ? "bg-emerald-400"
-                      : service.status ===
-                          "Down"
-                        ? "bg-rose-400"
-                        : "bg-amber-400"
-                  }`}
-                  style={{
-                    width:
-                      service.status ===
-                      "Operational"
-                        ? "92%"
-                        : service.status ===
-                            "Down"
-                          ? "22%"
-                          : "58%",
-                  }}
-                />
-              </div>
-            </motion.button>
-          )
-        )}
-      </div>
-
-      {filtered.length ===
-        0 && (
-        <div className="mt-5 rounded-[22px] border border-dashed border-slate-200 bg-slate-50 px-4 py-10 text-center text-xs text-slate-400">
-          No services match the current search and filter.
-        </div>
-      )}
-
-      {/* =====================================================
-          DRAWER — entrance animation intentionally unchanged
-      ====================================================== */}
-
-      <AnimatePresence>
-        {selectedService && (
-          <div className="fixed inset-0 z-50 overflow-hidden">
-            <motion.div
-              initial={{
-                opacity: 0,
-              }}
-              animate={{
-                opacity: 1,
-              }}
-              exit={{
-                opacity: 0,
-              }}
-              onClick={() =>
-                setSelectedService(
-                  null
-                )
-              }
-              className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm"
+          <div
+            className="
+              grid
+              grid-cols-2
+              gap-2
+              sm:grid-cols-3
+              lg:grid-cols-5
+            "
+          >
+            <SummaryMetric
+              icon={CheckCircle2}
+              label="Operational"
+              value={String(
+                stats.operational
+              )}
+              tone="success"
             />
 
-            <div className="absolute inset-y-0 right-0 flex max-w-full pl-10">
-              <motion.div
-                initial={{
-                  x: "100%",
-                }}
-                animate={{
-                  x: 0,
-                }}
-                exit={{
-                  x: "100%",
-                }}
-                className="flex w-screen max-w-md flex-col justify-between border-l border-white/10 bg-[#0B1F36] p-6 text-slate-200 shadow-2xl"
-              >
-                <div className="space-y-6 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                    <div>
-                      <span className="text-xs font-mono text-blue-100/50">
-                        {selectedService.category}
-                      </span>
+            <SummaryMetric
+              icon={TriangleAlert}
+              label="Warning"
+              value={String(
+                stats.warning
+              )}
+              tone="warning"
+            />
 
-                      <h2 className="text-xl font-black text-white">
-                        {selectedService.name}
-                      </h2>
-                    </div>
+            <SummaryMetric
+              icon={ShieldAlert}
+              label="Degraded"
+              value={String(
+                stats.degraded
+              )}
+              tone="danger"
+            />
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setSelectedService(
-                          null
-                        )
-                      }
-                      className="rounded-xl border border-white/10 bg-white/5 p-2 text-blue-100/60 transition hover:bg-white/10 hover:text-white"
-                    >
-                      <X className="h-5 w-5" />
-                    </button>
-                  </div>
+            <SummaryMetric
+              icon={XCircle}
+              label="Down"
+              value={String(
+                stats.down
+              )}
+              tone="danger"
+            />
 
-                  <div className="rounded-[22px] border border-white/10 bg-white/5 p-4">
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="text-xs text-blue-100/55">
-                        Current Status
-                      </span>
+            <SummaryMetric
+              icon={Gauge}
+              label="Avg latency"
+              value={`${Math.round(
+                stats.averageLatency
+              )} ms`}
+              tone="indigo"
+            />
+          </div>
+        </div>
+      </header>
 
-                      <span
-                        className={`rounded-full border px-2 py-1 text-[9px] font-black ${statusTone(
-                          selectedService.status
-                        )}`}
-                      >
-                        {selectedService.status}
-                      </span>
-                    </div>
+      {/* ===================================================
+          CONTENT
+      ==================================================== */}
 
-                    <DrawerMetric
-                      label="30-Day Uptime"
-                      value={selectedService.uptime}
-                    />
+      <div className="p-5 sm:p-6">
+        {loading &&
+        services.length === 0 ? (
+          <ServiceSkeleton />
+        ) : services.length ===
+          0 ? (
+          <EmptyServices />
+        ) : (
+          <div
+            className="
+              grid
+              gap-3
+              md:grid-cols-2
+              2xl:grid-cols-3
+            "
+          >
+            {sortedServices.map(
+              (
+                service,
+                index
+              ) => {
+                const selected =
+                  selectedId ===
+                  service.id;
 
-                    <DrawerMetric
-                      label="Requests (24h)"
-                      value={selectedService.requestCount}
-                    />
+                return (
+                  <ServiceCard
+                    key={
+                      service.id
+                    }
+                    service={
+                      service
+                    }
+                    index={
+                      index
+                    }
+                    selected={
+                      selected
+                    }
+                    onClick={() => {
+                      setSelectedId(
+                        selected
+                          ? null
+                          : service.id
+                      );
 
-                    <DrawerMetric
-                      label="Response Time"
-                      value={`${selectedService.responseTimeMs}ms`}
-                    />
-
-                    <DrawerMetric
-                      label="Error Rate"
-                      value={selectedService.errorRate}
-                    />
-                  </div>
-
-                  <div>
-                    <h4 className="mb-2 text-[10px] font-bold uppercase tracking-[0.14em] text-blue-100/45">
-                      Latest Registered Error
-                    </h4>
-
-                    <div className="rounded-2xl border border-rose-300/10 bg-rose-400/5 p-4 text-xs font-mono text-rose-200">
-                      {selectedService.lastError}
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl border border-cyan-300/10 bg-cyan-300/5 p-4 text-xs leading-5 text-blue-100/65">
-                    Backend-ready: this drawer can later fetch a dedicated
-                    service-details endpoint using the selected service id.
-                  </div>
-                </div>
-
-                <div className="border-t border-white/10 pt-4 text-center text-[10px] text-blue-100/40">
-                  Frontend telemetry preview
-                </div>
-              </motion.div>
-            </div>
+                      onSelectService?.(
+                        service
+                      );
+                    }}
+                  />
+                );
+              }
+            )}
           </div>
         )}
-      </AnimatePresence>
+
+        {/* =================================================
+            TOTAL REQUEST INFO
+        ================================================== */}
+
+        {services.length >
+          0 && (
+          <div
+            className="
+              mt-5
+              flex
+              flex-wrap
+              items-center
+              justify-between
+              gap-3
+              rounded-2xl
+              border
+              border-indigo-500/10
+              bg-indigo-500/5
+              px-4
+              py-3
+            "
+          >
+            <div className="flex items-center gap-2">
+              <Zap className="h-4 w-4 text-indigo-500" />
+
+              <span
+                className="
+                  text-[10px]
+                  font-semibold
+                  text-muted-foreground
+                "
+              >
+                Requests observed
+              </span>
+            </div>
+
+            <strong
+              className="
+                text-sm
+                font-black
+                text-indigo-500
+              "
+            >
+              {stats.totalRequests.toLocaleString(
+                "en-US"
+              )}
+            </strong>
+          </div>
+        )}
+      </div>
     </section>
   );
 }
 
-function MiniMetric({
+/* =========================================================
+   SERVICE CARD
+========================================================= */
+
+function ServiceCard({
+  service,
+  index,
+  selected,
+  onClick,
+}: {
+  service: ServiceHealth;
+  index: number;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  const statusConfig =
+    getStatusConfig(
+      service.status
+    );
+
+  const Icon =
+    getServiceIcon(
+      service.name
+    );
+
+  const responseTime =
+    safeNumber(
+      service.responseTimeMs
+    );
+
+  const successRate =
+    safeNumber(
+      service.observedSuccessRate
+    );
+
+  const requestCount =
+    parseRequestCount(
+      service.requestCount
+    );
+
+  const errorRate =
+    parsePercentage(
+      service.errorRate
+    );
+
+  const uptime =
+    parsePercentage(
+      service.uptime
+    );
+
+  return (
+    <motion.button
+      type="button"
+      initial={{
+        opacity: 0,
+        y: 10,
+      }}
+      animate={{
+        opacity: 1,
+        y: 0,
+      }}
+      transition={{
+        delay: Math.min(
+          index * 0.045,
+          0.2
+        ),
+      }}
+      whileHover={{
+        y: -3,
+      }}
+      whileTap={{
+        scale: 0.995,
+      }}
+      onClick={onClick}
+      className={`
+        group
+        min-w-0
+        rounded-[22px]
+        border
+        p-4
+        text-left
+        transition-all
+        ${
+          selected
+            ? "border-indigo-500/25 bg-indigo-500/5 shadow-[0_12px_30px_rgba(79,70,229,.08)]"
+            : "border-border bg-card hover:border-indigo-500/15 hover:bg-muted/20"
+        }
+      `}
+    >
+      {/* =================================================
+          CARD HEADER
+      ================================================== */}
+
+      <div className="flex items-start gap-3">
+        <motion.span
+          animate={
+            service.status ===
+            "Down"
+              ? {
+                  scale: [
+                    1,
+                    1.06,
+                    1,
+                  ],
+                }
+              : undefined
+          }
+          transition={{
+            duration: 1.7,
+            repeat:
+              service.status ===
+              "Down"
+                ? Infinity
+                : 0,
+          }}
+          className={`
+            flex
+            h-11
+            w-11
+            shrink-0
+            items-center
+            justify-center
+            rounded-xl
+            ${statusConfig.iconBackground}
+            ${statusConfig.iconColor}
+          `}
+        >
+          <Icon className="h-5 w-5" />
+        </motion.span>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p
+                className="
+                  truncate
+                  text-sm
+                  font-black
+                  text-card-foreground
+                "
+              >
+                {service.name}
+              </p>
+
+              <p
+                className="
+                  mt-0.5
+                  truncate
+                  text-[9px]
+                  font-semibold
+                  text-muted-foreground
+                "
+              >
+                {service.category}
+              </p>
+            </div>
+
+            <span
+              className={`
+                shrink-0
+                rounded-full
+                px-2.5
+                py-1
+                text-[8px]
+                font-black
+                ${statusConfig.badge}
+              `}
+            >
+              {service.status}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* =================================================
+          PERFORMANCE METRICS
+      ================================================== */}
+
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <MetricTile
+          icon={Clock3}
+          label="Response"
+          value={`${responseTime} ms`}
+          accent={
+            responseTime >=
+            1000
+              ? "danger"
+              : responseTime >=
+                400
+                ? "warning"
+                : "default"
+          }
+        />
+
+        <MetricTile
+          icon={Activity}
+          label="Error rate"
+          value={`${errorRate.toFixed(
+            2
+          )}%`}
+          accent={
+            errorRate >=
+            20
+              ? "danger"
+              : errorRate >=
+                5
+                ? "warning"
+                : "success"
+          }
+        />
+
+        <MetricTile
+          icon={Server}
+          label="Requests"
+          value={requestCount.toLocaleString(
+            "en-US"
+          )}
+        />
+
+        <MetricTile
+          icon={ShieldCheck}
+          label="Success"
+          value={`${successRate.toFixed(
+            2
+          )}%`}
+          accent={
+            successRate < 80
+              ? "danger"
+              : successRate <
+                95
+                ? "warning"
+                : "success"
+          }
+        />
+      </div>
+
+      {/* =================================================
+          UPTIME BAR
+      ================================================== */}
+
+      <div className="mt-4">
+        <div className="flex items-center justify-between gap-3">
+          <span
+            className="
+              text-[9px]
+              font-bold
+              uppercase
+              tracking-[0.1em]
+              text-muted-foreground
+            "
+          >
+            Observed availability
+          </span>
+
+          <span
+            className="
+              text-[10px]
+              font-black
+              text-card-foreground
+            "
+          >
+            {uptime.toFixed(
+              2
+            )}
+            %
+          </span>
+        </div>
+
+        <div
+          className="
+            mt-2
+            h-2
+            overflow-hidden
+            rounded-full
+            bg-muted
+          "
+        >
+          <motion.div
+            initial={{
+              width: 0,
+            }}
+            animate={{
+              width: `${Math.max(
+                0,
+                Math.min(
+                  100,
+                  uptime
+                )
+              )}%`,
+            }}
+            transition={{
+              duration: 0.7,
+              delay: Math.min(
+                index * 0.045,
+                0.2
+              ),
+            }}
+            className={`
+              h-full
+              rounded-full
+              ${statusConfig.bar}
+            `}
+          />
+        </div>
+      </div>
+
+      {/* =================================================
+          LAST ERROR
+      ================================================== */}
+
+      <div
+        className="
+          mt-4
+          rounded-xl
+          border
+          border-border
+          bg-muted/25
+          p-3
+        "
+      >
+        <div className="flex items-start gap-2">
+          <AlertTriangle
+            className={`
+              mt-0.5
+              h-3.5
+              w-3.5
+              shrink-0
+              ${
+                service.lastError &&
+                service.lastError !==
+                  "None in selected range"
+                  ? "text-amber-500"
+                  : "text-muted-foreground/40"
+              }
+            `}
+          />
+
+          <div className="min-w-0">
+            <p
+              className="
+                text-[8px]
+                font-black
+                uppercase
+                tracking-[0.1em]
+                text-muted-foreground
+              "
+            >
+              Latest error
+            </p>
+
+            <p
+              className="
+                mt-1
+                line-clamp-2
+                text-[10px]
+                leading-5
+                text-card-foreground
+              "
+            >
+              {service.lastError ||
+                "No error recorded in the selected range."}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* =================================================
+          LAST SEEN
+      ================================================== */}
+
+      <div
+        className="
+          mt-3
+          flex
+          items-center
+          justify-between
+          gap-3
+        "
+      >
+        <span
+          className="
+            inline-flex
+            min-w-0
+            items-center
+            gap-1.5
+            text-[9px]
+            text-muted-foreground
+          "
+        >
+          <Clock3 className="h-3 w-3 shrink-0" />
+
+          <span className="truncate">
+            {service.lastSeenAt
+              ? formatLastSeen(
+                  service.lastSeenAt
+                )
+              : "No recent observation"}
+          </span>
+        </span>
+
+        <ArrowUpRight
+          className="
+            h-3.5
+            w-3.5
+            shrink-0
+            text-muted-foreground/40
+            transition
+            group-hover:text-indigo-500
+          "
+        />
+      </div>
+    </motion.button>
+  );
+}
+
+/* =========================================================
+   METRIC TILE
+========================================================= */
+
+function MetricTile({
+  icon: Icon,
   label,
   value,
+  accent = "default",
 }: {
+  icon: React.ComponentType<{
+    className?: string;
+  }>;
   label: string;
   value: string;
+  accent?:
+    | "default"
+    | "success"
+    | "warning"
+    | "danger";
 }) {
-  return (
-    <div className="rounded-xl bg-white p-2.5 shadow-sm">
-      <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">
-        {label}
-      </p>
+  const accentColors = {
+    default:
+      "text-card-foreground",
 
-      <p className="mt-1 text-xs font-black text-[#0F2745]">
+    success:
+      "text-emerald-600",
+
+    warning:
+      "text-amber-600",
+
+    danger:
+      "text-rose-600",
+  };
+
+  return (
+    <div
+      className="
+        rounded-xl
+        border
+        border-border
+        bg-muted/20
+        p-2.5
+      "
+    >
+      <div className="flex items-center gap-1.5">
+        <Icon
+          className="
+            h-3
+            w-3
+            shrink-0
+            text-muted-foreground
+          "
+        />
+
+        <span
+          className="
+            truncate
+            text-[8px]
+            font-black
+            uppercase
+            tracking-[0.08em]
+            text-muted-foreground
+          "
+        >
+          {label}
+        </span>
+      </div>
+
+      <p
+        className={`
+          mt-1
+          truncate
+          text-xs
+          font-black
+          ${accentColors[accent]}
+        `}
+      >
         {value}
       </p>
     </div>
   );
 }
 
-function DrawerMetric({
+/* =========================================================
+   SUMMARY METRIC
+========================================================= */
+
+function SummaryMetric({
+  icon: Icon,
   label,
   value,
+  tone,
 }: {
+  icon: React.ComponentType<{
+    className?: string;
+  }>;
   label: string;
   value: string;
+  tone:
+    | "success"
+    | "warning"
+    | "danger"
+    | "indigo";
 }) {
+  const styles = {
+    success:
+      "bg-emerald-500/10 text-emerald-600",
+
+    warning:
+      "bg-amber-500/10 text-amber-600",
+
+    danger:
+      "bg-rose-500/10 text-rose-600",
+
+    indigo:
+      "bg-indigo-500/10 text-indigo-500",
+  };
+
   return (
-    <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-3 text-xs">
-      <span className="text-blue-100/50">
-        {label}
+    <div
+      className="
+        rounded-2xl
+        border
+        border-border
+        bg-muted/20
+        p-3
+      "
+    >
+      <span
+        className={`
+          flex
+          h-8
+          w-8
+          items-center
+          justify-center
+          rounded-lg
+          ${styles[tone]}
+        `}
+      >
+        <Icon className="h-4 w-4" />
       </span>
 
-      <span className="font-mono font-bold text-cyan-100">
+      <p
+        className="
+          mt-2
+          text-[8px]
+          font-black
+          uppercase
+          tracking-[0.08em]
+          text-muted-foreground
+        "
+      >
+        {label}
+      </p>
+
+      <p
+        className="
+          mt-0.5
+          text-lg
+          font-black
+          text-card-foreground
+        "
+      >
         {value}
-      </span>
+      </p>
     </div>
   );
+}
+
+/* =========================================================
+   STATUS CONFIG
+========================================================= */
+
+function getStatusConfig(
+  status: ServiceHealth["status"]
+) {
+  switch (status) {
+    case "Operational":
+      return {
+        iconBackground:
+          "bg-emerald-500/10",
+
+        iconColor:
+          "text-emerald-600",
+
+        badge:
+          "bg-emerald-500/10 text-emerald-600",
+
+        bar:
+          "bg-emerald-500",
+      };
+
+    case "Warning":
+      return {
+        iconBackground:
+          "bg-amber-500/10",
+
+        iconColor:
+          "text-amber-600",
+
+        badge:
+          "bg-amber-500/10 text-amber-600",
+
+        bar:
+          "bg-amber-500",
+      };
+
+    case "Degraded":
+      return {
+        iconBackground:
+          "bg-orange-500/10",
+
+        iconColor:
+          "text-orange-600",
+
+        badge:
+          "bg-orange-500/10 text-orange-600",
+
+        bar:
+          "bg-orange-500",
+      };
+
+    case "Down":
+      return {
+        iconBackground:
+          "bg-rose-500/10",
+
+        iconColor:
+          "text-rose-600",
+
+        badge:
+          "bg-rose-500/10 text-rose-600",
+
+        bar:
+          "bg-rose-500",
+      };
+
+    case "Maintenance":
+    default:
+      return {
+        iconBackground:
+          "bg-indigo-500/10",
+
+        iconColor:
+          "text-indigo-500",
+
+        badge:
+          "bg-indigo-500/10 text-indigo-500",
+
+        bar:
+          "bg-indigo-500",
+      };
+  }
+}
+
+/* =========================================================
+   SERVICE ICON
+========================================================= */
+
+function getServiceIcon(
+  serviceName: string
+) {
+  const value =
+    serviceName
+      .toLowerCase();
+
+  if (
+    value.includes("database") ||
+    value.includes("mongo") ||
+    value.includes("postgres") ||
+    value.includes("sql")
+  ) {
+    return Database;
+  }
+
+  if (
+    value.includes("auth") ||
+    value.includes("security")
+  ) {
+    return ShieldAlert;
+  }
+
+  if (
+    value.includes("api") ||
+    value.includes("gateway")
+  ) {
+    return Globe2;
+  }
+
+  if (
+    value.includes("support")
+  ) {
+    return Headphones;
+  }
+
+  if (
+    value.includes("wallet") ||
+    value.includes("payment") ||
+    value.includes("transfer")
+  ) {
+    return Zap;
+  }
+
+  if (
+    value.includes("cloud") ||
+    value.includes("storage")
+  ) {
+    return Hexagon;
+  }
+
+  return Server;
+}
+
+/* =========================================================
+   EMPTY STATE
+========================================================= */
+
+function EmptyServices() {
+  return (
+    <div
+      className="
+        flex
+        min-h-[340px]
+        flex-col
+        items-center
+        justify-center
+        rounded-[24px]
+        border
+        border-dashed
+        border-border
+        bg-muted/20
+        p-8
+        text-center
+      "
+    >
+      <span
+        className="
+          flex
+          h-16
+          w-16
+          items-center
+          justify-center
+          rounded-[20px]
+          bg-indigo-500/10
+          text-indigo-500
+        "
+      >
+        <Server className="h-7 w-7" />
+      </span>
+
+      <h4
+        className="
+          mt-4
+          text-base
+          font-black
+          text-card-foreground
+        "
+      >
+        No service telemetry
+      </h4>
+
+      <p
+        className="
+          mt-1
+          max-w-md
+          text-xs
+          leading-5
+          text-muted-foreground
+        "
+      >
+        The backend has not returned service health
+        observations for the selected time range yet.
+      </p>
+    </div>
+  );
+}
+
+/* =========================================================
+   SKELETON
+========================================================= */
+
+function ServiceSkeleton() {
+  return (
+    <div
+      className="
+        grid
+        gap-3
+        md:grid-cols-2
+        2xl:grid-cols-3
+      "
+    >
+      {Array.from({
+        length: 6,
+      }).map(
+        (
+          _,
+          index
+        ) => (
+          <div
+            key={
+              index
+            }
+            className="
+              h-[310px]
+              animate-pulse
+              rounded-[22px]
+              bg-muted
+            "
+          />
+        )
+      )}
+    </div>
+  );
+}
+
+/* =========================================================
+   HELPERS
+========================================================= */
+
+function safeNumber(
+  value: unknown
+): number {
+  const result =
+    Number(
+      value ?? 0
+    );
+
+  return Number.isFinite(
+    result
+  )
+    ? result
+    : 0;
+}
+
+function parsePercentage(
+  value: unknown
+): number {
+  if (
+    typeof value ===
+    "number"
+  ) {
+    return Number.isFinite(
+      value
+    )
+      ? value
+      : 0;
+  }
+
+  const parsed =
+    Number(
+      String(
+        value ?? "0"
+      ).replace(
+        "%",
+        ""
+      )
+    );
+
+  return Number.isFinite(
+    parsed
+  )
+    ? parsed
+    : 0;
+}
+
+function parseRequestCount(
+  value: unknown
+): number {
+  if (
+    typeof value ===
+    "number"
+  ) {
+    return safeNumber(
+      value
+    );
+  }
+
+  const normalized =
+    String(
+      value ?? "0"
+    )
+      .replaceAll(
+        ",",
+        ""
+      )
+      .trim();
+
+  const parsed =
+    Number(
+      normalized
+    );
+
+  return Number.isFinite(
+    parsed
+  )
+    ? parsed
+    : 0;
+}
+
+function formatLastSeen(
+  value: string
+): string {
+  const date =
+    new Date(value);
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return "Invalid timestamp";
+  }
+
+  return new Intl.DateTimeFormat(
+    "en-BD",
+    {
+      dateStyle:
+        "medium",
+      timeStyle:
+        "short",
+    }
+  ).format(date);
 }
