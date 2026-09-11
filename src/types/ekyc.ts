@@ -25,6 +25,7 @@ export interface AdminEKYCVerification extends EKYCVerification {
   };
   providerName?: string;
   faceScore: number | null;
+  faceQualityScore?: number | null;
   nameScore: number | null;
   livenessPassed: boolean | null;
   possibleDuplicateVectorId?: string;
@@ -48,6 +49,7 @@ export interface EKYCDocuments {
   nidFrontUrl: string;
   nidBackUrl: string;
   selfieUrl: string;
+  livenessVideoUrl?: string;
 }
 
 export interface EKYCAuditItem {
@@ -56,4 +58,24 @@ export interface EKYCAuditItem {
   eventType: string;
   actorType: "USER" | "SYSTEM" | "ADMIN";
   createdAt: string;
+}
+
+export type ActiveLivenessAction =
+  | "BLINK"
+  | "TURN_LEFT"
+  | "TURN_RIGHT";
+
+export interface ActiveLivenessChallengeSession {
+  sessionId: string;
+  challenges: ActiveLivenessAction[];
+  issuedAt: string;
+  expiresAt: string;
+}
+
+export interface CompletedLivenessCapture {
+  session: ActiveLivenessChallengeSession;
+  startedAt: string;
+  completedAt: string;
+  selfie: File;
+  video: File;
 }
