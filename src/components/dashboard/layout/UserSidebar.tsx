@@ -9,6 +9,8 @@ import {
   WalletCards,
   Send,
   Download,
+  PlusCircle,
+  ShieldCheck,
   ReceiptText,
   FileCheck2,
   Sparkles,
@@ -54,6 +56,11 @@ const navItems = [
     icon: WalletCards,
   },
   {
+    label: "Add Money",
+    href: "/dashboard/add-money",
+    icon: PlusCircle,
+  },
+  {
     label: "Send Money",
     href: "/dashboard/send",
     icon: Send,
@@ -72,6 +79,11 @@ const navItems = [
     label: "KYC",
     href: "/dashboard/kyc",
     icon: FileCheck2,
+  },
+  {
+    label: "Security",
+    href: "/dashboard/security",
+    icon: ShieldCheck,
   },
   {
     label: "AI Insights",
@@ -407,9 +419,10 @@ export default function UserSidebar({
           {navItems.map(
             (
               item,
-              index
+              index,
             ) => {
-              const Icon = item.icon;
+              const Icon =
+                item.icon;
 
               const active =
                 item.href ===
@@ -417,7 +430,7 @@ export default function UserSidebar({
                   ? pathname ===
                     "/dashboard"
                   : pathname.startsWith(
-                      item.href
+                      item.href,
                     );
 
               return (
@@ -482,10 +495,8 @@ export default function UserSidebar({
                         transition={{
                           type:
                             "spring",
-                          stiffness:
-                            300,
-                          damping:
-                            28,
+                          stiffness: 300,
+                          damping: 28,
                         }}
                         className="
                           absolute
@@ -580,9 +591,10 @@ export default function UserSidebar({
                         }
                       `}
                       style={{
-                        color: active
-                          ? undefined
-                          : undefined,
+                        color:
+                          active
+                            ? undefined
+                            : undefined,
                       }}
                     >
                       <Icon
@@ -641,7 +653,7 @@ export default function UserSidebar({
                   </Link>
                 </motion.div>
               );
-            }
+            },
           )}
         </nav>
       </div>
