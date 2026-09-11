@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+
 import {
   CalendarDays,
   Mail,
@@ -57,19 +58,19 @@ export default function KYCApplicantProfile({
   ];
 
   return (
-    <section className="rounded-[22px] border border-[#DCE7F0] bg-white p-5 shadow-[0_8px_28px_rgba(15,39,69,0.035)]">
+    <section className="rounded-[22px] border border-border bg-card p-5 text-card-foreground shadow-[0_8px_28px_rgba(0,0,0,0.03)]">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-[8px] font-black uppercase tracking-[0.14em] text-[#5B8BB7]">
+          <p className="text-[8px] font-black uppercase tracking-[0.14em] text-indigo-500">
             Applicant Profile
           </p>
 
-          <h3 className="mt-1 text-base font-black text-[#0F2745]">
+          <h3 className="mt-1 text-base font-black text-foreground">
             Identity & account context
           </h3>
         </div>
 
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-indigo-500/15 bg-indigo-500/10 text-indigo-500">
           <ShieldCheck className="h-4 w-4" />
         </span>
       </div>
@@ -83,19 +84,22 @@ export default function KYCApplicantProfile({
               key={item.label}
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: index * 0.03 }}
-              className="flex items-start gap-3 rounded-[16px] border border-slate-100 bg-[#FAFCFE] p-3"
+              transition={{
+                duration: 0.3,
+                delay: index * 0.03,
+              }}
+              className="flex items-start gap-3 rounded-[16px] border border-border bg-muted/35 p-3"
             >
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-[#1F5EA8] shadow-sm">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-border bg-background text-indigo-500 shadow-sm">
                 <Icon className="h-3.5 w-3.5" />
               </span>
 
               <div className="min-w-0">
-                <p className="text-[7px] font-black uppercase tracking-[0.1em] text-slate-400">
+                <p className="text-[7px] font-black uppercase tracking-[0.1em] text-muted-foreground">
                   {item.label}
                 </p>
 
-                <p className="mt-1 break-words text-[9px] font-bold text-slate-700">
+                <p className="mt-1 break-words text-[9px] font-bold text-foreground">
                   {item.value}
                 </p>
               </div>
@@ -112,7 +116,11 @@ export default function KYCApplicantProfile({
 
         <Mini
           label="2FA"
-          value={request.twoFactorEnabled ? "Enabled" : "Not enabled"}
+          value={
+            request.twoFactorEnabled
+              ? "Enabled"
+              : "Not enabled"
+          }
         />
 
         <Mini
@@ -132,12 +140,12 @@ function Mini({
   value: string;
 }) {
   return (
-    <div className="rounded-[14px] border border-blue-100 bg-blue-50/55 p-3">
-      <p className="text-[7px] font-black uppercase tracking-[0.1em] text-blue-400">
+    <div className="rounded-[14px] border border-indigo-500/20 bg-indigo-500/10 p-3">
+      <p className="text-[7px] font-black uppercase tracking-[0.1em] text-indigo-500">
         {label}
       </p>
 
-      <p className="mt-1 text-[9px] font-black text-[#174A7A]">
+      <p className="mt-1 text-[9px] font-black text-foreground">
         {value}
       </p>
     </div>
