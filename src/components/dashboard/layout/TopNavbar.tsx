@@ -21,18 +21,28 @@ import {
 import {
   Activity,
   ArrowLeftRight,
+  BarChart3,
   Bell,
+  BookOpen,
   ChevronDown,
   Command,
+  CreditCard,
+  FileBarChart,
   FileCheck2,
+  FileText,
+  HandCoins,
   LayoutDashboard,
   Menu,
+  Receipt,
   ReceiptText,
+  RefreshCcw,
   Search,
   Settings,
   ShieldCheck,
+  Store,
   Users,
   WalletCards,
+  Webhook,
   X,
 } from "lucide-react";
 
@@ -42,7 +52,11 @@ import {
 
 type UserRole =
   | "admin"
-  | "user";
+  | "user"
+  | "merchant"
+  | "support"
+  | "analyst"
+  | "super_admin";
 
 interface TopNavbarProps {
   onMenuClick: () => void;
@@ -97,12 +111,35 @@ const ACCENT = BRAND.highlight;
 ========================================================= */
 
 const searchItems: SearchItem[] = [
+  /* =======================================================
+     COMMON
+  ======================================================= */
+
   {
     id: "dashboard",
     title: "Dashboard Overview",
     href: "/dashboard",
     icon: LayoutDashboard,
   },
+
+  {
+    id: "settings",
+    title: "Settings",
+    href: "/dashboard/settings",
+    icon: Settings,
+  },
+
+  {
+    id: "notifications",
+    title: "Notifications",
+    href: "/dashboard/notifications",
+    icon: Bell,
+  },
+
+  /* =======================================================
+     USER
+  ======================================================= */
+
   {
     id: "wallet",
     title: "Wallet",
@@ -110,6 +147,7 @@ const searchItems: SearchItem[] = [
     icon: WalletCards,
     roles: ["user"],
   },
+
   {
     id: "transactions",
     title: "Transactions",
@@ -117,20 +155,7 @@ const searchItems: SearchItem[] = [
     icon: ArrowLeftRight,
     roles: ["user"],
   },
-  {
-    id: "all-transactions",
-    title: "System Transactions",
-    href: "/dashboard/all-transactions",
-    icon: ArrowLeftRight,
-    roles: ["admin"],
-  },
-  {
-    id: "users",
-    title: "User Management",
-    href: "/dashboard/users",
-    icon: Users,
-    roles: ["admin"],
-  },
+
   {
     id: "kyc",
     title: "KYC Verification",
@@ -138,27 +163,7 @@ const searchItems: SearchItem[] = [
     icon: FileCheck2,
     roles: ["user"],
   },
-  {
-    id: "kyc-requests",
-    title: "KYC Approvals",
-    href: "/dashboard/kyc-requests",
-    icon: ShieldCheck,
-    roles: ["admin"],
-  },
-  {
-    id: "analytics",
-    title: "Analytics & Reports",
-    href: "/dashboard/analytics",
-    icon: Activity,
-    roles: ["admin"],
-  },
-  {
-    id: "logs",
-    title: "System Logs",
-    href: "/dashboard/logs",
-    icon: Activity,
-    roles: ["admin"],
-  },
+
   {
     id: "receipts",
     title: "Receipts",
@@ -166,11 +171,189 @@ const searchItems: SearchItem[] = [
     icon: ReceiptText,
     roles: ["user"],
   },
+
+  /* =======================================================
+     MERCHANT
+  ======================================================= */
+
   {
-    id: "settings",
-    title: "Settings",
-    href: "/dashboard/settings",
+    id: "merchant-overview",
+    title: "Merchant Overview",
+    href: "/dashboard/merchant",
+    icon: LayoutDashboard,
+    roles: ["merchant"],
+  },
+
+  {
+    id: "merchant-payments",
+    title: "Merchant Payments",
+    href: "/dashboard/merchant/payments",
+    icon: CreditCard,
+    roles: ["merchant"],
+  },
+
+  {
+    id: "merchant-transactions",
+    title: "Merchant Transactions",
+    href: "/dashboard/merchant/transactions",
+    icon: ArrowLeftRight,
+    roles: ["merchant"],
+  },
+
+  {
+    id: "merchant-orders",
+    title: "Orders",
+    href: "/dashboard/merchant/orders",
+    icon: ReceiptText,
+    roles: ["merchant"],
+  },
+
+  {
+    id: "merchant-customers",
+    title: "Customers",
+    href: "/dashboard/merchant/customers",
+    icon: Users,
+    roles: ["merchant"],
+  },
+
+  {
+    id: "merchant-refunds",
+    title: "Refunds",
+    href: "/dashboard/merchant/refunds",
+    icon: RefreshCcw,
+    roles: ["merchant"],
+  },
+
+  {
+    id: "merchant-invoices",
+    title: "Invoices",
+    href: "/dashboard/merchant/invoices",
+    icon: FileText,
+    roles: ["merchant"],
+  },
+
+  {
+    id: "merchant-subscriptions",
+    title: "Subscriptions",
+    href: "/dashboard/merchant/subscriptions",
+    icon: Receipt,
+    roles: ["merchant"],
+  },
+
+  {
+    id: "merchant-payouts",
+    title: "Payouts",
+    href: "/dashboard/merchant/payouts",
+    icon: HandCoins,
+    roles: ["merchant"],
+  },
+
+  {
+    id: "merchant-disputes",
+    title: "Disputes",
+    href: "/dashboard/merchant/disputes",
+    icon: ShieldCheck,
+    roles: ["merchant"],
+  },
+
+  {
+    id: "merchant-settlement",
+    title: "Settlement",
+    href: "/dashboard/merchant/settlement",
+    icon: WalletCards,
+    roles: ["merchant"],
+  },
+
+  {
+    id: "merchant-analytics",
+    title: "Merchant Analytics",
+    href: "/dashboard/merchant/analytics",
+    icon: BarChart3,
+    roles: ["merchant"],
+  },
+
+  {
+    id: "merchant-reports",
+    title: "Merchant Reports",
+    href: "/dashboard/merchant/reports",
+    icon: FileBarChart,
+    roles: ["merchant"],
+  },
+
+  {
+    id: "merchant-api-keys",
+    title: "API Keys",
+    href: "/dashboard/merchant/api-keys",
+    icon: CodeIcon,
+    roles: ["merchant"],
+  },
+
+  {
+    id: "merchant-webhooks",
+    title: "Webhooks",
+    href: "/dashboard/merchant/webhooks",
+    icon: Webhook,
+    roles: ["merchant"],
+  },
+
+  {
+    id: "merchant-developers",
+    title: "Developers",
+    href: "/dashboard/merchant/developers",
+    icon: BookOpen,
+    roles: ["merchant"],
+  },
+
+  {
+    id: "merchant-settings",
+    title: "Merchant Settings",
+    href: "/dashboard/merchant/settings",
     icon: Settings,
+    roles: ["merchant"],
+  },
+
+  /* =======================================================
+     ADMIN
+  ======================================================= */
+
+  {
+    id: "all-transactions",
+    title: "System Transactions",
+    href: "/dashboard/all-transactions",
+    icon: ArrowLeftRight,
+    roles: ["admin", "super_admin"],
+  },
+
+  {
+    id: "users",
+    title: "User Management",
+    href: "/dashboard/users",
+    icon: Users,
+    roles: ["admin", "super_admin"],
+  },
+
+  {
+    id: "kyc-requests",
+    title: "KYC Approvals",
+    href: "/dashboard/kyc-requests",
+    icon: ShieldCheck,
+    roles: ["admin", "super_admin"],
+  },
+
+  {
+    id: "analytics",
+    title: "Analytics & Reports",
+    href: "/dashboard/analytics",
+    icon: Activity,
+    roles: ["admin", "super_admin", "analyst"],
+  },
+
+  {
+    id: "logs",
+    title: "System Logs",
+    href: "/dashboard/logs",
+    icon: Activity,
+    roles: ["admin", "super_admin"],
   },
 ];
 
@@ -179,23 +362,99 @@ const searchItems: SearchItem[] = [
 ========================================================= */
 
 const pageTitles: Record<string, string> = {
+  /* =======================================================
+     COMMON
+  ======================================================= */
+
   "/dashboard": "Dashboard Overview",
+  "/dashboard/notifications": "Notifications",
+  "/dashboard/settings": "Settings",
+
+  /* =======================================================
+     USER
+  ======================================================= */
+
   "/dashboard/wallet": "Wallet",
   "/dashboard/transactions": "Transactions",
+  "/dashboard/kyc": "KYC Verification",
+  "/dashboard/receipts": "Receipts",
+
+  /* =======================================================
+     ADMIN
+  ======================================================= */
+
   "/dashboard/all-transactions":
     "System Transactions",
-  "/dashboard/users": "User Management",
-  "/dashboard/kyc": "KYC Verification",
+
+  "/dashboard/users":
+    "User Management",
+
   "/dashboard/kyc-requests":
     "KYC Management",
+
   "/dashboard/analytics":
     "Analytics & Reports",
-  "/dashboard/insights": "AI Insights",
-  "/dashboard/logs": "System Logs",
-  "/dashboard/receipts": "Receipts",
-  "/dashboard/notifications":
-    "Notifications",
-  "/dashboard/settings": "Settings",
+
+  "/dashboard/insights":
+    "AI Insights",
+
+  "/dashboard/logs":
+    "System Logs",
+
+  /* =======================================================
+     MERCHANT
+  ======================================================= */
+
+  "/dashboard/merchant":
+    "Merchant Overview",
+
+  "/dashboard/merchant/payments":
+    "Payments",
+
+  "/dashboard/merchant/transactions":
+    "Transactions",
+
+  "/dashboard/merchant/orders":
+    "Orders",
+
+  "/dashboard/merchant/customers":
+    "Customers",
+
+  "/dashboard/merchant/refunds":
+    "Refunds",
+
+  "/dashboard/merchant/invoices":
+    "Invoices",
+
+  "/dashboard/merchant/subscriptions":
+    "Subscriptions",
+
+  "/dashboard/merchant/payouts":
+    "Payouts",
+
+  "/dashboard/merchant/disputes":
+    "Disputes",
+
+  "/dashboard/merchant/settlement":
+    "Settlement",
+
+  "/dashboard/merchant/analytics":
+    "Analytics",
+
+  "/dashboard/merchant/reports":
+    "Reports",
+
+  "/dashboard/merchant/api-keys":
+    "API Keys",
+
+  "/dashboard/merchant/webhooks":
+    "Webhooks",
+
+  "/dashboard/merchant/developers":
+    "Developers",
+
+  "/dashboard/merchant/settings":
+    "Merchant Settings",
 };
 
 /* =========================================================
@@ -319,6 +578,23 @@ function ProfileAvatar({
 }
 
 /* =========================================================
+   ICON HELPER
+========================================================= */
+
+function CodeIcon(
+  props: React.ComponentProps<
+    typeof Activity
+  >
+) {
+  return (
+    <Activity
+      {...props}
+      strokeWidth={1.8}
+    />
+  );
+}
+
+/* =========================================================
    TOP NAVBAR
 ========================================================= */
 
@@ -331,7 +607,8 @@ export default function TopNavbar({
 }: TopNavbarProps) {
   const router = useRouter();
 
-  const pathname = usePathname();
+  const pathname =
+    usePathname();
 
   const inputRef =
     useRef<HTMLInputElement | null>(
@@ -353,14 +630,52 @@ export default function TopNavbar({
     setProfileOpen,
   ] = useState(false);
 
+  /* =======================================================
+     CURRENT PAGE
+  ======================================================= */
+
   const currentPageTitle =
     pageTitles[pathname] ??
-    "Dashboard";
+    (
+      pathname?.startsWith(
+        "/dashboard/merchant/"
+      )
+        ? "Merchant Dashboard"
+        : "Dashboard"
+    );
+
+  /* =======================================================
+     ROLE LABEL
+  ======================================================= */
 
   const roleLabel =
     userRole === "admin"
       ? "Administrator"
-      : "Wallet User";
+      : userRole === "super_admin"
+        ? "Super Administrator"
+        : userRole === "merchant"
+          ? "Merchant Account"
+          : userRole === "analyst"
+            ? "Analyst"
+            : userRole === "support"
+              ? "Support"
+              : "Wallet User";
+
+  /* =======================================================
+     TOP CATEGORY LABEL
+  ======================================================= */
+
+  const workspaceLabel =
+    userRole === "admin" ||
+    userRole === "super_admin"
+      ? "Control Center"
+      : userRole === "merchant"
+        ? "Merchant Portal"
+        : userRole === "analyst"
+          ? "Analytics"
+          : userRole === "support"
+            ? "Support Center"
+            : "My Wallet";
 
   /* =======================================================
      SEARCH
@@ -385,7 +700,7 @@ export default function TopNavbar({
       if (!query) {
         return allowedItems.slice(
           0,
-          6
+          8
         );
       }
 
@@ -553,7 +868,9 @@ export default function TopNavbar({
             xl:gap-6
           "
         >
-          {/* LEFT */}
+          {/* =================================================
+              LEFT
+          ================================================= */}
 
           <div
             className="
@@ -662,10 +979,7 @@ export default function TopNavbar({
                     dark:text-violet-300
                   "
                 >
-                  {userRole ===
-                  "admin"
-                    ? "Control Center"
-                    : "My Wallet"}
+                  {workspaceLabel}
                 </span>
               </div>
 
@@ -688,7 +1002,9 @@ export default function TopNavbar({
             </div>
           </div>
 
-          {/* SEARCH */}
+          {/* =================================================
+              SEARCH
+          ================================================= */}
 
           <div
             className="
@@ -785,9 +1101,9 @@ export default function TopNavbar({
                   dark:text-slate-400
                 "
               >
-                Search transactions,
-                users, wallet,
-                settings...
+                {userRole === "merchant"
+                  ? "Search payments, transactions, customers, analytics..."
+                  : "Search transactions, users, wallet, settings..."}
               </span>
 
               <span
@@ -824,7 +1140,9 @@ export default function TopNavbar({
             </motion.button>
           </div>
 
-          {/* RIGHT */}
+          {/* =================================================
+              RIGHT
+          ================================================= */}
 
           <div
             className="
@@ -890,7 +1208,10 @@ export default function TopNavbar({
               type="button"
               onClick={() =>
                 router.push(
-                  "/dashboard/insights"
+                  userRole ===
+                    "merchant"
+                    ? "/dashboard/merchant/analytics"
+                    : "/dashboard/insights"
                 )
               }
               whileHover={{
@@ -946,7 +1267,10 @@ export default function TopNavbar({
               />
 
               <span className="relative z-10">
-                AI Insights
+                {userRole ===
+                "merchant"
+                  ? "Analytics"
+                  : "AI Insights"}
               </span>
             </motion.button>
 
@@ -1297,7 +1621,10 @@ export default function TopNavbar({
                           );
 
                           router.push(
-                            "/dashboard/settings"
+                            userRole ===
+                              "merchant"
+                              ? "/dashboard/merchant/settings"
+                              : "/dashboard/settings"
                           );
                         }}
                         className="
@@ -1340,7 +1667,10 @@ export default function TopNavbar({
                           "
                         />
 
-                        Account Settings
+                        {userRole ===
+                        "merchant"
+                          ? "Merchant Settings"
+                          : "Account Settings"}
                       </button>
                     </motion.div>
                   </>
@@ -1367,7 +1697,9 @@ export default function TopNavbar({
             exit={{
               opacity: 0,
             }}
-            onMouseDown={closeSearch}
+            onMouseDown={
+              closeSearch
+            }
             className="
               fixed
               inset-0
@@ -1452,7 +1784,17 @@ export default function TopNavbar({
                 "
                 style={{
                   background:
-                    BRAND_GRADIENT,
+                    userRole ===
+                    "merchant"
+                      ? `
+                        linear-gradient(
+                          90deg,
+                          #2563eb,
+                          #0ea5e9,
+                          #22d3ee
+                        )
+                      `
+                      : BRAND_GRADIENT,
                 }}
               />
 
@@ -1484,7 +1826,9 @@ export default function TopNavbar({
                 />
 
                 <input
-                  ref={inputRef}
+                  ref={
+                    inputRef
+                  }
                   value={
                     searchQuery
                   }
@@ -1496,7 +1840,12 @@ export default function TopNavbar({
                         .value
                     )
                   }
-                  placeholder="Search dashboard..."
+                  placeholder={
+                    userRole ===
+                    "merchant"
+                      ? "Search payments, transactions, customers..."
+                      : "Search dashboard..."
+                  }
                   className="
                     h-10
                     min-w-0
@@ -1560,7 +1909,7 @@ export default function TopNavbar({
 
               <div
                 className="
-                  max-h-[360px]
+                  max-h-[420px]
                   overflow-y-auto
                   p-2.5
 
@@ -1580,7 +1929,10 @@ export default function TopNavbar({
 
                         const active =
                           pathname ===
-                          item.href;
+                          item.href ||
+                          pathname.startsWith(
+                            `${item.href}/`
+                          );
 
                         return (
                           <motion.button
@@ -1634,7 +1986,10 @@ export default function TopNavbar({
                             style={{
                               background:
                                 active
-                                  ? BRAND_SOFT
+                                  ? userRole ===
+                                    "merchant"
+                                    ? "linear-gradient(135deg, rgba(37,99,235,0.08), rgba(14,165,233,0.09))"
+                                    : BRAND_SOFT
                                   : undefined,
                             }}
                           >
@@ -1655,7 +2010,16 @@ export default function TopNavbar({
                               style={{
                                 background:
                                   active
-                                    ? BRAND_GRADIENT
+                                    ? userRole ===
+                                      "merchant"
+                                      ? `
+                                        linear-gradient(
+                                          135deg,
+                                          #2563eb,
+                                          #0ea5e9
+                                        )
+                                      `
+                                      : BRAND_GRADIENT
                                     : "var(--muted)",
 
                                 color:
@@ -1665,18 +2029,24 @@ export default function TopNavbar({
 
                                 boxShadow:
                                   active
-                                    ? "0 7px 18px rgba(59,35,104,0.25)"
+                                    ? userRole ===
+                                      "merchant"
+                                      ? "0 7px 18px rgba(37,99,235,0.25)"
+                                      : "0 7px 18px rgba(59,35,104,0.25)"
                                     : undefined,
                               }}
                             >
                               <Icon
-                                className="
+                                className={`
                                   h-[16px]
                                   w-[16px]
 
-                                  text-slate-500
-                                  dark:text-slate-300
-                                "
+                                  ${
+                                    active
+                                      ? "text-white"
+                                      : "text-slate-500 dark:text-slate-300"
+                                  }
+                                `}
                               />
                             </motion.span>
 
@@ -1688,7 +2058,10 @@ export default function TopNavbar({
 
                                 ${
                                   active
-                                    ? "text-[#5b3a8f] dark:text-violet-300"
+                                    ? userRole ===
+                                      "merchant"
+                                      ? "text-blue-600 dark:text-blue-400"
+                                      : "text-[#5b3a8f] dark:text-violet-300"
                                     : "text-slate-700 dark:text-slate-200"
                                 }
                               `}
@@ -1709,13 +2082,10 @@ export default function TopNavbar({
                                   opacity: 1,
                                   scale: 1,
                                 }}
-                                className="
+                                className={`
                                   ml-auto
 
                                   rounded-full
-
-                                  bg-violet-100
-                                  dark:bg-violet-500/10
 
                                   px-2
                                   py-0.5
@@ -1725,9 +2095,13 @@ export default function TopNavbar({
                                   uppercase
                                   tracking-wider
 
-                                  text-[#5b3a8f]
-                                  dark:text-violet-300
-                                "
+                                  ${
+                                    userRole ===
+                                    "merchant"
+                                      ? "bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300"
+                                      : "bg-violet-100 text-[#5b3a8f] dark:bg-violet-500/10 dark:text-violet-300"
+                                  }
+                                `}
                               >
                                 Current
                               </motion.span>
@@ -1758,7 +2132,7 @@ export default function TopNavbar({
                     "
                   >
                     <div
-                      className="
+                      className={`
                         flex
                         h-11
                         w-11
@@ -1766,12 +2140,13 @@ export default function TopNavbar({
                         justify-center
                         rounded-xl
 
-                        bg-violet-100
-                        dark:bg-violet-500/10
-
-                        text-[#5b3a8f]
-                        dark:text-violet-300
-                      "
+                        ${
+                          userRole ===
+                          "merchant"
+                            ? "bg-blue-100 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300"
+                            : "bg-violet-100 text-[#5b3a8f] dark:bg-violet-500/10 dark:text-violet-300"
+                        }
+                      `}
                     >
                       <Search
                         className="
