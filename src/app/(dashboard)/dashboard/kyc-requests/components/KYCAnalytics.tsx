@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+
 import {
   BarChart3,
   CheckCircle2,
@@ -64,7 +65,7 @@ export default function KYCAnalytics({
       label: "Under Review",
       status: "Under Review" as KYCStatus,
       value: overview.underReview,
-      color: "#3B82F6",
+      color: "#6366F1",
       icon: FileCheck2,
     },
     {
@@ -88,7 +89,7 @@ export default function KYCAnalytics({
     {
       label: "Submitted",
       value: overview.totalSubmitted,
-      color: "#60A5FA",
+      color: "#818CF8",
     },
     {
       label: "Verified",
@@ -116,37 +117,42 @@ export default function KYCAnalytics({
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, amount: 0.18 }}
         transition={{ duration: 0.5 }}
-        className="min-w-0 rounded-[26px] border border-[#DCE7F0] bg-white p-5 shadow-[0_10px_34px_rgba(15,39,69,0.045)] sm:p-6"
+        className="min-w-0 rounded-[26px] border border-border bg-card p-5 text-card-foreground shadow-[0_10px_34px_rgba(0,0,0,0.04)] sm:p-6"
       >
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#5B8BB7]">
+            <p className="text-[8px] font-black uppercase tracking-[0.16em] text-indigo-500">
               Verification Health
             </p>
 
-            <h2 className="mt-1 text-lg font-black text-[#0F2745]">
+            <h2 className="mt-1 text-lg font-black text-foreground">
               Queue distribution
             </h2>
 
-            <p className="mt-1 max-w-xl text-[10px] leading-5 text-slate-500">
-              Current KYC status mix with direct filtering into the review queue.
+            <p className="mt-1 max-w-xl text-[10px] leading-5 text-muted-foreground">
+              Current KYC status mix with direct filtering into the review
+              queue.
             </p>
           </div>
 
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-blue-600">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-indigo-500/15 bg-indigo-500/10 text-indigo-500">
             <BarChart3 className="h-4 w-4" />
           </div>
         </div>
 
         <div className="mt-6 grid gap-6 lg:grid-cols-[190px_minmax(0,1fr)] lg:items-center">
           <div className="relative mx-auto h-[180px] w-[180px]">
-            <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
+            <svg
+              viewBox="0 0 100 100"
+              className="h-full w-full -rotate-90"
+            >
               <circle
                 cx="50"
                 cy="50"
                 r="40"
                 fill="none"
-                stroke="#E8EFF5"
+                stroke="currentColor"
+                className="text-muted"
                 strokeWidth="10"
               />
 
@@ -175,29 +181,35 @@ export default function KYCAnalytics({
                     stroke={segment.color}
                     strokeWidth="10"
                     strokeLinecap="round"
-                    strokeDasharray={`${Math.max(0, dash - 1)} ${Math.max(
+                    strokeDasharray={`${Math.max(
+                      0,
+                      dash - 1
+                    )} ${Math.max(
                       0,
                       circumference - Math.max(0, dash - 1)
                     )}`}
                     strokeDashoffset={offset}
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    transition={{ duration: 0.45, delay: index * 0.07 }}
+                    transition={{
+                      duration: 0.45,
+                      delay: index * 0.07,
+                    }}
                   />
                 );
               })}
             </svg>
 
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-              <p className="text-3xl font-black text-[#0F2745]">
+              <p className="text-3xl font-black text-foreground">
                 {verifiedPercent}%
               </p>
 
-              <p className="mt-0.5 text-[8px] font-black uppercase tracking-[0.12em] text-slate-400">
+              <p className="mt-0.5 text-[8px] font-black uppercase tracking-[0.12em] text-muted-foreground">
                 Verified
               </p>
 
-              <p className="mt-1 text-[8px] text-slate-400">
+              <p className="mt-1 text-[8px] text-muted-foreground">
                 {total.toLocaleString()} total
               </p>
             </div>
@@ -213,30 +225,33 @@ export default function KYCAnalytics({
                   type="button"
                   initial={{ opacity: 0, y: 6 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.35, delay: index * 0.04 }}
+                  transition={{
+                    duration: 0.35,
+                    delay: index * 0.04,
+                  }}
                   onClick={() => onFilterStatus(segment.status)}
-                  className="group flex items-center justify-between gap-3 rounded-[18px] border border-[#E4ECF3] bg-[#FAFCFE] p-3.5 text-left transition hover:-translate-y-0.5 hover:border-blue-100 hover:bg-blue-50/45"
+                  className="group flex items-center justify-between gap-3 rounded-[18px] border border-border bg-muted/35 p-3.5 text-left transition hover:-translate-y-0.5 hover:border-indigo-500/25 hover:bg-indigo-500/5"
                 >
                   <div className="flex min-w-0 items-center gap-2.5">
                     <span
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white shadow-sm"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-border bg-background shadow-sm"
                       style={{ color: segment.color }}
                     >
                       <Icon className="h-4 w-4" />
                     </span>
 
                     <div className="min-w-0">
-                      <p className="truncate text-[9px] font-black text-[#174A7A]">
+                      <p className="truncate text-[9px] font-black text-foreground">
                         {segment.label}
                       </p>
 
-                      <p className="mt-0.5 text-[8px] text-slate-400">
+                      <p className="mt-0.5 text-[8px] text-muted-foreground">
                         Click to filter
                       </p>
                     </div>
                   </div>
 
-                  <span className="text-sm font-black text-[#0F2745]">
+                  <span className="text-sm font-black text-foreground">
                     {segment.value.toLocaleString()}
                   </span>
                 </motion.button>
@@ -245,22 +260,25 @@ export default function KYCAnalytics({
           </div>
         </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-2.5 border-t border-slate-100 pt-5 sm:grid-cols-4">
+        <div className="mt-5 grid grid-cols-2 gap-2.5 border-t border-border pt-5 sm:grid-cols-4">
           <MiniSignal
             label="AI Reviewed"
             value={overview.aiReviewed}
             tone="blue"
           />
+
           <MiniSignal
             label="Manual Review"
             value={overview.needsManualReview}
             tone="amber"
           />
+
           <MiniSignal
             label="Verified"
             value={overview.verified}
             tone="emerald"
           />
+
           <MiniSignal
             label="Rejected"
             value={overview.rejected}
@@ -274,19 +292,20 @@ export default function KYCAnalytics({
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, amount: 0.18 }}
         transition={{ duration: 0.5, delay: 0.05 }}
-        className="flex h-full flex-col rounded-[26px] border border-[#173D61] bg-[linear-gradient(145deg,#0B2A48,#123E64)] p-5 text-white shadow-[0_18px_44px_rgba(15,39,69,0.14)] sm:p-6"
+        className="flex h-full flex-col rounded-[26px] border border-indigo-500/20 bg-indigo-500/5 p-5 text-card-foreground sm:p-6"
       >
         <div>
-          <p className="text-[8px] font-black uppercase tracking-[0.16em] text-blue-100/45">
+          <p className="text-[8px] font-black uppercase tracking-[0.16em] text-indigo-500">
             Review Operations
           </p>
 
-          <h2 className="mt-1 text-lg font-black">
+          <h2 className="mt-1 text-lg font-black text-foreground">
             Queue performance
           </h2>
 
-          <p className="mt-1 text-[10px] leading-5 text-blue-100/45">
-            Real queue counts; zero values stay at zero instead of showing fake minimum bars.
+          <p className="mt-1 text-[10px] leading-5 text-muted-foreground">
+            Real queue counts; zero values stay at zero instead of showing
+            fake minimum bars.
           </p>
         </div>
 
@@ -300,20 +319,23 @@ export default function KYCAnalytics({
             return (
               <div key={item.label}>
                 <div className="flex items-center justify-between text-[9px]">
-                  <span className="font-semibold text-blue-100/55">
+                  <span className="font-semibold text-muted-foreground">
                     {item.label}
                   </span>
 
-                  <span className="font-black text-white">
+                  <span className="font-black text-foreground">
                     {item.value.toLocaleString()}
                   </span>
                 </div>
 
-                <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${width}%` }}
-                    transition={{ duration: 0.7, delay: index * 0.05 }}
+                    transition={{
+                      duration: 0.7,
+                      delay: index * 0.05,
+                    }}
                     className="h-full rounded-full"
                     style={{ backgroundColor: item.color }}
                   />
@@ -323,18 +345,18 @@ export default function KYCAnalytics({
           })}
         </div>
 
-        <div className="mt-6 rounded-[20px] border border-white/10 bg-white/[0.055] p-4">
+        <div className="mt-6 rounded-[20px] border border-indigo-500/15 bg-background/70 p-4">
           <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-cyan-200/10 bg-cyan-200/10 text-cyan-200">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-indigo-500/15 bg-indigo-500/10 text-indigo-500">
               <TimerReset className="h-4 w-4" />
             </span>
 
             <div>
-              <p className="text-[8px] font-black uppercase tracking-[0.11em] text-blue-100/45">
+              <p className="text-[8px] font-black uppercase tracking-[0.11em] text-muted-foreground">
                 Avg. completed review
               </p>
 
-              <p className="mt-1 text-xl font-black">
+              <p className="mt-1 text-xl font-black text-foreground">
                 {formatReviewTime(overview.averageReviewMinutes)}
               </p>
             </div>
@@ -355,10 +377,11 @@ function MiniSignal({
   tone: "blue" | "amber" | "emerald" | "rose";
 }) {
   const styles = {
-    blue: "border-blue-100 bg-blue-50 text-blue-700",
-    amber: "border-amber-100 bg-amber-50 text-amber-700",
-    emerald: "border-emerald-100 bg-emerald-50 text-emerald-700",
-    rose: "border-rose-100 bg-rose-50 text-rose-700",
+    blue: "border-indigo-500/20 bg-indigo-500/10 text-indigo-500",
+    amber: "border-amber-500/20 bg-amber-500/10 text-amber-600",
+    emerald:
+      "border-emerald-500/20 bg-emerald-500/10 text-emerald-600",
+    rose: "border-rose-500/20 bg-rose-500/10 text-rose-600",
   }[tone];
 
   return (
