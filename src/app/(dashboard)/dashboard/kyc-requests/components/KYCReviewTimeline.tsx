@@ -31,7 +31,9 @@ export default function KYCReviewTimeline({
       label: "Last reviewed",
       value: request.lastReviewedAt,
       icon: ShieldAlert,
-      active: Boolean(request.lastReviewedAt),
+      active: Boolean(
+        request.lastReviewedAt
+      ),
     },
     {
       label: "Current state",
@@ -44,12 +46,12 @@ export default function KYCReviewTimeline({
   ];
 
   return (
-    <section className="rounded-[22px] border border-[#DCE7F0] bg-white p-5">
-      <p className="text-[8px] font-black uppercase tracking-[0.14em] text-[#5B8BB7]">
+    <section className="rounded-[22px] border border-border bg-card p-5 text-card-foreground">
+      <p className="text-[8px] font-black uppercase tracking-[0.14em] text-indigo-500">
         Review Timeline
       </p>
 
-      <h3 className="mt-1 text-base font-black text-[#0F2745]">
+      <h3 className="mt-1 text-base font-black text-foreground">
         Case activity
       </h3>
 
@@ -66,8 +68,8 @@ export default function KYCReviewTimeline({
                 <span
                   className={`flex h-9 w-9 items-center justify-center rounded-xl border ${
                     step.active
-                      ? "border-blue-100 bg-blue-50 text-blue-600"
-                      : "border-slate-200 bg-slate-50 text-slate-300"
+                      ? "border-indigo-500/20 bg-indigo-500/10 text-indigo-500"
+                      : "border-border bg-muted text-muted-foreground/40"
                   }`}
                 >
                   <Icon className="h-4 w-4" />
@@ -75,17 +77,17 @@ export default function KYCReviewTimeline({
               </div>
 
               <div className="min-w-0 pt-0.5">
-                <p className="text-[9px] font-black text-[#174A7A]">
+                <p className="text-[9px] font-black text-foreground">
                   {step.label}
                 </p>
 
-                <p className="mt-1 text-[8px] text-slate-400">
+                <p className="mt-1 text-[8px] text-muted-foreground">
                   {formatValue(step.value)}
                 </p>
               </div>
 
               {index < steps.length - 1 && (
-                <span className="absolute bottom-0 left-[17px] top-9 w-px bg-slate-200" />
+                <span className="absolute bottom-0 left-[17px] top-9 w-px bg-border" />
               )}
             </div>
           );
@@ -95,28 +97,22 @@ export default function KYCReviewTimeline({
   );
 }
 
-function formatValue(
-  value?: string
-) {
+function formatValue(value?: string) {
   if (!value) {
     return "Not available";
   }
 
-  const date =
-    new Date(value);
+  const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
     return value;
   }
 
-  return new Intl.DateTimeFormat(
-    "en-GB",
-    {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }
-  ).format(date);
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
 }
