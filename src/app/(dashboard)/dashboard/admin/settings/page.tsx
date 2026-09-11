@@ -1,6 +1,7 @@
 "use client";
 
 import React, {
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -25,16 +26,23 @@ import {
   Gauge,
   History,
   KeyRound,
+  Laptop,
+  Monitor,
+  Moon,
+  Palette,
   Lock,
   Network,
   RefreshCw,
   RotateCcw,
   Search,
   Server,
+  LogOut,
+  Smartphone,
   Settings,
   ShieldAlert,
   ShieldCheck,
   SlidersHorizontal,
+  Sun,
   TriangleAlert,
   UserCog,
   Users,
@@ -47,12 +55,16 @@ import {
   adminSettingsApi,
   type AdminSettingsOverview,
 } from "@/lib/api/adminSettingsApi";
+import { apiClient } from "@/lib/api/client";
+import { useTheme, type ThemeMode } from "@/context/ThemeContext";
 
 type SectionId =
   | "overview"
   | "users"
   | "risk"
   | "security"
+  | "sessions"
+  | "appearance"
   | "audit"
   | "system"
   | "danger";
@@ -149,6 +161,26 @@ type ToastState = {
   message:
     string;
 };
+
+interface ActiveAdminSession {
+  id: string;
+  device: string;
+  browser: string;
+  os: string;
+  location: string;
+  ip: string;
+  lastActiveAt: string;
+  expiresAt: string;
+  createdAt: string;
+  isCurrent: boolean;
+}
+
+interface AdminSessionsResponse {
+  success: boolean;
+  count: number;
+  sessions: ActiveAdminSession[];
+  message?: string;
+}
 
 const DEFAULT_SETTINGS:
   AdminSettingsState = {
@@ -319,6 +351,47 @@ const SECTIONS: Array<{
       "mfa",
       "session",
       "login",
+    ],
+  },
+  {
+    id:
+      "sessions",
+
+    label:
+      "Devices & Sessions",
+
+    description:
+      "Live admin devices and active sessions",
+
+    icon:
+      Monitor,
+
+    keywords: [
+      "devices",
+      "sessions",
+      "active",
+      "login",
+    ],
+  },
+  {
+    id:
+      "appearance",
+
+    label:
+      "Appearance",
+
+    description:
+      "Dashboard theme and visual preference",
+
+    icon:
+      Palette,
+
+    keywords: [
+      "appearance",
+      "theme",
+      "light",
+      "dark",
+      "system",
     ],
   },
   {
@@ -553,6 +626,14 @@ export default function AdminSettingsPage() {
       null
     );
 
+  const { theme, setTheme } = useTheme();
+
+  const [themeSaving, setThemeSaving] = useState(false);
+  const [sessions, setSessions] = useState<ActiveAdminSession[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sessionsError, setSessionsError] = useState("");
+  const [sessionActionLoading, setSessionActionLoading] = useState<string | null>(null);
+
   const [
     loading,
     setLoading,
@@ -674,8 +755,52 @@ export default function AdminSettingsPage() {
     );
 
     void loadPlatformSettings();
+
+  }, []);
+  
+  const loadAdminSessions = useCallback(async (silent = false) => {
+    if (!silent) setSessionsLoading(true);
+    setSessionsError("");
+
+    try {
+      const response = await apiClient<AdminSessionsResponse>(
+        "/security/sessions",
+        { method: "GET" }
+      );
+
+      if (!response.success) {
+        throw new Error(response.message || "Failed to load active admin sessions.");
+      }
+
+      setSessions(response.sessions ?? []);
+    } catch (error) {
+      console.error("ADMIN SESSIONS ERROR:", error);
+      setSessionsError(error instanceof Error ? error.message : "Failed to load active admin sessions.");
+      if (silent) {
+        setToast({ type: "error", message: error instanceof Error ? error.message : "Failed to load active admin sessions." });
+      }
+    } finally {
+      if (!silent) setSessionsLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+  void loadAdminSessions();
+
+  const refreshTimer = window.setInterval(() => {
+    if (document.visibilityState === "visible") {
+      void loadAdminSessions(true);
+    }
+  }, 30_000);
+
+  const handleFocus = () => void loadAdminSessions(true);
+  window.addEventListener("focus", handleFocus);
+
+  return () => {
+    window.clearInterval(refreshTimer);
+    window.removeEventListener("focus", handleFocus);
+  };
+}, [loadAdminSessions]);
   useEffect(() => {
     if (!toast) {
       return;
@@ -863,6 +988,54 @@ export default function AdminSettingsPage() {
     }, [
       draft.risk,
     ]);
+
+
+  const terminateAdminSession = async (sessionId: string) => {
+    setSessionActionLoading(sessionId);
+    try {
+      const response = await apiClient<{ success: boolean; message?: string }>(
+        `/security/sessions/${encodeURIComponent(sessionId)}`,
+        { method: "DELETE" }
+      );
+      if (!response.success) throw new Error(response.message || "Failed to sign out session.");
+      setSessions((current) => current.filter((item) => item.id !== sessionId));
+      setToast({ type: "success", message: response.message || "Session signed out successfully." });
+    } catch (error) {
+      setToast({ type: "error", message: error instanceof Error ? error.message : "Failed to sign out session." });
+    } finally {
+      setSessionActionLoading(null);
+    }
+  };
+
+  const terminateOtherAdminSessions = async () => {
+    setSessionActionLoading("others");
+    try {
+      const response = await apiClient<{ success: boolean; message?: string }>(
+        "/security/sessions/others",
+        { method: "DELETE" }
+      );
+      if (!response.success) throw new Error(response.message || "Failed to sign out other sessions.");
+      setSessions((current) => current.filter((item) => item.isCurrent));
+      setToast({ type: "success", message: response.message || "Other sessions signed out successfully." });
+    } catch (error) {
+      setToast({ type: "error", message: error instanceof Error ? error.message : "Failed to sign out other sessions." });
+    } finally {
+      setSessionActionLoading(null);
+    }
+  };
+
+  const handleThemeChange = async (nextTheme: ThemeMode) => {
+    if (nextTheme === theme) return;
+    setThemeSaving(true);
+    try {
+      await setTheme(nextTheme);
+      setToast({ type: "success", message: `Dashboard theme changed to ${nextTheme}.` });
+    } catch (error) {
+      setToast({ type: "error", message: error instanceof Error ? error.message : "Failed to change dashboard theme." });
+    } finally {
+      setThemeSaving(false);
+    }
+  };
 
   const requestSave =
     () => {
@@ -1057,18 +1230,18 @@ export default function AdminSettingsPage() {
 
   if (!mounted) {
     return (
-      <div className="min-h-screen bg-[#F4F7FB]" />
+      <div className="min-h-screen bg-background" />
     );
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#F4F7FB] px-4 py-10">
-        <div className="mx-auto flex min-h-[420px] w-full max-w-[1500px] items-center justify-center rounded-[30px] border border-slate-200 bg-white">
+      <div className="min-h-screen bg-background px-4 py-10">
+        <div className="mx-auto flex min-h-[420px] w-full max-w-[1500px] items-center justify-center rounded-[30px] border border-border bg-card">
           <div className="text-center">
-            <RefreshCw className="mx-auto h-7 w-7 animate-spin text-[#1F5EA8]" />
+            <RefreshCw className="mx-auto h-7 w-7 animate-spin text-indigo-600 dark:text-indigo-400" />
 
-            <p className="mt-4 text-sm font-black text-[#0F2745]">
+            <p className="mt-4 text-sm font-black text-card-foreground">
               Loading platform settings...
             </p>
           </div>
@@ -1079,16 +1252,16 @@ export default function AdminSettingsPage() {
 
   if (loadError) {
     return (
-      <div className="min-h-screen bg-[#F4F7FB] px-4 py-10">
-        <div className="mx-auto flex min-h-[420px] w-full max-w-[900px] items-center justify-center rounded-[30px] border border-rose-100 bg-white p-6">
+      <div className="min-h-screen bg-background px-4 py-10">
+        <div className="mx-auto flex min-h-[420px] w-full max-w-[900px] items-center justify-center rounded-[30px] border border-rose-100 bg-card p-6">
           <div className="max-w-md text-center">
             <AlertTriangle className="mx-auto h-8 w-8 text-rose-500" />
 
-            <h1 className="mt-4 text-xl font-black text-[#0F2745]">
+            <h1 className="mt-4 text-xl font-black text-card-foreground">
               Could not load platform settings
             </h1>
 
-            <p className="mt-2 text-sm leading-6 text-slate-500">
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
               {loadError}
             </p>
 
@@ -1097,7 +1270,7 @@ export default function AdminSettingsPage() {
               onClick={() =>
                 void loadPlatformSettings()
               }
-              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#1F5EA8] px-4 py-2.5 text-xs font-black text-white"
+              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-black text-white"
             >
               <RefreshCw className="h-3.5 w-3.5" />
               Retry
@@ -1109,7 +1282,7 @@ export default function AdminSettingsPage() {
   }
 
   return (
-    <main className="bg-[radial-gradient(circle_at_top_left,#eef7ff_0%,#f5f8fc_36%,#f4f7fb_72%)] pb-10 text-[#0F2745] sm:pb-12">
+    <main className="min-h-screen bg-background pb-10 text-foreground sm:pb-12">
       <div className="mx-auto w-full max-w-[1500px] px-4 py-5 sm:px-6 lg:px-8 lg:py-8">
         <AdminHero
           healthScore={
@@ -1259,6 +1432,26 @@ export default function AdminSettingsPage() {
                     setDraft={
                       setDraft
                     }
+                  />
+                )}
+
+                {activeSection === "sessions" && (
+                  <ActiveSessionsSection
+                    sessions={sessions}
+                    loading={sessionsLoading}
+                    error={sessionsError}
+                    actionLoading={sessionActionLoading}
+                    onReload={() => void loadAdminSessions()}
+                    onTerminate={(id) => void terminateAdminSession(id)}
+                    onTerminateOthers={() => void terminateOtherAdminSessions()}
+                  />
+                )}
+
+                {activeSection === "appearance" && (
+                  <AppearanceSection
+                    theme={theme}
+                    saving={themeSaving}
+                    onThemeChange={(nextTheme) => void handleThemeChange(nextTheme)}
                   />
                 )}
 
@@ -1449,7 +1642,7 @@ function AdminHero({ healthScore, onOpenChanges }: { healthScore: number; onOpen
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, ease: "easeOut" }}
-      className="relative overflow-hidden rounded-[34px] border border-white/10 bg-[linear-gradient(118deg,#07182b_0%,#0c3153_46%,#17689c_100%)] px-5 py-6 text-white shadow-[0_28px_85px_rgba(15,39,69,0.22)] sm:px-7 sm:py-8 lg:px-9"
+      className="relative overflow-hidden rounded-[34px] border border-white/10 bg-indigo-950 px-5 py-6 text-white shadow-[0_28px_85px_rgba(15,39,69,0.22)] sm:px-7 sm:py-8 lg:px-9"
     >
       <div className="pointer-events-none absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(255,255,255,.035)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.035)_1px,transparent_1px)] [background-size:34px_34px]" />
 
@@ -1468,7 +1661,7 @@ function AdminHero({ healthScore, onOpenChanges }: { healthScore: number; onOpen
       <div className="relative z-10 grid gap-7 xl:grid-cols-[minmax(0,1fr)_390px] xl:items-center">
         <div className="max-w-3xl">
           <div className="flex flex-wrap items-center gap-3">
-            <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/10 backdrop-blur-xl">
+            <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-card/10 backdrop-blur-xl">
               <motion.span
                 className="absolute inset-1 rounded-xl border border-cyan-300/20"
                 animate={{ rotate: [0, 4, 0, -4, 0] }}
@@ -1505,7 +1698,7 @@ function AdminHero({ healthScore, onOpenChanges }: { healthScore: number; onOpen
         <button
           type="button"
           onClick={onOpenChanges}
-          className="group relative overflow-hidden rounded-[26px] border border-white/10 bg-white/[0.08] p-5 text-left backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/[0.12]"
+          className="group relative overflow-hidden rounded-[26px] border border-white/10 bg-card/[0.08] p-5 text-left backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-card/[0.12]"
         >
           <motion.div
             className="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full border border-emerald-300/20"
@@ -1575,6 +1768,8 @@ function SettingsNavigation({
     users: "Roles",
     risk: "Risk",
     security: "Security",
+    sessions: "Devices",
+    appearance: "Appearance",
     audit: "Audit",
     system: "System",
     danger: "Danger",
@@ -1582,11 +1777,11 @@ function SettingsNavigation({
 
   return (
     <aside className="sticky top-3 z-40 min-w-0">
-      <div className="overflow-hidden rounded-[28px] border border-slate-200/90 bg-white/95 shadow-[0_18px_55px_rgba(15,39,69,0.09)] backdrop-blur-xl">
+      <div className="overflow-hidden rounded-[28px] border border-border/90 bg-card/95 shadow-[0_18px_55px_rgba(15,39,69,0.09)] backdrop-blur-xl">
         <div className="flex flex-col gap-3 p-3 2xl:flex-row 2xl:items-center">
           <div className="flex shrink-0 items-center justify-between gap-3 rounded-2xl bg-[linear-gradient(135deg,#f8fbff,#ffffff)] px-3 py-2.5 2xl:w-[218px] 2xl:justify-start">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#0F2745] text-cyan-200 shadow-[0_8px_22px_rgba(15,39,69,.18)]">
+              <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-950 text-cyan-200 shadow-[0_8px_22px_rgba(15,39,69,.18)]">
                 <SlidersHorizontal className="h-[18px] w-[18px]" />
                 <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-400">
                   <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400 opacity-35" />
@@ -1594,10 +1789,10 @@ function SettingsNavigation({
               </div>
 
               <div className="min-w-0">
-                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
+                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
                   Admin Console
                 </p>
-                <p className="mt-0.5 truncate text-sm font-black tracking-[-0.01em] text-[#0F2745]">
+                <p className="mt-0.5 truncate text-sm font-black tracking-[-0.01em] text-card-foreground">
                   Platform Controls
                 </p>
               </div>
@@ -1610,7 +1805,7 @@ function SettingsNavigation({
 
           <div className="order-3 grid min-w-0 flex-1 grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7 2xl:order-2">
             {sections.length === 0 ? (
-              <div className="col-span-full flex min-h-12 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 text-xs font-bold text-slate-400">
+              <div className="col-span-full flex min-h-12 items-center justify-center rounded-2xl border border-dashed border-border bg-muted px-4 text-xs font-bold text-muted-foreground">
                 No matching settings
               </div>
             ) : (
@@ -1627,8 +1822,8 @@ function SettingsNavigation({
                     whileTap={{ scale: 0.97 }}
                     className={`group relative flex min-w-0 items-center justify-center gap-2 overflow-hidden rounded-2xl border px-2.5 py-3 transition-all duration-200 ${
                       active
-                        ? "border-[#143c63] bg-[#0F2745] text-white shadow-[0_10px_28px_rgba(15,39,69,0.18)]"
-                        : "border-transparent bg-[#F7F9FC] text-slate-600 hover:border-blue-100 hover:bg-blue-50 hover:text-[#1F5EA8]"
+                        ? "border-[#143c63] bg-indigo-950 text-white shadow-[0_10px_28px_rgba(15,39,69,0.18)]"
+                        : "border-transparent bg-muted text-card-foreground/75 hover:border-indigo-200/70 dark:border-indigo-500/25 hover:bg-indigo-50 dark:bg-indigo-500/10 hover:text-indigo-600 dark:text-indigo-400"
                     }`}
                   >
                     {active && (
@@ -1657,7 +1852,7 @@ function SettingsNavigation({
           </div>
 
           <div className="relative order-2 w-full 2xl:order-3 2xl:w-[260px]">
-            <div className="pointer-events-none absolute left-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg bg-white text-slate-400 shadow-sm ring-1 ring-slate-100">
+            <div className="pointer-events-none absolute left-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg bg-card text-muted-foreground shadow-sm ring-1 ring-slate-100">
               <Search className="h-3.5 w-3.5" />
             </div>
 
@@ -1665,14 +1860,14 @@ function SettingsNavigation({
               value={searchQuery}
               onChange={(event) => onSearchChange(event.target.value)}
               placeholder="Search controls..."
-              className="h-12 w-full rounded-2xl border border-slate-200 bg-[#F8FAFC] pl-12 pr-10 text-xs font-semibold text-[#0F2745] outline-none transition focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+              className="h-12 w-full rounded-2xl border border-border bg-muted pl-12 pr-10 text-xs font-semibold text-card-foreground outline-none transition focus:border-blue-300 focus:bg-card focus:ring-4 focus:ring-indigo-500/10"
             />
 
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => onSearchChange("")}
-                className="absolute right-2.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-white hover:text-slate-700"
+                className="absolute right-2.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-card hover:text-card-foreground/85"
                 aria-label="Clear search"
               >
                 <X className="h-3.5 w-3.5" />
@@ -1681,8 +1876,8 @@ function SettingsNavigation({
           </div>
         </div>
 
-        <div className="hidden border-t border-slate-100 px-4 py-2 2xl:flex 2xl:items-center 2xl:justify-between">
-          <p className="text-[9px] font-semibold text-slate-400">
+        <div className="hidden border-t border-border/70 px-4 py-2 2xl:flex 2xl:items-center 2xl:justify-between">
+          <p className="text-[9px] font-semibold text-muted-foreground">
             Search, switch sections, and stage configuration changes from this control strip.
           </p>
           <div className="flex items-center gap-2 text-[9px] font-black text-emerald-700">
@@ -1774,13 +1969,13 @@ function OverviewSection({
         />
       </div>
 
-      <div className="rounded-[28px] border border-slate-200/80 bg-white p-4 shadow-[0_12px_36px_rgba(15,39,69,0.045)] sm:p-5">
+      <div className="rounded-[28px] border border-border/80 bg-card p-4 shadow-[0_12px_36px_rgba(15,39,69,0.045)] sm:p-5">
         <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">
+            <p className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground">
               Infrastructure
             </p>
-            <h3 className="mt-1 text-base font-black text-[#0F2745]">
+            <h3 className="mt-1 text-base font-black text-card-foreground">
               Service readiness
             </h3>
           </div>
@@ -1834,7 +2029,7 @@ function SystemHealthCard({
   const circumference = 2 * Math.PI * 54;
 
   return (
-    <div className="relative h-full min-w-0 overflow-hidden rounded-[30px] bg-[linear-gradient(135deg,#0b213d_0%,#10385d_58%,#155f88_100%)] p-5 text-white shadow-[0_20px_62px_rgba(15,39,69,0.18)] sm:p-7">
+    <div className="relative h-full min-w-0 overflow-hidden rounded-[30px] bg-indigo-950 p-5 text-white shadow-[0_20px_62px_rgba(15,39,69,0.18)] sm:p-7">
       <div className="pointer-events-none absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.045)_1px,transparent_1px)] [background-size:30px_30px]" />
 
       <motion.div
@@ -1928,7 +2123,7 @@ function HealthMini({ label, value }: { label: string; value: number }) {
   return (
     <motion.div
       whileHover={{ y: -3 }}
-      className="rounded-2xl border border-white/10 bg-white/[0.055] p-3.5 backdrop-blur-sm"
+      className="rounded-2xl border border-white/10 bg-card/[0.055] p-3.5 backdrop-blur-sm"
     >
       <div className="flex items-center justify-between gap-2">
         <p className="text-[9px] font-bold uppercase tracking-[0.12em] text-blue-100/45">{label}</p>
@@ -1942,12 +2137,12 @@ function HealthMini({ label, value }: { label: string; value: number }) {
 
 function AnimatedHealthBar({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-3.5">
+    <div className="rounded-2xl border border-white/10 bg-card/[0.045] p-3.5">
       <div className="flex items-center justify-between gap-3 text-[10px]">
         <span className="truncate font-semibold text-blue-100/60">{label}</span>
         <span className="font-black">{value}%</span>
       </div>
-      <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-white/10">
+      <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-card/10">
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${value}%` }}
@@ -1972,30 +2167,30 @@ function RecentChangesCard({
   const warning = items.filter((item) => item.severity === "warning").length;
 
   return (
-    <div className="relative flex h-full min-h-[430px] min-w-0 flex-col overflow-hidden rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_14px_42px_rgba(15,39,69,0.055)] sm:p-6">
-      <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-blue-50" />
+    <div className="relative flex h-full min-h-[430px] min-w-0 flex-col overflow-hidden rounded-[30px] border border-border bg-card p-5 shadow-[0_14px_42px_rgba(15,39,69,0.055)] sm:p-6">
+      <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-indigo-50 dark:bg-indigo-500/10" />
       <div className="pointer-events-none absolute -bottom-20 -left-16 h-44 w-44 rounded-full bg-cyan-50/60 blur-2xl" />
 
       <div className="relative z-10 flex items-start justify-between gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-[#1F5EA8] ring-1 ring-blue-100">
+            <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 ring-1 ring-blue-100">
               <History className="h-4 w-4" />
               {items.length > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#0F2745] px-1 text-[8px] font-black text-white">
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-indigo-950 px-1 text-[8px] font-black text-white">
                   {Math.min(items.length, 99)}
                 </span>
               )}
             </span>
-            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1F5EA8]">
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-indigo-600 dark:text-indigo-400">
               Activity
             </p>
           </div>
 
-          <h3 className="mt-3 text-[22px] font-black tracking-[-0.025em] text-[#0F2745]">
+          <h3 className="mt-3 text-[22px] font-black tracking-[-0.025em] text-card-foreground">
             Recent Changes
           </h3>
-          <p className="mt-1 max-w-sm text-[11px] leading-5 text-slate-500">
+          <p className="mt-1 max-w-sm text-[11px] leading-5 text-muted-foreground">
             Latest backend-recorded platform configuration activity and audit severity.
           </p>
         </div>
@@ -2003,7 +2198,7 @@ function RecentChangesCard({
         <button
           type="button"
           onClick={onOpenAll}
-          className="group inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-[10px] font-black text-[#1F5EA8] transition hover:border-[#1F5EA8] hover:bg-[#1F5EA8] hover:text-white"
+          className="group inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-indigo-200/70 dark:border-indigo-500/25 bg-indigo-50 dark:bg-indigo-500/10 px-3 py-2 text-[10px] font-black text-indigo-600 dark:text-indigo-400 transition hover:border-[#1F5EA8] hover:bg-indigo-600 hover:text-white"
         >
           View all
           <ArrowUpRight className="h-3.5 w-3.5 transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
@@ -2018,9 +2213,9 @@ function RecentChangesCard({
 
       <div className="relative z-10 mt-4 flex flex-1 flex-col">
         {items.length === 0 ? (
-          <div className="relative flex min-h-[235px] flex-1 flex-col items-center justify-center overflow-hidden rounded-[22px] border border-dashed border-blue-100 bg-[linear-gradient(145deg,#f9fcff_0%,#f4f8fd_100%)] px-5 py-8 text-center">
+          <div className="relative flex min-h-[235px] flex-1 flex-col items-center justify-center overflow-hidden rounded-[22px] border border-dashed border-indigo-200/70 dark:border-indigo-500/25 bg-[linear-gradient(145deg,#f9fcff_0%,#f4f8fd_100%)] px-5 py-8 text-center">
             <motion.div
-              className="pointer-events-none absolute h-40 w-40 rounded-full border border-blue-100/80"
+              className="pointer-events-none absolute h-40 w-40 rounded-full border border-indigo-200/70 dark:border-indigo-500/25/80"
               animate={{ scale: [0.84, 1.08, 0.84], opacity: [0.15, 0.5, 0.15] }}
               transition={{ duration: 3.8, repeat: Infinity, ease: "easeInOut" }}
             />
@@ -2033,17 +2228,17 @@ function RecentChangesCard({
             </motion.div>
 
             <motion.div
-              className="relative z-10 flex h-14 w-14 items-center justify-center rounded-2xl border border-blue-100 bg-white text-[#1F5EA8] shadow-[0_8px_24px_rgba(31,94,168,.10)]"
+              className="relative z-10 flex h-14 w-14 items-center justify-center rounded-2xl border border-indigo-200/70 dark:border-indigo-500/25 bg-card text-indigo-600 dark:text-indigo-400 shadow-[0_8px_24px_rgba(31,94,168,.10)]"
               animate={{ y: [0, -5, 0] }}
               transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
             >
               <History className="h-5 w-5" />
             </motion.div>
 
-            <p className="relative z-10 mt-4 text-sm font-black tracking-[-0.01em] text-[#0F2745]">
+            <p className="relative z-10 mt-4 text-sm font-black tracking-[-0.01em] text-card-foreground">
               No platform setting changes yet
             </p>
-            <p className="relative z-10 mx-auto mt-1 max-w-xs text-[10px] leading-5 text-slate-400">
+            <p className="relative z-10 mx-auto mt-1 max-w-xs text-[10px] leading-5 text-muted-foreground">
               Your first saved configuration change will appear here with actor, severity and audit metadata.
             </p>
           </div>
@@ -2058,7 +2253,7 @@ function RecentChangesCard({
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.06 }}
                 whileHover={{ x: 3 }}
-                className="group flex w-full items-center gap-3 rounded-2xl border border-slate-100 bg-[#F8FAFC] p-3.5 text-left transition hover:border-blue-100 hover:bg-white hover:shadow-sm"
+                className="group flex w-full items-center gap-3 rounded-2xl border border-border/70 bg-muted p-3.5 text-left transition hover:border-indigo-200/70 dark:border-indigo-500/25 hover:bg-card hover:shadow-sm"
               >
                 <span
                   className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
@@ -2066,20 +2261,20 @@ function RecentChangesCard({
                       ? "bg-rose-50 text-rose-600"
                       : item.severity === "warning"
                         ? "bg-amber-50 text-amber-600"
-                        : "bg-blue-50 text-[#1F5EA8]"
+                        : "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
                   }`}
                 >
                   {item.severity === "critical" ? <ShieldAlert className="h-4 w-4" /> : <History className="h-4 w-4" />}
                 </span>
 
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-black text-slate-800">{item.action}</p>
-                  <p className="mt-1 truncate text-[10px] text-slate-400">{item.detail}</p>
+                  <p className="truncate text-xs font-black text-card-foreground">{item.action}</p>
+                  <p className="mt-1 truncate text-[10px] text-muted-foreground">{item.detail}</p>
                 </div>
 
                 <div className="shrink-0 text-right">
-                  <p className="text-[9px] font-bold text-slate-400">{item.time}</p>
-                  <ChevronRight className="ml-auto mt-1 h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[#1F5EA8]" />
+                  <p className="text-[9px] font-bold text-muted-foreground">{item.time}</p>
+                  <ChevronRight className="ml-auto mt-1 h-4 w-4 text-muted-foreground/60 transition group-hover:translate-x-0.5 group-hover:text-indigo-600 dark:text-indigo-400" />
                 </div>
               </motion.button>
             ))}
@@ -2104,7 +2299,7 @@ function ActivityMini({
       ? "bg-rose-50 text-rose-600"
       : tone === "amber"
         ? "bg-amber-50 text-amber-600"
-        : "bg-blue-50 text-[#1F5EA8]";
+        : "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400";
 
   return (
     <div className={`rounded-xl px-3 py-2.5 ${toneClass}`}>
@@ -2230,9 +2425,9 @@ function UsersRolesSection({
                   y:
                     -4,
                 }}
-                className="rounded-[24px] border border-slate-200 bg-white p-5 text-left shadow-sm transition hover:border-blue-100"
+                className="rounded-[24px] border border-border bg-card p-5 text-left shadow-sm transition hover:border-indigo-200/70 dark:border-indigo-500/25"
               >
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 text-[#1F5EA8]">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
                   <Icon className="h-5 w-5" />
                 </div>
 
@@ -2242,13 +2437,13 @@ function UsersRolesSection({
                   }
                 </h3>
 
-                <p className="mt-2 text-[10px] leading-5 text-slate-400">
+                <p className="mt-2 text-[10px] leading-5 text-muted-foreground">
                   {
                     role.description
                   }
                 </p>
 
-                <div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4 text-[10px] font-bold text-slate-500">
+                <div className="mt-5 flex items-center justify-between border-t border-border/70 pt-4 text-[10px] font-bold text-muted-foreground">
                   <span>
                     {
                       role.members
@@ -2273,30 +2468,30 @@ function UsersRolesSection({
         )}
       </div>
 
-      <div className="overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-sm">
-        <div className="border-b border-slate-100 px-5 py-4">
+      <div className="overflow-hidden rounded-[26px] border border-border bg-card shadow-sm">
+        <div className="border-b border-border/70 px-5 py-4">
           <h3 className="text-sm font-black">
             Permission Matrix
           </h3>
 
-          <p className="mt-1 text-[10px] text-slate-400">
+          <p className="mt-1 text-[10px] text-muted-foreground">
             UI summary only. Backend route authorization remains the source of truth.
           </p>
         </div>
 
         <div className="overflow-x-auto">
           <table className="min-w-[560px] w-full text-left">
-            <thead className="bg-[#F8FAFC]">
+            <thead className="bg-muted">
               <tr>
-                <th className="px-5 py-4 text-xs font-black text-slate-500">
+                <th className="px-5 py-4 text-xs font-black text-muted-foreground">
                   Capability
                 </th>
 
-                <th className="px-5 py-4 text-center text-xs font-black text-slate-500">
+                <th className="px-5 py-4 text-center text-xs font-black text-muted-foreground">
                   Admin
                 </th>
 
-                <th className="px-5 py-4 text-center text-xs font-black text-slate-500">
+                <th className="px-5 py-4 text-center text-xs font-black text-muted-foreground">
                   User
                 </th>
               </tr>
@@ -2311,9 +2506,9 @@ function UsersRolesSection({
                     key={
                       row.capability
                     }
-                    className="transition hover:bg-slate-50/70"
+                    className="transition hover:bg-muted/70"
                   >
-                    <td className="px-5 py-4 text-sm font-bold text-slate-700">
+                    <td className="px-5 py-4 text-sm font-bold text-card-foreground/85">
                       {
                         row.capability
                       }
@@ -2344,7 +2539,7 @@ function UsersRolesSection({
 function PermissionCell({ allowed }: { allowed: boolean }) {
   return (
     <td className="px-5 py-4 text-center">
-      {allowed ? <CheckCircle2 className="mx-auto h-5 w-5 text-emerald-500" /> : <Lock className="mx-auto h-4 w-4 text-slate-300" />}
+      {allowed ? <CheckCircle2 className="mx-auto h-5 w-5 text-emerald-500" /> : <Lock className="mx-auto h-4 w-4 text-muted-foreground/60" />}
     </td>
   );
 }
@@ -2365,7 +2560,7 @@ function RiskSection({
       <SectionHeader eyebrow="Transaction Controls" title="Transaction Risk Engine" description="Tune amount thresholds, velocity controls and KYC requirements for sensitive wallet operations." icon={Gauge} />
 
       <div className="grid items-start gap-6 2xl:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="space-y-5 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <div className="space-y-5 rounded-[28px] border border-border bg-card p-5 shadow-sm sm:p-6">
           <RangeField
             label="Daily Transfer Limit"
             description="Maximum standard transfer amount per user before additional checks."
@@ -2375,7 +2570,7 @@ function RiskSection({
             step={5000}
             onChange={(value) => setDraft((c) => ({ ...c, risk: { ...c.risk, dailyTransferLimit: value } }))}
           />
-          <div className="border-t border-slate-100 pt-5">
+          <div className="border-t border-border/70 pt-5">
             <RangeField
               label="Manual Review Threshold"
               description="Transfers above this amount enter enhanced review."
@@ -2386,7 +2581,7 @@ function RiskSection({
               onChange={(value) => setDraft((c) => ({ ...c, risk: { ...c.risk, reviewThreshold: value } }))}
             />
           </div>
-          <div className="grid gap-4 border-t border-slate-100 pt-5 md:grid-cols-2">
+          <div className="grid gap-4 border-t border-border/70 pt-5 md:grid-cols-2">
             <NumberField
               label="Velocity window"
               suffix="minutes"
@@ -2404,7 +2599,7 @@ function RiskSection({
               onChange={(value) => setDraft((c) => ({ ...c, risk: { ...c.risk, maxTransfersPerWindow: value } }))}
             />
           </div>
-          <div className="border-t border-slate-100 pt-5">
+          <div className="border-t border-border/70 pt-5">
             <ToggleRow
               label="Require KYC for high-value transfers"
               description="Require verified identity before the high-value transaction path can proceed."
@@ -2446,7 +2641,7 @@ function RiskVisualizer({
     90;
 
   return (
-    <div className="relative self-start overflow-hidden rounded-[28px] bg-[#0F2745] p-5 text-white shadow-[0_18px_50px_rgba(15,39,69,.14)] sm:p-6">
+    <div className="relative self-start overflow-hidden rounded-[28px] bg-indigo-950 p-5 text-white shadow-[0_18px_50px_rgba(15,39,69,.14)] sm:p-6">
       <motion.div
         className="pointer-events-none absolute -right-14 -top-14 h-44 w-44 rounded-full border border-cyan-300/10"
         animate={{
@@ -2637,7 +2832,7 @@ function RiskVisualizer({
 
 function RiskStat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-xl border border-white/10 bg-white/[0.05] px-2 py-3 text-center">
+    <div className="min-w-0 rounded-xl border border-white/10 bg-card/[0.05] px-2 py-3 text-center">
       <p className="truncate text-[9px] text-blue-100/45">{label}</p>
       <p className="mt-1 truncate text-xs font-black">{value}</p>
     </div>
@@ -2688,17 +2883,17 @@ function SecuritySection({
       />
 
       <div className="grid items-stretch gap-5 2xl:grid-cols-[minmax(0,1fr)_430px]">
-        <div className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_14px_38px_rgba(15,39,69,.055)] sm:p-6">
-          <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-blue-100 bg-[linear-gradient(135deg,#f7fbff,#ffffff)] p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="rounded-[30px] border border-border bg-card p-5 shadow-[0_14px_38px_rgba(15,39,69,.055)] sm:p-6">
+          <div className="mb-5 flex flex-col gap-3 rounded-2xl border border-indigo-200/70 dark:border-indigo-500/25 bg-[linear-gradient(135deg,#f7fbff,#ffffff)] p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#0F2745] text-cyan-200 shadow-sm">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-indigo-950 text-cyan-200 shadow-sm">
                 <KeyRound className="h-4.5 w-4.5" />
               </div>
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1F5EA8]">
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-indigo-600 dark:text-indigo-400">
                   Privileged Authentication
                 </p>
-                <p className="mt-1 text-sm font-black tracking-[-0.01em] text-[#0F2745]">
+                <p className="mt-1 text-sm font-black tracking-[-0.01em] text-card-foreground">
                   Staff access protection policy
                 </p>
               </div>
@@ -2709,7 +2904,7 @@ function SecuritySection({
           </div>
 
           <div className="space-y-1">
-            <div className="rounded-2xl px-1 py-2 transition hover:bg-slate-50/70">
+            <div className="rounded-2xl px-1 py-2 transition hover:bg-muted/70">
               <ToggleRow
                 label="Require MFA for staff"
                 description="Require a second authentication factor before privileged accounts can enter protected administration flows."
@@ -2718,9 +2913,9 @@ function SecuritySection({
               />
             </div>
 
-            <div className="border-t border-slate-100" />
+            <div className="border-t border-border/70" />
 
-            <div className="rounded-2xl px-1 py-2 transition hover:bg-slate-50/70">
+            <div className="rounded-2xl px-1 py-2 transition hover:bg-muted/70">
               <ToggleRow
                 label="Re-authenticate sensitive admin actions"
                 description="Ask for the current administrator password again before platform-wide or destructive configuration changes."
@@ -2730,13 +2925,13 @@ function SecuritySection({
             </div>
           </div>
 
-          <div className="mt-5 grid gap-4 border-t border-slate-100 pt-5 md:grid-cols-2">
-            <div className="rounded-2xl border border-slate-100 bg-[#FAFBFD] p-4">
+          <div className="mt-5 grid gap-4 border-t border-border/70 pt-5 md:grid-cols-2">
+            <div className="rounded-2xl border border-border/70 bg-muted/50 p-4">
               <div className="mb-3 flex items-center gap-2">
-                <Clock3 className="h-4 w-4 text-[#1F5EA8]" />
+                <Clock3 className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                 <div>
-                  <p className="text-xs font-black text-[#0F2745]">Session lifetime</p>
-                  <p className="mt-0.5 text-[9px] text-slate-400">Shorter sessions reduce unattended admin exposure.</p>
+                  <p className="text-xs font-black text-card-foreground">Session lifetime</p>
+                  <p className="mt-0.5 text-[9px] text-muted-foreground">Shorter sessions reduce unattended admin exposure.</p>
                 </div>
               </div>
               <SelectField
@@ -2752,12 +2947,12 @@ function SecuritySection({
               />
             </div>
 
-            <div className="rounded-2xl border border-slate-100 bg-[#FAFBFD] p-4">
+            <div className="rounded-2xl border border-border/70 bg-muted/50 p-4">
               <div className="mb-3 flex items-center gap-2">
-                <ShieldAlert className="h-4 w-4 text-[#1F5EA8]" />
+                <ShieldAlert className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                 <div>
-                  <p className="text-xs font-black text-[#0F2745]">Login guard</p>
-                  <p className="mt-0.5 text-[9px] text-slate-400">Lower limits reduce repeated privileged-login attempts.</p>
+                  <p className="text-xs font-black text-card-foreground">Login guard</p>
+                  <p className="mt-0.5 text-[9px] text-muted-foreground">Lower limits reduce repeated privileged-login attempts.</p>
                 </div>
               </div>
               <NumberField
@@ -2771,11 +2966,11 @@ function SecuritySection({
             </div>
           </div>
 
-          <div className="mt-5 rounded-2xl border border-slate-100 bg-slate-50/70 p-4">
+          <div className="mt-5 rounded-2xl border border-border/70 bg-muted/70 p-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-xs font-black text-[#0F2745]">Policy presets</p>
-                <p className="mt-1 text-[10px] leading-5 text-slate-400">
+                <p className="text-xs font-black text-card-foreground">Policy presets</p>
+                <p className="mt-1 text-[10px] leading-5 text-muted-foreground">
                   Apply a preset to stage several related security controls at once.
                 </p>
               </div>
@@ -2785,7 +2980,7 @@ function SecuritySection({
                     key={preset}
                     type="button"
                     onClick={() => applyPreset(preset)}
-                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[9px] font-black capitalize text-slate-600 transition hover:border-blue-200 hover:bg-blue-50 hover:text-[#1F5EA8]"
+                    className="rounded-xl border border-border bg-card px-3 py-2 text-[9px] font-black capitalize text-card-foreground/75 transition hover:border-indigo-300/70 dark:border-indigo-500/35 hover:bg-indigo-50 dark:bg-indigo-500/10 hover:text-indigo-600 dark:text-indigo-400"
                   >
                     {preset}
                   </button>
@@ -2824,7 +3019,7 @@ function SecurityVisualizer({
   onApplyPreset: (preset: "balanced" | "strict" | "maximum") => void;
 }) {
   return (
-    <div className="relative h-full min-h-[520px] overflow-hidden rounded-[30px] bg-[linear-gradient(155deg,#081b31_0%,#0f3152_58%,#174b73_100%)] p-5 text-white shadow-[0_22px_60px_rgba(15,39,69,.18)] sm:p-6">
+    <div className="relative h-full min-h-[520px] overflow-hidden rounded-[30px] bg-indigo-950 p-5 text-white shadow-[0_22px_60px_rgba(15,39,69,.18)] sm:p-6">
       <div className="pointer-events-none absolute inset-0 opacity-20 [background-image:radial-gradient(circle_at_center,rgba(103,232,249,.22)_1px,transparent_1px)] [background-size:22px_22px]" />
 
       <motion.div
@@ -2882,7 +3077,7 @@ function SecurityVisualizer({
         </div>
 
         <div className="space-y-3">
-          <div className="rounded-2xl border border-white/10 bg-white/[0.055] p-4 text-center">
+          <div className="rounded-2xl border border-white/10 bg-card/[0.055] p-4 text-center">
             <motion.p
               key={score}
               initial={{ opacity: 0, scale: 0.8 }}
@@ -2929,7 +3124,7 @@ function SecurityInsight({
   good: boolean;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.045] p-3.5">
+    <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-card/[0.045] p-3.5">
       <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${good ? "bg-emerald-300/10 text-emerald-200" : "bg-amber-300/10 text-amber-200"}`}>
         <Icon className="h-4 w-4" />
       </span>
@@ -2953,7 +3148,7 @@ function SecurityMetric({
   good: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-3.5">
+    <div className="rounded-2xl border border-white/10 bg-card/[0.045] p-3.5">
       <div className="flex items-center justify-between gap-3">
         <p className="text-[9px] font-semibold text-blue-100/45">{label}</p>
         <span className={`h-2 w-2 rounded-full ${good ? "bg-emerald-300" : "bg-amber-300"}`} />
@@ -2966,12 +3161,290 @@ function SecurityMetric({
 
 function SecurityStateRow({ label, active }: { label: string; active: boolean }) {
   return (
-    <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.05] px-3 py-2.5">
+    <div className="flex items-center justify-between rounded-xl border border-white/10 bg-card/[0.05] px-3 py-2.5">
       <span className="truncate text-[9px] font-semibold text-blue-100/60">{label}</span>
       <span className={`ml-2 flex items-center gap-1 text-[9px] font-black ${active ? "text-emerald-300" : "text-amber-300"}`}>
         <span className={`h-1.5 w-1.5 rounded-full ${active ? "bg-emerald-300" : "bg-amber-300"}`} />
         {active ? "Active" : "Review"}
       </span>
+    </div>
+  );
+}
+
+/* =========================================================
+   DEVICES & SESSIONS
+========================================================= */
+
+function ActiveSessionsSection({
+  sessions,
+  loading,
+  error,
+  actionLoading,
+  onReload,
+  onTerminate,
+  onTerminateOthers,
+}: {
+  sessions: ActiveAdminSession[];
+  loading: boolean;
+  error: string;
+  actionLoading: string | null;
+  onReload: () => void;
+  onTerminate: (id: string) => void;
+  onTerminateOthers: () => void;
+}) {
+  const otherCount = sessions.filter((item) => !item.isCurrent).length;
+
+  return (
+    <div className="space-y-5">
+      <SectionHeader
+        eyebrow="Access Intelligence"
+        title="Active Devices & Sessions"
+        description="Live server-side authentication sessions currently associated with this administrator account."
+        icon={Monitor}
+      />
+
+      <div className="overflow-hidden rounded-[30px] border border-border bg-card shadow-sm">
+        <div className="flex flex-col justify-between gap-4 border-b border-border/70 p-5 sm:p-6 md:flex-row md:items-center">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1.5 text-[9px] font-black text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-500" />
+                Live backend data
+              </span>
+              <span className="rounded-full bg-muted px-3 py-1.5 text-[9px] font-black text-muted-foreground">
+                {sessions.length} active
+              </span>
+            </div>
+            <p className="mt-3 max-w-2xl text-xs leading-5 text-muted-foreground">
+              Review where the admin account is logged in and immediately terminate sessions that should no longer have access.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={onReload}
+              disabled={loading}
+              className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3.5 py-2.5 text-xs font-black text-card-foreground transition hover:border-indigo-300 hover:bg-indigo-50 dark:hover:border-indigo-500/35 dark:hover:bg-indigo-500/10 disabled:opacity-50"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+              Refresh
+            </button>
+            {otherCount > 0 && (
+              <button
+                type="button"
+                onClick={onTerminateOthers}
+                disabled={actionLoading === "others"}
+                className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-black text-red-600 transition hover:bg-red-100 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/15 disabled:opacity-50"
+              >
+                {actionLoading === "others" ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <LogOut className="h-3.5 w-3.5" />}
+                Sign out others
+              </button>
+            )}
+          </div>
+        </div>
+
+        {loading && (
+          <div className="divide-y divide-border/70">
+            {[1, 2, 3].map((item) => (
+              <div key={item} className="flex animate-pulse gap-4 p-5 sm:p-6">
+                <div className="h-12 w-12 rounded-2xl bg-muted" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div className="h-4 w-44 rounded bg-muted" />
+                  <div className="h-3 w-36 rounded bg-muted" />
+                  <div className="h-3 w-56 rounded bg-muted" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!loading && error && (
+          <div className="p-5 sm:p-6">
+            <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-red-700 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-300">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-sm font-black">Could not load active sessions</p>
+                <p className="mt-1 text-xs leading-5 opacity-80">{error}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!loading && !error && sessions.length === 0 && (
+          <div className="flex min-h-[260px] flex-col items-center justify-center px-6 py-12 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400">
+              <Laptop className="h-6 w-6" />
+            </div>
+            <p className="mt-4 text-sm font-black text-card-foreground">No active sessions</p>
+            <p className="mt-1 max-w-md text-xs leading-5 text-muted-foreground">No active authentication sessions were returned by the server.</p>
+          </div>
+        )}
+
+        {!loading && !error && sessions.length > 0 && (
+          <div className="divide-y divide-border/70">
+            {sessions.map((session) => {
+              const value = `${session.device} ${session.os}`.toLowerCase();
+              const Icon = value.includes("iphone") || value.includes("ipad") || value.includes("android") || value.includes("ios") || value.includes("mobile") ? Smartphone : Laptop;
+
+              return (
+                <motion.div
+                  key={session.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex flex-col justify-between gap-5 p-5 transition hover:bg-muted/40 sm:p-6 md:flex-row md:items-center"
+                >
+                  <div className="flex min-w-0 items-start gap-4">
+                    <div className={`mt-1 flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${session.isCurrent ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400" : "bg-muted text-muted-foreground"}`}>
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-sm font-black text-card-foreground">{session.device}</p>
+                        {session.isCurrent && (
+                          <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-emerald-600 dark:text-emerald-300">Current</span>
+                        )}
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">{session.browser} on {session.os}</p>
+                      <p className="mt-1 text-[10px] text-muted-foreground">{session.location}{session.ip ? ` • ${session.ip}` : ""}</p>
+                      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[9px] font-medium text-muted-foreground">
+                        <span>Last active {formatAdminRelativeTime(session.lastActiveAt)}</span>
+                        <span>Created {formatAdminDate(session.createdAt)}</span>
+                        <span>Expires {formatAdminDate(session.expiresAt)}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {!session.isCurrent && (
+                    <button
+                      type="button"
+                      onClick={() => onTerminate(session.id)}
+                      disabled={actionLoading === session.id}
+                      className="inline-flex items-center justify-center gap-2 self-start rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-black text-red-600 transition hover:bg-red-100 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/15 disabled:opacity-50 md:self-auto"
+                    >
+                      {actionLoading === session.id ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <LogOut className="h-3.5 w-3.5" />}
+                      Sign out
+                    </button>
+                  )}
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function formatAdminDate(value: string | null | undefined) {
+  if (!value) return "Unknown";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Unknown";
+  return date.toLocaleString("en-BD", { dateStyle: "medium", timeStyle: "short" });
+}
+
+function formatAdminRelativeTime(value: string | null | undefined) {
+  if (!value) return "Unknown";
+  const stamp = new Date(value).getTime();
+  if (Number.isNaN(stamp)) return "Unknown";
+  const diff = Date.now() - stamp;
+  if (diff < 30_000) return "Active now";
+  if (diff < 60_000) return "1 minute ago";
+  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} minutes ago`;
+  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} hours ago`;
+  return `${Math.floor(diff / 86_400_000)} days ago`;
+}
+
+/* =========================================================
+   APPEARANCE
+========================================================= */
+
+function AppearanceSection({
+  theme,
+  saving,
+  onThemeChange,
+}: {
+  theme: ThemeMode;
+  saving: boolean;
+  onThemeChange: (theme: ThemeMode) => void;
+}) {
+  const options: Array<{
+    value: ThemeMode;
+    title: string;
+    description: string;
+    icon: LucideIcon;
+  }> = [
+    { value: "light", title: "Light", description: "Bright surfaces and high-contrast daytime presentation.", icon: Sun },
+    { value: "dark", title: "Dark", description: "Deep surfaces with indigo highlights for low-light work.", icon: Moon },
+    { value: "system", title: "System", description: "Automatically follow your operating system appearance preference.", icon: Monitor },
+  ];
+
+  return (
+    <div className="space-y-5">
+      <SectionHeader
+        eyebrow="Personalization"
+        title="Appearance"
+        description="Control the visual theme used across the administration dashboard. Your preference is cached locally and persisted through the settings API."
+        icon={Palette}
+      />
+
+      <div className="rounded-[30px] border border-border bg-card p-5 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-3 border-b border-border/70 pb-5 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-indigo-600 dark:text-indigo-400">Theme mode</p>
+            <h3 className="mt-1 text-xl font-black text-card-foreground">Choose your dashboard appearance</h3>
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">Light, dark, and system modes use the shared theme tokens already defined by the dashboard.</p>
+          </div>
+          <span className="w-fit rounded-full bg-indigo-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.08em] text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400">Current: {theme}</span>
+        </div>
+
+        <div className="mt-5 grid gap-3 lg:grid-cols-3">
+          {options.map((option) => {
+            const active = theme === option.value;
+            const Icon = option.icon;
+            return (
+              <motion.button
+                key={option.value}
+                type="button"
+                onClick={() => onThemeChange(option.value)}
+                disabled={saving}
+                whileHover={{ y: -4 }}
+                whileTap={{ scale: 0.985 }}
+                className={`group relative overflow-hidden rounded-[24px] border p-5 text-left transition ${
+                  active
+                    ? "border-indigo-500 bg-indigo-50 shadow-sm ring-1 ring-indigo-500/20 dark:border-indigo-400 dark:bg-indigo-500/10"
+                    : "border-border bg-card hover:border-indigo-300 hover:bg-indigo-50/60 dark:hover:border-indigo-500/35 dark:hover:bg-indigo-500/10"
+                } disabled:cursor-not-allowed disabled:opacity-60`}
+              >
+                {active && <motion.span layoutId="admin-theme-active" className="absolute inset-x-5 bottom-0 h-1 rounded-t-full bg-indigo-600 dark:bg-indigo-400" />}
+                <div className="flex items-center justify-between gap-3">
+                  <span className={`flex h-11 w-11 items-center justify-center rounded-2xl ${active ? "bg-indigo-600 text-white" : "bg-muted text-muted-foreground"}`}>
+                    <Icon className="h-5 w-5" />
+                  </span>
+                  {active && <CheckCircle2 className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />}
+                </div>
+                <p className="mt-5 text-sm font-black text-card-foreground">{option.title}</p>
+                <p className="mt-1.5 text-xs leading-5 text-muted-foreground">{option.description}</p>
+              </motion.button>
+            );
+          })}
+        </div>
+
+        <div className="mt-5 grid gap-3 md:grid-cols-3">
+          <AppearanceNote label="Fixed admin accents" value="Indigo / Violet" />
+          <AppearanceNote label="Theme persistence" value="Local + Backend" />
+          <AppearanceNote label="System mode" value="OS preference" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AppearanceNote({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-border bg-muted/50 p-4">
+      <p className="text-[9px] font-black uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
+      <p className="mt-1.5 text-sm font-black text-card-foreground">{value}</p>
     </div>
   );
 }
@@ -3071,7 +3544,7 @@ function AuditSection({
         />
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-card p-3 shadow-sm">
         <div className="flex flex-wrap gap-2">
           {(
             [
@@ -3096,8 +3569,8 @@ function AuditSection({
                 className={`rounded-xl border px-3.5 py-2 text-[11px] font-black capitalize transition ${
                   filter ===
                   value
-                    ? "border-[#1F5EA8] bg-[#1F5EA8] text-white shadow-sm"
-                    : "border-slate-200 bg-slate-50 text-slate-600 hover:border-blue-200 hover:bg-blue-50"
+                    ? "border-[#1F5EA8] bg-indigo-600 text-white shadow-sm"
+                    : "border-border bg-muted text-card-foreground/75 hover:border-indigo-300/70 dark:border-indigo-500/35 hover:bg-indigo-50 dark:bg-indigo-500/10"
                 }`}
               >
                 {value}
@@ -3106,7 +3579,7 @@ function AuditSection({
           )}
         </div>
 
-        <span className="text-[10px] font-bold text-slate-400">
+        <span className="text-[10px] font-bold text-muted-foreground">
           {filtered.length} shown
         </span>
       </div>
@@ -3114,9 +3587,9 @@ function AuditSection({
       <div className="space-y-3">
         {filtered.length ===
         0 ? (
-          <div className="relative overflow-hidden rounded-[26px] border border-dashed border-slate-200 bg-white px-5 py-10 text-center shadow-sm">
+          <div className="relative overflow-hidden rounded-[26px] border border-dashed border-border bg-card px-5 py-10 text-center shadow-sm">
             <motion.div
-              className="pointer-events-none absolute left-1/2 top-1/2 h-36 w-36 -translate-x-1/2 -translate-y-1/2 rounded-full border border-blue-100"
+              className="pointer-events-none absolute left-1/2 top-1/2 h-36 w-36 -translate-x-1/2 -translate-y-1/2 rounded-full border border-indigo-200/70 dark:border-indigo-500/25"
               animate={{
                 scale: [
                   0.9,
@@ -3136,15 +3609,15 @@ function AuditSection({
             />
 
             <div className="relative z-10">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-[#1F5EA8]">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
                 <History className="h-5 w-5" />
               </div>
 
-              <p className="mt-3 text-sm font-black text-slate-700">
+              <p className="mt-3 text-sm font-black text-card-foreground/85">
                 No matching audit events
               </p>
 
-              <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-slate-400">
+              <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-muted-foreground">
                 Backend configuration changes will appear here after an administrator saves a platform policy update.
               </p>
             </div>
@@ -3182,7 +3655,7 @@ function AuditSection({
                     index *
                     0.05,
                 }}
-                className="group flex w-full flex-col gap-4 rounded-[22px] border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-blue-100 hover:shadow-md sm:flex-row sm:items-center sm:justify-between"
+                className="group flex w-full flex-col gap-4 rounded-[22px] border border-border bg-card p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200/70 dark:border-indigo-500/25 hover:shadow-md sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="flex gap-3">
                   <div
@@ -3193,7 +3666,7 @@ function AuditSection({
                         : item.severity ===
                             "warning"
                           ? "bg-amber-50 text-amber-600"
-                          : "bg-blue-50 text-[#1F5EA8]"
+                          : "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
                     }`}
                   >
                     <History className="h-4 w-4" />
@@ -3206,13 +3679,13 @@ function AuditSection({
                       }
                     </p>
 
-                    <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
+                    <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">
                       {
                         item.detail
                       }
                     </p>
 
-                    <p className="mt-2 text-[10px] font-semibold text-slate-400">
+                    <p className="mt-2 text-[10px] font-semibold text-muted-foreground">
                       By{" "}
                       {
                         item.actor
@@ -3221,12 +3694,12 @@ function AuditSection({
                   </div>
                 </div>
 
-                <div className="flex shrink-0 items-center gap-2 text-[10px] font-bold text-slate-400">
+                <div className="flex shrink-0 items-center gap-2 text-[10px] font-bold text-muted-foreground">
                   <Clock3 className="h-3.5 w-3.5" />
                   {
                     item.time
                   }
-                  <ChevronRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[#1F5EA8]" />
+                  <ChevronRight className="h-4 w-4 text-muted-foreground/60 transition group-hover:translate-x-0.5 group-hover:text-indigo-600 dark:text-indigo-400" />
                 </div>
               </motion.button>
             )
@@ -3256,12 +3729,12 @@ function AuditMetric({
       : tone ===
           "rose"
         ? "bg-rose-50 text-rose-600"
-        : "bg-blue-50 text-[#1F5EA8]";
+        : "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400";
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">
+        <p className="text-[10px] font-black uppercase tracking-[0.12em] text-muted-foreground">
           {label}
         </p>
 
@@ -3291,20 +3764,20 @@ function SystemSection({
       />
 
       <div className="grid items-stretch gap-5 2xl:grid-cols-[minmax(0,1fr)_430px]">
-        <div className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_14px_38px_rgba(15,39,69,.055)] sm:p-6">
-          <div className="flex flex-col gap-4 rounded-2xl border border-blue-100 bg-[linear-gradient(135deg,#f7fbff,#ffffff)] p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="rounded-[30px] border border-border bg-card p-5 shadow-[0_14px_38px_rgba(15,39,69,.055)] sm:p-6">
+          <div className="flex flex-col gap-4 rounded-2xl border border-indigo-200/70 dark:border-indigo-500/25 bg-[linear-gradient(135deg,#f7fbff,#ffffff)] p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
-              <div className="relative flex h-11 w-11 items-center justify-center rounded-xl bg-[#0F2745] text-cyan-200 shadow-sm">
+              <div className="relative flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-950 text-cyan-200 shadow-sm">
                 <Server className="h-5 w-5" />
                 <span className={`absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-white ${draft.platform.maintenanceMode ? "bg-amber-400" : "bg-emerald-400"}`} />
               </div>
 
               <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#1F5EA8]">Platform State</p>
-                <p className="mt-1 text-sm font-black tracking-[-0.01em] text-[#0F2745]">
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-indigo-600 dark:text-indigo-400">Platform State</p>
+                <p className="mt-1 text-sm font-black tracking-[-0.01em] text-card-foreground">
                   {draft.platform.maintenanceMode ? "Maintenance policy staged" : "Platform operating normally"}
                 </p>
-                <p className="mt-1 text-[10px] leading-4 text-slate-500">
+                <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
                   This card reflects the current settings draft before final authenticated save.
                 </p>
               </div>
@@ -3322,7 +3795,7 @@ function SystemSection({
           </div>
 
           <div className="mt-5 space-y-1">
-            <div className="rounded-2xl px-1 py-2 transition hover:bg-slate-50/70">
+            <div className="rounded-2xl px-1 py-2 transition hover:bg-muted/70">
               <ToggleRow
                 label="Maintenance Mode"
                 description="Temporarily stage restricted platform operations while administrative maintenance is performed."
@@ -3336,9 +3809,9 @@ function SystemSection({
               />
             </div>
 
-            <div className="border-t border-slate-100" />
+            <div className="border-t border-border/70" />
 
-            <div className="rounded-2xl px-1 py-2 transition hover:bg-slate-50/70">
+            <div className="rounded-2xl px-1 py-2 transition hover:bg-muted/70">
               <ToggleRow
                 label="Allow New Signups"
                 description="Control whether new public accounts may register while preserving access for existing authenticated users."
@@ -3353,15 +3826,15 @@ function SystemSection({
             </div>
           </div>
 
-          <div className="mt-5 border-t border-slate-100 pt-5">
+          <div className="mt-5 border-t border-border/70 pt-5">
             <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="text-xs font-black text-[#0F2745]">Default Currency</p>
-                <p className="mt-1 text-[10px] leading-5 text-slate-400">
+                <p className="text-xs font-black text-card-foreground">Default Currency</p>
+                <p className="mt-1 text-[10px] leading-5 text-muted-foreground">
                   Choose the preferred display and platform-default currency for supported admin experiences.
                 </p>
               </div>
-              <span className="w-fit rounded-full bg-blue-50 px-3 py-1.5 text-[9px] font-black text-[#1F5EA8]">
+              <span className="w-fit rounded-full bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1.5 text-[9px] font-black text-indigo-600 dark:text-indigo-400">
                 Current: {draft.platform.defaultCurrency}
               </span>
             </div>
@@ -3403,7 +3876,7 @@ function SystemPulseCard({
   ];
 
   return (
-    <div className="relative h-full min-h-[430px] overflow-hidden rounded-[30px] bg-[linear-gradient(155deg,#081b31_0%,#10385d_62%,#165782_100%)] p-5 text-white shadow-[0_22px_60px_rgba(15,39,69,.18)] sm:p-6">
+    <div className="relative h-full min-h-[430px] overflow-hidden rounded-[30px] bg-indigo-950 p-5 text-white shadow-[0_22px_60px_rgba(15,39,69,.18)] sm:p-6">
       <div className="pointer-events-none absolute inset-0 opacity-20 [background-image:radial-gradient(circle_at_center,rgba(103,232,249,.24)_1px,transparent_1px)] [background-size:24px_24px]" />
 
       <motion.div
@@ -3455,7 +3928,7 @@ function SystemPulseCard({
         {nodes.map((node, index) => (
           <motion.div
             key={node.label}
-            className="absolute flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-xl border border-cyan-300/15 bg-white/[0.06] text-[9px] font-black text-cyan-100 sm:h-14 sm:w-14 sm:rounded-2xl"
+            className="absolute flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-xl border border-cyan-300/15 bg-card/[0.06] text-[9px] font-black text-cyan-100 sm:h-14 sm:w-14 sm:rounded-2xl"
             style={{ left: node.x, top: node.y }}
             animate={{
               y: [0, index % 2 ? -5 : 5, 0],
@@ -3499,7 +3972,7 @@ function SystemStatusPill({
   good: boolean;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.055] px-3 py-2.5 backdrop-blur-sm">
+    <div className="rounded-2xl border border-white/10 bg-card/[0.055] px-3 py-2.5 backdrop-blur-sm">
       <p className="text-[8px] font-semibold uppercase tracking-[0.12em] text-blue-100/40">{label}</p>
       <div className="mt-1 flex items-center gap-2">
         <span className={`h-1.5 w-1.5 rounded-full ${good ? "bg-emerald-300" : "bg-amber-300"}`} />
@@ -3530,8 +4003,8 @@ function DangerSection({
         danger
       />
 
-      <div className="relative overflow-hidden rounded-[32px] border border-rose-100 bg-white p-4 shadow-[0_18px_55px_rgba(15,39,69,0.07)] sm:p-5">
-        <div className="relative overflow-hidden rounded-[26px] bg-[linear-gradient(120deg,#07182b_0%,#102d4c_52%,#4a1732_125%)] p-5 text-white sm:p-6">
+      <div className="relative overflow-hidden rounded-[32px] border border-rose-100 bg-card p-4 shadow-[0_18px_55px_rgba(15,39,69,0.07)] sm:p-5">
+        <div className="relative overflow-hidden rounded-[26px] bg-gradient-to-r from-indigo-950 via-indigo-950 to-red-900 p-5 text-white sm:p-6">
           <div className="pointer-events-none absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.04)_1px,transparent_1px)] [background-size:28px_28px]" />
 
           <motion.div
@@ -3567,7 +4040,7 @@ function DangerSection({
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-[10px] font-black uppercase tracking-[0.16em] text-rose-200/75">Protected Command Gate</p>
-                  <span className="rounded-full bg-white/[0.07] px-2.5 py-1 text-[8px] font-black text-blue-100/60">Admin only</span>
+                  <span className="rounded-full bg-card/[0.07] px-2.5 py-1 text-[8px] font-black text-blue-100/60">Admin only</span>
                 </div>
                 <h3 className="mt-2 text-xl font-black tracking-[-0.025em] sm:text-2xl">High-impact administration</h3>
                 <p className="mt-2 max-w-2xl text-xs leading-6 text-blue-100/65">
@@ -3665,7 +4138,7 @@ function DangerStep({
   return (
     <motion.div
       whileHover={{ y: -3 }}
-      className="rounded-2xl border border-white/10 bg-white/[0.055] px-3 py-3.5 text-center backdrop-blur-sm"
+      className="rounded-2xl border border-white/10 bg-card/[0.055] px-3 py-3.5 text-center backdrop-blur-sm"
     >
       <p className="text-[9px] font-black text-cyan-200">{number}</p>
       <p className="mt-1 text-[10px] font-black text-white">{label}</p>
@@ -3684,13 +4157,13 @@ function SafetyItem({
   description: string;
 }) {
   return (
-    <div className="flex gap-3 rounded-2xl bg-white p-3 shadow-sm ring-1 ring-rose-50">
+    <div className="flex gap-3 rounded-2xl bg-card p-3 shadow-sm ring-1 ring-rose-50">
       <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-500">
         <Icon className="h-4 w-4" />
       </span>
       <div>
-        <p className="text-[10px] font-black text-[#0F2745]">{title}</p>
-        <p className="mt-1 text-[9px] leading-4 text-slate-400">{description}</p>
+        <p className="text-[10px] font-black text-card-foreground">{title}</p>
+        <p className="mt-1 text-[9px] leading-4 text-muted-foreground">{description}</p>
       </div>
     </div>
   );
@@ -3731,10 +4204,10 @@ function DangerActionCard({
             glow: "bg-amber-100",
           }
         : {
-            accent: "bg-[#1F5EA8]",
-            border: "border-blue-100 hover:border-blue-200",
-            icon: "bg-blue-50 text-[#1F5EA8]",
-            status: "text-[#1F5EA8]",
+            accent: "bg-indigo-600",
+            border: "border-indigo-200/70 dark:border-indigo-500/25 hover:border-indigo-300/70 dark:border-indigo-500/35",
+            icon: "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
+            status: "text-indigo-600 dark:text-indigo-400",
             glow: "bg-blue-100",
           };
 
@@ -3745,7 +4218,7 @@ function DangerActionCard({
       onClick={onClick}
       whileHover={disabled ? undefined : { y: -5 }}
       whileTap={disabled ? undefined : { scale: 0.985 }}
-      className={`group relative min-h-[210px] overflow-hidden rounded-[24px] border bg-white p-5 text-left shadow-[0_10px_28px_rgba(15,39,69,.045)] transition ${toneClass.border} disabled:cursor-not-allowed disabled:opacity-45`}
+      className={`group relative min-h-[210px] overflow-hidden rounded-[24px] border bg-card p-5 text-left shadow-[0_10px_28px_rgba(15,39,69,.045)] transition ${toneClass.border} disabled:cursor-not-allowed disabled:opacity-45`}
     >
       <span className={`absolute inset-y-5 left-0 w-1 rounded-r-full ${toneClass.accent}`} />
       <motion.div
@@ -3759,17 +4232,17 @@ function DangerActionCard({
           <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${toneClass.icon}`}>
             <Icon className="h-4.5 w-4.5" />
           </div>
-          <span className={`rounded-full bg-slate-50 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.1em] ${toneClass.status}`}>
+          <span className={`rounded-full bg-muted px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.1em] ${toneClass.status}`}>
             {disabled ? "Staged" : tone === "rose" ? "Critical" : "Protected"}
           </span>
         </div>
 
-        <p className="mt-5 text-[15px] font-black tracking-[-0.015em] text-[#0F2745]">{title}</p>
-        <p className="mt-2 flex-1 text-[10px] leading-5 text-slate-500">{description}</p>
+        <p className="mt-5 text-[15px] font-black tracking-[-0.015em] text-card-foreground">{title}</p>
+        <p className="mt-2 flex-1 text-[10px] leading-5 text-muted-foreground">{description}</p>
 
-        <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+        <div className="mt-4 flex items-center justify-between border-t border-border/70 pt-3">
           <span className={`text-[9px] font-black uppercase tracking-[0.09em] ${toneClass.status}`}>{status}</span>
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-50 text-slate-300 transition group-hover:bg-[#0F2745] group-hover:text-white">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted text-muted-foreground/60 transition group-hover:bg-indigo-950 group-hover:text-white">
             <ChevronRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
           </span>
         </div>
@@ -3826,16 +4299,16 @@ function SettingsDrawer({
         animate={{ x: 0 }}
         exit={{ x: "100%" }}
         transition={{ type: "spring", stiffness: 240, damping: 28 }}
-        className="fixed bottom-0 right-0 top-0 z-[90] w-full max-w-[520px] overflow-y-auto border-l border-slate-200 bg-white shadow-2xl"
+        className="fixed bottom-0 right-0 top-0 z-[90] w-full max-w-[520px] overflow-y-auto border-l border-border bg-card shadow-2xl"
       >
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white/90 px-5 py-4 backdrop-blur">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border/70 bg-card/90 px-5 py-4 backdrop-blur">
           <div>
-            <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">Admin Drawer</p>
+            <p className="text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">Admin Drawer</p>
             <h2 className="mt-1 text-lg font-black">
               {type === "changes" ? "Recent Configuration Changes" : type === "audit" ? "Audit Event Detail" : "Role Detail"}
             </h2>
           </div>
-          <button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
+          <button type="button" onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-xl bg-muted text-muted-foreground">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -3848,15 +4321,15 @@ function SettingsDrawer({
                   key={item.id}
                   type="button"
                   onClick={() => onOpenAudit(item)}
-                  className="flex w-full items-start gap-3 rounded-2xl border border-slate-200 p-4 text-left transition hover:border-blue-100 hover:bg-slate-50"
+                  className="flex w-full items-start gap-3 rounded-2xl border border-border p-4 text-left transition hover:border-indigo-200/70 dark:border-indigo-500/25 hover:bg-muted"
                 >
                   <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${
                     item.severity === "critical" ? "bg-rose-500" : item.severity === "warning" ? "bg-amber-500" : "bg-emerald-500"
                   }`} />
                   <div>
                     <p className="font-black">{item.action}</p>
-                    <p className="mt-1 text-xs leading-5 text-slate-500">{item.detail}</p>
-                    <p className="mt-2 text-[10px] text-slate-400">{item.time} · {item.actor}</p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">{item.detail}</p>
+                    <p className="mt-2 text-[10px] text-muted-foreground">{item.time} · {item.actor}</p>
                   </div>
                 </button>
               ))}
@@ -3867,11 +4340,11 @@ function SettingsDrawer({
             <div className="space-y-5">
               <div className={`rounded-[24px] p-5 ${
                 auditPayload.severity === "critical" ? "bg-rose-50" :
-                auditPayload.severity === "warning" ? "bg-amber-50" : "bg-blue-50"
+                auditPayload.severity === "warning" ? "bg-amber-50" : "bg-indigo-50 dark:bg-indigo-500/10"
               }`}>
-                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">{auditPayload.severity} event</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">{auditPayload.severity} event</p>
                 <h3 className="mt-2 text-lg font-black">{auditPayload.action}</h3>
-                <p className="mt-2 text-sm leading-6 text-slate-600">{auditPayload.detail}</p>
+                <p className="mt-2 text-sm leading-6 text-card-foreground/75">{auditPayload.detail}</p>
               </div>
               <DetailList rows={[
                 ["Actor", auditPayload.actor],
@@ -3918,7 +4391,7 @@ function RoleDetail({
   return (
     <div className="space-y-5">
       <div className="rounded-[24px] bg-[linear-gradient(135deg,#0F2745,#17466F)] p-5 text-white">
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10">
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-card/10">
           <Users className="h-5 w-5" />
         </div>
 
@@ -3940,11 +4413,11 @@ function RoleDetail({
               key={
                 item.capability
               }
-              className="flex items-center gap-3 rounded-xl border border-slate-200 p-3"
+              className="flex items-center gap-3 rounded-xl border border-border p-3"
             >
               <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
 
-              <span className="text-xs font-bold text-slate-700">
+              <span className="text-xs font-bold text-card-foreground/85">
                 {
                   item.capability
                 }
@@ -3959,10 +4432,10 @@ function RoleDetail({
 
 function DetailList({ rows }: { rows: Array<[string, string]> }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200">
+    <div className="overflow-hidden rounded-2xl border border-border">
       {rows.map((row, index) => (
-        <div key={row[0]} className={`flex items-center justify-between gap-4 px-4 py-3 ${index < rows.length - 1 ? "border-b border-slate-100" : ""}`}>
-          <span className="text-xs text-slate-400">{row[0]}</span>
+        <div key={row[0]} className={`flex items-center justify-between gap-4 px-4 py-3 ${index < rows.length - 1 ? "border-b border-border/70" : ""}`}>
+          <span className="text-xs text-muted-foreground">{row[0]}</span>
           <span className="text-right text-xs font-black">{row[1]}</span>
         </div>
       ))}
@@ -3999,7 +4472,7 @@ function ConfirmationModal({
           initial={{ opacity: 0, y: 18, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 12, scale: 0.96 }}
-          className="relative z-10 w-full max-w-md overflow-hidden rounded-[28px] border border-rose-100 bg-white shadow-2xl"
+          className="relative z-10 w-full max-w-md overflow-hidden rounded-[28px] border border-rose-100 bg-card shadow-2xl"
         >
           <div className="relative overflow-hidden bg-[linear-gradient(135deg,#fff1f2,#fff)] p-6">
             <motion.div
@@ -4018,7 +4491,7 @@ function ConfirmationModal({
             </div>
           </div>
           <div className="flex flex-col-reverse gap-3 p-5 sm:flex-row sm:justify-end">
-            <button type="button" onClick={onCancel} className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600">Cancel</button>
+            <button type="button" onClick={onCancel} className="rounded-xl border border-border px-4 py-2.5 text-xs font-black text-card-foreground/75">Cancel</button>
             <button type="button" onClick={onConfirm} className="rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-black text-white hover:bg-rose-700">{content.confirm}</button>
           </div>
         </motion.div>
@@ -4107,7 +4580,7 @@ function AdminReauthModal({
               scale:
                 0.96,
             }}
-            className="relative z-10 w-full max-w-md overflow-hidden rounded-[28px] border border-blue-100 bg-white shadow-2xl"
+            className="relative z-10 w-full max-w-md overflow-hidden rounded-[28px] border border-indigo-200/70 dark:border-indigo-500/25 bg-card shadow-2xl"
           >
             <div className="relative overflow-hidden bg-[linear-gradient(135deg,#07182b,#12385e)] p-6 text-white">
               <motion.div
@@ -4127,7 +4600,7 @@ function AdminReauthModal({
               />
 
               <div className="relative z-10 flex items-start gap-4">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/10">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-card/10">
                   <KeyRound className="h-5 w-5 text-cyan-200" />
                 </div>
 
@@ -4149,12 +4622,12 @@ function AdminReauthModal({
 
             <div className="p-5">
               <label className="block">
-                <span className="mb-2 block text-xs font-black text-slate-700">
+                <span className="mb-2 block text-xs font-black text-card-foreground/85">
                   Current Admin Password
                 </span>
 
                 <div className="relative">
-                  <Lock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <Lock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 
                   <input
                     type="password"
@@ -4184,7 +4657,7 @@ function AdminReauthModal({
                       }
                     }}
                     placeholder="Enter current password"
-                    className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-semibold outline-none transition focus:border-[#1F5EA8] focus:bg-white focus:ring-4 focus:ring-blue-500/10"
+                    className="h-12 w-full rounded-xl border border-border bg-muted pl-11 pr-4 text-sm font-semibold outline-none transition focus:border-indigo-500 focus:bg-card focus:ring-4 focus:ring-indigo-500/10"
                   />
                 </div>
               </label>
@@ -4204,7 +4677,7 @@ function AdminReauthModal({
                   onClick={
                     onCancel
                   }
-                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600 disabled:opacity-50"
+                  className="rounded-xl border border-border px-4 py-2.5 text-xs font-black text-card-foreground/75 disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -4218,7 +4691,7 @@ function AdminReauthModal({
                   onClick={
                     onConfirm
                   }
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#1F5EA8] px-4 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {saving && (
                     <RefreshCw className="h-3.5 w-3.5 animate-spin" />
@@ -4247,7 +4720,7 @@ function SaveBar({ saving, onSave, onDiscard }: { saving: boolean; onSave: () =>
       initial={{ opacity: 0, y: 30 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: 30 }}
-      className="fixed bottom-5 left-1/2 z-50 flex w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 flex-col gap-4 rounded-[22px] border border-white/10 bg-[#0F2745]/95 p-4 text-white shadow-[0_24px_70px_rgba(15,39,69,.35)] backdrop-blur sm:flex-row sm:items-center sm:justify-between"
+      className="fixed bottom-5 left-1/2 z-50 flex w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 flex-col gap-4 rounded-[22px] border border-white/10 bg-indigo-950/95 p-4 text-white shadow-[0_24px_70px_rgba(15,39,69,.35)] backdrop-blur sm:flex-row sm:items-center sm:justify-between"
     >
       <div className="flex items-center gap-3">
         <motion.div
@@ -4264,7 +4737,7 @@ function SaveBar({ saving, onSave, onDiscard }: { saving: boolean; onSave: () =>
       </div>
       <div className="flex items-center justify-end gap-2">
         <button type="button" onClick={onDiscard} disabled={saving} className="rounded-xl px-4 py-2.5 text-xs font-black text-blue-100/70">Discard</button>
-        <button type="button" onClick={onSave} disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-[#1F5EA8] px-4 py-2.5 text-xs font-black text-white disabled:opacity-60">
+        <button type="button" onClick={onSave} disabled={saving} className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-black text-white disabled:opacity-60">
           {saving && <RefreshCw className="h-3.5 w-3.5 animate-spin" />}
           {saving ? "Saving..." : "Save Changes"}
         </button>
@@ -4274,22 +4747,22 @@ function SaveBar({ saving, onSave, onDiscard }: { saving: boolean; onSave: () =>
 }
 
 function Toast({ toast, onClose }: { toast: ToastState; onClose: () => void }) {
-  const tone = toast.type === "success" ? "text-emerald-600 bg-emerald-50" : toast.type === "error" ? "text-rose-600 bg-rose-50" : "text-[#1F5EA8] bg-blue-50";
+  const tone = toast.type === "success" ? "text-emerald-600 bg-emerald-50" : toast.type === "error" ? "text-rose-600 bg-rose-50" : "text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10";
   return (
     <motion.div
       initial={{ opacity: 0, x: 30 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 30 }}
-      className="fixed right-5 top-5 z-[140] flex w-[calc(100%-2.5rem)] max-w-sm items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl"
+      className="fixed right-5 top-5 z-[140] flex w-[calc(100%-2.5rem)] max-w-sm items-start gap-3 rounded-2xl border border-border bg-card p-4 shadow-2xl"
     >
       <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${tone}`}>
         {toast.type === "error" ? <AlertTriangle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-xs font-black">{toast.type === "success" ? "Saved" : toast.type === "error" ? "Error" : "Updated"}</p>
-        <p className="mt-1 text-xs leading-5 text-slate-500">{toast.message}</p>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">{toast.message}</p>
       </div>
-      <button type="button" onClick={onClose} className="text-slate-300 hover:text-slate-600"><X className="h-4 w-4" /></button>
+      <button type="button" onClick={onClose} className="text-muted-foreground/60 hover:text-card-foreground/75"><X className="h-4 w-4" /></button>
     </motion.div>
   );
 }
@@ -4312,24 +4785,24 @@ function SectionHeader({
   danger?: boolean;
 }) {
   return (
-    <div className={`relative overflow-hidden rounded-[28px] border bg-white p-5 shadow-[0_10px_34px_rgba(15,39,69,0.045)] sm:p-6 ${danger ? "border-rose-100" : "border-slate-200"}`}>
+    <div className={`relative overflow-hidden rounded-[28px] border bg-card p-5 shadow-[0_10px_34px_rgba(15,39,69,0.045)] sm:p-6 ${danger ? "border-rose-100" : "border-border"}`}>
       <div className={`pointer-events-none absolute left-0 top-0 h-full w-1 ${danger ? "bg-rose-500" : "bg-[linear-gradient(#1F5EA8,#45c7ec)]"}`} />
-      <div className="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full bg-blue-50/70" />
+      <div className="pointer-events-none absolute -right-16 -top-20 h-44 w-44 rounded-full bg-indigo-50 dark:bg-indigo-500/10/70" />
 
       <div className="relative z-10 flex items-start gap-4">
-        <div className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${danger ? "bg-rose-50 text-rose-600" : "bg-blue-50 text-[#1F5EA8]"}`}>
+        <div className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${danger ? "bg-rose-50 text-rose-600" : "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"}`}>
           <Icon className="h-5 w-5" />
           {!danger && <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-cyan-400" />}
         </div>
 
         <div className="min-w-0">
-          <p className={`text-[10px] font-black uppercase tracking-[0.15em] ${danger ? "text-rose-500" : "text-[#1F5EA8]"}`}>
+          <p className={`text-[10px] font-black uppercase tracking-[0.15em] ${danger ? "text-rose-500" : "text-indigo-600 dark:text-indigo-400"}`}>
             {eyebrow}
           </p>
-          <h2 className="mt-1 text-2xl font-black tracking-[-0.03em] text-[#0F2745] sm:text-[29px]">
+          <h2 className="mt-1 text-2xl font-black tracking-[-0.03em] text-card-foreground sm:text-[29px]">
             {title}
           </h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
             {description}
           </p>
         </div>
@@ -4341,7 +4814,7 @@ function SectionHeader({
 function StatusPill({ icon: Icon, text, tone }: { icon: LucideIcon; text: string; tone: "green" | "blue" }) {
   return (
     <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-black ${
-      tone === "green" ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-100" : "border-white/10 bg-white/10 text-blue-100"
+      tone === "green" ? "border-emerald-300/20 bg-emerald-300/10 text-emerald-100" : "border-white/10 bg-card/10 text-blue-100"
     }`}>
       <Icon className="h-3.5 w-3.5" /> {text}
     </span>
@@ -4366,14 +4839,14 @@ function MetricCard({
       ? "bg-emerald-50 text-emerald-600 ring-emerald-100"
       : tone === "amber"
         ? "bg-amber-50 text-amber-600 ring-amber-100"
-        : "bg-blue-50 text-[#1F5EA8] ring-blue-100";
+        : "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 ring-blue-100";
 
   const valueClass =
     tone === "green"
       ? "text-emerald-600"
       : tone === "amber"
         ? "text-amber-600"
-        : "text-[#0F2745]";
+        : "text-card-foreground";
 
   const accentClass =
     tone === "green"
@@ -4386,10 +4859,10 @@ function MetricCard({
     <motion.div
       whileHover={{ y: -4, scale: 1.005 }}
       transition={{ type: "spring", stiffness: 320, damping: 24 }}
-      className="group relative min-w-0 overflow-hidden rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(15,39,69,0.045)] sm:p-5"
+      className="group relative min-w-0 overflow-hidden rounded-[24px] border border-border bg-card p-4 shadow-[0_10px_30px_rgba(15,39,69,0.045)] sm:p-5"
     >
       <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${accentClass}`} />
-      <div className="pointer-events-none absolute -right-7 -top-8 h-24 w-24 rounded-full bg-slate-50 transition group-hover:scale-110" />
+      <div className="pointer-events-none absolute -right-7 -top-8 h-24 w-24 rounded-full bg-muted transition group-hover:scale-110" />
 
       <div className="relative z-10 flex items-start justify-between gap-3">
         <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ring-1 ${iconClass}`}>
@@ -4399,9 +4872,9 @@ function MetricCard({
       </div>
 
       <div className="relative z-10 mt-5">
-        <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">{title}</p>
+        <p className="text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">{title}</p>
         <p className={`mt-2 break-words text-[26px] font-black leading-none tracking-[-0.03em] ${valueClass}`}>{value}</p>
-        <p className="mt-2 min-h-5 text-[10px] font-medium leading-5 text-slate-400">{note}</p>
+        <p className="mt-2 min-h-5 text-[10px] font-medium leading-5 text-muted-foreground">{note}</p>
       </div>
     </motion.div>
   );
@@ -4423,7 +4896,7 @@ function OperationalCard({
   return (
     <motion.div
       whileHover={{ y: -3 }}
-      className="group relative overflow-hidden rounded-[22px] border border-slate-200 bg-[#FBFCFE] p-4 transition hover:border-blue-100 hover:bg-white hover:shadow-md"
+      className="group relative overflow-hidden rounded-[22px] border border-border bg-card p-4 transition hover:border-indigo-200/70 dark:border-indigo-500/25 hover:bg-card hover:shadow-md"
     >
       {pulse && (
         <motion.div
@@ -4441,12 +4914,12 @@ function OperationalCard({
 
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
-            <p className="text-xs font-black text-[#0F2745]">{title}</p>
+            <p className="text-xs font-black text-card-foreground">{title}</p>
             <span className={`rounded-full px-2 py-1 text-[8px] font-black uppercase tracking-wide ${pulse ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"}`}>
               {value}
             </span>
           </div>
-          <p className="mt-2 text-[10px] leading-5 text-slate-400">{detail}</p>
+          <p className="mt-2 text-[10px] leading-5 text-muted-foreground">{detail}</p>
         </div>
       </div>
     </motion.div>
@@ -4468,12 +4941,12 @@ function ToggleRow({
     <div className="group flex items-center justify-between gap-5 py-1">
       <div className="min-w-0 pr-2">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-[13px] font-black tracking-[-0.01em] text-[#0F2745]">{label}</p>
-          <span className={`rounded-full px-2 py-1 text-[8px] font-black uppercase tracking-[0.08em] ${enabled ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>
+          <p className="text-[13px] font-black tracking-[-0.01em] text-card-foreground">{label}</p>
+          <span className={`rounded-full px-2 py-1 text-[8px] font-black uppercase tracking-[0.08em] ${enabled ? "bg-emerald-50 text-emerald-700" : "bg-muted text-muted-foreground"}`}>
             {enabled ? "Enabled" : "Disabled"}
           </span>
         </div>
-        <p className="mt-1.5 max-w-2xl text-[11px] leading-5 text-slate-500">{description}</p>
+        <p className="mt-1.5 max-w-2xl text-[11px] leading-5 text-muted-foreground">{description}</p>
       </div>
 
       <button
@@ -4483,12 +4956,12 @@ function ToggleRow({
         onClick={() => onChange(!enabled)}
         className={`relative h-8 w-14 shrink-0 rounded-full p-1 transition-all duration-200 ${
           enabled
-            ? "bg-[#1F5EA8] shadow-[0_6px_18px_rgba(31,94,168,.22)]"
+            ? "bg-indigo-600 shadow-[0_6px_18px_rgba(31,94,168,.22)]"
             : "bg-slate-300"
         }`}
       >
         <motion.span
-          className="block h-6 w-6 rounded-full bg-white shadow-[0_2px_8px_rgba(15,39,69,.18)]"
+          className="block h-6 w-6 rounded-full bg-card shadow-[0_2px_8px_rgba(15,39,69,.18)]"
           animate={{ x: enabled ? 24 : 0 }}
           transition={{ type: "spring", stiffness: 480, damping: 30 }}
         />
@@ -4514,14 +4987,14 @@ function RangeField({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-black">{label}</p>
-          <p className="mt-1 max-w-xl text-xs leading-5 text-slate-400">{description}</p>
+          <p className="mt-1 max-w-xl text-xs leading-5 text-muted-foreground">{description}</p>
         </div>
-        <motion.span key={value} initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-fit rounded-xl bg-blue-50 px-3 py-2 text-xs font-black text-[#1F5EA8]">
+        <motion.span key={value} initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-fit rounded-xl bg-indigo-50 dark:bg-indigo-500/10 px-3 py-2 text-xs font-black text-indigo-600 dark:text-indigo-400">
           ৳{value.toLocaleString("en-BD")}
         </motion.span>
       </div>
       <div className="relative mt-5">
-        <div className="absolute left-0 right-0 top-1/2 h-2 -translate-y-1/2 overflow-hidden rounded-full bg-slate-100">
+        <div className="absolute left-0 right-0 top-1/2 h-2 -translate-y-1/2 overflow-hidden rounded-full bg-muted">
           <motion.div
             className="h-full rounded-full bg-[linear-gradient(90deg,#1F5EA8,#22d3ee)]"
             animate={{ width: `${percent}%` }}
@@ -4535,7 +5008,7 @@ function RangeField({
           step={step}
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="relative z-10 h-6 w-full cursor-pointer appearance-none bg-transparent accent-[#1F5EA8]"
+          className="relative z-10 h-6 w-full cursor-pointer appearance-none bg-transparent accent-indigo-600"
         />
       </div>
     </div>
@@ -4562,7 +5035,7 @@ function NumberField({
 }) {
   return (
     <label className="block min-w-0">
-      <span className="mb-2 block text-xs font-black leading-4 text-slate-700">
+      <span className="mb-2 block text-xs font-black leading-4 text-card-foreground/85">
         {label}
       </span>
 
@@ -4606,10 +5079,10 @@ function NumberField({
               )
             );
           }}
-          className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 pr-20 text-sm font-bold text-[#0F2745] outline-none transition [appearance:textfield] focus:border-[#1F5EA8] focus:bg-white focus:ring-4 focus:ring-blue-500/10 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          className="h-12 w-full rounded-xl border border-border bg-muted px-4 pr-20 text-sm font-bold text-card-foreground outline-none transition [appearance:textfield] focus:border-indigo-500 focus:bg-card focus:ring-4 focus:ring-indigo-500/10 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         />
 
-        <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 rounded-lg bg-white px-2 py-1 text-[9px] font-bold text-slate-400 shadow-sm ring-1 ring-slate-100">
+        <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 rounded-lg bg-card px-2 py-1 text-[9px] font-bold text-muted-foreground shadow-sm ring-1 ring-slate-100">
           {suffix}
         </span>
       </div>
@@ -4665,7 +5138,7 @@ function SelectField({
         )
       }
     >
-      <span className="mb-2 block text-xs font-black text-slate-700">
+      <span className="mb-2 block text-xs font-black text-card-foreground/85">
         {label}
       </span>
 
@@ -4681,8 +5154,8 @@ function SelectField({
         }
         className={`flex h-12 w-full items-center justify-between gap-3 rounded-xl border px-4 text-left text-sm font-semibold transition ${
           open
-            ? "border-[#1F5EA8] bg-white ring-4 ring-blue-500/10"
-            : "border-slate-200 bg-slate-50 hover:border-blue-200 hover:bg-white"
+            ? "border-[#1F5EA8] bg-card ring-4 ring-blue-500/10"
+            : "border-border bg-muted hover:border-indigo-300/70 dark:border-indigo-500/35 hover:bg-card"
         }`}
         aria-expanded={
           open
@@ -4700,7 +5173,7 @@ function SelectField({
                 : 0,
           }}
         >
-          <ChevronDown className="h-4 w-4 text-slate-400" />
+          <ChevronDown className="h-4 w-4 text-muted-foreground" />
         </motion.span>
       </button>
 
@@ -4725,7 +5198,7 @@ function SelectField({
             transition={{
               duration: 0.16,
             }}
-            className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-[0_18px_45px_rgba(15,39,69,0.14)]"
+            className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-2xl border border-border bg-card p-1.5 shadow-[0_18px_45px_rgba(15,39,69,0.14)]"
           >
             {options.map(
               (
@@ -4757,8 +5230,8 @@ function SelectField({
                     }}
                     className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-left text-xs font-bold transition ${
                       active
-                        ? "bg-blue-50 text-[#1F5EA8]"
-                        : "text-slate-600 hover:bg-slate-50"
+                        ? "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
+                        : "text-card-foreground/75 hover:bg-muted"
                     }`}
                   >
                     <span>
@@ -4768,7 +5241,7 @@ function SelectField({
                     </span>
 
                     {active && (
-                      <CheckCircle2 className="h-4 w-4 text-[#1F5EA8]" />
+                      <CheckCircle2 className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                     )}
                   </button>
                 );
@@ -4803,7 +5276,7 @@ function CurrencySelect({
 
   return (
     <div className="min-w-0">
-      {label && <span className="mb-2 block text-xs font-black text-slate-700">{label}</span>}
+      {label && <span className="mb-2 block text-xs font-black text-card-foreground/85">{label}</span>}
 
       <div className="grid gap-2 sm:grid-cols-3">
         {options.map((option) => {
@@ -4817,27 +5290,27 @@ function CurrencySelect({
               whileTap={{ scale: 0.98 }}
               className={`group relative overflow-hidden rounded-2xl border p-3.5 text-left transition ${
                 active
-                  ? "border-blue-200 bg-[linear-gradient(135deg,#edf6ff,#ffffff)] shadow-[0_8px_22px_rgba(31,94,168,.09)] ring-1 ring-blue-100"
-                  : "border-slate-200 bg-[#FAFBFD] hover:border-blue-100 hover:bg-white"
+                  ? "border-indigo-300/70 dark:border-indigo-500/35 bg-[linear-gradient(135deg,#edf6ff,#ffffff)] shadow-[0_8px_22px_rgba(31,94,168,.09)] ring-1 ring-blue-100"
+                  : "border-border bg-muted/50 hover:border-indigo-200/70 dark:border-indigo-500/25 hover:bg-card"
               }`}
             >
               {active && (
                 <motion.span
                   layoutId="currency-active"
-                  className="absolute inset-x-4 bottom-0 h-[3px] rounded-t-full bg-[#1F5EA8]"
+                  className="absolute inset-x-4 bottom-0 h-[3px] rounded-t-full bg-indigo-600"
                 />
               )}
 
               <div className="flex items-start justify-between gap-3">
-                <span className={`flex h-9 w-9 items-center justify-center rounded-xl text-sm font-black ${active ? "bg-[#1F5EA8] text-white" : "bg-white text-slate-500 shadow-sm ring-1 ring-slate-100"}`}>
+                <span className={`flex h-9 w-9 items-center justify-center rounded-xl text-sm font-black ${active ? "bg-indigo-600 text-white" : "bg-card text-muted-foreground shadow-sm ring-1 ring-slate-100"}`}>
                   {option.symbol}
                 </span>
-                {active && <CheckCircle2 className="h-4 w-4 text-[#1F5EA8]" />}
+                {active && <CheckCircle2 className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />}
               </div>
 
-              <p className={`mt-3 text-xs font-black ${active ? "text-[#0F2745]" : "text-slate-700"}`}>{option.value}</p>
-              <p className="mt-1 text-[10px] font-semibold text-slate-500">{option.label}</p>
-              <p className="mt-1 text-[9px] leading-4 text-slate-400">{option.detail}</p>
+              <p className={`mt-3 text-xs font-black ${active ? "text-card-foreground" : "text-card-foreground/85"}`}>{option.value}</p>
+              <p className="mt-1 text-[10px] font-semibold text-muted-foreground">{option.label}</p>
+              <p className="mt-1 text-[9px] leading-4 text-muted-foreground">{option.detail}</p>
             </motion.button>
           );
         })}
