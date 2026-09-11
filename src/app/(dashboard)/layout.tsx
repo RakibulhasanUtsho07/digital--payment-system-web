@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 
 import UserSidebar from "@/components/dashboard/layout/UserSidebar";
 import AdminSidebar from "@/components/dashboard/layout/AdminSidebar";
+import MerchantSidebar from "@/components/dashboard/layout/MerchantSidebar";
 import TopNavbar from "@/components/dashboard/layout/TopNavbar";
 
 import { apiClient } from "@/lib/api/client";
@@ -19,7 +20,11 @@ import { apiClient } from "@/lib/api/client";
 
 type UserRole =
   | "admin"
-  | "user";
+  | "user"
+  | "merchant"
+  | "support"
+  | "analyst"
+  | "super_admin";
 
 type KYCStatus =
   | "not_started"
@@ -216,8 +221,7 @@ export default function DashboardLayout({
 
   const toggleMobileMenu = () => {
     setMobileMenuOpen(
-      (current) =>
-        !current
+      (current) => !current
     );
   };
 
@@ -374,6 +378,8 @@ export default function DashboardLayout({
               text-xl
               font-black
               text-red-600
+              dark:bg-red-950/20
+              dark:text-red-400
             "
           >
             !
@@ -417,6 +423,10 @@ export default function DashboardLayout({
       </div>
     );
   }
+
+  /* =======================================================
+     USER CHECK
+  ======================================================= */
 
   if (!user) {
     return null;
@@ -485,14 +495,35 @@ export default function DashboardLayout({
           }
         `}
       >
-        {user.role ===
-        "admin" ? (
+        {/* =================================================
+            ADMIN / SUPER ADMIN
+        ================================================= */}
+
+        {user.role === "admin" ||
+        user.role === "super_admin" ? (
           <AdminSidebar
             onLogout={
               handleLogout
             }
           />
+        ) : user.role === "merchant" ? (
+          /* ===============================================
+             MERCHANT
+          =============================================== */
+
+          <MerchantSidebar
+            onLogout={
+              handleLogout
+            }
+            onClose={
+              closeMobileMenu
+            }
+          />
         ) : (
+          /* ===============================================
+             NORMAL USER
+          =============================================== */
+
           <UserSidebar
             onLogout={
               handleLogout
@@ -531,12 +562,12 @@ export default function DashboardLayout({
           }
         />
 
-        {/* =================================================
+        {/* ===============================================
             PAGE CONTENT
 
             IMPORTANT:
             No hard-coded #F4F7FB here.
-        ================================================== */}
+        =============================================== */}
 
         <main
           className="
