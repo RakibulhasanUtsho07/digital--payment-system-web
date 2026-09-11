@@ -16,13 +16,10 @@ import {
   AlertCircle,
   CheckCircle2,
   Download,
-  Loader2,
   X,
 } from "lucide-react";
 
-import {
-  apiClient,
-} from "@/lib/api/client";
+import { apiClient } from "@/lib/api/client";
 
 import KYCHeader from "./components/KYCHeader";
 import KYCStats from "./components/KYCStats";
@@ -118,41 +115,31 @@ interface AdminKYCRecord {
 
 interface PendingKYCResponse {
   success: boolean;
-
   count?: number;
-
   kycs?: AdminKYCRecord[];
-
   message?: string;
 }
 
 interface ReviewKYCResponse {
   success: boolean;
-
   message?: string;
 }
 
 interface DocumentsResponse {
   success: boolean;
-
   message?: string;
-
   documents?: KYCPrivateDocuments;
 }
 
 interface OverviewResponse {
   success: boolean;
-
   overview?: KYCOverviewData;
-
   message?: string;
 }
 
 interface AIReviewResponse {
   success: boolean;
-
   review?: KYCAIReview;
-
   message?: string;
 }
 
@@ -170,6 +157,7 @@ function mapDocumentType(
     case "driving_license":
       return "Driving License";
 
+    case "nid":
     default:
       return "NID";
   }
@@ -191,6 +179,7 @@ function mapKYCStatus(
     case "pending":
       return "Pending";
 
+    case "not_started":
     default:
       return "Not Started";
   }
@@ -199,7 +188,9 @@ function mapKYCStatus(
 function mapRiskLevel(
   value?: string
 ): RiskLevel {
-  const normalized = String(value || "")
+  const normalized = String(
+    value || ""
+  )
     .trim()
     .toLowerCase();
 
@@ -213,6 +204,10 @@ function mapRiskLevel(
 
   if (normalized === "medium") {
     return "Medium";
+  }
+
+  if (normalized === "low") {
+    return "Low";
   }
 
   return "Unknown";
@@ -238,7 +233,7 @@ function getUser(
 
 function normalizeRiskScore(
   value?: number
-) {
+): number {
   if (
     typeof value !== "number" ||
     !Number.isFinite(value)
@@ -257,12 +252,16 @@ function normalizeRiskScore(
 
 function getSlaMinutes(
   kyc: AdminKYCRecord
-) {
+): number {
   if (
     typeof kyc.slaMinutes === "number" &&
-    Number.isFinite(kyc.slaMinutes)
+    Number.isFinite(
+      kyc.slaMinutes
+    )
   ) {
-    return Math.round(kyc.slaMinutes);
+    return Math.round(
+      kyc.slaMinutes
+    );
   }
 
   const source =
@@ -276,7 +275,11 @@ function getSlaMinutes(
   const submitted =
     Date.parse(source);
 
-  if (!Number.isFinite(submitted)) {
+  if (
+    !Number.isFinite(
+      submitted
+    )
+  ) {
     return 24 * 60;
   }
 
@@ -286,7 +289,7 @@ function getSlaMinutes(
         Date.now() -
         submitted
       ) /
-      (60 * 1000)
+        (60 * 1000)
     );
 
   return (
@@ -305,7 +308,9 @@ function toKYCRequest(
     String(kyc._id);
 
   const status =
-    mapKYCStatus(kyc.status);
+    mapKYCStatus(
+      kyc.status
+    );
 
   const submittedAt =
     kyc.submittedAt ||
@@ -323,52 +328,53 @@ function toKYCRequest(
     );
 
   const verificationChecks:
-    KYCRequest["verificationChecks"] = [
-      {
-        label:
-          "Document front uploaded",
+    KYCRequest["verificationChecks"] =
+      [
+        {
+          label:
+            "Document front uploaded",
 
-        status:
-          kyc.hasFrontImage
-            ? "Pass"
-            : "Review",
+          status:
+            kyc.hasFrontImage
+              ? "Pass"
+              : "Review",
 
-        reason:
-          kyc.hasFrontImage
-            ? undefined
-            : "Front image is not available in the queue record.",
-      },
+          reason:
+            kyc.hasFrontImage
+              ? undefined
+              : "Front image is not available in the queue record.",
+        },
 
-      {
-        label:
-          "Document back uploaded",
+        {
+          label:
+            "Document back uploaded",
 
-        status:
-          kyc.hasBackImage
-            ? "Pass"
-            : "Review",
+          status:
+            kyc.hasBackImage
+              ? "Pass"
+              : "Review",
 
-        reason:
-          kyc.hasBackImage
-            ? undefined
-            : "Back image may be optional depending on the document type.",
-      },
+          reason:
+            kyc.hasBackImage
+              ? undefined
+              : "Back image may be optional depending on the document type.",
+        },
 
-      {
-        label:
-          "Selfie uploaded",
+        {
+          label:
+            "Selfie uploaded",
 
-        status:
-          kyc.hasSelfieImage
-            ? "Pass"
-            : "Review",
+          status:
+            kyc.hasSelfieImage
+              ? "Pass"
+              : "Review",
 
-        reason:
-          kyc.hasSelfieImage
-            ? undefined
-            : "A selfie verification signal is not available.",
-      },
-    ];
+          reason:
+            kyc.hasSelfieImage
+              ? undefined
+              : "A selfie verification signal is not available.",
+        },
+      ];
 
   return {
     id,
@@ -426,29 +432,27 @@ function toKYCRequest(
       "Unassigned",
 
     slaMinutes:
-      getSlaMinutes(kyc),
+      getSlaMinutes(
+        kyc
+      ),
 
     reason:
       kyc.rejectionReason ||
       "The application is waiting for a final administrative KYC review.",
 
     provider:
-      kyc.provider === "other"
+      kyc.provider ===
+      "other"
         ? "other"
         : "manual",
 
     city: "",
-
     country: "",
-
     walletId: "",
 
     transactionCount: 0,
-
     accountAgeDays: 0,
-
     twoFactorEnabled: false,
-
     failedLoginCount: 0,
 
     rejectionReason:
@@ -461,24 +465,22 @@ function toKYCRequest(
 }
 
 /* =========================================================
-   SKELETON LOADER
+   LOADING SKELETON
 ========================================================= */
 
 function KYCLoadingSkeleton() {
   return (
-    <main className="min-h-screen bg-[#F3F7FB] pb-12">
+    <main className="min-h-screen bg-background pb-12 text-foreground">
       <div className="mx-auto max-w-[1600px] space-y-5 px-4 py-5 sm:px-6 lg:px-8">
-
-        {/* Header */}
-        <div className="flex items-center justify-between rounded-[20px] border border-slate-100 bg-white p-5">
+        <div className="flex items-center justify-between rounded-[20px] border border-border bg-card p-5">
           <div className="space-y-2">
-            <div className="h-3 w-40 animate-pulse rounded-full bg-slate-100" />
+            <div className="h-3 w-40 animate-pulse rounded-full bg-muted" />
 
-            <div className="h-5 w-64 animate-pulse rounded-full bg-slate-100" />
+            <div className="h-5 w-64 animate-pulse rounded-full bg-muted" />
           </div>
 
-          <div className="flex items-center gap-2 text-[#1F5EA8]">
-            <Loader2 className="h-4 w-4 animate-spin" />
+          <div className="flex items-center gap-2 text-indigo-500">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-500/20 border-t-indigo-500" />
 
             <span className="text-[10px] font-black uppercase tracking-wider">
               Syncing queue
@@ -486,14 +488,13 @@ function KYCLoadingSkeleton() {
           </div>
         </div>
 
-        {/* Stat cards */}
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
           {Array.from({
             length: 6,
           }).map((_, index) => (
             <div
               key={index}
-              className="h-24 animate-pulse rounded-[18px] border border-slate-100 bg-white"
+              className="h-24 animate-pulse rounded-[18px] border border-border bg-card"
               style={{
                 animationDelay:
                   `${index * 70}ms`,
@@ -502,14 +503,13 @@ function KYCLoadingSkeleton() {
           ))}
         </div>
 
-        {/* Queue */}
-        <div className="space-y-2 rounded-[20px] border border-slate-100 bg-white p-4">
+        <div className="space-y-2 rounded-[20px] border border-border bg-card p-4">
           {Array.from({
             length: 8,
           }).map((_, index) => (
             <div
               key={index}
-              className="h-14 w-full animate-pulse rounded-xl bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 bg-[length:200%_100%]"
+              className="h-14 w-full animate-pulse rounded-xl bg-gradient-to-r from-muted via-muted/50 to-muted"
               style={{
                 animationDelay:
                   `${index * 60}ms`,
@@ -530,7 +530,9 @@ export default function KYCRequestsPage() {
   const [
     requests,
     setRequests,
-  ] = useState<KYCRequest[]>([]);
+  ] = useState<KYCRequest[]>(
+    []
+  );
 
   const [
     overview,
@@ -541,7 +543,8 @@ export default function KYCRequestsPage() {
     approvedToday: 0,
     rejectedToday: 0,
     highRisk: 0,
-    averageReviewMinutes: null,
+    averageReviewMinutes:
+      null,
     totalSubmitted: 0,
     verified: 0,
     rejected: 0,
@@ -567,9 +570,10 @@ export default function KYCRequestsPage() {
   const [
     filters,
     setFilters,
-  ] = useState<KYCFiltersState>(
-    DEFAULT_KYC_FILTERS
-  );
+  ] =
+    useState<KYCFiltersState>(
+      DEFAULT_KYC_FILTERS
+    );
 
   const [
     selectedIds,
@@ -581,16 +585,18 @@ export default function KYCRequestsPage() {
   const [
     selectedRequest,
     setSelectedRequest,
-  ] = useState<KYCRequest | null>(
-    null
-  );
+  ] =
+    useState<KYCRequest | null>(
+      null
+    );
 
   const [
     privateDocuments,
     setPrivateDocuments,
-  ] = useState<KYCPrivateDocuments>(
-    {}
-  );
+  ] =
+    useState<KYCPrivateDocuments>(
+      {}
+    );
 
   const [
     documentsLoading,
@@ -605,9 +611,10 @@ export default function KYCRequestsPage() {
   const [
     aiReview,
     setAIReview,
-  ] = useState<KYCAIReview | null>(
-    null
-  );
+  ] =
+    useState<KYCAIReview | null>(
+      null
+    );
 
   const [
     aiLoading,
@@ -646,14 +653,17 @@ export default function KYCRequestsPage() {
     | "submittedAt"
     | "riskScore"
     | "applicantName"
-  >("submittedAt");
+  >(
+    "submittedAt"
+  );
 
   const [
     sortDirection,
     setSortDirection,
-  ] = useState<
-    "asc" | "desc"
-  >("desc");
+  ] =
+    useState<
+      "asc" | "desc"
+    >("desc");
 
   const [
     errorMessage,
@@ -663,18 +673,19 @@ export default function KYCRequestsPage() {
   const [
     toast,
     setToast,
-  ] = useState<string | null>(
-    null
-  );
+  ] =
+    useState<string | null>(
+      null
+    );
 
   const [
     lastUpdated,
     setLastUpdated,
   ] = useState("");
 
-  /* =======================================================
-     OVERVIEW
-  ======================================================== */
+  /* =========================================================
+     LOAD OVERVIEW
+  ========================================================= */
 
   const loadOverview =
     useCallback(
@@ -719,9 +730,9 @@ export default function KYCRequestsPage() {
       []
     );
 
-  /* =======================================================
+  /* =========================================================
      LOAD REQUESTS
-  ======================================================== */
+  ========================================================= */
 
   const loadRequests =
     useCallback(
@@ -732,7 +743,9 @@ export default function KYCRequestsPage() {
           if (fullLoader) {
             setLoading(true);
           } else {
-            setRefreshing(true);
+            setRefreshing(
+              true
+            );
           }
 
           setErrorMessage("");
@@ -744,11 +757,12 @@ export default function KYCRequestsPage() {
 
           if (
             !response ||
-            response.success !== true
+            response.success !==
+              true
           ) {
             throw new Error(
               response?.message ||
-              "Failed to load KYC requests."
+                "Failed to load KYC requests."
             );
           }
 
@@ -822,7 +836,8 @@ export default function KYCRequestsPage() {
           );
 
           setErrorMessage(
-            error instanceof Error
+            error instanceof
+              Error
               ? error.message
               : "Failed to load KYC requests."
           );
@@ -834,17 +849,19 @@ export default function KYCRequestsPage() {
       [loadOverview]
     );
 
-  /* =======================================================
+  /* =========================================================
      INITIAL LOAD
-  ======================================================== */
+  ========================================================= */
 
   useEffect(() => {
-    void loadRequests(true);
+    void loadRequests(
+      true
+    );
   }, [loadRequests]);
 
-  /* =======================================================
+  /* =========================================================
      TOAST
-  ======================================================== */
+  ========================================================= */
 
   useEffect(() => {
     if (!toast) {
@@ -853,8 +870,9 @@ export default function KYCRequestsPage() {
 
     const timer =
       window.setTimeout(
-        () =>
-          setToast(null),
+        () => {
+          setToast(null);
+        },
         3000
       );
 
@@ -864,9 +882,9 @@ export default function KYCRequestsPage() {
       );
   }, [toast]);
 
-  /* =======================================================
-     LOAD DRAWER DATA
-  ======================================================== */
+  /* =========================================================
+     LOAD SELECTED DRAWER DATA
+  ========================================================= */
 
   useEffect(() => {
     let cancelled = false;
@@ -874,38 +892,60 @@ export default function KYCRequestsPage() {
     const loadSelectedData =
       async () => {
         if (!selectedRequest) {
-          setPrivateDocuments({});
-          setDocumentsError("");
-          setDocumentsLoading(false);
+          setPrivateDocuments(
+            {}
+          );
+
+          setDocumentsError(
+            ""
+          );
+
+          setDocumentsLoading(
+            false
+          );
 
           setAIReview(null);
+
           setAIError("");
+
           setAILoading(false);
 
           return;
         }
 
-        setDocumentsLoading(true);
-        setDocumentsError("");
-        setPrivateDocuments({});
+        setDocumentsLoading(
+          true
+        );
+
+        setDocumentsError(
+          ""
+        );
+
+        setPrivateDocuments(
+          {}
+        );
 
         setAILoading(true);
+
         setAIError("");
+
         setAIReview(null);
 
         const [
           documentsResult,
           aiResult,
         ] =
-          await Promise.allSettled([
-            apiClient<DocumentsResponse>(
-              `/admin/kyc/${selectedRequest.id}/documents`
-            ),
+          await Promise.allSettled(
+            [
+              apiClient<DocumentsResponse>(
+                `/admin/kyc/${selectedRequest.id}/documents`
+              ),
 
-            apiClient<AIReviewResponse>(
-              `/admin/kyc/${selectedRequest.id}/ai-review`
-            ),
-          ]);
+              apiClient<AIReviewResponse>(
+                `/admin/kyc/${selectedRequest.id}/ai-review`
+              ),
+            ]
+          );
 
         if (cancelled) {
           return;
@@ -914,7 +954,8 @@ export default function KYCRequestsPage() {
         if (
           documentsResult.status ===
             "fulfilled" &&
-          documentsResult.value?.success
+          documentsResult.value
+            ?.success
         ) {
           setPrivateDocuments(
             documentsResult.value
@@ -926,7 +967,8 @@ export default function KYCRequestsPage() {
               "rejected" &&
             documentsResult.reason instanceof
               Error
-              ? documentsResult.reason
+              ? documentsResult
+                  .reason
                   .message
               : "KYC documents could not be loaded."
           );
@@ -953,7 +995,10 @@ export default function KYCRequestsPage() {
           );
         }
 
-        setDocumentsLoading(false);
+        setDocumentsLoading(
+          false
+        );
+
         setAILoading(false);
       };
 
@@ -964,9 +1009,9 @@ export default function KYCRequestsPage() {
     };
   }, [selectedRequest?.id]);
 
-  /* =======================================================
+  /* =========================================================
      FILTER + SORT
-  ======================================================== */
+  ========================================================= */
 
   const filteredRequests =
     useMemo(() => {
@@ -997,7 +1042,8 @@ export default function KYCRequestsPage() {
                 .includes(query);
 
             const matchesStatus =
-              filters.status === "All" ||
+              filters.status ===
+                "All" ||
               request.status ===
                 filters.status;
 
@@ -1008,7 +1054,8 @@ export default function KYCRequestsPage() {
                 filters.documentType;
 
             const matchesRisk =
-              filters.risk === "All" ||
+              filters.risk ===
+                "All" ||
               request.riskLevel ===
                 filters.risk;
 
@@ -1031,9 +1078,11 @@ export default function KYCRequestsPage() {
               );
 
             const matchesSla =
-              filters.sla === "All" ||
+              filters.sla ===
+                "All" ||
               (
-                filters.sla === "Normal"
+                filters.sla ===
+                  "Normal"
                   ? request.slaMinutes >
                     15
                   : filters.sla ===
@@ -1072,17 +1121,22 @@ export default function KYCRequestsPage() {
             sortField ===
             "riskScore"
           ) {
-            left = a.riskScore;
-            right = b.riskScore;
+            left =
+              a.riskScore;
+
+            right =
+              b.riskScore;
           } else if (
             sortField ===
             "applicantName"
           ) {
             left =
-              a.applicantName.toLowerCase();
+              a.applicantName
+                .toLowerCase();
 
             right =
-              b.applicantName.toLowerCase();
+              b.applicantName
+                .toLowerCase();
           } else {
             left =
               Date.parse(
@@ -1120,9 +1174,9 @@ export default function KYCRequestsPage() {
       sortDirection,
     ]);
 
-  /* =======================================================
+  /* =========================================================
      RESET PAGE
-  ======================================================== */
+  ========================================================= */
 
   useEffect(() => {
     setPage(1);
@@ -1132,9 +1186,9 @@ export default function KYCRequestsPage() {
     pageSize,
   ]);
 
-  /* =======================================================
+  /* =========================================================
      PAGINATION
-  ======================================================== */
+  ========================================================= */
 
   const totalPages =
     Math.max(
@@ -1159,18 +1213,22 @@ export default function KYCRequestsPage() {
         pageSize
     );
 
-  /* =======================================================
-     ACTIONS
-  ======================================================== */
+  /* =========================================================
+     SELECTION
+  ========================================================= */
 
   const toggleSelection =
     (id: string) => {
       setSelectedIds(
         (current) => {
           const next =
-            new Set(current);
+            new Set(
+              current
+            );
 
-          if (next.has(id)) {
+          if (
+            next.has(id)
+          ) {
             next.delete(id);
           } else {
             next.add(id);
@@ -1201,6 +1259,10 @@ export default function KYCRequestsPage() {
       );
     };
 
+  /* =========================================================
+     SORT
+  ========================================================= */
+
   const sortBy =
     (
       field:
@@ -1225,9 +1287,9 @@ export default function KYCRequestsPage() {
       setSortDirection("desc");
     };
 
-  /* =======================================================
+  /* =========================================================
      AI REVIEW
-  ======================================================== */
+  ========================================================= */
 
   const runAIReview =
     async () => {
@@ -1253,7 +1315,7 @@ export default function KYCRequestsPage() {
         ) {
           throw new Error(
             response?.message ||
-            "Automated KYC screening failed."
+              "Automated KYC screening failed."
           );
         }
 
@@ -1268,7 +1330,8 @@ export default function KYCRequestsPage() {
         await loadOverview();
       } catch (error) {
         setAIError(
-          error instanceof Error
+          error instanceof
+            Error
             ? error.message
             : "Automated KYC screening failed."
         );
@@ -1277,9 +1340,9 @@ export default function KYCRequestsPage() {
       }
     };
 
-  /* =======================================================
+  /* =========================================================
      DECISION
-  ======================================================== */
+  ========================================================= */
 
   const submitDecision =
     async (
@@ -1295,7 +1358,9 @@ export default function KYCRequestsPage() {
           true
         );
 
-        setErrorMessage("");
+        setErrorMessage(
+          ""
+        );
 
         const status =
           action === "approve"
@@ -1332,14 +1397,18 @@ export default function KYCRequestsPage() {
               },
 
               body:
-                JSON.stringify(body),
+                JSON.stringify(
+                  body
+                ),
             }
           );
 
-        if (!response?.success) {
+        if (
+          !response?.success
+        ) {
           throw new Error(
             response?.message ||
-            "Failed to save the KYC decision."
+              "Failed to save the KYC decision."
           );
         }
 
@@ -1348,7 +1417,8 @@ export default function KYCRequestsPage() {
         );
 
         setToast(
-          action === "approve"
+          action ===
+            "approve"
             ? "KYC approved successfully."
             : "KYC rejected successfully."
         );
@@ -1358,7 +1428,8 @@ export default function KYCRequestsPage() {
         );
       } catch (error) {
         setErrorMessage(
-          error instanceof Error
+          error instanceof
+            Error
             ? error.message
             : "Failed to save the KYC decision."
         );
@@ -1369,9 +1440,9 @@ export default function KYCRequestsPage() {
       }
     };
 
-  /* =======================================================
+  /* =========================================================
      EXPORT
-  ======================================================== */
+  ========================================================= */
 
   const exportRows =
     () => {
@@ -1459,7 +1530,10 @@ export default function KYCRequestsPage() {
       anchor.download =
         `kyc-review-${new Date()
           .toISOString()
-          .slice(0, 10)}.csv`;
+          .slice(
+            0,
+            10
+          )}.csv`;
 
       document.body.appendChild(
         anchor
@@ -1474,9 +1548,9 @@ export default function KYCRequestsPage() {
       );
     };
 
-  /* =======================================================
+  /* =========================================================
      ANALYTICS FILTER
-  ======================================================== */
+  ========================================================= */
 
   const applyAnalyticsFilter =
     (
@@ -1484,7 +1558,8 @@ export default function KYCRequestsPage() {
     ) => {
       if (
         status === "Pending" ||
-        status === "Under Review"
+        status ===
+          "Under Review"
       ) {
         setFilters(
           (current) => ({
@@ -1495,9 +1570,9 @@ export default function KYCRequestsPage() {
       }
     };
 
-  /* =======================================================
+  /* =========================================================
      LOADING
-  ======================================================== */
+  ========================================================= */
 
   if (loading) {
     return (
@@ -1505,22 +1580,30 @@ export default function KYCRequestsPage() {
     );
   }
 
-  /* =======================================================
+  /* =========================================================
      UI
-  ======================================================== */
+  ========================================================= */
 
   return (
-    <main className="min-h-screen bg-[#F3F7FB] pb-12">
+    <main className="min-h-screen bg-background pb-12 text-foreground">
       <div className="mx-auto max-w-[1600px] space-y-5 px-4 py-5 sm:px-6 lg:px-8">
 
         {/* HEADER */}
         <KYCHeader
-          refreshing={refreshing}
-          onRefresh={() =>
-            void loadRequests(false)
+          refreshing={
+            refreshing
           }
-          onExport={exportRows}
-          lastUpdated={lastUpdated}
+          onRefresh={() =>
+            void loadRequests(
+              false
+            )
+          }
+          onExport={
+            exportRows
+          }
+          lastUpdated={
+            lastUpdated
+          }
         />
 
         {/* ERROR */}
@@ -1539,12 +1622,12 @@ export default function KYCRequestsPage() {
                 opacity: 0,
                 y: -8,
               }}
-              className="flex flex-col gap-3 rounded-[20px] border border-rose-100 bg-rose-50/75 p-4 sm:flex-row sm:items-center sm:justify-between"
+              className="flex flex-col gap-3 rounded-[20px] border border-rose-500/20 bg-rose-500/10 p-4 sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="flex items-start gap-3">
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-500" />
 
-                <p className="text-[9px] leading-5 text-rose-700">
+                <p className="text-[9px] leading-5 text-rose-500">
                   {errorMessage}
                 </p>
               </div>
@@ -1552,9 +1635,11 @@ export default function KYCRequestsPage() {
               <button
                 type="button"
                 onClick={() =>
-                  setErrorMessage("")
+                  setErrorMessage(
+                    ""
+                  )
                 }
-                className="flex h-8 w-8 items-center justify-center self-end rounded-xl text-rose-500 hover:bg-white sm:self-auto"
+                className="flex h-8 w-8 items-center justify-center self-end rounded-xl text-rose-500 transition hover:bg-rose-500/10 sm:self-auto"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -1588,7 +1673,8 @@ export default function KYCRequestsPage() {
 
         {/* SELECTED ACTION BAR */}
         <AnimatePresence>
-          {selectedIds.size > 0 && (
+          {selectedIds.size >
+            0 && (
             <motion.div
               initial={{
                 opacity: 0,
@@ -1602,11 +1688,12 @@ export default function KYCRequestsPage() {
                 opacity: 0,
                 y: 8,
               }}
-              className="flex flex-col gap-3 rounded-[20px] border border-blue-100 bg-blue-50/70 p-4 sm:flex-row sm:items-center sm:justify-between"
+              className="flex flex-col gap-3 rounded-[20px] border border-indigo-500/20 bg-indigo-500/5 p-4 sm:flex-row sm:items-center sm:justify-between"
             >
-              <p className="text-[9px] font-black text-[#174A7A]">
+              <p className="text-[9px] font-black text-foreground">
                 {selectedIds.size} review request
-                {selectedIds.size === 1
+                {selectedIds.size ===
+                1
                   ? ""
                   : "s"}{" "}
                 selected
@@ -1618,7 +1705,7 @@ export default function KYCRequestsPage() {
                   onClick={
                     exportRows
                   }
-                  className="inline-flex h-9 items-center gap-2 rounded-xl bg-[#1F5EA8] px-3 text-[9px] font-black text-white"
+                  className="inline-flex h-9 items-center gap-2 rounded-xl bg-indigo-600 px-3 text-[9px] font-black text-white transition hover:bg-violet-600"
                 >
                   <Download className="h-3.5 w-3.5" />
                   Export Selected
@@ -1631,7 +1718,7 @@ export default function KYCRequestsPage() {
                       new Set()
                     )
                   }
-                  className="h-9 rounded-xl border border-blue-100 bg-white px-3 text-[9px] font-black text-blue-700"
+                  className="h-9 rounded-xl border border-border bg-background px-3 text-[9px] font-black text-muted-foreground transition hover:border-indigo-500/25 hover:bg-indigo-500/5 hover:text-indigo-500"
                 >
                   Clear
                 </button>
@@ -1640,15 +1727,8 @@ export default function KYCRequestsPage() {
           )}
         </AnimatePresence>
 
-        {/* ===================================================
-            KYC QUEUE
-            No custom hook required.
-            Framer Motion handles the page/result animation.
-        ==================================================== */}
-
-        <AnimatePresence
-          mode="wait"
-        >
+        {/* KYC QUEUE */}
+        <AnimatePresence mode="wait">
           <motion.div
             key={[
               safePage,
@@ -1684,8 +1764,12 @@ export default function KYCRequestsPage() {
               selectedIds={
                 selectedIds
               }
-              page={safePage}
-              pageSize={pageSize}
+              page={
+                safePage
+              }
+              pageSize={
+                pageSize
+              }
               total={
                 filteredRequests.length
               }
@@ -1707,14 +1791,19 @@ export default function KYCRequestsPage() {
               sortDirection={
                 sortDirection
               }
-              onSort={sortBy}
+              onSort={
+                sortBy
+              }
               onPageChange={
                 setPage
               }
               onPageSizeChange={(
                 size
               ) => {
-                setPageSize(size);
+                setPageSize(
+                  size
+                );
+
                 setPage(1);
               }}
             />
@@ -1722,7 +1811,10 @@ export default function KYCRequestsPage() {
         </AnimatePresence>
       </div>
 
-      {/* REVIEW DRAWER */}
+      {/* =====================================================
+          REVIEW DRAWER
+      ====================================================== */}
+
       <KYCReviewDrawer
         request={
           selectedRequest
@@ -1760,17 +1852,20 @@ export default function KYCRequestsPage() {
           void runAIReview()
         }
         onDecision={(
-          action,
-          reason
-        ) =>
+          action: DecisionAction,
+          reason: string
+        ) => {
           void submitDecision(
             action,
             reason
-          )
-        }
+          );
+        }}
       />
 
-      {/* TOAST */}
+      {/* =====================================================
+          TOAST
+      ====================================================== */}
+
       <AnimatePresence>
         {toast && (
           <motion.div
@@ -1786,16 +1881,16 @@ export default function KYCRequestsPage() {
               opacity: 0,
               x: 18,
             }}
-            className="fixed right-4 top-4 z-[210] flex w-[calc(100%-2rem)] max-w-sm items-start gap-3 rounded-[18px] border border-emerald-100 bg-white p-4 shadow-[0_22px_60px_rgba(15,39,69,0.16)]"
+            className="fixed right-4 top-4 z-[210] flex w-[calc(100%-2rem)] max-w-sm items-start gap-3 rounded-[18px] border border-emerald-500/20 bg-card p-4 text-card-foreground shadow-[0_22px_60px_rgba(0,0,0,0.16)]"
           >
             <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
 
             <div>
-              <p className="text-[9px] font-black text-slate-800">
+              <p className="text-[9px] font-black text-foreground">
                 Updated
               </p>
 
-              <p className="mt-1 text-[9px] leading-5 text-slate-500">
+              <p className="mt-1 text-[9px] leading-5 text-muted-foreground">
                 {toast}
               </p>
             </div>
