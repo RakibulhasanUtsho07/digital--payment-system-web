@@ -61,6 +61,12 @@ import {
   getMyWallet,
 } from "@/lib/api/walletApi";
 
+import {
+  authorizeTransferWithPasskey,
+  getPasskeys,
+  registerDevicePasskey,
+} from "@/lib/api/passkeyApi";
+
 /* =========================================================
    TYPES
 ========================================================= */
@@ -428,6 +434,16 @@ export default function SendMoneyPage() {
   ] = useState(false);
 
   const [
+    passkeyAvailable,
+    setPasskeyAvailable,
+  ] = useState(false);
+
+  const [
+    passkeyLoading,
+    setPasskeyLoading,
+  ] = useState(true);
+
+  const [
     errorMessage,
     setErrorMessage,
   ] = useState("");
@@ -635,6 +651,31 @@ export default function SendMoneyPage() {
   useEffect(() => {
     void loadKYCStatus();
   }, [loadKYCStatus]);
+
+  const loadPasskeys =
+    useCallback(
+      async () => {
+        try {
+          setPasskeyLoading(true);
+          const passkeys =
+            await getPasskeys();
+          setPasskeyAvailable(
+            passkeys.length > 0
+          );
+        } catch {
+          setPasskeyAvailable(false);
+        } finally {
+          setPasskeyLoading(false);
+        }
+      },
+      []
+    );
+
+  useEffect(() => {
+    if (kycStatus === "verified") {
+      void loadPasskeys();
+    }
+  }, [kycStatus, loadPasskeys]);
 
   /* =====================================================
      QR CLEANUP
@@ -1145,7 +1186,9 @@ export default function SendMoneyPage() {
   ===================================================== */
 
   const handleSend =
-    async () => {
+    async (
+      paymentAuthorization?: string
+    ) => {
       if (
         isLoading
       ) {
@@ -1163,10 +1206,11 @@ export default function SendMoneyPage() {
       }
 
       if (
-        !password.trim()
+        !paymentAuthorization &&
+        !password
       ) {
         setErrorMessage(
-          "Enter your login password to confirm this transfer."
+          "Use your device passkey or enter your login password."
         );
         return;
       }
@@ -1219,6 +1263,13 @@ export default function SendMoneyPage() {
               headers: {
                 "Idempotency-Key":
                   idempotencyKey,
+
+                ...(paymentAuthorization
+                  ? {
+                      "X-Payment-Authorization":
+                        paymentAuthorization,
+                    }
+                  : {}),
               },
 
               body:
@@ -1233,8 +1284,11 @@ export default function SendMoneyPage() {
                     note.trim() ||
                     undefined,
 
-                  password:
-                    password,
+                  ...(!paymentAuthorization
+                    ? {
+                        password,
+                      }
+                    : {}),
                 }),
             }
           );
@@ -1343,6 +1397,66 @@ export default function SendMoneyPage() {
         setIsLoading(
           false
         );
+      }
+    };
+
+  const handleRegisterPasskey =
+    async () => {
+      if (passkeyLoading) return;
+
+      try {
+        setPasskeyLoading(true);
+        setErrorMessage("");
+        await registerDevicePasskey(
+          "Windows Hello"
+        );
+        setPasskeyAvailable(true);
+      } catch (error) {
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "Unable to register this device."
+        );
+      } finally {
+        setPasskeyLoading(false);
+      }
+    };
+
+  const handleBiometricSend =
+    async () => {
+      if (
+        passkeyLoading ||
+        isLoading
+      ) {
+        return;
+      }
+
+      let idempotencyKey = "";
+      try {
+        idempotencyKey =
+          getIdempotencyKey();
+        setPasskeyLoading(true);
+        setErrorMessage("");
+        const authorization =
+          await authorizeTransferWithPasskey({
+            recipient,
+            amount: numericAmount,
+            reference:
+              note.trim() ||
+              undefined,
+            idempotencyKey,
+          });
+        await handleSend(
+          authorization
+        );
+      } catch (error) {
+        setErrorMessage(
+          error instanceof Error
+            ? error.message
+            : "Device verification was cancelled or failed."
+        );
+      } finally {
+        setPasskeyLoading(false);
       }
     };
 
@@ -2165,19 +2279,65 @@ export default function SendMoneyPage() {
                     <div className="rounded-[22px] border border-border bg-card p-5 sm:p-6">
                       <div className="text-center">
                         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-[16px] bg-violet-100 text-violet-700 dark:bg-violet-950/35 dark:text-violet-300">
-                          <LockKeyhole className="h-5 w-5" />
+                          <Fingerprint className="h-5 w-5" />
                         </div>
 
                         <h3 className="mt-3 text-sm font-black">
-                          Confirm with your login password
+                          Secure payment authorization
                         </h3>
 
                         <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
-                          Re-enter your account password to authorize this transfer.
+                          Use Windows Hello or enter your login password as a fallback.
                         </p>
                       </div>
 
-                      <div className="relative mt-5">
+                      {passkeyAvailable ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void handleBiometricSend()
+                          }
+                          disabled={
+                            passkeyLoading ||
+                            isLoading
+                          }
+                          className="mt-5 flex h-[58px] w-full items-center justify-center gap-2 rounded-[16px] border border-violet-200 bg-violet-50 text-sm font-black text-violet-700 transition hover:border-violet-300 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-violet-900 dark:bg-violet-950/25 dark:text-violet-200"
+                        >
+                          {passkeyLoading ? (
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                          ) : (
+                            <Fingerprint className="h-5 w-5" />
+                          )}
+                          Verify with Windows Hello
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void handleRegisterPasskey()
+                          }
+                          disabled={
+                            passkeyLoading ||
+                            isLoading
+                          }
+                          className="mt-5 flex h-[58px] w-full items-center justify-center gap-2 rounded-[16px] border border-violet-200 bg-violet-50 text-sm font-black text-violet-700 transition hover:border-violet-300 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-violet-900 dark:bg-violet-950/25 dark:text-violet-200"
+                        >
+                          {passkeyLoading ? (
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                          ) : (
+                            <Fingerprint className="h-5 w-5" />
+                          )}
+                          Set up this device
+                        </button>
+                      )}
+
+                      <div className="my-4 flex items-center gap-3 text-[9px] font-black uppercase tracking-[0.15em] text-muted-foreground">
+                        <span className="h-px flex-1 bg-border" />
+                        Password fallback
+                        <span className="h-px flex-1 bg-border" />
+                      </div>
+
+                      <div className="relative">
                         <input
                           id="transfer-password"
                           type={
@@ -2251,7 +2411,7 @@ export default function SendMoneyPage() {
                         <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-500" />
 
                         <p className="text-[10px] font-medium leading-5 text-muted-foreground">
-                          Your password is used only for secure authorization and is not stored in this transfer record.
+                          Your fingerprint never leaves the device. The server stores only the passkey public credential; passwords and biometric data are not written to the transaction.
                         </p>
                       </div>
                     </div>
@@ -2259,10 +2419,14 @@ export default function SendMoneyPage() {
                     <motion.button
                       type="button"
                       onClick={() =>
-                        void handleSend()
+                        password
+                          ? void handleSend()
+                          : void handleBiometricSend()
                       }
                       disabled={
-                        !password.trim() ||
+                        (!passkeyAvailable &&
+                          !password) ||
+                        passkeyLoading ||
                         isLoading
                       }
                       whileTap={{
@@ -2278,8 +2442,14 @@ export default function SendMoneyPage() {
                         </>
                       ) : (
                         <>
-                          <Send className="h-[18px] w-[18px]" />
-                          Confirm & send
+                          {password ? (
+                            <LockKeyhole className="h-[18px] w-[18px]" />
+                          ) : (
+                            <Fingerprint className="h-[18px] w-[18px]" />
+                          )}
+                          {password
+                            ? "Confirm with password"
+                            : "Verify & send"}
                         </>
                       )}
                     </motion.button>
