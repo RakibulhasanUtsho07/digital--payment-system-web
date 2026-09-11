@@ -325,7 +325,7 @@ export default function SupportDashboard() {
   ].filter(Boolean).length;
 
   return (
-    <main className="min-h-screen bg-[#F4F8FC] px-4 py-5 font-sans text-[#0F2745] sm:px-6 md:px-8">
+    <main className="min-h-screen bg-transparent px-4 py-5 font-sans text-card-foreground sm:px-6 md:px-8">
       <div className="mx-auto max-w-[1600px]">
         <SupportHeader
           refreshing={isRefreshing}
@@ -360,7 +360,7 @@ export default function SupportDashboard() {
 
         <section
           id="support-queue"
-          className="relative mt-6 overflow-visible rounded-[28px] border border-[#DCE7F0] bg-white shadow-[0_14px_50px_rgba(15,39,69,0.06)]"
+          className="relative mt-6 overflow-visible rounded-[28px] border border-border bg-card shadow-[0_14px_50px_rgba(15,39,69,0.06)]"
         >
           <QueueToolbar
             search={search}
@@ -379,7 +379,7 @@ export default function SupportDashboard() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
                 transition={{ duration: 0.2 }}
-                className="relative z-30 border-b border-slate-100 bg-[#F8FBFE]"
+                className="relative z-30 border-b border-border bg-muted"
               >
                 <div className="grid gap-3 p-4 md:grid-cols-4">
                   <FilterSelect
@@ -435,7 +435,7 @@ export default function SupportDashboard() {
           </AnimatePresence>
 
           {error && (
-            <div className="border-b border-rose-100 bg-rose-50 px-5 py-3 text-xs font-semibold text-rose-700">
+            <div className="border-b border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 px-5 py-3 text-xs font-semibold text-rose-700">
               {error}
             </div>
           )}
@@ -465,7 +465,7 @@ export default function SupportDashboard() {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setSelectedTicketId(null)}
-              className="fixed inset-0 z-40 bg-[#0A2038]/40 backdrop-blur-[2px]"
+              className="fixed inset-0 z-40 bg-slate-950/45 backdrop-blur-[2px]"
             />
 
             <TicketDrawer
@@ -499,15 +499,15 @@ export default function SupportDashboard() {
             initial={{ opacity: 0, y: -10, x: 10 }}
             animate={{ opacity: 1, y: 0, x: 0 }}
             exit={{ opacity: 0, y: -8 }}
-            className="fixed right-4 top-4 z-[120] w-[calc(100%-2rem)] max-w-sm rounded-2xl border border-[#D6E5F0] bg-white p-4 shadow-2xl"
+            className="fixed right-4 top-4 z-[120] w-[calc(100%-2rem)] max-w-sm rounded-2xl border border-border bg-card p-4 shadow-2xl"
           >
             <div className="flex gap-3">
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-500" />
               <div>
-                <p className="text-xs font-black text-[#0F2745]">
+                <p className="text-xs font-black text-card-foreground">
                   Support Operations
                 </p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
                   {toast}
                 </p>
               </div>
@@ -532,25 +532,25 @@ function SupportHeader({
   onCreate: () => void;
 }) {
   return (
-    <header className="rounded-[28px] border border-[#DCE7F0] bg-white/90 p-5 shadow-[0_12px_40px_rgba(15,39,69,0.05)] backdrop-blur md:p-6">
+    <header className="relative overflow-hidden rounded-[28px] border border-indigo-900 bg-indigo-950 p-5 text-white shadow-[0_18px_55px_rgba(30,27,75,0.25)] md:p-6">
       <div className="flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-2xl font-black tracking-tight text-[#0F2745] md:text-[30px]">
+            <h1 className="text-2xl font-black tracking-tight text-white md:text-[30px]">
               Support Operations
             </h1>
 
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-black text-emerald-700">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/30 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-black text-emerald-100">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
               Operational
             </span>
 
-            <span className="rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-black text-[#1F5EA8]">
+            <span className="rounded-full border border-indigo-300/40 bg-indigo-400/10 px-2.5 py-1 text-[10px] font-black text-indigo-100">
               Administrator
             </span>
           </div>
 
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-indigo-100/75">
             Resolve customer issues, control SLA risk, coordinate ownership, and keep every support action auditable from one workspace.
           </p>
         </div>
@@ -570,7 +570,7 @@ function SupportHeader({
           <button
             type="button"
             onClick={onCreate}
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#1F5EA8] to-[#256DB9] px-4 text-xs font-black text-white shadow-[0_10px_24px_rgba(31,94,168,0.22)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_30px_rgba(31,94,168,0.28)] sm:px-5"
+            className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-4 text-xs font-black text-white shadow-[0_10px_24px_rgba(31,94,168,0.22)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_30px_rgba(31,94,168,0.28)] sm:px-5"
           >
             <Plus className="h-4 w-4" />
             <span className="hidden sm:inline">
@@ -599,7 +599,7 @@ function HeaderButton({
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-[#DCE7F0] bg-white px-3 text-xs font-black text-[#173F6D] shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50/60 sm:px-4"
+      className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-indigo-300/60 bg-white/10 px-3 text-xs font-black text-white transition hover:-translate-y-0.5 hover:bg-white/15 sm:px-4"
     >
       <Icon
         className={`h-4 w-4 ${
@@ -623,13 +623,13 @@ function SupportPulse({
       label: "Open Tickets",
       value: metrics.openTickets,
       icon: Inbox,
-      tone: "text-white",
+      tone: "text-indigo-700 dark:text-indigo-300",
     },
     {
       label: "Pending Replies",
       value: metrics.pendingReplies,
       icon: MessageSquare,
-      tone: "text-blue-100",
+      tone: "text-indigo-600 dark:text-indigo-300",
     },
     {
       label: "SLA Risk",
@@ -650,7 +650,7 @@ function SupportPulse({
           ? "—"
           : `${metrics.csat.toFixed(1)}%`,
       icon: Sparkles,
-      tone: "text-cyan-300",
+      tone: "text-violet-600 dark:text-violet-300",
     },
   ];
 
@@ -658,10 +658,10 @@ function SupportPulse({
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="relative overflow-hidden rounded-[28px] border border-[#183B5E] bg-gradient-to-br from-[#0C2846] via-[#10385D] to-[#154A77] p-5 text-white shadow-[0_18px_48px_rgba(15,39,69,0.18)] md:p-6"
+      className="relative overflow-hidden rounded-[28px] border border-border bg-card p-5 text-card-foreground shadow-[0_12px_40px_rgba(15,23,42,0.06)] md:p-6"
     >
-      <div className="pointer-events-none absolute -left-20 -top-24 h-60 w-60 rounded-full bg-cyan-300/10 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-20 right-0 h-56 w-56 rounded-full bg-blue-400/10 blur-3xl" />
+      <div className="pointer-events-none absolute -left-20 -top-24 h-60 w-60 rounded-full bg-indigo-500/8 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-20 right-0 h-56 w-56 rounded-full bg-violet-500/8 blur-3xl" />
 
       <div className="relative z-10 flex flex-col gap-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -681,7 +681,7 @@ function SupportPulse({
             </h2>
           </div>
 
-          <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[9px] font-bold text-blue-100/70">
+          <span className="rounded-full border border-white/10 bg-card/5 px-3 py-1.5 text-[9px] font-bold text-blue-100/70">
             Admin intelligence
           </span>
         </div>
@@ -695,7 +695,7 @@ function SupportPulse({
               transition={{
                 delay: index * 0.05,
               }}
-              className="group rounded-2xl border border-white/10 bg-white/[0.055] p-3.5 backdrop-blur transition hover:-translate-y-0.5 hover:border-cyan-200/20 hover:bg-white/[0.08]"
+              className="group rounded-2xl border border-white/10 bg-card/[0.055] p-3.5 backdrop-blur transition hover:-translate-y-0.5 hover:border-cyan-200/20 hover:bg-card/[0.08]"
             >
               <div className="flex items-center justify-between gap-2">
                 <item.icon className="h-4 w-4 text-blue-100/50" />
@@ -710,7 +710,7 @@ function SupportPulse({
                 className={`mt-1 text-2xl font-black tracking-tight ${item.tone}`}
               >
                 {loading ? (
-                  <span className="inline-block h-7 w-14 animate-pulse rounded-lg bg-white/10" />
+                  <span className="inline-block h-7 w-14 animate-pulse rounded-lg bg-card/10" />
                 ) : (
                   item.value
                 )}
@@ -734,29 +734,29 @@ function SupportWeather({
           label: "Pressure Rising",
           text: "Breached cases need immediate ownership.",
           icon: ShieldAlert,
-          bg: "from-rose-50 to-white",
+          bg: "from-transparent to-transparent",
           iconBg: "bg-rose-50",
           iconColor: "text-rose-500",
-          pill: "bg-rose-50 text-rose-600 border-rose-100",
+          pill: "bg-rose-50 dark:bg-rose-950/40 text-rose-600 border-rose-100",
         }
       : metrics.slaRisk >= 10
         ? {
             label: "Watch Queue",
             text: "Several tickets are approaching SLA limits.",
             icon: BellRing,
-            bg: "from-amber-50 to-white",
+            bg: "from-transparent to-transparent",
             iconBg: "bg-amber-50",
             iconColor: "text-amber-600",
-            pill: "bg-amber-50 text-amber-700 border-amber-100",
+            pill: "bg-amber-50 dark:bg-amber-950/40 text-amber-700 border-amber-100",
           }
         : {
             label: "Clear Skies",
             text: "Backlog is healthy and SLA pressure is controlled.",
             icon: SunMedium,
-            bg: "from-emerald-50 to-white",
+            bg: "from-transparent to-transparent",
             iconBg: "bg-emerald-50",
             iconColor: "text-emerald-600",
-            pill: "bg-emerald-50 text-emerald-700 border-emerald-100",
+            pill: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 border-emerald-100",
           };
 
   const Icon = state.icon;
@@ -765,7 +765,7 @@ function SupportWeather({
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`relative overflow-hidden rounded-[28px] border border-[#DCE7F0] bg-gradient-to-br ${state.bg} p-5 shadow-[0_14px_40px_rgba(15,39,69,0.06)] md:p-6`}
+      className="relative overflow-hidden rounded-[28px] border border-border bg-card p-5 shadow-[0_12px_40px_rgba(15,23,42,0.06)] md:p-6"
     >
       <div className="flex h-full flex-col justify-between gap-5">
         <div className="flex items-start justify-between gap-3">
@@ -785,13 +785,13 @@ function SupportWeather({
         </div>
 
         <div>
-          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#6F8DAA]">
+          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
             Support Weather
           </p>
-          <h3 className="mt-1 text-xl font-black text-[#0F2745]">
+          <h3 className="mt-1 text-xl font-black text-card-foreground">
             {state.label}
           </h3>
-          <p className="mt-2 text-xs leading-5 text-slate-500">
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">
             {state.text}
           </p>
         </div>
@@ -827,8 +827,8 @@ function MiniWeatherStat({
   tone: string;
 }) {
   return (
-    <div className="rounded-2xl border border-white/80 bg-white/70 p-3">
-      <p className="text-[9px] font-bold uppercase tracking-wide text-slate-400">
+    <div className="rounded-2xl border border-white/80 bg-card/70 p-3">
+      <p className="text-[9px] font-bold uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
       <p className={`mt-1 text-lg font-black ${tone}`}>
@@ -898,7 +898,7 @@ function AttentionGrid({
     <section className="mt-6">
       <div className="mb-3 flex items-center gap-2">
         <AlertCircle className="h-4 w-4 text-rose-500" />
-        <h2 className="text-[11px] font-black uppercase tracking-[0.16em] text-[#173F6D]">
+        <h2 className="text-[11px] font-black uppercase tracking-[0.16em] text-indigo-700 dark:text-indigo-300">
           Attention Required
         </h2>
       </div>
@@ -939,22 +939,22 @@ function AttentionCard({
   const tone = {
     rose: {
       line: "bg-rose-500",
-      icon: "bg-rose-50 text-rose-500",
+      icon: "bg-rose-50 dark:bg-rose-950/40 text-rose-500",
       action: "text-rose-600",
     },
     amber: {
       line: "bg-amber-500",
-      icon: "bg-amber-50 text-amber-600",
+      icon: "bg-amber-50 dark:bg-amber-950/40 text-amber-600",
       action: "text-amber-700",
     },
     blue: {
-      line: "bg-blue-500",
-      icon: "bg-blue-50 text-blue-600",
+      line: "bg-indigo-50 dark:bg-indigo-950/400",
+      icon: "bg-indigo-50 dark:bg-indigo-950/40 text-blue-600",
       action: "text-blue-600",
     },
     cyan: {
       line: "bg-cyan-500",
-      icon: "bg-cyan-50 text-cyan-700",
+      icon: "bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700",
       action: "text-cyan-700",
     },
   }[accent];
@@ -966,7 +966,7 @@ function AttentionCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay }}
       onClick={onClick}
-      className="group relative overflow-hidden rounded-[22px] border border-[#DCE7F0] bg-white p-4 text-left shadow-[0_8px_28px_rgba(15,39,69,0.04)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(15,39,69,0.08)]"
+      className="group relative overflow-hidden rounded-[22px] border border-border bg-card p-4 text-left shadow-[0_8px_28px_rgba(15,39,69,0.04)] transition hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(15,39,69,0.08)]"
     >
       <span
         className={`absolute inset-y-0 left-0 w-1 ${tone.line}`}
@@ -979,16 +979,16 @@ function AttentionCard({
           <Icon className="h-4 w-4" />
         </div>
 
-        <span className="text-2xl font-black text-[#0F2745]">
+        <span className="text-2xl font-black text-card-foreground">
           {value}
         </span>
       </div>
 
-      <h3 className="mt-4 text-sm font-black text-[#0F2745]">
+      <h3 className="mt-4 text-sm font-black text-card-foreground">
         {title}
       </h3>
 
-      <p className="mt-1 min-h-10 text-[11px] leading-5 text-slate-500">
+      <p className="mt-1 min-h-10 text-[11px] leading-5 text-muted-foreground">
         {description}
       </p>
 
@@ -1020,16 +1020,16 @@ function QueueToolbar({
   onClear: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-4 border-b border-slate-100 bg-[#FBFDFF] p-4 md:flex-row md:items-center md:justify-between">
+    <div className="flex flex-col gap-4 border-b border-border bg-muted p-4 md:flex-row md:items-center md:justify-between">
       <div className="flex min-w-0 items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-[#1F5EA8]">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400">
           <Inbox className="h-4 w-4" />
         </div>
         <div>
-          <h2 className="text-sm font-black text-[#0F2745]">
+          <h2 className="text-sm font-black text-card-foreground">
             Support Queue
           </h2>
-          <p className="text-[10px] text-slate-400">
+          <p className="text-[10px] text-muted-foreground">
             {total.toLocaleString()} matching tickets
           </p>
         </div>
@@ -1037,26 +1037,26 @@ function QueueToolbar({
 
       <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto">
         <label className="relative min-w-0 flex-1 md:w-80">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <input
             value={search}
             onChange={(event) =>
               setSearch(event.target.value)
             }
             placeholder="Search ticket, customer or subject..."
-            className="h-11 w-full rounded-2xl border border-[#DCE7F0] bg-white pl-9 pr-3 text-xs text-[#0F2745] outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-100/50"
+            className="h-11 w-full rounded-2xl border border-border bg-card pl-9 pr-3 text-xs text-card-foreground outline-none transition placeholder:text-muted-foreground focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10"
           />
         </label>
 
         <button
           type="button"
           onClick={() => setShowFilters(!showFilters)}
-          className="relative inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-[#DCE7F0] bg-white px-4 text-xs font-black text-[#173F6D] transition hover:bg-blue-50/60"
+          className="relative inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-border bg-card px-4 text-xs font-black text-indigo-700 dark:text-indigo-300 transition hover:bg-indigo-50 dark:bg-indigo-950/40 dark:hover:bg-indigo-950/40"
         >
           <Filter className="h-4 w-4" />
           Filters
           {activeFilterCount > 0 && (
-            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#1F5EA8] px-1 text-[9px] text-white">
+            <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-indigo-600 px-1 text-[9px] text-white">
               {activeFilterCount}
             </span>
           )}
@@ -1066,7 +1066,7 @@ function QueueToolbar({
           <button
             type="button"
             onClick={onClear}
-            className="h-11 rounded-2xl px-3 text-[10px] font-black text-slate-500 transition hover:bg-slate-100"
+            className="h-11 rounded-2xl px-3 text-[10px] font-black text-muted-foreground transition hover:bg-muted"
           >
             Clear
           </button>
@@ -1094,7 +1094,7 @@ function FilterSelect({
       ? {
           icon: Zap,
           iconWrap:
-            "border-amber-200 bg-amber-50 text-amber-700",
+            "border-amber-200 bg-amber-50 dark:bg-amber-950/40 text-amber-700",
           ring:
             "focus-visible:ring-amber-200/70",
           glow:
@@ -1106,7 +1106,7 @@ function FilterSelect({
         ? {
             icon: Inbox,
             iconWrap:
-              "border-violet-200 bg-violet-50 text-violet-700",
+              "border-violet-200 bg-violet-50 dark:bg-violet-950/40 text-violet-700",
             ring:
               "focus-visible:ring-violet-200/70",
             glow:
@@ -1118,7 +1118,7 @@ function FilterSelect({
           ? {
               icon: Clock3,
               iconWrap:
-                "border-rose-200 bg-rose-50 text-rose-700",
+                "border-rose-200 bg-rose-50 dark:bg-rose-950/40 text-rose-700",
               ring:
                 "focus-visible:ring-rose-200/70",
               glow:
@@ -1129,7 +1129,7 @@ function FilterSelect({
           : {
               icon: Sparkles,
               iconWrap:
-                "border-blue-200 bg-blue-50 text-blue-700",
+                "border-blue-200 bg-indigo-50 dark:bg-indigo-950/40 text-blue-700",
               ring:
                 "focus-visible:ring-blue-200/70",
               glow:
@@ -1146,7 +1146,7 @@ function FilterSelect({
         open ? "z-[70]" : "z-10"
       }`}
     >
-      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
+      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">
         {label}
       </span>
 
@@ -1157,7 +1157,7 @@ function FilterSelect({
         onClick={() =>
           setOpen((current) => !current)
         }
-        className={`group relative flex h-12 w-full items-center gap-3 overflow-hidden rounded-2xl border border-[#D8E5EF] bg-white px-2.5 text-left shadow-[0_6px_18px_rgba(15,39,69,0.04)] outline-none transition-all duration-200 hover:-translate-y-0.5 hover:border-[#BFD5E8] hover:shadow-[0_12px_28px_rgba(15,39,69,0.09)] focus-visible:ring-4 ${theme.ring}`}
+        className={`group relative flex h-12 w-full items-center gap-3 overflow-hidden rounded-2xl border border-border bg-card px-2.5 text-left shadow-[0_6px_18px_rgba(15,39,69,0.04)] outline-none transition-all duration-200 hover:-translate-y-0.5 hover:border-[#BFD5E8] hover:shadow-[0_12px_28px_rgba(15,39,69,0.09)] focus-visible:ring-4 ${theme.ring}`}
       >
         <span
           className={`pointer-events-none absolute inset-0 bg-gradient-to-r ${theme.glow} opacity-0 transition-opacity duration-200 group-hover:opacity-100`}
@@ -1170,17 +1170,17 @@ function FilterSelect({
         </span>
 
         <span className="relative z-10 min-w-0 flex-1">
-          <span className="block truncate text-xs font-black text-[#173F6D]">
+          <span className="block truncate text-xs font-black text-indigo-700 dark:text-indigo-300">
             {value}
           </span>
-          <span className="mt-0.5 block truncate text-[8px] font-semibold text-slate-400">
+          <span className="mt-0.5 block truncate text-[8px] font-semibold text-muted-foreground">
             {value === "All"
               ? `Any ${label.toLowerCase()}`
               : `Filtered by ${label.toLowerCase()}`}
           </span>
         </span>
 
-        <span className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#F5F9FC] text-slate-400 transition group-hover:bg-blue-50 group-hover:text-[#1F5EA8]">
+        <span className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground transition group-hover:bg-indigo-50 dark:bg-indigo-950/40 dark:group-hover:bg-indigo-950/40 group-hover:text-indigo-600 dark:text-indigo-400">
           <ChevronDown
             className={`h-4 w-4 transition-transform duration-200 ${
               open ? "rotate-180" : ""
@@ -1221,7 +1221,7 @@ function FilterSelect({
                 duration: 0.16,
                 ease: [0.22, 1, 0.36, 1],
               }}
-              className="absolute left-0 right-0 top-[calc(100%+8px)] z-[80] overflow-hidden rounded-[20px] border border-[#D6E4EF] bg-white/95 p-2 shadow-[0_22px_60px_rgba(15,39,69,0.18)] backdrop-blur-xl"
+              className="absolute left-0 right-0 top-[calc(100%+8px)] z-[80] overflow-hidden rounded-[20px] border border-border bg-card/95 p-2 shadow-[0_22px_60px_rgba(15,39,69,0.18)] backdrop-blur-xl"
             >
               <div
                 className={`absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r ${theme.menuAccent}`}
@@ -1229,15 +1229,15 @@ function FilterSelect({
 
               <div className="mb-1 flex items-center justify-between px-2 py-1.5">
                 <div>
-                  <p className="text-[8px] font-black uppercase tracking-[0.15em] text-slate-400">
+                  <p className="text-[8px] font-black uppercase tracking-[0.15em] text-muted-foreground">
                     Select {label}
                   </p>
-                  <p className="mt-0.5 text-[9px] font-semibold text-slate-500">
+                  <p className="mt-0.5 text-[9px] font-semibold text-muted-foreground">
                     Update queue instantly
                   </p>
                 </div>
 
-                <span className="rounded-lg bg-slate-50 px-2 py-1 text-[8px] font-black text-slate-400">
+                <span className="rounded-lg bg-muted px-2 py-1 text-[8px] font-black text-muted-foreground">
                   {options.length} options
                 </span>
               </div>
@@ -1265,8 +1265,8 @@ function FilterSelect({
                       }}
                       className={`group/option flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left transition ${
                         selected
-                          ? "bg-gradient-to-r from-[#EEF6FF] to-[#F7FBFF] ring-1 ring-inset ring-blue-100"
-                          : "hover:bg-[#F7FAFD]"
+                          ? "bg-indigo-50 dark:bg-indigo-950/40 ring-1 ring-inset ring-indigo-200 dark:ring-indigo-800"
+                          : "hover:bg-muted"
                       }`}
                     >
                       <span
@@ -1281,13 +1281,13 @@ function FilterSelect({
                         <span
                           className={`block truncate text-[11px] font-black ${
                             selected
-                              ? "text-[#1259A7]"
-                              : "text-[#173F6D]"
+                              ? "text-indigo-700 dark:text-indigo-300"
+                              : "text-indigo-700 dark:text-indigo-300"
                           }`}
                         >
                           {option}
                         </span>
-                        <span className="mt-0.5 block text-[8px] font-medium text-slate-400">
+                        <span className="mt-0.5 block text-[8px] font-medium text-muted-foreground">
                           {option === "All"
                             ? "Show every matching ticket"
                             : `Use ${option.toLowerCase()} filter`}
@@ -1297,8 +1297,8 @@ function FilterSelect({
                       <span
                         className={`flex h-6 w-6 items-center justify-center rounded-lg transition ${
                           selected
-                            ? "bg-[#1F5EA8] text-white shadow-sm"
-                            : "bg-slate-50 text-transparent group-hover/option:text-slate-300"
+                            ? "bg-indigo-600 text-white shadow-sm"
+                            : "bg-muted text-transparent group-hover/option:text-muted-foreground/60"
                         }`}
                       >
                         <Check className="h-3.5 w-3.5" />
@@ -1336,7 +1336,7 @@ function getFilterOptionTone(
   ) {
     return {
       wrap:
-        "border-rose-100 bg-rose-50",
+        "border-rose-200 dark:border-rose-800 bg-rose-50",
       dot:
         "bg-rose-500",
     };
@@ -1350,7 +1350,7 @@ function getFilterOptionTone(
   ) {
     return {
       wrap:
-        "border-amber-100 bg-amber-50",
+        "border-amber-200 dark:border-amber-800 bg-amber-50",
       dot:
         "bg-amber-500",
     };
@@ -1363,7 +1363,7 @@ function getFilterOptionTone(
   ) {
     return {
       wrap:
-        "border-emerald-100 bg-emerald-50",
+        "border-emerald-200 dark:border-emerald-800 bg-emerald-50",
       dot:
         "bg-emerald-500",
     };
@@ -1375,7 +1375,7 @@ function getFilterOptionTone(
   ) {
     return {
       wrap:
-        "border-violet-100 bg-violet-50",
+        "border-violet-200 dark:border-violet-800 bg-violet-50",
       dot:
         "bg-violet-500",
     };
@@ -1387,7 +1387,7 @@ function getFilterOptionTone(
   ) {
     return {
       wrap:
-        "border-cyan-100 bg-cyan-50",
+        "border-cyan-200 dark:border-cyan-800 bg-cyan-50",
       dot:
         "bg-cyan-500",
     };
@@ -1399,15 +1399,15 @@ function getFilterOptionTone(
   ) {
     return {
       wrap:
-        "border-blue-100 bg-blue-50",
+        "border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/40",
       dot:
-        "bg-blue-500",
+        "bg-indigo-50 dark:bg-indigo-950/400",
     };
   }
 
   return {
     wrap:
-      "border-slate-200 bg-slate-50",
+      "border-border bg-muted",
     dot:
       "bg-slate-400",
   };
@@ -1429,7 +1429,7 @@ function SupportQueue({
         {Array.from({ length: 6 }).map((_, index) => (
           <div
             key={index}
-            className="h-16 animate-pulse rounded-2xl bg-slate-100"
+            className="h-16 animate-pulse rounded-2xl bg-muted"
           />
         ))}
       </div>
@@ -1440,13 +1440,13 @@ function SupportQueue({
     return (
       <div className="flex min-h-72 items-center justify-center p-6">
         <div className="max-w-sm text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-[#1F5EA8]">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400">
             <Inbox className="h-5 w-5" />
           </div>
-          <h3 className="mt-4 text-sm font-black text-[#0F2745]">
+          <h3 className="mt-4 text-sm font-black text-card-foreground">
             No tickets match this view
           </h3>
-          <p className="mt-2 text-xs leading-5 text-slate-500">
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">
             Adjust the search or filters to return to the active support queue.
           </p>
         </div>
@@ -1458,7 +1458,7 @@ function SupportQueue({
     <div className="overflow-x-auto">
       <table className="w-full min-w-[1050px] border-collapse text-left">
         <thead>
-          <tr className="border-b border-slate-100 bg-[#F8FBFE]">
+          <tr className="border-b border-border bg-muted">
             {[
               "Ticket",
               "Customer",
@@ -1471,7 +1471,7 @@ function SupportQueue({
             ].map((label, index) => (
               <th
                 key={label}
-                className={`px-5 py-3.5 text-[9px] font-black uppercase tracking-[0.14em] text-slate-400 ${
+                className={`px-5 py-3.5 text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground ${
                   index === 7 ? "text-right" : ""
                 }`}
               >
@@ -1489,28 +1489,28 @@ function SupportQueue({
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.025 }}
               onClick={() => onOpen(ticket.id)}
-              className="group cursor-pointer bg-white transition hover:bg-[#F7FBFF]"
+              className="group cursor-pointer bg-card transition hover:bg-muted/70"
             >
               <td className="px-5 py-4">
-                <p className="text-xs font-black text-[#1F5EA8]">
+                <p className="text-xs font-black text-indigo-600 dark:text-indigo-400">
                   {ticket.ticketNumber}
                 </p>
-                <p className="mt-1 text-[9px] text-slate-400">
+                <p className="mt-1 text-[9px] text-muted-foreground">
                   {formatRelativeTime(ticket.lastActivityAt)}
                 </p>
               </td>
 
               <td className="px-5 py-4">
                 <div className="flex items-center gap-3">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-50 to-cyan-50 text-[9px] font-black text-[#1F5EA8]">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-50 to-cyan-50 text-[9px] font-black text-indigo-600 dark:text-indigo-400">
                     {getInitials(ticket.customerName)}
                   </span>
 
                   <div className="min-w-0">
-                    <p className="max-w-[180px] truncate text-xs font-black text-[#0F2745]">
+                    <p className="max-w-[180px] truncate text-xs font-black text-card-foreground">
                       {ticket.customerName}
                     </p>
-                    <p className="mt-0.5 max-w-[190px] truncate text-[9px] text-slate-400">
+                    <p className="mt-0.5 max-w-[190px] truncate text-[9px] text-muted-foreground">
                       {ticket.customerEmail}
                     </p>
                   </div>
@@ -1518,10 +1518,10 @@ function SupportQueue({
               </td>
 
               <td className="px-5 py-4">
-                <p className="max-w-[260px] truncate text-xs font-bold text-[#0F2745]">
+                <p className="max-w-[260px] truncate text-xs font-bold text-card-foreground">
                   {ticket.subject}
                 </p>
-                <p className="mt-1 text-[9px] font-semibold text-slate-400">
+                <p className="mt-1 text-[9px] font-semibold text-muted-foreground">
                   {ticket.category}
                 </p>
               </td>
@@ -1538,7 +1538,7 @@ function SupportQueue({
                 <p
                   className={`text-[10px] font-black ${
                     ticket.assignee.id
-                      ? "text-[#173F6D]"
+                      ? "text-indigo-700 dark:text-indigo-300"
                       : "text-amber-700"
                   }`}
                 >
@@ -1560,7 +1560,7 @@ function SupportQueue({
                     event.stopPropagation();
                     onOpen(ticket.id);
                   }}
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 transition group-hover:bg-blue-50 group-hover:text-[#1F5EA8]"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-muted-foreground transition group-hover:bg-indigo-50 dark:bg-indigo-950/40 dark:group-hover:bg-indigo-950/40 group-hover:text-indigo-600 dark:text-indigo-400"
                 >
                   <MoreHorizontal className="h-4 w-4" />
                 </button>
@@ -1585,8 +1585,8 @@ function QueuePagination({
   onPage: (page: number) => void;
 }) {
   return (
-    <div className="flex flex-col gap-3 border-t border-slate-100 bg-[#FBFDFF] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-[10px] font-semibold text-slate-400">
+    <div className="flex flex-col gap-3 border-t border-border bg-muted px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-[10px] font-semibold text-muted-foreground">
         {total.toLocaleString()} total tickets
       </p>
 
@@ -1595,12 +1595,12 @@ function QueuePagination({
           type="button"
           disabled={page <= 1}
           onClick={() => onPage(page - 1)}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#DCE7F0] bg-white text-[#173F6D] disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-indigo-700 dark:text-indigo-300 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
 
-        <span className="rounded-xl bg-blue-50 px-3 py-2 text-[10px] font-black text-[#1F5EA8]">
+        <span className="rounded-xl bg-indigo-50 dark:bg-indigo-950/40 px-3 py-2 text-[10px] font-black text-indigo-600 dark:text-indigo-400">
           {page} / {Math.max(1, pages)}
         </span>
 
@@ -1608,7 +1608,7 @@ function QueuePagination({
           type="button"
           disabled={page >= pages}
           onClick={() => onPage(page + 1)}
-          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#DCE7F0] bg-white text-[#173F6D] disabled:cursor-not-allowed disabled:opacity-40"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-indigo-700 dark:text-indigo-300 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <ChevronRight className="h-4 w-4" />
         </button>
@@ -1697,30 +1697,30 @@ function TicketDrawer({
         damping: 28,
         stiffness: 230,
       }}
-      className="fixed inset-y-0 right-0 z-50 flex w-full max-w-3xl flex-col bg-white shadow-[-20px_0_60px_rgba(15,39,69,0.16)]"
+      className="fixed inset-y-0 right-0 z-50 flex w-full max-w-3xl flex-col bg-card shadow-[-20px_0_60px_rgba(15,39,69,0.16)]"
     >
       {!ticket ? (
         <div className="flex h-full items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-[#1F5EA8]" />
+          <Loader2 className="h-6 w-6 animate-spin text-indigo-600 dark:text-indigo-400" />
         </div>
       ) : (
         <>
-          <div className="border-b border-slate-100 bg-[#F8FBFE] p-5 md:p-6">
+          <div className="border-b border-border bg-muted p-5 md:p-6">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-black text-[#1F5EA8]">
+                  <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">
                     {ticket.ticketNumber}
                   </span>
                   <PriorityBadge priority={ticket.priority} />
                   <StatusBadge status={ticket.status} />
                 </div>
 
-                <h2 className="mt-3 text-xl font-black leading-7 text-[#0F2745]">
+                <h2 className="mt-3 text-xl font-black leading-7 text-card-foreground">
                   {ticket.subject}
                 </h2>
 
-                <p className="mt-1 text-[10px] text-slate-400">
+                <p className="mt-1 text-[10px] text-muted-foreground">
                   {ticket.category} • opened{" "}
                   {formatRelativeTime(ticket.createdAt)}
                 </p>
@@ -1729,14 +1729,14 @@ function TicketDrawer({
               <button
                 type="button"
                 onClick={onClose}
-                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-100"
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border bg-card text-muted-foreground transition hover:bg-muted"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
           </div>
 
-          <div className="grid gap-3 border-b border-slate-100 p-4 sm:grid-cols-3">
+          <div className="grid gap-3 border-b border-border p-4 sm:grid-cols-3">
             <ContextCard
               label="Customer"
               value={ticket.customer.name}
@@ -1765,7 +1765,7 @@ function TicketDrawer({
             />
           </div>
 
-          <div className="border-b border-slate-100 p-4">
+          <div className="border-b border-border p-4">
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
               <DrawerSelect
                 label="Status"
@@ -1814,7 +1814,7 @@ function TicketDrawer({
               />
 
               <label>
-                <span className="mb-1 block text-[8px] font-black uppercase tracking-[0.12em] text-slate-400">
+                <span className="mb-1 block text-[8px] font-black uppercase tracking-[0.12em] text-muted-foreground">
                   Owner
                 </span>
                 <select
@@ -1835,7 +1835,7 @@ function TicketDrawer({
                       "Ticket owner updated."
                     )
                   }
-                  className="h-10 w-full rounded-xl border border-slate-200 bg-white px-2 text-[10px] font-bold text-[#173F6D] outline-none disabled:opacity-50"
+                  className="h-10 w-full rounded-xl border border-border bg-card px-2 text-[10px] font-bold text-indigo-700 dark:text-indigo-300 outline-none disabled:opacity-50"
                 >
                   <option value="">
                     Unassigned
@@ -1871,7 +1871,7 @@ function TicketDrawer({
                     "Ticket escalated."
                   );
                 }}
-                className="mt-auto h-10 rounded-xl border border-amber-200 bg-amber-50 px-3 text-[10px] font-black text-amber-700 transition hover:bg-amber-100 disabled:opacity-50"
+                className="mt-auto h-10 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/40 px-3 text-[10px] font-black text-amber-700 transition hover:bg-amber-100 disabled:opacity-50"
               >
                 Escalate
               </button>
@@ -1906,7 +1906,7 @@ function TicketDrawer({
             </div>
           </div>
 
-          <div className="border-b border-slate-100 px-4 pt-3">
+          <div className="border-b border-border px-4 pt-3">
             <div className="flex gap-1">
               {(["conversation", "activity"] as const).map(
                 (item) => (
@@ -1916,8 +1916,8 @@ function TicketDrawer({
                     onClick={() => setTab(item)}
                     className={`border-b-2 px-3 pb-2 text-[10px] font-black capitalize transition ${
                       tab === item
-                        ? "border-[#1F5EA8] text-[#1F5EA8]"
-                        : "border-transparent text-slate-400 hover:text-slate-600"
+                        ? "border-[#1F5EA8] text-indigo-600 dark:text-indigo-400"
+                        : "border-transparent text-muted-foreground hover:text-muted-foreground"
                     }`}
                   >
                     {item}
@@ -1927,26 +1927,26 @@ function TicketDrawer({
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto bg-[#FBFDFF] p-4 md:p-5">
+          <div className="flex-1 overflow-y-auto bg-muted p-4 md:p-5">
             {tab === "conversation" ? (
               <div className="space-y-4">
-                <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
-                  <p className="text-[9px] font-black uppercase tracking-[0.13em] text-[#1F5EA8]">
+                <div className="rounded-2xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/40/60 p-4">
+                  <p className="text-[9px] font-black uppercase tracking-[0.13em] text-indigo-600 dark:text-indigo-400">
                     Customer issue
                   </p>
-                  <p className="mt-2 text-xs leading-6 text-slate-600">
+                  <p className="mt-2 text-xs leading-6 text-muted-foreground">
                     {ticket.description}
                   </p>
 
                   {ticket.relatedReference && (
-                    <p className="mt-3 text-[10px] font-bold text-[#173F6D]">
+                    <p className="mt-3 text-[10px] font-bold text-indigo-700 dark:text-indigo-300">
                       Reference: {ticket.relatedReference}
                     </p>
                   )}
                 </div>
 
                 {ticket.messages.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-6 text-center text-xs text-slate-400">
+                  <div className="rounded-2xl border border-dashed border-border bg-card p-6 text-center text-xs text-muted-foreground">
                     No conversation messages yet.
                   </div>
                 ) : (
@@ -2010,21 +2010,21 @@ function TicketDrawer({
             ) : (
               <div className="space-y-3">
                 {ticket.activity.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-6 text-center text-xs text-slate-400">
+                  <div className="rounded-2xl border border-dashed border-border bg-card p-6 text-center text-xs text-muted-foreground">
                     No activity recorded yet.
                   </div>
                 ) : (
                   ticket.activity.map((item) => (
                     <div
                       key={item.id}
-                      className="flex gap-3 rounded-2xl border border-slate-100 bg-white p-4"
+                      className="flex gap-3 rounded-2xl border border-border bg-card p-4"
                     >
-                      <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#1F5EA8]" />
+                      <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-indigo-600" />
                       <div>
-                        <p className="text-xs font-black text-[#0F2745]">
+                        <p className="text-xs font-black text-card-foreground">
                           {item.summary}
                         </p>
-                        <p className="mt-1 text-[9px] text-slate-400">
+                        <p className="mt-1 text-[9px] text-muted-foreground">
                           {item.actorName} •{" "}
                           {formatRelativeTime(item.createdAt)}
                         </p>
@@ -2053,18 +2053,18 @@ function ContextCard({
   icon: React.ElementType;
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-slate-100 bg-white p-3">
-      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-[#1F5EA8]">
+    <div className="flex items-center gap-3 rounded-2xl border border-border bg-card p-3">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400">
         <Icon className="h-4 w-4" />
       </div>
       <div className="min-w-0">
-        <p className="text-[8px] font-black uppercase tracking-[0.12em] text-slate-400">
+        <p className="text-[8px] font-black uppercase tracking-[0.12em] text-muted-foreground">
           {label}
         </p>
-        <p className="mt-0.5 truncate text-[10px] font-black text-[#0F2745]">
+        <p className="mt-0.5 truncate text-[10px] font-black text-card-foreground">
           {value}
         </p>
-        <p className="mt-0.5 truncate text-[9px] text-slate-400">
+        <p className="mt-0.5 truncate text-[9px] text-muted-foreground">
           {subvalue}
         </p>
       </div>
@@ -2087,7 +2087,7 @@ function DrawerSelect({
 }) {
   return (
     <label>
-      <span className="mb-1 block text-[8px] font-black uppercase tracking-[0.12em] text-slate-400">
+      <span className="mb-1 block text-[8px] font-black uppercase tracking-[0.12em] text-muted-foreground">
         {label}
       </span>
       <select
@@ -2096,7 +2096,7 @@ function DrawerSelect({
         onChange={(event) =>
           onChange(event.target.value)
         }
-        className="h-10 w-full rounded-xl border border-slate-200 bg-white px-2 text-[10px] font-bold text-[#173F6D] outline-none disabled:opacity-50"
+        className="h-10 w-full rounded-xl border border-border bg-card px-2 text-[10px] font-bold text-indigo-700 dark:text-indigo-300 outline-none disabled:opacity-50"
       >
         {options.map((option) => (
           <option
@@ -2132,10 +2132,10 @@ function MessageBubble({
       <div
         className={`max-w-[88%] rounded-2xl p-3.5 ${
           isInternal
-            ? "border border-amber-100 bg-amber-50"
+            ? "border border-amber-200 dark:border-amber-800 bg-amber-50"
             : isAdmin
-              ? "bg-[#173F6D] text-white"
-              : "border border-slate-200 bg-white text-[#0F2745]"
+              ? "bg-indigo-950 text-white"
+              : "border border-border bg-card text-card-foreground"
         }`}
       >
         <div className="flex items-center gap-2">
@@ -2145,14 +2145,14 @@ function MessageBubble({
                 ? "text-amber-700"
                 : isAdmin
                   ? "text-cyan-100"
-                  : "text-[#1F5EA8]"
+                  : "text-indigo-600 dark:text-indigo-400"
             }`}
           >
             {message.authorName}
           </p>
 
           {isInternal && (
-            <span className="rounded-full bg-white px-2 py-0.5 text-[8px] font-black text-amber-700">
+            <span className="rounded-full bg-card px-2 py-0.5 text-[8px] font-black text-amber-700">
               INTERNAL
             </span>
           )}
@@ -2162,7 +2162,7 @@ function MessageBubble({
           className={`mt-2 whitespace-pre-wrap text-xs leading-5 ${
             isAdmin && !isInternal
               ? "text-blue-50"
-              : "text-slate-600"
+              : "text-muted-foreground"
           }`}
         >
           {message.body}
@@ -2172,7 +2172,7 @@ function MessageBubble({
           className={`mt-2 text-[8px] ${
             isAdmin && !isInternal
               ? "text-blue-100/50"
-              : "text-slate-400"
+              : "text-muted-foreground"
           }`}
         >
           {formatRelativeTime(message.createdAt)}
@@ -2207,15 +2207,15 @@ function Composer({
     <div
       className={`rounded-2xl border p-4 ${
         internal
-          ? "border-amber-100 bg-amber-50/50"
-          : "border-blue-100 bg-white"
+          ? "border-amber-200 dark:border-amber-800 bg-amber-50/50"
+          : "border-indigo-200 dark:border-indigo-800 bg-card"
       }`}
     >
       <p
         className={`text-[9px] font-black uppercase tracking-[0.12em] ${
           internal
             ? "text-amber-700"
-            : "text-[#1F5EA8]"
+            : "text-indigo-600 dark:text-indigo-400"
         }`}
       >
         {title}
@@ -2229,11 +2229,11 @@ function Composer({
         placeholder={placeholder}
         rows={3}
         maxLength={4000}
-        className="mt-3 w-full resize-none rounded-xl border border-slate-200 bg-white p-3 text-xs leading-5 text-[#0F2745] outline-none transition placeholder:text-slate-400 focus:border-blue-300"
+        className="mt-3 w-full resize-none rounded-xl border border-border bg-card p-3 text-xs leading-5 text-card-foreground outline-none transition placeholder:text-muted-foreground focus:border-indigo-400"
       />
 
       <div className="mt-3 flex items-center justify-between gap-3">
-        <span className="text-[8px] text-slate-400">
+        <span className="text-[8px] text-muted-foreground">
           {value.length}/4000
         </span>
 
@@ -2244,7 +2244,7 @@ function Composer({
           className={`inline-flex h-9 items-center gap-2 rounded-xl px-3 text-[10px] font-black transition disabled:cursor-not-allowed disabled:opacity-50 ${
             internal
               ? "bg-amber-600 text-white hover:bg-amber-700"
-              : "bg-[#1F5EA8] text-white hover:bg-[#173F6D]"
+              : "bg-indigo-600 text-white hover:bg-indigo-950"
           }`}
         >
           {busy ? (
@@ -2361,23 +2361,23 @@ function CreateTicketModal({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[80] flex items-center justify-center bg-[#0A2038]/45 p-4 backdrop-blur-[2px]"
+        className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-[2px]"
       >
         <motion.div
           initial={{ opacity: 0, scale: 0.96, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.97 }}
-          className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[28px] border border-[#DCE7F0] bg-white shadow-2xl"
+          className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-[28px] border border-border bg-card shadow-2xl"
         >
-          <div className="flex items-start justify-between border-b border-slate-100 bg-[#F8FBFE] p-5">
+          <div className="flex items-start justify-between border-b border-border bg-muted p-5">
             <div>
-              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-[#1F5EA8]">
+              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-indigo-600 dark:text-indigo-400">
                 Admin Support
               </p>
-              <h2 className="mt-1 text-xl font-black text-[#0F2745]">
+              <h2 className="mt-1 text-xl font-black text-card-foreground">
                 Create Support Ticket
               </h2>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-muted-foreground">
                 Open an auditable case for an existing customer.
               </p>
             </div>
@@ -2385,7 +2385,7 @@ function CreateTicketModal({
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-500"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-card text-muted-foreground"
             >
               <X className="h-4 w-4" />
             </button>
@@ -2411,7 +2411,7 @@ function CreateTicketModal({
             />
 
             <label>
-              <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+              <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.12em] text-muted-foreground">
                 Category
               </span>
               <select
@@ -2422,7 +2422,7 @@ function CreateTicketModal({
                     event.target.value as TicketCategory
                   )
                 }
-                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-[#173F6D] outline-none"
+                className="h-11 w-full rounded-xl border border-border bg-card px-3 text-xs font-bold text-indigo-700 dark:text-indigo-300 outline-none"
               >
                 {CATEGORY_OPTIONS.filter(
                   (item) => item !== "All"
@@ -2438,7 +2438,7 @@ function CreateTicketModal({
             </label>
 
             <label>
-              <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+              <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.12em] text-muted-foreground">
                 Priority
               </span>
               <select
@@ -2449,7 +2449,7 @@ function CreateTicketModal({
                     event.target.value as TicketPriority
                   )
                 }
-                className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-[#173F6D] outline-none"
+                className="h-11 w-full rounded-xl border border-border bg-card px-3 text-xs font-bold text-indigo-700 dark:text-indigo-300 outline-none"
               >
                 {PRIORITY_OPTIONS.filter(
                   (item) => item !== "All"
@@ -2476,7 +2476,7 @@ function CreateTicketModal({
             </div>
 
             <label className="md:col-span-2">
-              <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+              <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.12em] text-muted-foreground">
                 Description
               </span>
               <textarea
@@ -2490,23 +2490,23 @@ function CreateTicketModal({
                 rows={5}
                 maxLength={4000}
                 placeholder="Describe the customer problem and any verified context..."
-                className="w-full resize-none rounded-xl border border-slate-200 bg-white p-3 text-xs leading-5 text-[#0F2745] outline-none focus:border-blue-300"
+                className="w-full resize-none rounded-xl border border-border bg-card p-3 text-xs leading-5 text-card-foreground outline-none focus:border-indigo-400"
               />
             </label>
 
             {error && (
-              <div className="md:col-span-2 rounded-xl border border-rose-100 bg-rose-50 p-3 text-[10px] font-semibold text-rose-600">
+              <div className="md:col-span-2 rounded-xl border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 p-3 text-[10px] font-semibold text-rose-600">
                 {error}
               </div>
             )}
           </div>
 
-          <div className="flex justify-end gap-2 border-t border-slate-100 p-4">
+          <div className="flex justify-end gap-2 border-t border-border p-4">
             <button
               type="button"
               disabled={busy}
               onClick={onClose}
-              className="h-10 rounded-xl px-4 text-xs font-black text-slate-500 transition hover:bg-slate-100"
+              className="h-10 rounded-xl px-4 text-xs font-black text-muted-foreground transition hover:bg-muted"
             >
               Cancel
             </button>
@@ -2515,7 +2515,7 @@ function CreateTicketModal({
               type="button"
               disabled={busy}
               onClick={() => void submit()}
-              className="inline-flex h-10 items-center gap-2 rounded-xl bg-[#1F5EA8] px-4 text-xs font-black text-white transition hover:bg-[#173F6D] disabled:opacity-50"
+              className="inline-flex h-10 items-center gap-2 rounded-xl bg-indigo-600 px-4 text-xs font-black text-white transition hover:bg-indigo-950 disabled:opacity-50"
             >
               {busy ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -2544,7 +2544,7 @@ function FormField({
 }) {
   return (
     <label>
-      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.12em] text-muted-foreground">
         {label}
       </span>
 
@@ -2554,7 +2554,7 @@ function FormField({
           onChange(event.target.value)
         }
         placeholder={placeholder}
-        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-xs text-[#0F2745] outline-none transition placeholder:text-slate-400 focus:border-blue-300"
+        className="h-11 w-full rounded-xl border border-border bg-card px-3 text-xs text-card-foreground outline-none transition placeholder:text-muted-foreground focus:border-indigo-400"
       />
     </label>
   );
@@ -2567,13 +2567,13 @@ function PriorityBadge({
 }) {
   const tone: Record<TicketPriority, string> = {
     Urgent:
-      "border-rose-100 bg-rose-50 text-rose-600",
+      "border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 text-rose-600",
     High:
-      "border-amber-100 bg-amber-50 text-amber-700",
+      "border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-700",
     Normal:
-      "border-blue-100 bg-blue-50 text-blue-600",
+      "border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/40 text-blue-600",
     Low:
-      "border-slate-200 bg-slate-50 text-slate-500",
+      "border-border bg-muted text-muted-foreground",
   };
 
   return (
@@ -2592,15 +2592,15 @@ function StatusBadge({
 }) {
   const tone: Record<TicketStatus, string> = {
     Open:
-      "border-blue-100 bg-blue-50 text-blue-600",
+      "border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/40 text-blue-600",
     "In Progress":
-      "border-cyan-100 bg-cyan-50 text-cyan-700",
+      "border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700",
     "Waiting for Customer":
-      "border-amber-100 bg-amber-50 text-amber-700",
+      "border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-700",
     Escalated:
-      "border-rose-100 bg-rose-50 text-rose-600",
+      "border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 text-rose-600",
     Resolved:
-      "border-emerald-100 bg-emerald-50 text-emerald-700",
+      "border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700",
   };
 
   return (
@@ -2621,7 +2621,7 @@ function SlaBadge({
 }) {
   if (breached || minutes <= 0) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full border border-rose-100 bg-rose-50 px-2.5 py-1 text-[9px] font-black text-rose-600">
+      <span className="inline-flex items-center gap-1 rounded-full border border-rose-200 dark:border-rose-800 bg-rose-50 dark:bg-rose-950/40 px-2.5 py-1 text-[9px] font-black text-rose-600">
         <AlertCircle className="h-3 w-3" />
         Breached
       </span>
@@ -2634,8 +2634,8 @@ function SlaBadge({
     <span
       className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[9px] font-black ${
         dueSoon
-          ? "border-amber-100 bg-amber-50 text-amber-700"
-          : "border-slate-200 bg-slate-50 text-slate-600"
+          ? "border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-700"
+          : "border-border bg-muted text-muted-foreground"
       }`}
     >
       <Clock3 className="h-3 w-3" />
