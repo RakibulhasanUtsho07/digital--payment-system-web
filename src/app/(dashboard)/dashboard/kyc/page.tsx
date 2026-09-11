@@ -3,7 +3,12 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
+  useRef,
   useState,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
 } from "react";
 
 import {
@@ -19,1137 +24,685 @@ import {
   Camera,
   Check,
   CheckCircle2,
-  ChevronRight,
   Clock3,
-  CreditCard,
   FileCheck2,
-  FileImage,
-  FileText,
   Fingerprint,
-  IdCard,
   Loader2,
-  LockKeyhole,
   RefreshCw,
   ScanFace,
   ShieldCheck,
   UploadCloud,
-  X,
+  XCircle,
 } from "lucide-react";
 
-import { apiClient } from "@/lib/api/client";
+import {
+  createLivenessChallenge,
+  getCurrentEKYC,
+  submitEKYC,
+} from "@/lib/api/ekycApi";
 
-/* =========================================================
-   TYPES
-========================================================= */
+import {
+  getPasskeys,
+  registerDevicePasskey,
+  type PasskeySummary,
+} from "@/lib/api/passkeyApi";
 
-type KYCStatus =
-  | "not_started"
-  | "pending"
-  | "under_review"
-  | "verified"
-  | "rejected";
-
-type DocumentType =
-  | "nid"
-  | "passport"
-  | "driving_license";
-
-interface KYCRecord {
-  _id?: string;
-  userId?: string;
-
-  documentType?: DocumentType;
-
-  documentNumber?: string;
-
-  provider?:
-    | "manual"
-    | "stripe"
-    | "other";
-
-  status: KYCStatus;
-
-  rejectionReason?: string;
-
-  submittedAt?: string;
-
-  verifiedAt?: string;
-
-  createdAt?: string;
-
-  updatedAt?: string;
-}
-
-interface KYCResponse {
-  success: boolean;
-
-  message?: string;
-
-  status?: KYCStatus;
-
-  kyc?: Partial<KYCRecord>;
-
-  data?: Partial<KYCRecord>;
-}
-
-type WizardStep =
-  | 1
-  | 2
-  | 3;
+import type {
+  ActiveLivenessAction,
+  CompletedLivenessCapture,
+  EKYCStatus,
+  EKYCVerification,
+} from "@/types/ekyc";
 
 /* =========================================================
    FILE CONFIG
 ========================================================= */
 
-const MAX_FILE_SIZE =
-  1 * 1024 * 1024;
+const MAX_FILE_BYTES = 1024 * 1024;
+const TARGET_FILE_BYTES = 800 * 1024;
 
-const TARGET_COMPRESSED_SIZE =
-  700 * 1024;
-
-const ALLOWED_FILE_TYPES = [
+const allowedTypes = new Set([
   "image/jpeg",
   "image/png",
   "image/webp",
-];
+]);
 
 /* =========================================================
-   IMAGE HELPERS
+   FORM STATE
 ========================================================= */
 
-const loadImage = (
-  objectUrl: string
-): Promise<HTMLImageElement> => {
-  return new Promise(
-    (
-      resolve,
-      reject
-    ) => {
-      const image =
-        new Image();
+interface FormState {
+  claimedName: string;
+  dateOfBirth: string;
+  nid: string;
+  frontImage: File | null;
+  backImage: File | null;
+  selfieImage: File | null;
+  liveness: CompletedLivenessCapture | null;
+}
 
-      image.onload = () =>
-        resolve(image);
-
-      image.onerror = () =>
-        reject(
-          new Error(
-            "Unable to read the selected image."
-          )
-        );
-
-      image.src =
-        objectUrl;
-    }
-  );
+const emptyForm: FormState = {
+  claimedName: "",
+  dateOfBirth: "",
+  nid: "",
+  frontImage: null,
+  backImage: null,
+  selfieImage: null,
+  liveness: null,
 };
 
-const canvasToBlob = (
-  canvas: HTMLCanvasElement,
-  quality: number
-): Promise<Blob> => {
-  return new Promise(
+/* =========================================================
+   AGE
+========================================================= */
+
+function ageFromDOB(value: string): number {
+  const birth = new Date(`${value}T00:00:00Z`);
+
+  if (!Number.isFinite(birth.getTime())) {
+    return -1;
+  }
+
+  const today = new Date();
+
+  let age =
+    today.getUTCFullYear() -
+    birth.getUTCFullYear();
+
+  if (
+    today.getUTCMonth() <
+      birth.getUTCMonth() ||
     (
-      resolve,
-      reject
-    ) => {
-      canvas.toBlob(
-        (blob) => {
-          if (!blob) {
-            reject(
-              new Error(
-                "Image compression failed."
-              )
-            );
+      today.getUTCMonth() ===
+        birth.getUTCMonth() &&
+      today.getUTCDate() <
+        birth.getUTCDate()
+    )
+  ) {
+    age -= 1;
+  }
 
-            return;
-          }
+  return age;
+}
 
-          resolve(blob);
-        },
-        "image/jpeg",
-        quality
-      );
-    }
+/* =========================================================
+   IMAGE COMPRESSION
+========================================================= */
+
+async function compressImage(
+  file: File,
+): Promise<File> {
+  if (!allowedTypes.has(file.type)) {
+    throw new Error(
+      "Only JPG, PNG and WEBP images are supported.",
+    );
+  }
+
+  if (file.size <= TARGET_FILE_BYTES) {
+    return file;
+  }
+
+  const bitmap =
+    await createImageBitmap(file);
+
+  const scale = Math.min(
+    1,
+    1800 /
+      Math.max(
+        bitmap.width,
+        bitmap.height,
+      ),
   );
-};
 
-const compressKYCImage =
-  async (
-    file: File
-  ): Promise<File> => {
-    if (
-      !ALLOWED_FILE_TYPES.includes(
-        file.type
-      )
-    ) {
-      throw new Error(
-        "Only JPG, PNG and WEBP images are supported."
-      );
-    }
+  const canvas =
+    document.createElement("canvas");
 
-    const objectUrl =
-      URL.createObjectURL(
-        file
-      );
+  canvas.width = Math.max(
+    1,
+    Math.round(
+      bitmap.width * scale,
+    ),
+  );
 
-    try {
-      const image =
-        await loadImage(
-          objectUrl
-        );
+  canvas.height = Math.max(
+    1,
+    Math.round(
+      bitmap.height * scale,
+    ),
+  );
 
-      const MAX_DIMENSION =
-        1400;
+  const context =
+    canvas.getContext("2d");
 
-      const scale =
-        Math.min(
-          MAX_DIMENSION /
-            image.naturalWidth,
-          MAX_DIMENSION /
-            image.naturalHeight,
-          1
-        );
+  if (!context) {
+    bitmap.close();
 
-      const width =
-        Math.max(
-          1,
-          Math.round(
-            image.naturalWidth *
-              scale
-          )
-        );
+    throw new Error(
+      "Your browser could not optimize the selected image.",
+    );
+  }
 
-      const height =
-        Math.max(
-          1,
-          Math.round(
-            image.naturalHeight *
-              scale
-          )
-        );
+  context.drawImage(
+    bitmap,
+    0,
+    0,
+    canvas.width,
+    canvas.height,
+  );
 
-      const canvas =
-        document.createElement(
-          "canvas"
-        );
+  bitmap.close();
 
-      canvas.width =
-        width;
+  let quality = 0.88;
+  let blob: Blob | null = null;
 
-      canvas.height =
-        height;
-
-      const context =
-        canvas.getContext(
-          "2d"
-        );
-
-      if (!context) {
-        throw new Error(
-          "Unable to process the selected image."
-        );
-      }
-
-      context.fillStyle =
-        "#ffffff";
-
-      context.fillRect(
-        0,
-        0,
-        width,
-        height
-      );
-
-      context.drawImage(
-        image,
-        0,
-        0,
-        width,
-        height
-      );
-
-      let quality =
-        0.82;
-
-      let blob =
-        await canvasToBlob(
-          canvas,
-          quality
-        );
-
-      while (
-        blob.size >
-          TARGET_COMPRESSED_SIZE &&
-        quality > 0.42
-      ) {
-        quality -=
-          0.08;
-
-        blob =
-          await canvasToBlob(
-            canvas,
-            quality
-          );
-      }
-
-      if (
-        blob.size >
-        MAX_FILE_SIZE
-      ) {
-        throw new Error(
-          "This image is still too large after optimization. Please choose a smaller image."
-        );
-      }
-
-      const safeBaseName =
-        file.name
-          .replace(
-            /\.[^/.]+$/,
-            ""
-          )
-          .replace(
-            /[^a-zA-Z0-9-_]/g,
-            "-"
-          ) ||
-        "kyc-image";
-
-      return new File(
-        [blob],
-        `${safeBaseName}.jpg`,
-        {
-          type:
+  while (quality >= 0.5) {
+    blob =
+      await new Promise<Blob | null>(
+        (resolve) => {
+          canvas.toBlob(
+            resolve,
             "image/jpeg",
+            quality,
+          );
+        },
+      );
 
-          lastModified:
-            Date.now(),
-        }
-      );
-    } finally {
-      URL.revokeObjectURL(
-        objectUrl
-      );
+    if (
+      blob &&
+      blob.size <= TARGET_FILE_BYTES
+    ) {
+      break;
     }
+
+    quality -= 0.08;
+  }
+
+  if (
+    !blob ||
+    blob.size > MAX_FILE_BYTES
+  ) {
+    throw new Error(
+      "The image is still larger than 1 MB after optimization.",
+    );
+  }
+
+  return new File(
+    [blob],
+    `${file.name.replace(
+      /\.[^.]+$/,
+      "",
+    )}.jpg`,
+    {
+      type: "image/jpeg",
+      lastModified: Date.now(),
+    },
+  );
+}
+
+/* =========================================================
+   REJECTION MESSAGE
+========================================================= */
+
+function reasonMessage(
+  reasons: string[],
+): string {
+  const reason = reasons[0];
+
+  const messages: Record<string, string> = {
+    AGE_UNDER_18:
+      "The applicant must be at least 18 years old.",
+
+    NID_MISMATCH:
+      "The submitted NID did not match the authoritative identity record.",
+
+    DOB_MISMATCH:
+      "The date of birth did not match the identity record.",
+
+    OCR_NID_MISMATCH:
+      "The NID number could not be confirmed from the uploaded card.",
+
+    OCR_DOB_MISMATCH:
+      "The date of birth could not be confirmed from the uploaded card.",
+
+    FACE_SCORE_REJECTED:
+      "The selfie could not be matched confidently with the NID photograph.",
+
+    LIVENESS_FAILED:
+      "The live-person check was not completed successfully.",
+
+    NID_ALREADY_VERIFIED:
+      "This NID is already linked to another verified account.",
+
+    ADMIN_OVERRIDE:
+      "The verification was declined after manual review.",
   };
 
-/* =========================================================
-   DOCUMENT OPTIONS
-========================================================= */
-
-const documentOptions = [
-  {
-    value:
-      "nid" as DocumentType,
-
-    title:
-      "National ID",
-
-    description:
-      "Bangladesh National Identity Card",
-
-    icon:
-      IdCard,
-  },
-
-  {
-    value:
-      "passport" as DocumentType,
-
-    title:
-      "Passport",
-
-    description:
-      "Government issued passport",
-
-    icon:
-      FileText,
-  },
-
-  {
-    value:
-      "driving_license" as DocumentType,
-
-    title:
-      "Driving License",
-
-    description:
-      "Government issued driving license",
-
-    icon:
-      CreditCard,
-  },
-];
-
-/* =========================================================
-   RESPONSE NORMALIZER
-========================================================= */
-
-function normalizeKYCResponse(
-  response: KYCResponse
-): KYCRecord {
-  const record =
-    response.kyc ??
-    response.data ??
-    {};
-
-  return {
-    ...record,
-
-    status:
-      record.status ??
-      response.status ??
-      "not_started",
-  } as KYCRecord;
+  return reason
+    ? messages[reason] ||
+        "The verification could not be approved."
+    : "The verification could not be approved.";
 }
+
+/* =========================================================
+   STATUS CONTENT
+========================================================= */
+
+const statusContent: Record<
+  EKYCStatus,
+  {
+    title: string;
+    description: string;
+    icon: typeof Clock3;
+    tone: string;
+  }
+> = {
+  QUEUED: {
+    title: "Verification queued",
+    description:
+      "Your encrypted application is waiting for automated processing.",
+    icon: Clock3,
+    tone:
+      "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-800/60 dark:bg-indigo-950/30 dark:text-indigo-300",
+  },
+
+  PROCESSING: {
+    title: "Identity checks in progress",
+    description:
+      "OCR, liveness, face matching, duplicate detection and compliance screening are running.",
+    icon: ScanFace,
+    tone:
+      "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800/60 dark:bg-violet-950/30 dark:text-violet-300",
+  },
+
+  PENDING_MANUAL_REVIEW: {
+    title: "Manual review required",
+    description:
+      "A protected reviewer will inspect the verification signals before making a final decision.",
+    icon: ShieldCheck,
+    tone:
+      "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-300",
+  },
+
+  VERIFIED: {
+    title: "Identity verified",
+    description:
+      "Your advanced e-KYC verification has been completed successfully.",
+    icon: BadgeCheck,
+    tone:
+      "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/30 dark:text-emerald-300",
+  },
+
+  REJECTED: {
+    title: "Verification not approved",
+    description:
+      "Review the reason below, correct the information and submit a new attempt.",
+    icon: XCircle,
+    tone:
+      "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800/60 dark:bg-rose-950/30 dark:text-rose-300",
+  },
+};
 
 /* =========================================================
    PAGE
 ========================================================= */
 
-export default function KYCPage() {
+export default function AdvancedKYCPage() {
   const [
-    kyc,
-    setKYC,
-  ] = useState<KYCRecord | null>(
-    null
-  );
+    verification,
+    setVerification,
+  ] =
+    useState<EKYCVerification | null>(
+      null,
+    );
 
   const [
-    loading,
-    setLoading,
-  ] = useState(true);
-
-  const [
-    refreshing,
-    setRefreshing,
-  ] = useState(false);
-
-  const [
-    starting,
-    setStarting,
-  ] = useState(false);
-
-  const [
-    submitting,
-    setSubmitting,
-  ] = useState(false);
-
-  const [
-    formOpen,
-    setFormOpen,
-  ] = useState(false);
+    form,
+    setForm,
+  ] =
+    useState<FormState>(
+      emptyForm,
+    );
 
   const [
     step,
     setStep,
-  ] = useState<WizardStep>(
-    1
-  );
+  ] =
+    useState<1 | 2 | 3 | 4>(1);
 
   const [
-    documentType,
-    setDocumentType,
-  ] = useState<
-    DocumentType | ""
-  >("");
+    loading,
+    setLoading,
+  ] =
+    useState(true);
 
   const [
-    documentNumber,
-    setDocumentNumber,
-  ] = useState("");
+    refreshing,
+    setRefreshing,
+  ] =
+    useState(false);
 
   const [
-    frontImage,
-    setFrontImage,
-  ] = useState<File | null>(
-    null
-  );
+    submitting,
+    setSubmitting,
+  ] =
+    useState(false);
 
   const [
-    backImage,
-    setBackImage,
-  ] = useState<File | null>(
-    null
-  );
+    processingFile,
+    setProcessingFile,
+  ] =
+    useState<string | null>(null);
 
   const [
-    selfieImage,
-    setSelfieImage,
-  ] = useState<File | null>(
-    null
-  );
-
-  const [
-    errorMessage,
-    setErrorMessage,
-  ] = useState("");
-
-  const [
-    successMessage,
-    setSuccessMessage,
-  ] = useState("");
+    error,
+    setError,
+  ] =
+    useState("");
 
   /* =======================================================
-     LOAD KYC
-  ======================================================== */
+     LOAD STATUS
+  ====================================================== */
 
-  const loadKYC =
+  const loadStatus =
     useCallback(
-      async (
-        silent = false
-      ) => {
+      async (silent = false) => {
         try {
           if (silent) {
-            setRefreshing(
-              true
-            );
+            setRefreshing(true);
           } else {
-            setLoading(
-              true
-            );
+            setLoading(true);
           }
 
-          setErrorMessage("");
+          const current =
+            await getCurrentEKYC();
 
-          const response =
-            await apiClient<KYCResponse>(
-              "/kyc/status"
-            );
-
-          if (
-            !response.success
-          ) {
-            throw new Error(
-              response.message ||
-                "Unable to load KYC status."
-            );
-          }
-
-          const normalized =
-            normalizeKYCResponse(
-              response
-            );
-
-          setKYC(
-            normalized
-          );
-
-          if (
-            normalized.documentType
-          ) {
-            setDocumentType(
-              normalized.documentType
-            );
-          }
-
-          if (
-            normalized.documentNumber
-          ) {
-            setDocumentNumber(
-              normalized.documentNumber
-            );
-          }
-        } catch (
-          error
-        ) {
-          console.error(
-            "KYC status error:",
-            error
-          );
-
-          setErrorMessage(
-            error instanceof Error
-              ? error.message
-              : "Unable to load KYC information."
+          setVerification(current);
+          setError("");
+        } catch (loadError) {
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : "Unable to load e-KYC status.",
           );
         } finally {
-          setLoading(
-            false
-          );
-
-          setRefreshing(
-            false
-          );
+          setLoading(false);
+          setRefreshing(false);
         }
       },
-      []
+      [],
     );
 
+  /* =======================================================
+     INITIAL LOAD
+  ====================================================== */
+
   useEffect(() => {
-    void loadKYC();
-  }, [
-    loadKYC,
-  ]);
+    void loadStatus();
+  }, [loadStatus]);
 
   /* =======================================================
-     SUCCESS AUTO CLEAR
-  ======================================================== */
+     POLLING
+  ====================================================== */
 
   useEffect(() => {
-    if (!successMessage) {
+    if (
+      !verification ||
+      ![
+        "QUEUED",
+        "PROCESSING",
+      ].includes(
+        verification.status,
+      )
+    ) {
       return;
     }
 
-    const timer =
-      window.setTimeout(
+    const interval =
+      window.setInterval(
         () => {
-          setSuccessMessage("");
+          void loadStatus(true);
         },
-        4000
+        4000,
       );
 
     return () => {
-      window.clearTimeout(
-        timer
+      window.clearInterval(
+        interval,
       );
     };
   }, [
-    successMessage,
+    verification,
+    loadStatus,
   ]);
 
   /* =======================================================
-     START KYC
-  ======================================================== */
+     IDENTITY VALIDATION
+  ====================================================== */
 
-  const handleStartKYC =
-    async () => {
-      try {
-        setStarting(true);
-        setErrorMessage("");
+  const validateIdentity = () => {
+    const nid =
+      form.nid.replace(
+        /[\s-]/g,
+        "",
+      );
 
-        const response =
-          await apiClient<KYCResponse>(
-            "/kyc/start",
-            {
-              method:
-                "POST",
-            }
-          );
+    if (
+      form.claimedName.trim().length <
+      2
+    ) {
+      return "Enter your full name exactly as it appears on the NID.";
+    }
 
-        if (
-          !response.success
-        ) {
-          throw new Error(
-            response.message ||
-              "Unable to start KYC verification."
-          );
-        }
+    if (!form.dateOfBirth) {
+      return "Select your date of birth.";
+    }
 
-        const normalized =
-          normalizeKYCResponse(
-            response
-          );
+    if (
+      ageFromDOB(
+        form.dateOfBirth,
+      ) < 18
+    ) {
+      return "The applicant must be at least 18 years old.";
+    }
 
-        setKYC(
-          normalized
+    if (
+      ![10, 13, 17].includes(
+        nid.length,
+      ) ||
+      !/^\d+$/.test(nid)
+    ) {
+      return "NID must contain exactly 10, 13, or 17 digits.";
+    }
+
+    return "";
+  };
+
+  /* =======================================================
+     FILE SELECT
+  ====================================================== */
+
+  const selectFile = async (
+    field:
+      | "frontImage"
+      | "backImage"
+      | "selfieImage",
+    file?: File,
+  ) => {
+    if (!file) {
+      return;
+    }
+
+    try {
+      setProcessingFile(field);
+      setError("");
+
+      const optimized =
+        await compressImage(file);
+
+      setForm(
+        (current) => ({
+          ...current,
+          [field]: optimized,
+        }),
+      );
+    } catch (fileError) {
+      setError(
+        fileError instanceof Error
+          ? fileError.message
+          : "Unable to process the image.",
+      );
+    } finally {
+      setProcessingFile(null);
+    }
+  };
+
+  /* =======================================================
+     NEXT STEP
+  ====================================================== */
+
+  const goNext = () => {
+    setError("");
+
+    if (step === 1) {
+      const validationError =
+        validateIdentity();
+
+      if (validationError) {
+        setError(
+          validationError,
         );
-
-        resetForm();
-
-        setFormOpen(
-          true
-        );
-
-        setStep(
-          1
-        );
-      } catch (
-        error
-      ) {
-        console.error(
-          "Start KYC error:",
-          error
-        );
-
-        setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : "Unable to start verification."
-        );
-      } finally {
-        setStarting(
-          false
-        );
+        return;
       }
-    };
 
-  /* =======================================================
-     RESUBMIT
-  ======================================================== */
+      setStep(2);
+      return;
+    }
 
-  const handleResubmit =
-    async () => {
-      resetForm();
-
-      setFormOpen(
-        true
-      );
-
-      setStep(
-        1
-      );
-    };
-
-  /* =======================================================
-     RESET FORM
-  ======================================================== */
-
-  const resetForm =
-    () => {
-      setDocumentType(
-        ""
-      );
-
-      setDocumentNumber(
-        ""
-      );
-
-      setFrontImage(
-        null
-      );
-
-      setBackImage(
-        null
-      );
-
-      setSelfieImage(
-        null
-      );
-
-      setErrorMessage(
-        ""
-      );
-    };
-
-  /* =======================================================
-     STEP 1 VALIDATION
-  ======================================================== */
-
-  const goToDocuments =
-    () => {
-      setErrorMessage("");
-
+    if (step === 2) {
       if (
-        !documentType
+        !form.frontImage ||
+        !form.backImage
       ) {
-        setErrorMessage(
-          "Please select a document type."
+        setError(
+          "Upload clear images of the NID front and back.",
         );
-
         return;
       }
 
+      setStep(3);
+      return;
+    }
+
+    if (step === 3) {
       if (
-        !documentNumber.trim()
+        !form.liveness ||
+        !form.selfieImage
       ) {
-        setErrorMessage(
-          "Please enter your document number."
+        setError(
+          "Complete the live camera challenge before continuing.",
         );
-
         return;
       }
 
-      if (
-        documentNumber.trim()
-          .length < 4
-      ) {
-        setErrorMessage(
-          "Please enter a valid document number."
-        );
-
-        return;
-      }
-
-      setStep(
-        2
-      );
-    };
-
-  /* =======================================================
-     FILE CHANGE
-  ======================================================== */
-
-  const handleFileChange =
-    async (
-      file: File | null,
-      type:
-        | "front"
-        | "back"
-        | "selfie"
-    ) => {
-      if (!file) {
-        return;
-      }
-
-      try {
-        setErrorMessage("");
-
-        if (
-          !ALLOWED_FILE_TYPES.includes(
-            file.type
-          )
-        ) {
-          throw new Error(
-            "Only JPG, PNG and WEBP images are supported."
-          );
-        }
-
-        const optimizedFile =
-          await compressKYCImage(
-            file
-          );
-
-        if (
-          optimizedFile.size >
-          MAX_FILE_SIZE
-        ) {
-          throw new Error(
-            "Optimized image must be less than 1 MB."
-          );
-        }
-
-        if (
-          type === "front"
-        ) {
-          setFrontImage(
-            optimizedFile
-          );
-        }
-
-        if (
-          type === "back"
-        ) {
-          setBackImage(
-            optimizedFile
-          );
-        }
-
-        if (
-          type === "selfie"
-        ) {
-          setSelfieImage(
-            optimizedFile
-          );
-        }
-      } catch (
-        error
-      ) {
-        console.error(
-          "KYC image processing error:",
-          error
-        );
-
-        setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : "Unable to process the selected image."
-        );
-      }
-    };
-
-  /* =======================================================
-     STEP 2 VALIDATION
-  ======================================================== */
-
-  const goToReview =
-    () => {
-      setErrorMessage("");
-
-      if (!frontImage) {
-        setErrorMessage(
-          "Please upload the front side of your document."
-        );
-
-        return;
-      }
-
-      const backRequired =
-        documentType ===
-          "nid" ||
-        documentType ===
-          "driving_license";
-
-      if (
-        backRequired &&
-        !backImage
-      ) {
-        setErrorMessage(
-          "Please upload the back side of your document."
-        );
-
-        return;
-      }
-
-      if (!selfieImage) {
-        setErrorMessage(
-          "Please upload a clear selfie."
-        );
-
-        return;
-      }
-
-      setStep(
-        3
-      );
-    };
+      setStep(4);
+    }
+  };
 
   /* =======================================================
      SUBMIT
-  ======================================================== */
+  ====================================================== */
 
-  const handleSubmit =
+  const submit =
     async () => {
       if (
-        !documentType ||
-        !documentNumber.trim() ||
-        !frontImage ||
-        !selfieImage
+        !form.frontImage ||
+        !form.backImage ||
+        !form.selfieImage ||
+        !form.liveness
       ) {
-        setErrorMessage(
-          "Please complete all required information."
-        );
-
-        return;
-      }
-
-      const backRequired =
-        documentType ===
-          "nid" ||
-        documentType ===
-          "driving_license";
-
-      if (
-        backRequired &&
-        !backImage
-      ) {
-        setErrorMessage(
-          "Back image is required for this document type."
-        );
-
-        return;
-      }
-
-      const totalUploadSize =
-        frontImage.size +
-        (backImage?.size ?? 0) +
-        selfieImage.size;
-
-      if (
-        totalUploadSize >
-        3 * 1024 * 1024
-      ) {
-        setErrorMessage(
-          "The total upload is too large. Please re-select the images so they can be optimized again."
-        );
-
         return;
       }
 
       try {
-        setSubmitting(
-          true
-        );
-
-        setErrorMessage("");
-
-        const formData =
-          new FormData();
-
-        formData.append(
-          "documentType",
-          documentType
-        );
-
-        formData.append(
-          "documentNumber",
-          documentNumber.trim()
-        );
-
-        formData.append(
-          "frontImage",
-          frontImage
-        );
-
-        if (backImage) {
-          formData.append(
-            "backImage",
-            backImage
-          );
-        }
-
-        formData.append(
-          "selfieImage",
-          selfieImage
-        );
+        setSubmitting(true);
+        setError("");
 
         const response =
-          await apiClient<KYCResponse>(
-            "/kyc/submit",
-            {
-              method:
-                "PUT",
+          await submitEKYC({
+            claimedName:
+              form.claimedName,
 
-              body:
-                formData,
-            }
-          );
+            dateOfBirth:
+              form.dateOfBirth,
 
-        if (
-          !response.success
-        ) {
-          throw new Error(
-            response.message ||
-              "Unable to submit KYC."
-          );
-        }
+            nid:
+              form.nid,
 
-        const normalized =
-          normalizeKYCResponse(
-            response
-          );
+            frontImage:
+              form.frontImage,
 
-        setKYC(
-          normalized
+            backImage:
+              form.backImage,
+
+            selfieImage:
+              form.selfieImage,
+
+            liveness:
+              form.liveness,
+          });
+
+        setVerification(
+          response.verification,
         );
 
-        setFormOpen(
-          false
+        setForm(
+          emptyForm,
         );
 
-        setStep(
-          1
-        );
-
-        setSuccessMessage(
-          response.message ||
-            "Your KYC application has been submitted successfully."
-        );
-
-        await loadKYC(
-          true
-        );
-      } catch (
-        error
-      ) {
-        console.error(
-          "KYC submit error:",
-          error
-        );
-
-        setErrorMessage(
-          error instanceof Error
-            ? error.message
-            : "Unable to submit KYC."
+        setStep(1);
+      } catch (submitError) {
+        setError(
+          submitError instanceof
+            Error
+            ? submitError.message
+            : "Unable to submit e-KYC.",
         );
       } finally {
-        setSubmitting(
-          false
-        );
+        setSubmitting(false);
       }
+    };
+
+  /* =======================================================
+     START AGAIN
+  ====================================================== */
+
+  const startAgain =
+    () => {
+      setVerification(null);
+      setForm(emptyForm);
+      setStep(1);
+      setError("");
     };
 
   /* =======================================================
      LOADING
-  ======================================================== */
+  ====================================================== */
 
   if (loading) {
-    return (
-      <KYCLoadingState />
-    );
+    return <LoadingState />;
   }
 
-  /* =======================================================
-     PAGE
-  ======================================================== */
-
   return (
-    <div
-      className="
-        relative
-        min-h-full
-        overflow-hidden
-        bg-background
-      "
-    >
-      {/* AMBIENT GLOW */}
-
-      <div
-        aria-hidden="true"
-        className="
-          pointer-events-none
-          absolute
-          -right-40
-          -top-44
-          h-[420px]
-          w-[420px]
-          rounded-full
-          bg-indigo-500/[0.08]
-          blur-[100px]
-          dark:bg-violet-500/[0.12]
-        "
-      />
-
-      <div
-        aria-hidden="true"
-        className="
-          pointer-events-none
-          absolute
-          -bottom-44
-          -left-44
-          h-[420px]
-          w-[420px]
-          rounded-full
-          bg-emerald-400/[0.05]
-          blur-[110px]
-        "
-      />
-
-      <div
-        className="
-          relative
-          z-10
-          space-y-6
-        "
-      >
-        {/* =================================================
-            MESSAGE
-        ================================================== */}
-
-        <AnimatePresence>
-          {errorMessage && (
-            <MessageAlert
-              type="error"
-              message={
-                errorMessage
-              }
-              onClose={() =>
-                setErrorMessage("")
-              }
-            />
-          )}
-
-          {successMessage && (
-            <MessageAlert
-              type="success"
-              message={
-                successMessage
-              }
-              onClose={() =>
-                setSuccessMessage("")
-              }
-            />
-          )}
-        </AnimatePresence>
+    <main className="min-h-screen bg-background px-3 py-5 text-foreground sm:px-5 sm:py-6 lg:px-8">
+      <div className="mx-auto w-full max-w-7xl">
 
         {/* =================================================
-            HERO
-            FIXED INDIGO / VIOLET
-        ================================================== */}
+            TOP HERO
+        ================================================= */}
 
-        <motion.section
+        <motion.header
           initial={{
             opacity: 0,
-            y: 18,
+            y: -18,
           }}
           animate={{
             opacity: 1,
@@ -1157,209 +710,130 @@ export default function KYCPage() {
           }}
           transition={{
             duration: 0.5,
+            ease: [
+              0.22,
+              1,
+              0.36,
+              1,
+            ],
           }}
-          className="
-            relative
-            overflow-hidden
-            rounded-[28px]
-            border border-white/10
-            bg-gradient-to-br
-            from-[#1E1B4B]
-            via-[#4338CA]
-            to-[#7C3AED]
-            text-white
-            shadow-[0_20px_60px_rgba(49,46,129,0.28)]
-          "
+          className="relative isolate overflow-hidden rounded-[30px] border border-indigo-900/20 bg-gradient-to-br from-[#170C35] via-[#31205F] to-[#5B35A6] p-5 text-white shadow-[0_28px_80px_rgba(49,32,106,.22)] sm:p-7 lg:p-8"
         >
-          <div
-            aria-hidden="true"
-            className="
-              pointer-events-none
-              absolute
-              -left-24
-              -top-24
-              h-72
-              w-72
-              rounded-full
-              bg-violet-400/10
-              blur-3xl
-            "
+          <motion.div
+            animate={{
+              scale: [
+                0.9,
+                1.1,
+                0.9,
+              ],
+              opacity: [
+                0.1,
+                0.24,
+                0.1,
+              ],
+            }}
+            transition={{
+              duration: 7,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+            className="pointer-events-none absolute -right-24 -top-28 h-[350px] w-[350px] rounded-full bg-indigo-300/15 blur-[100px]"
           />
 
-          <div
-            aria-hidden="true"
-            className="
-              pointer-events-none
-              absolute
-              right-0
-              top-0
-              h-full
-              w-[48%]
-              bg-gradient-to-l
-              from-white/[0.06]
-              via-white/[0.02]
-              to-transparent
-            "
+          <motion.div
+            animate={{
+              x: [
+                -15,
+                20,
+                -15,
+              ],
+              opacity: [
+                0.06,
+                0.18,
+                0.06,
+              ],
+            }}
+            transition={{
+              duration: 8,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+            className="pointer-events-none absolute -bottom-40 left-[25%] h-[290px] w-[290px] rounded-full bg-violet-300/10 blur-[100px]"
           />
 
-          <div
-            aria-hidden="true"
-            className="
-              pointer-events-none
-              absolute
-              -right-10
-              -top-20
-              h-56
-              w-56
-              rounded-full
-              border
-              border-white/10
-            "
-          />
+          <div className="pointer-events-none absolute inset-0 opacity-[0.045] [background-image:linear-gradient(rgba(255,255,255,.25)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.25)_1px,transparent_1px)] [background-size:34px_34px]" />
 
-          <div
-            aria-hidden="true"
-            className="
-              pointer-events-none
-              absolute
-              right-16
-              top-10
-              h-28
-              w-28
-              rounded-full
-              border
-              border-white/10
-            "
-          />
-
-          <div
-            className="
-              relative
-              z-10
-              grid
-              gap-8
-              p-6
-              md:p-8
-              lg:grid-cols-[1fr_auto]
-              lg:items-center
-            "
-          >
-            <div className="max-w-2xl">
-              <div
-                className="
-                  inline-flex
-                  items-center
-                  gap-2
-                  rounded-full
-                  border
-                  border-white/15
-                  bg-white/10
-                  px-3
-                  py-1.5
-                  text-[10px]
-                  font-extrabold
-                  uppercase
-                  tracking-[0.15em]
-                  text-indigo-100
-                  backdrop-blur-md
-                "
+          <div className="relative z-10 flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex min-w-0 items-start gap-4 sm:gap-5">
+              <motion.div
+                whileHover={{
+                  scale: 1.05,
+                  rotate: 2,
+                }}
+                whileTap={{
+                  scale: 0.97,
+                }}
+                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,.14),0_15px_35px_rgba(0,0,0,.14)] backdrop-blur"
               >
-                <Fingerprint className="h-3.5 w-3.5" />
+                <Fingerprint className="h-7 w-7 text-violet-200" />
+              </motion.div>
 
-                Identity Verification
-              </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-violet-200/15 bg-white/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-violet-100">
+                    <ShieldCheck className="h-3.5 w-3.5" />
+                    Identity Security
+                  </span>
 
-              <h1
-                className="
-                  mt-4
-                  max-w-xl
-                  text-[25px]
-                  font-black
-                  tracking-[-0.035em]
-                  text-white
-                  sm:text-[30px]
-                  lg:text-[34px]
-                "
-              >
-                Secure your wallet with
-                verified identity.
-              </h1>
+                  <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/15 bg-emerald-300/10 px-3 py-1.5 text-[9px] font-bold text-emerald-100">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-300" />
+                    Protected
+                  </span>
+                </div>
 
-              <p
-                className="
-                  mt-3
-                  max-w-xl
-                  text-sm
-                  leading-6
-                  text-indigo-100/70
-                "
-              >
-                Verify your identity to
-                strengthen account security
-                and access protected wallet
-                actions.
-              </p>
+                <h1 className="mt-4 text-3xl font-black tracking-[-0.04em] sm:text-4xl lg:text-[42px]">
+                  Advanced e-KYC
+                </h1>
 
-              <div
-                className="
-                  mt-5
-                  flex
-                  flex-wrap
-                  items-center
-                  gap-3
-                "
-              >
-                <HeroSecurityItem
-                  icon={LockKeyhole}
-                  text="Private uploads"
-                />
+                <p className="mt-3 max-w-3xl text-xs leading-6 text-violet-100/70 sm:text-sm">
+                  Verify your Bangladesh NID through encrypted
+                  document capture, live liveness checks,
+                  identity matching and protected compliance
+                  processing.
+                </p>
 
-                <HeroSecurityItem
-                  icon={ShieldCheck}
-                  text="Secure review"
-                />
+                <div className="mt-4 flex flex-wrap gap-2 text-[9px] font-bold text-violet-100/55">
+                  <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5">
+                    NID verification
+                  </span>
 
-                <HeroSecurityItem
-                  icon={BadgeCheck}
-                  text="Verified access"
-                />
+                  <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5">
+                    Live biometric check
+                  </span>
+
+                  <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5">
+                    Secure processing
+                  </span>
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            {verification && (
               <motion.button
+                whileHover={{
+                  y: -2,
+                }}
+                whileTap={{
+                  scale: 0.98,
+                }}
                 type="button"
                 onClick={() =>
-                  void loadKYC(true)
+                  void loadStatus(
+                    true,
+                  )
                 }
-                disabled={
-                  refreshing
-                }
-                whileTap={{
-                  scale: 0.96,
-                }}
-                className="
-                  flex
-                  h-11
-                  items-center
-                  gap-2
-                  rounded-[14px]
-                  border
-                  border-white/15
-                  bg-white/10
-                  px-4
-                  text-[11px]
-                  font-bold
-                  text-indigo-100
-                  shadow-sm
-                  backdrop-blur-md
-                  transition
-                  hover:border-white/25
-                  hover:bg-white/15
-                  hover:text-white
-                  disabled:cursor-not-allowed
-                  disabled:opacity-60
-                "
+                disabled={refreshing}
+                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.08] px-4 text-[11px] font-black text-white backdrop-blur transition hover:bg-white/[0.15] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <RefreshCw
                   className={
@@ -1369,2209 +843,1377 @@ export default function KYCPage() {
                   }
                 />
 
-                Refresh
+                {refreshing
+                  ? "Refreshing..."
+                  : "Refresh status"}
               </motion.button>
-            </div>
+            )}
           </div>
-        </motion.section>
+        </motion.header>
 
         {/* =================================================
-            MAIN GRID
-        ================================================== */}
+            ERROR
+        ================================================= */}
 
-        <div
-          className="
-            grid
-            gap-6
-            xl:grid-cols-[360px_minmax(0,1fr)]
-          "
-        >
-          {/* LEFT */}
-
-          <div
-            className="
-              space-y-5
-            "
-          >
-            <KYCStatusCard
-              kyc={kyc}
-              starting={starting}
-              onStart={
-                handleStartKYC
-              }
-              onResubmit={
-                handleResubmit
-              }
-            />
-
-            <VerificationRoadmap
-              status={
-                kyc?.status ??
-                "not_started"
-              }
-            />
-          </div>
-
-          {/* RIGHT */}
-
-          <div>
-            <AnimatePresence
-              mode="wait"
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{
+                opacity: 0,
+                y: -8,
+              }}
+              animate={{
+                opacity: 1,
+                y: 0,
+              }}
+              exit={{
+                opacity: 0,
+                y: -6,
+              }}
+              className="mt-4"
             >
-              {formOpen ? (
-                <motion.div
-                  key="form"
-                  initial={{
-                    opacity: 0,
-                    y: 14,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                  }}
-                  exit={{
-                    opacity: 0,
-                    y: -10,
-                  }}
-                >
-                  <VerificationWizard
-                    step={step}
-                    setStep={
-                      setStep
-                    }
-                    documentType={
-                      documentType
-                    }
-                    setDocumentType={
-                      setDocumentType
-                    }
-                    documentNumber={
-                      documentNumber
-                    }
-                    setDocumentNumber={
-                      setDocumentNumber
-                    }
-                    frontImage={
-                      frontImage
-                    }
-                    backImage={
-                      backImage
-                    }
-                    selfieImage={
-                      selfieImage
-                    }
-                    onFileChange={
-                      handleFileChange
-                    }
-                    onRemoveFront={() =>
-                      setFrontImage(
-                        null
-                      )
-                    }
-                    onRemoveBack={() =>
-                      setBackImage(
-                        null
-                      )
-                    }
-                    onRemoveSelfie={() =>
-                      setSelfieImage(
-                        null
-                      )
-                    }
-                    onNextIdentity={
-                      goToDocuments
-                    }
-                    onNextDocuments={
-                      goToReview
-                    }
-                    onSubmit={
-                      handleSubmit
-                    }
-                    submitting={
-                      submitting
-                    }
-                    onCancel={() => {
-                      setFormOpen(
-                        false
-                      );
-
-                      setStep(
-                        1
-                      );
-
-                      setErrorMessage(
-                        ""
-                      );
-                    }}
-                  />
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="overview"
-                  initial={{
-                    opacity: 0,
-                    y: 14,
-                  }}
-                  animate={{
-                    opacity: 1,
-                    y: 0,
-                  }}
-                  exit={{
-                    opacity: 0,
-                  }}
-                >
-                  <KYCOverview
-                    status={
-                      kyc?.status ??
-                      "not_started"
-                    }
-                    onStart={
-                      handleStartKYC
-                    }
-                    onResubmit={
-                      handleResubmit
-                    }
-                    starting={
-                      starting
-                    }
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* =========================================================
-   HERO SECURITY ITEM
-========================================================= */
-
-function HeroSecurityItem({
-  icon: Icon,
-  text,
-}: {
-  icon: React.ElementType;
-  text: string;
-}) {
-  return (
-    <span
-      className="
-        inline-flex
-        items-center
-        gap-2
-        text-[10px]
-        font-semibold
-        text-indigo-100/80
-      "
-    >
-      <span
-        className="
-          flex
-          h-6
-          w-6
-          items-center
-          justify-center
-          rounded-lg
-          bg-white/10
-          text-indigo-100
-        "
-      >
-        <Icon className="h-3 w-3" />
-      </span>
-
-      {text}
-    </span>
-  );
-}
-
-/* =========================================================
-   STATUS CARD
-========================================================= */
-
-function KYCStatusCard({
-  kyc,
-  starting,
-  onStart,
-  onResubmit,
-}: {
-  kyc: KYCRecord | null;
-
-  starting: boolean;
-
-  onStart: () => void;
-
-  onResubmit: () => void;
-}) {
-  const status =
-    kyc?.status ??
-    "not_started";
-
-  const config =
-    getStatusConfig(
-      status
-    );
-
-  const Icon =
-    config.icon;
-
-  return (
-    <motion.div
-      initial={{
-        opacity: 0,
-        x: -12,
-      }}
-      animate={{
-        opacity: 1,
-        x: 0,
-      }}
-      transition={{
-        duration: 0.45,
-      }}
-      className="
-        overflow-hidden
-        rounded-[24px]
-        border border-border
-        bg-card
-        text-card-foreground
-        shadow-[var(--dashboard-shadow)]
-      "
-    >
-      <div
-        className="
-          p-5
-          sm:p-6
-        "
-      >
-        <div
-          className="
-            flex
-            items-start
-            justify-between
-            gap-4
-          "
-        >
-          <div
-            className={`
-              flex
-              h-12
-              w-12
-              shrink-0
-              items-center
-              justify-center
-              rounded-[15px]
-              ${getStatusIconTheme(
-                status
-              )}
-            `}
-          >
-            <Icon className="h-5 w-5" />
-          </div>
-
-          <span
-            className={`
-              rounded-full
-              px-3
-              py-1.5
-              text-[9px]
-              font-extrabold
-              uppercase
-              tracking-[0.12em]
-              ${getStatusBadgeTheme(
-                status
-              )}
-            `}
-          >
-            {config.label}
-          </span>
-        </div>
-
-        <h2
-          className="
-            mt-5
-            text-lg
-            font-extrabold
-            tracking-[-0.02em]
-            text-card-foreground
-          "
-        >
-          {config.title}
-        </h2>
-
-        <p
-          className="
-            mt-2
-            text-xs
-            leading-5
-            text-muted-foreground
-          "
-        >
-          {config.description}
-        </p>
-
-        {kyc?.documentType && (
-          <div
-            className="
-              mt-5
-              rounded-[15px]
-              bg-muted/60
-              p-3.5
-            "
-          >
-            <InfoRow
-              label="Document"
-              value={formatDocumentType(
-                kyc.documentType
-              )}
-            />
-
-            {kyc.documentNumber && (
-              <InfoRow
-                label="Document No."
-                value={maskDocumentNumber(
-                  kyc.documentNumber
-                )}
-              />
-            )}
-
-            {kyc.provider && (
-              <InfoRow
-                label="Provider"
-                value={capitalize(
-                  kyc.provider
-                )}
-              />
-            )}
-          </div>
-        )}
-
-        {kyc?.submittedAt && (
-          <div
-            className="
-              mt-4
-              flex
-              items-center
-              gap-2
-              text-[10px]
-              text-muted-foreground
-            "
-          >
-            <Clock3 className="h-3.5 w-3.5" />
-
-            Submitted{" "}
-            {formatDate(
-              kyc.submittedAt
-            )}
-          </div>
-        )}
-
-        {status ===
-          "verified" &&
-          kyc?.verifiedAt && (
-            <div
-              className="
-                mt-3
-                flex
-                items-center
-                gap-2
-                text-[10px]
-                font-semibold
-                text-emerald-600
-                dark:text-emerald-400
-              "
-            >
-              <BadgeCheck className="h-3.5 w-3.5" />
-
-              Verified{" "}
-              {formatDate(
-                kyc.verifiedAt
-              )}
-            </div>
-          )}
-
-        {status ===
-          "rejected" &&
-          kyc?.rejectionReason && (
-            <div
-              className="
-                mt-4
-                rounded-[14px]
-                border border-rose-500/15
-                bg-rose-500/5
-                p-3.5
-              "
-            >
-              <p
-                className="
-                  text-[9px]
-                  font-extrabold
-                  uppercase
-                  tracking-[0.12em]
-                  text-rose-500
-                "
-              >
-                Review note
-              </p>
-
-              <p
-                className="
-                  mt-1.5
-                  text-xs
-                  leading-5
-                  text-rose-700
-                  dark:text-rose-300
-                "
-              >
-                {kyc.rejectionReason}
-              </p>
-            </div>
-          )}
-      </div>
-
-      {(status ===
-        "not_started" ||
-        status ===
-          "rejected") && (
-        <div
-          className="
-            border-t
-            border-border
-            bg-muted/40
-            p-4
-          "
-        >
-          <button
-            type="button"
-            onClick={
-              status ===
-              "rejected"
-                ? onResubmit
-                : onStart
-            }
-            disabled={
-              starting
-            }
-            className="
-              flex
-              h-11
-              w-full
-              items-center
-              justify-center
-              gap-2
-              rounded-[13px]
-              bg-primary
-              px-4
-              text-xs
-              font-extrabold
-              text-primary-foreground
-              shadow-[0_10px_24px_rgba(79,70,229,0.18)]
-              transition
-              hover:brightness-105
-              disabled:cursor-not-allowed
-              disabled:opacity-60
-            "
-          >
-            {starting ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-
-                Starting...
-              </>
-            ) : (
-              <>
-                {status ===
-                "rejected"
-                  ? "Resubmit Verification"
-                  : "Start Verification"}
-
-                <ArrowRight className="h-4 w-4" />
-              </>
-            )}
-          </button>
-        </div>
-      )}
-    </motion.div>
-  );
-}
-
-/* =========================================================
-   ROADMAP
-========================================================= */
-
-function VerificationRoadmap({
-  status,
-}: {
-  status: KYCStatus;
-}) {
-  const submitted =
-    status !==
-    "not_started";
-
-  const reviewing =
-    status ===
-      "pending" ||
-    status ===
-      "under_review" ||
-    status ===
-      "verified";
-
-  const verified =
-    status ===
-    "verified";
-
-  const steps = [
-    {
-      title:
-        "Submit identity",
-
-      description:
-        "Provide your identity document.",
-
-      complete:
-        submitted,
-
-      icon:
-        FileCheck2,
-    },
-
-    {
-      title:
-        "Compliance review",
-
-      description:
-        "Your submission is securely reviewed.",
-
-      complete:
-        reviewing,
-
-      icon:
-        ShieldCheck,
-    },
-
-    {
-      title:
-        "Account verified",
-
-      description:
-        "Protected wallet access is enabled.",
-
-      complete:
-        verified,
-
-      icon:
-        BadgeCheck,
-    },
-  ];
-
-  return (
-    <motion.div
-      initial={{
-        opacity: 0,
-        x: -12,
-      }}
-      animate={{
-        opacity: 1,
-        x: 0,
-      }}
-      transition={{
-        delay: 0.08,
-        duration: 0.45,
-      }}
-      className="
-        rounded-[24px]
-        border border-border
-        bg-card
-        p-5
-        text-card-foreground
-        shadow-[var(--dashboard-shadow)]
-      "
-    >
-      <div
-        className="
-          flex
-          items-center
-          justify-between
-          gap-3
-        "
-      >
-        <div>
-          <p
-            className="
-              text-[9px]
-              font-black
-              uppercase
-              tracking-[0.16em]
-              text-primary
-            "
-          >
-            Verification flow
-          </p>
-
-          <h3
-            className="
-              mt-1
-              text-sm
-              font-extrabold
-              text-card-foreground
-            "
-          >
-            Verification journey
-          </h3>
-        </div>
-
-        <div
-          className="
-            flex
-            h-9
-            w-9
-            items-center
-            justify-center
-            rounded-xl
-            bg-primary/10
-            text-primary
-          "
-        >
-          <ShieldCheck className="h-4 w-4" />
-        </div>
-      </div>
-
-      <div className="mt-5 space-y-1">
-        {steps.map(
-          (
-            item,
-            index
-          ) => {
-            const Icon =
-              item.icon;
-
-            return (
-              <div
-                key={
-                  item.title
-                }
-                className="relative flex gap-3"
-              >
-                {index <
-                  steps.length -
-                    1 && (
-                  <div
-                    className={`
-                      absolute
-                      left-[17px]
-                      top-9
-                      h-[calc(100%-12px)]
-                      w-px
-                      ${
-                        item.complete
-                          ? "bg-emerald-500/35"
-                          : "bg-border"
-                      }
-                    `}
-                  />
-                )}
-
-                <div
-                  className={`
-                    relative
-                    z-10
-                    flex
-                    h-9
-                    w-9
-                    shrink-0
-                    items-center
-                    justify-center
-                    rounded-[11px]
-                    ${
-                      item.complete
-                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                        : "bg-muted text-muted-foreground"
-                    }
-                  `}
-                >
-                  {item.complete ? (
-                    <Check className="h-4 w-4" />
-                  ) : (
-                    <Icon className="h-4 w-4" />
-                  )}
+              <div className="flex items-start gap-3 rounded-[20px] border border-rose-200 bg-rose-50 p-4 dark:border-rose-900/60 dark:bg-rose-950/25">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-background text-rose-600 shadow-sm dark:text-rose-400">
+                  <AlertCircle className="h-4 w-4" />
                 </div>
 
-                <div className="pb-5 pt-0.5">
-                  <p
-                    className="
-                      text-[11px]
-                      font-bold
-                      text-card-foreground
-                    "
-                  >
-                    {
-                      item.title
-                    }
+                <div className="min-w-0">
+                  <p className="text-[9px] font-black uppercase tracking-[0.13em] text-rose-600 dark:text-rose-400">
+                    Verification notice
                   </p>
 
-                  <p
-                    className="
-                      mt-1
-                      text-[9px]
-                      leading-4
-                      text-muted-foreground
-                    "
-                  >
-                    {
-                      item.description
-                    }
+                  <p className="mt-1 text-xs font-semibold leading-5 text-rose-800 dark:text-rose-200">
+                    {error}
                   </p>
                 </div>
               </div>
-            );
-          }
-        )}
-      </div>
-    </motion.div>
-  );
-}
-
-/* =========================================================
-   OVERVIEW
-========================================================= */
-
-function KYCOverview({
-  status,
-  onStart,
-  onResubmit,
-  starting,
-}: {
-  status: KYCStatus;
-
-  onStart: () => void;
-
-  onResubmit: () => void;
-
-  starting: boolean;
-}) {
-  const verified =
-    status ===
-    "verified";
-
-  return (
-    <div
-      className="
-        rounded-[26px]
-        border border-border
-        bg-card
-        p-5
-        text-card-foreground
-        shadow-[var(--dashboard-shadow)]
-        sm:p-6
-        lg:p-7
-      "
-    >
-      <div
-        className="
-          flex
-          items-center
-          justify-between
-          gap-4
-        "
-      >
-        <div>
-          <p
-            className="
-              text-[9px]
-              font-extrabold
-              uppercase
-              tracking-[0.16em]
-              text-primary
-            "
-          >
-            Verification Center
-          </p>
-
-          <h2
-            className="
-              mt-2
-              text-xl
-              font-extrabold
-              tracking-[-0.025em]
-              text-card-foreground
-            "
-          >
-            What you&apos;ll need
-          </h2>
-        </div>
-
-        <div
-          className="
-            flex
-            h-11
-            w-11
-            items-center
-            justify-center
-            rounded-[14px]
-            bg-primary/10
-            text-primary
-          "
-        >
-          <Fingerprint className="h-5 w-5" />
-        </div>
-      </div>
-
-      <div
-        className="
-          mt-6
-          grid
-          gap-4
-          sm:grid-cols-3
-        "
-      >
-        <RequirementCard
-          number="01"
-          icon={IdCard}
-          title="Identity document"
-          description="A valid NID, passport or driving license."
-        />
-
-        <RequirementCard
-          number="02"
-          icon={FileImage}
-          title="Clear document photos"
-          description="Upload readable front and back images where required."
-        />
-
-        <RequirementCard
-          number="03"
-          icon={ScanFace}
-          title="Recent selfie"
-          description="Use a clear, well-lit photo of your face."
-        />
-      </div>
-
-      <div
-        className="
-          mt-6
-          rounded-[20px]
-          border border-primary/15
-          bg-primary/5
-          p-5
-        "
-      >
-        <div
-          className="
-            flex
-            flex-col
-            gap-5
-            sm:flex-row
-            sm:items-center
-            sm:justify-between
-          "
-        >
-          <div
-            className="
-              flex
-              items-start
-              gap-3
-            "
-          >
-            <div
-              className="
-                flex
-                h-10
-                w-10
-                shrink-0
-                items-center
-                justify-center
-                rounded-[12px]
-                bg-card
-                text-primary
-                shadow-sm
-                ring-1
-                ring-border
-              "
-            >
-              <LockKeyhole className="h-[17px] w-[17px]" />
-            </div>
-
-            <div>
-              <h3
-                className="
-                  text-xs
-                  font-extrabold
-                  text-card-foreground
-                "
-              >
-                Your documents stay protected
-              </h3>
-
-              <p
-                className="
-                  mt-1
-                  max-w-xl
-                  text-[10px]
-                  leading-5
-                  text-muted-foreground
-                "
-              >
-                Identity images are uploaded
-                through your protected KYC flow
-                and stored as private Cloudinary
-                assets by the backend.
-              </p>
-            </div>
-          </div>
-
-          {(status ===
-            "not_started" ||
-            status ===
-              "rejected") && (
-            <button
-              type="button"
-              disabled={
-                starting
-              }
-              onClick={
-                status ===
-                "rejected"
-                  ? onResubmit
-                  : onStart
-              }
-              className="
-                flex
-                h-11
-                shrink-0
-                items-center
-                justify-center
-                gap-2
-                rounded-[13px]
-                bg-primary
-                px-5
-                text-[11px]
-                font-extrabold
-                text-primary-foreground
-                transition
-                hover:brightness-105
-                disabled:opacity-60
-              "
-            >
-              {starting && (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              )}
-
-              {status ===
-              "rejected"
-                ? "Try Again"
-                : "Begin Verification"}
-
-              {!starting && (
-                <ChevronRight className="h-4 w-4" />
-              )}
-            </button>
-          )}
-
-          {verified && (
-            <div
-              className="
-                inline-flex
-                h-11
-                items-center
-                gap-2
-                rounded-[13px]
-                bg-emerald-500/10
-                px-4
-                text-[11px]
-                font-extrabold
-                text-emerald-700
-                dark:text-emerald-300
-              "
-            >
-              <BadgeCheck className="h-4 w-4" />
-
-              Identity verified
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* =========================================================
-   WIZARD
-========================================================= */
-
-function VerificationWizard({
-  step,
-  setStep,
-  documentType,
-  setDocumentType,
-  documentNumber,
-  setDocumentNumber,
-  frontImage,
-  backImage,
-  selfieImage,
-  onFileChange,
-  onRemoveFront,
-  onRemoveBack,
-  onRemoveSelfie,
-  onNextIdentity,
-  onNextDocuments,
-  onSubmit,
-  submitting,
-  onCancel,
-}: {
-  step: WizardStep;
-
-  setStep: (
-    step: WizardStep
-  ) => void;
-
-  documentType:
-    | DocumentType
-    | "";
-
-  setDocumentType: (
-    type: DocumentType
-  ) => void;
-
-  documentNumber:
-    string;
-
-  setDocumentNumber: (
-    value: string
-  ) => void;
-
-  frontImage:
-    File | null;
-
-  backImage:
-    File | null;
-
-  selfieImage:
-    File | null;
-
-  onFileChange: (
-    file: File | null,
-    type:
-      | "front"
-      | "back"
-      | "selfie"
-  ) => void;
-
-  onRemoveFront:
-    () => void;
-
-  onRemoveBack:
-    () => void;
-
-  onRemoveSelfie:
-    () => void;
-
-  onNextIdentity:
-    () => void;
-
-  onNextDocuments:
-    () => void;
-
-  onSubmit:
-    () => void;
-
-  submitting:
-    boolean;
-
-  onCancel:
-    () => void;
-}) {
-  return (
-    <div
-      className="
-        overflow-hidden
-        rounded-[26px]
-        border border-border
-        bg-card
-        text-card-foreground
-        shadow-[var(--dashboard-shadow)]
-      "
-    >
-      <div
-        className="
-          border-b
-          border-border
-          px-5
-          py-5
-          sm:px-6
-        "
-      >
-        <div
-          className="
-            flex
-            items-start
-            justify-between
-            gap-4
-          "
-        >
-          <div>
-            <p
-              className="
-                text-[9px]
-                font-extrabold
-                uppercase
-                tracking-[0.16em]
-                text-primary
-              "
-            >
-              Secure verification
-            </p>
-
-            <h2
-              className="
-                mt-1.5
-                text-lg
-                font-extrabold
-                tracking-[-0.02em]
-                text-card-foreground
-              "
-            >
-              Complete your identity check
-            </h2>
-          </div>
-
-          <button
-            type="button"
-            onClick={
-              onCancel
-            }
-            disabled={
-              submitting
-            }
-            className="
-              flex
-              h-9
-              w-9
-              shrink-0
-              items-center
-              justify-center
-              rounded-[11px]
-              bg-muted
-              text-muted-foreground
-              transition
-              hover:bg-muted/80
-              hover:text-foreground
-            "
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <WizardProgress
-          step={step}
-        />
-      </div>
-
-      <div
-        className="
-          p-5
-          sm:p-6
-          lg:p-7
-        "
-      >
-        <AnimatePresence
-          mode="wait"
-        >
-          {step === 1 && (
-            <motion.div
-              key="identity"
-              initial={{
-                opacity: 0,
-                x: 20,
-              }}
-              animate={{
-                opacity: 1,
-                x: 0,
-              }}
-              exit={{
-                opacity: 0,
-                x: -20,
-              }}
-            >
-              <StepIdentity
-                documentType={
-                  documentType
-                }
-                setDocumentType={
-                  setDocumentType
-                }
-                documentNumber={
-                  documentNumber
-                }
-                setDocumentNumber={
-                  setDocumentNumber
-                }
-                onNext={
-                  onNextIdentity
-                }
-              />
-            </motion.div>
-          )}
-
-          {step === 2 && (
-            <motion.div
-              key="documents"
-              initial={{
-                opacity: 0,
-                x: 20,
-              }}
-              animate={{
-                opacity: 1,
-                x: 0,
-              }}
-              exit={{
-                opacity: 0,
-                x: -20,
-              }}
-            >
-              <StepDocuments
-                documentType={
-                  documentType
-                }
-                frontImage={
-                  frontImage
-                }
-                backImage={
-                  backImage
-                }
-                selfieImage={
-                  selfieImage
-                }
-                onFileChange={
-                  onFileChange
-                }
-                onRemoveFront={
-                  onRemoveFront
-                }
-                onRemoveBack={
-                  onRemoveBack
-                }
-                onRemoveSelfie={
-                  onRemoveSelfie
-                }
-                onBack={() =>
-                  setStep(1)
-                }
-                onNext={
-                  onNextDocuments
-                }
-              />
-            </motion.div>
-          )}
-
-          {step === 3 && (
-            <motion.div
-              key="review"
-              initial={{
-                opacity: 0,
-                x: 20,
-              }}
-              animate={{
-                opacity: 1,
-                x: 0,
-              }}
-              exit={{
-                opacity: 0,
-                x: -20,
-              }}
-            >
-              <StepReview
-                documentType={
-                  documentType as DocumentType
-                }
-                documentNumber={
-                  documentNumber
-                }
-                frontImage={
-                  frontImage
-                }
-                backImage={
-                  backImage
-                }
-                selfieImage={
-                  selfieImage
-                }
-                onBack={() =>
-                  setStep(2)
-                }
-                onSubmit={
-                  onSubmit
-                }
-                submitting={
-                  submitting
-                }
-              />
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* =================================================
+            FORM / STATUS
+        ================================================= */}
+
+        <AnimatePresence mode="wait">
+          {verification ? (
+            <StatusPanel
+              key="status"
+              verification={
+                verification
+              }
+              onStartAgain={
+                startAgain
+              }
+            />
+          ) : (
+            <motion.section
+              key="form"
+              initial={{
+                opacity: 0,
+                y: 14,
+              }}
+              animate={{
+                opacity: 1,
+                y: 0,
+              }}
+              exit={{
+                opacity: 0,
+                y: -10,
+              }}
+              transition={{
+                duration: 0.35,
+              }}
+              className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]"
+            >
+              <div className="overflow-hidden rounded-[30px] border border-border bg-card shadow-[0_18px_55px_rgba(15,23,42,.06)] dark:shadow-none">
+                <div className="border-b border-border bg-muted/40 p-5 sm:p-7">
+                  <StepHeader
+                    step={step}
+                  />
+                </div>
+
+                <div className="p-5 sm:p-7">
+                  <AnimatePresence mode="wait">
+                    {step === 1 && (
+                      <motion.div
+                        key="identity"
+                        initial={{
+                          opacity: 0,
+                          x: 16,
+                        }}
+                        animate={{
+                          opacity: 1,
+                          x: 0,
+                        }}
+                        exit={{
+                          opacity: 0,
+                          x: -16,
+                        }}
+                      >
+                        <IdentityStep
+                          form={form}
+                          setForm={
+                            setForm
+                          }
+                        />
+                      </motion.div>
+                    )}
+
+                    {step === 2 && (
+                      <motion.div
+                        key="documents"
+                        initial={{
+                          opacity: 0,
+                          x: 16,
+                        }}
+                        animate={{
+                          opacity: 1,
+                          x: 0,
+                        }}
+                        exit={{
+                          opacity: 0,
+                          x: -16,
+                        }}
+                      >
+                        <DocumentsStep
+                          form={form}
+                          processingFile={
+                            processingFile
+                          }
+                          onSelect={
+                            selectFile
+                          }
+                          onRemove={(
+                            field,
+                          ) =>
+                            setForm(
+                              (
+                                current,
+                              ) => ({
+                                ...current,
+                                [field]:
+                                  null,
+                              }),
+                            )
+                          }
+                        />
+                      </motion.div>
+                    )}
+
+                    {step === 3 && (
+                      <motion.div
+                        key="biometrics"
+                        initial={{
+                          opacity: 0,
+                          x: 16,
+                        }}
+                        animate={{
+                          opacity: 1,
+                          x: 0,
+                        }}
+                        exit={{
+                          opacity: 0,
+                          x: -16,
+                        }}
+                      >
+                        <BiometricsStep
+                          form={form}
+                          setForm={
+                            setForm
+                          }
+                          onError={
+                            setError
+                          }
+                        />
+                      </motion.div>
+                    )}
+
+                    {step === 4 && (
+                      <motion.div
+                        key="review"
+                        initial={{
+                          opacity: 0,
+                          x: 16,
+                        }}
+                        animate={{
+                          opacity: 1,
+                          x: 0,
+                        }}
+                        exit={{
+                          opacity: 0,
+                          x: -16,
+                        }}
+                      >
+                        <ReviewStep
+                          form={form}
+                        />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <div className="mt-8 flex items-center justify-between gap-3 border-t border-border pt-5">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setStep(
+                          (
+                            current,
+                          ) =>
+                            Math.max(
+                              1,
+                              current -
+                                1,
+                            ) as
+                              | 1
+                              | 2
+                              | 3
+                              | 4,
+                        )
+                      }
+                      disabled={
+                        step === 1 ||
+                        submitting
+                      }
+                      className="inline-flex h-11 items-center gap-2 rounded-xl px-4 text-xs font-black text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:invisible"
+                    >
+                      <ArrowLeft className="h-4 w-4" />
+                      Back
+                    </button>
+
+                    {step < 4 ? (
+                      <motion.button
+                        whileHover={{
+                          y: -2,
+                        }}
+                        whileTap={{
+                          scale: 0.98,
+                        }}
+                        type="button"
+                        onClick={
+                          goNext
+                        }
+                        className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 text-xs font-black text-white shadow-[0_12px_28px_rgba(79,70,229,.20)] transition hover:from-indigo-700 hover:to-violet-700"
+                      >
+                        Continue
+                        <ArrowRight className="h-4 w-4" />
+                      </motion.button>
+                    ) : (
+                      <motion.button
+                        whileHover={{
+                          y: -2,
+                        }}
+                        whileTap={{
+                          scale: 0.98,
+                        }}
+                        type="button"
+                        onClick={() =>
+                          void submit()
+                        }
+                        disabled={
+                          submitting
+                        }
+                        className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 text-xs font-black text-white shadow-[0_12px_28px_rgba(79,70,229,.20)] transition hover:from-indigo-700 hover:to-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {submitting ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <ShieldCheck className="h-4 w-4" />
+                        )}
+
+                        {submitting
+                          ? "Submitting securely..."
+                          : "Submit verification"}
+                      </motion.button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <SecurityAside />
+            </motion.section>
+          )}
+        </AnimatePresence>
       </div>
-    </div>
+    </main>
   );
 }
 
 /* =========================================================
-   WIZARD PROGRESS
+   STEP HEADER
 ========================================================= */
 
-function WizardProgress({
+function StepHeader({
   step,
 }: {
-  step: WizardStep;
+  step: 1 | 2 | 3 | 4;
 }) {
-  const items = [
-    {
-      step: 1,
-      label: "Identity",
-    },
-
-    {
-      step: 2,
-      label: "Documents",
-    },
-
-    {
-      step: 3,
-      label: "Review",
-    },
+  const labels = [
+    "Identity",
+    "Documents",
+    "Biometrics",
+    "Review",
   ];
 
   return (
-    <div className="mt-5 flex items-center">
-      {items.map(
-        (
-          item,
-          index
-        ) => {
-          const completed =
-            step >
-            item.step;
-
-          const active =
-            step ===
-            item.step;
-
-          return (
-            <div
-              key={
-                item.step
-              }
-              className={`flex items-center ${
-                index <
-                items.length -
-                  1
-                  ? "flex-1"
-                  : ""
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <div
-                  className={`
-                    flex
-                    h-7
-                    w-7
-                    shrink-0
-                    items-center
-                    justify-center
-                    rounded-full
-                    text-[9px]
-                    font-extrabold
-                    transition-all
-                    ${
-                      completed
-                        ? "bg-emerald-500 text-white"
-                        : active
-                          ? "bg-primary text-primary-foreground shadow-[0_5px_15px_rgba(79,70,229,0.2)]"
-                          : "bg-muted text-muted-foreground"
-                    }
-                  `}
-                >
-                  {completed ? (
-                    <Check className="h-3.5 w-3.5" />
-                  ) : (
-                    item.step
-                  )}
-                </div>
-
-                <span
-                  className={`
-                    hidden
-                    text-[9px]
-                    font-bold
-                    sm:block
-                    ${
-                      active
-                        ? "text-primary"
-                        : completed
-                          ? "text-emerald-600 dark:text-emerald-400"
-                          : "text-muted-foreground"
-                    }
-                  `}
-                >
-                  {item.label}
-                </span>
-              </div>
-
-              {index <
-                items.length -
-                  1 && (
-                <div
-                  className="
-                    mx-3
-                    h-px
-                    flex-1
-                    bg-border
-                  "
-                >
-                  <motion.div
-                    initial={{
-                      width:
-                        "0%",
-                    }}
-                    animate={{
-                      width:
-                        step >
-                        item.step
-                          ? "100%"
-                          : "0%",
-                    }}
-                    className="
-                      h-full
-                      bg-emerald-500
-                    "
-                  />
-                </div>
-              )}
-            </div>
-          );
-        }
-      )}
-    </div>
-  );
-}
-
-/* =========================================================
-   STEP 1
-========================================================= */
-
-function StepIdentity({
-  documentType,
-  setDocumentType,
-  documentNumber,
-  setDocumentNumber,
-  onNext,
-}: {
-  documentType:
-    | DocumentType
-    | "";
-
-  setDocumentType: (
-    type: DocumentType
-  ) => void;
-
-  documentNumber:
-    string;
-
-  setDocumentNumber: (
-    value: string
-  ) => void;
-
-  onNext: () => void;
-}) {
-  return (
     <div>
-      <div>
-        <h3
-          className="
-            text-base
-            font-extrabold
-            text-card-foreground
-          "
-        >
-          Choose your identity document
-        </h3>
+      <div className="mb-4 flex items-end justify-between gap-3">
+        <div>
+          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-indigo-600 dark:text-indigo-400">
+            Verification progress
+          </p>
 
-        <p
-          className="
-            mt-1
-            text-xs
-            leading-5
-            text-muted-foreground
-          "
-        >
-          Select a valid government issued
-          document.
-        </p>
+          <p className="mt-1 text-sm font-black text-foreground">
+            Step {step} of 4
+          </p>
+        </div>
+
+        <span className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-[9px] font-black text-violet-700 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-300">
+          {
+            labels[
+              step - 1
+            ]
+          }
+        </span>
       </div>
 
-      <div
-        className="
-          mt-5
-          grid
-          gap-3
-          md:grid-cols-3
-        "
-      >
-        {documentOptions.map(
+      <div className="grid grid-cols-4 gap-2">
+        {labels.map(
           (
-            option
+            label,
+            index,
           ) => {
-            const Icon =
-              option.icon;
+            const value =
+              index + 1;
 
-            const selected =
-              documentType ===
-              option.value;
+            const active =
+              value <= step;
 
             return (
-              <motion.button
-                key={
-                  option.value
-                }
-                type="button"
-                whileTap={{
-                  scale:
-                    0.98,
-                }}
-                onClick={() =>
-                  setDocumentType(
-                    option.value
-                  )
-                }
-                className={`
-                  relative
-                  min-h-[145px]
-                  rounded-[18px]
-                  border
-                  p-4
-                  text-left
-                  transition-all
-                  duration-200
-                  ${
-                    selected
-                      ? "border-primary/40 bg-primary/10 shadow-[0_8px_24px_rgba(79,70,229,0.08)]"
-                      : "border-border bg-card hover:border-primary/25 hover:bg-muted/50"
-                  }
-                `}
-              >
-                {selected && (
-                  <span
-                    className="
-                      absolute
-                      right-3
-                      top-3
-                      flex
-                      h-5
-                      w-5
-                      items-center
-                      justify-center
-                      rounded-full
-                      bg-primary
-                      text-primary-foreground
-                    "
-                  >
-                    <Check className="h-3 w-3" />
-                  </span>
-                )}
-
-                <div
-                  className={`
-                    flex
-                    h-10
-                    w-10
-                    items-center
-                    justify-center
-                    rounded-[12px]
-                    ${
-                      selected
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground"
-                    }
-                  `}
-                >
-                  <Icon className="h-[18px] w-[18px]" />
-                </div>
+              <div key={label}>
+                <motion.div
+                  animate={{
+                    scaleX:
+                      active
+                        ? 1
+                        : 0.97,
+                  }}
+                  className={`h-1.5 origin-left rounded-full transition-all duration-300 ${
+                    active
+                      ? "bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-500"
+                      : "bg-muted"
+                  }`}
+                />
 
                 <p
-                  className="
-                    mt-4
-                    text-xs
-                    font-extrabold
-                    text-card-foreground
-                  "
+                  className={`mt-2 text-[9px] font-black uppercase tracking-wider ${
+                    active
+                      ? "text-indigo-600 dark:text-indigo-400"
+                      : "text-muted-foreground"
+                  }`}
                 >
-                  {
-                    option.title
-                  }
+                  {value}.{" "}
+                  {label}
                 </p>
-
-                <p
-                  className="
-                    mt-1
-                    text-[9px]
-                    leading-4
-                    text-muted-foreground
-                  "
-                >
-                  {
-                    option.description
-                  }
-                </p>
-              </motion.button>
+              </div>
             );
-          }
+          },
         )}
-      </div>
-
-      <div className="mt-6">
-        <label
-          htmlFor="documentNumber"
-          className="
-            text-[10px]
-            font-extrabold
-            text-muted-foreground
-          "
-        >
-          Document Number
-        </label>
-
-        <div className="relative mt-2">
-          <FileText
-            className="
-              absolute
-              left-4
-              top-1/2
-              h-4
-              w-4
-              -translate-y-1/2
-              text-muted-foreground
-            "
-          />
-
-          <input
-            id="documentNumber"
-            type="text"
-            value={
-              documentNumber
-            }
-            onChange={(
-              event
-            ) =>
-              setDocumentNumber(
-                event.target.value
-              )
-            }
-            autoComplete="off"
-            placeholder="Enter your document number"
-            className="
-              h-12
-              w-full
-              rounded-[14px]
-              border
-              border-input
-              bg-background
-              pl-11
-              pr-4
-              text-xs
-              font-semibold
-              text-foreground
-              outline-none
-              transition
-              placeholder:text-muted-foreground
-              focus:border-primary
-              focus:ring-4
-              focus:ring-primary/10
-            "
-          />
-        </div>
-
-        <p
-          className="
-            mt-2
-            text-[9px]
-            text-muted-foreground
-          "
-        >
-          Enter the number exactly as shown
-          on your document.
-        </p>
-      </div>
-
-      <div className="mt-7 flex justify-end">
-        <PrimaryButton onClick={onNext}>
-          Continue
-
-          <ArrowRight className="h-4 w-4" />
-        </PrimaryButton>
       </div>
     </div>
   );
 }
 
 /* =========================================================
-   STEP 2
+   IDENTITY STEP
 ========================================================= */
 
-function StepDocuments({
-  documentType,
-  frontImage,
-  backImage,
-  selfieImage,
-  onFileChange,
-  onRemoveFront,
-  onRemoveBack,
-  onRemoveSelfie,
-  onBack,
-  onNext,
+function IdentityStep({
+  form,
+  setForm,
 }: {
-  documentType:
-    | DocumentType
-    | "";
-
-  frontImage:
-    File | null;
-
-  backImage:
-    File | null;
-
-  selfieImage:
-    File | null;
-
-  onFileChange: (
-    file: File | null,
-    type:
-      | "front"
-      | "back"
-      | "selfie"
-  ) => void;
-
-  onRemoveFront:
-    () => void;
-
-  onRemoveBack:
-    () => void;
-
-  onRemoveSelfie:
-    () => void;
-
-  onBack:
-    () => void;
-
-  onNext:
-    () => void;
+  form: FormState;
+  setForm: Dispatch<
+    SetStateAction<FormState>
+  >;
 }) {
-  const backRequired =
-    documentType ===
-      "nid" ||
-    documentType ===
-      "driving_license";
+  const field = (
+    key:
+      | "claimedName"
+      | "dateOfBirth"
+      | "nid",
+    value: string,
+  ) =>
+    setForm(
+      (
+        current,
+      ) => ({
+        ...current,
+        [key]: value,
+      }),
+    );
 
   return (
     <div>
-      <h3
-        className="
-          text-base
-          font-extrabold
-          text-card-foreground
-        "
-      >
-        Upload verification images
-      </h3>
-
-      <p
-        className="
-          mt-1
-          text-xs
-          leading-5
-          text-muted-foreground
-        "
-      >
-        Use clear, readable images without
-        glare or blur.
-      </p>
-
-      <div
-        className="
-          mt-5
-          grid
-          gap-4
-          md:grid-cols-2
-        "
-      >
-        <UploadCard
-          id="front-image"
-          icon={FileImage}
-          title="Document front"
-          description="Upload the front side"
-          required
-          file={
-            frontImage
-          }
-          onChange={(file) =>
-            onFileChange(
-              file,
-              "front"
-            )
-          }
-          onRemove={
-            onRemoveFront
-          }
-        />
-
-        <UploadCard
-          id="back-image"
-          icon={FileImage}
-          title="Document back"
-          description={
-            backRequired
-              ? "Required for this document"
-              : "Optional if not applicable"
-          }
-          required={
-            backRequired
-          }
-          file={
-            backImage
-          }
-          onChange={(file) =>
-            onFileChange(
-              file,
-              "back"
-            )
-          }
-          onRemove={
-            onRemoveBack
-          }
-        />
-
-        <div className="md:col-span-2">
-          <UploadCard
-            id="selfie-image"
-            icon={Camera}
-            title="Identity selfie"
-            description="Upload a recent, clear photo of yourself"
-            required
-            file={
-              selfieImage
-            }
-            onChange={(file) =>
-              onFileChange(
-                file,
-                "selfie"
-              )
-            }
-            onRemove={
-              onRemoveSelfie
-            }
-            selfie
-          />
+      <div className="flex items-start gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-300">
+          <BadgeCheck className="h-5 w-5" />
         </div>
-      </div>
 
-      <div
-        className="
-          mt-5
-          rounded-[15px]
-          bg-muted/40
-          p-4
-        "
-      >
-        <div className="flex items-start gap-3">
-          <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+        <div>
+          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-indigo-600 dark:text-indigo-400">
+            Step 01
+          </p>
 
-          <p
-            className="
-              text-[10px]
-              leading-5
-              text-muted-foreground
-            "
-          >
-            Accepted formats: JPG, PNG and
-            WEBP. Images are automatically
-            optimized before upload. Maximum
-            processed size: 1 MB per image.
-            Make sure all information is
-            clearly visible.
+          <h2 className="mt-1 text-xl font-black tracking-tight text-foreground">
+            Personal identity
+          </h2>
+
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Enter the information exactly as printed
+            on your Bangladesh NID.
           </p>
         </div>
       </div>
 
-      <div
-        className="
-          mt-7
-          flex
-          items-center
-          justify-between
-          gap-3
-        "
-      >
-        <SecondaryButton
-          onClick={
-            onBack
-          }
+      <div className="mt-7 grid gap-5 sm:grid-cols-2">
+        <Field
+          label="Full name on NID"
+          className="sm:col-span-2"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <input
+            value={
+              form.claimedName
+            }
+            onChange={(
+              event,
+            ) =>
+              field(
+                "claimedName",
+                event.target.value,
+              )
+            }
+            autoComplete="name"
+            maxLength={160}
+            placeholder="Enter your full legal name"
+            className="h-12 w-full rounded-2xl border border-border bg-background px-4 text-sm font-semibold text-foreground outline-none transition placeholder:text-muted-foreground focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
+          />
+        </Field>
 
-          Back
-        </SecondaryButton>
+        <Field label="Date of birth">
+          <input
+            type="date"
+            value={
+              form.dateOfBirth
+            }
+            onChange={(
+              event,
+            ) =>
+              field(
+                "dateOfBirth",
+                event.target.value,
+              )
+            }
+            autoComplete="bday"
+            className="h-12 w-full rounded-2xl border border-border bg-background px-4 text-sm font-semibold text-foreground outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
+          />
+        </Field>
 
-        <PrimaryButton
-          onClick={
-            onNext
-          }
-        >
-          Review submission
+        <Field label="NID number">
+          <input
+            inputMode="numeric"
+            value={form.nid}
+            onChange={(
+              event,
+            ) =>
+              field(
+                "nid",
+                event.target.value.replace(
+                  /[^\d\s-]/g,
+                  "",
+                ),
+              )
+            }
+            autoComplete="off"
+            placeholder="10, 13 or 17 digits"
+            className="h-12 w-full rounded-2xl border border-border bg-background px-4 text-sm font-semibold text-foreground outline-none transition placeholder:text-muted-foreground focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
+          />
+        </Field>
+      </div>
 
-          <ArrowRight className="h-4 w-4" />
-        </PrimaryButton>
+      <div className="mt-5 flex items-start gap-3 rounded-[20px] border border-indigo-200 bg-indigo-50 p-4 text-[11px] leading-5 text-indigo-800 dark:border-indigo-900/70 dark:bg-indigo-950/25 dark:text-indigo-200">
+        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-400" />
+
+        <div>
+          <p className="font-black">
+            Protected identity information
+          </p>
+
+          <p className="mt-1 opacity-75">
+            Your NID number, date of birth and name
+            are encrypted before they are stored.
+            They are never placed in the processing
+            queue.
+          </p>
+        </div>
       </div>
     </div>
   );
 }
 
 /* =========================================================
-   STEP 3
+   FIELD
 ========================================================= */
 
-function StepReview({
-  documentType,
-  documentNumber,
-  frontImage,
-  backImage,
-  selfieImage,
-  onBack,
-  onSubmit,
-  submitting,
+function Field({
+  label,
+  className = "",
+  children,
 }: {
-  documentType:
-    DocumentType;
+  label: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <label className={className}>
+      <span className="mb-2 block text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+        {label}
+      </span>
 
-  documentNumber:
-    string;
+      {children}
+    </label>
+  );
+}
 
-  frontImage:
-    File | null;
+/* =========================================================
+   DOCUMENTS
+========================================================= */
 
-  backImage:
-    File | null;
-
-  selfieImage:
-    File | null;
-
-  onBack:
-    () => void;
-
-  onSubmit:
-    () => void;
-
-  submitting:
-    boolean;
+function DocumentsStep({
+  form,
+  processingFile,
+  onSelect,
+  onRemove,
+}: {
+  form: FormState;
+  processingFile:
+    | string
+    | null;
+  onSelect: (
+    field:
+      | "frontImage"
+      | "backImage"
+      | "selfieImage",
+    file?: File,
+  ) => void;
+  onRemove: (
+    field:
+      | "frontImage"
+      | "backImage"
+      | "selfieImage",
+  ) => void;
 }) {
   return (
     <div>
-      <div
-        className="
-          flex
-          items-start
-          gap-3
-        "
-      >
-        <div
-          className="
-            flex
-            h-11
-            w-11
-            shrink-0
-            items-center
-            justify-center
-            rounded-[14px]
-            bg-emerald-500/10
-            text-emerald-600
-            dark:text-emerald-400
-          "
-        >
+      <div className="flex items-start gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-50 text-violet-600 dark:bg-violet-950/30 dark:text-violet-300">
           <FileCheck2 className="h-5 w-5" />
         </div>
 
         <div>
-          <h3
-            className="
-              text-base
-              font-extrabold
-              text-card-foreground
-            "
-          >
-            Review your submission
+          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-violet-600 dark:text-violet-400">
+            Step 02
+          </p>
+
+          <h2 className="mt-1 text-xl font-black tracking-tight text-foreground">
+            Identity documents
+          </h2>
+
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Use clear, uncropped images. Each file is
+            optimized and must remain below 1 MB.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-7 grid gap-4 md:grid-cols-2">
+        <UploadCard
+          title="NID front"
+          hint="All details readable"
+          file={
+            form.frontImage
+          }
+          loading={
+            processingFile ===
+            "frontImage"
+          }
+          icon={
+            <FileCheck2 />
+          }
+          onSelect={(
+            file,
+          ) =>
+            onSelect(
+              "frontImage",
+              file,
+            )
+          }
+          onRemove={() =>
+            onRemove(
+              "frontImage",
+            )
+          }
+        />
+
+        <UploadCard
+          title="NID back"
+          hint="Complete back side"
+          file={
+            form.backImage
+          }
+          loading={
+            processingFile ===
+            "backImage"
+          }
+          icon={
+            <FileCheck2 />
+          }
+          onSelect={(
+            file,
+          ) =>
+            onSelect(
+              "backImage",
+              file,
+            )
+          }
+          onRemove={() =>
+            onRemove(
+              "backImage",
+            )
+          }
+        />
+      </div>
+
+      <div className="mt-5 flex items-start gap-3 rounded-[20px] border border-violet-200 bg-violet-50 p-4 text-[11px] leading-5 text-violet-800 dark:border-violet-900/70 dark:bg-violet-950/25 dark:text-violet-200">
+        <Camera className="mt-0.5 h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400" />
+
+        <div>
+          <p className="font-black">
+            Live selfie comes next
+          </p>
+
+          <p className="mt-1 opacity-75">
+            Your selfie will be captured directly
+            from the live camera in the next step.
+            Gallery uploads are not accepted as live
+            evidence.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   LIVENESS LABELS
+========================================================= */
+
+const challengeLabels: Record<
+  ActiveLivenessAction,
+  string
+> = {
+  BLINK:
+    "Blink both eyes naturally",
+
+  TURN_LEFT:
+    "Slowly turn your head left",
+
+  TURN_RIGHT:
+    "Slowly turn your head right",
+};
+
+/* =========================================================
+   BIOMETRICS
+========================================================= */
+
+function BiometricsStep({
+  form,
+  setForm,
+  onError,
+}: {
+  form: FormState;
+  setForm: Dispatch<
+    SetStateAction<FormState>
+  >;
+  onError: (
+    message: string,
+  ) => void;
+}) {
+  const videoRef =
+    useRef<HTMLVideoElement | null>(
+      null,
+    );
+
+  const streamRef =
+    useRef<MediaStream | null>(
+      null,
+    );
+
+  const recorderRef =
+    useRef<MediaRecorder | null>(
+      null,
+    );
+
+  const chunksRef =
+    useRef<Blob[]>([]);
+
+  const sessionRef =
+    useRef<
+      Awaited<
+        ReturnType<
+          typeof createLivenessChallenge
+        >
+      > | null
+    >(null);
+
+  const startedAtRef =
+    useRef("");
+
+  const [
+    cameraStarting,
+    setCameraStarting,
+  ] =
+    useState(false);
+
+  const [
+    recording,
+    setRecording,
+  ] =
+    useState(false);
+
+  const [
+    challengeIndex,
+    setChallengeIndex,
+  ] =
+    useState(0);
+
+  const stopCamera =
+    useCallback(() => {
+      streamRef.current
+        ?.getTracks()
+        .forEach(
+          (
+            track,
+          ) =>
+            track.stop(),
+        );
+
+      streamRef.current =
+        null;
+
+      if (videoRef.current) {
+        videoRef.current.srcObject =
+          null;
+      }
+    }, []);
+
+  useEffect(
+    () => () => {
+      stopCamera();
+    },
+    [stopCamera],
+  );
+
+  /* =======================================================
+     BEGIN LIVE CHECK
+  ====================================================== */
+
+  const beginLiveness =
+    async () => {
+      if (
+        !navigator.mediaDevices
+          ?.getUserMedia ||
+        typeof MediaRecorder ===
+          "undefined"
+      ) {
+        onError(
+          "This browser does not support secure live camera recording. Use a current Chrome or Edge browser.",
+        );
+
+        return;
+      }
+
+      try {
+        setCameraStarting(
+          true,
+        );
+
+        onError("");
+
+        setForm(
+          (
+            current,
+          ) => ({
+            ...current,
+            selfieImage:
+              null,
+            liveness:
+              null,
+          }),
+        );
+
+        const session =
+          await createLivenessChallenge();
+
+        const stream =
+          await navigator.mediaDevices.getUserMedia(
+            {
+              audio: false,
+              video: {
+                facingMode: "user",
+                width: {
+                  ideal: 1280,
+                },
+                height: {
+                  ideal: 720,
+                },
+              },
+            },
+          );
+
+        streamRef.current =
+          stream;
+
+        if (videoRef.current) {
+          videoRef.current.srcObject =
+            stream;
+
+          await videoRef.current.play();
+        }
+
+        const candidates = [
+          "video/webm;codecs=vp9",
+          "video/webm;codecs=vp8",
+          "video/webm",
+          "video/mp4",
+        ];
+
+        const mimeType =
+          candidates.find(
+            (
+              value,
+            ) =>
+              MediaRecorder.isTypeSupported(
+                value,
+              ),
+          );
+
+        const recorder =
+          new MediaRecorder(
+            stream,
+            mimeType
+              ? {
+                  mimeType,
+                }
+              : undefined,
+          );
+
+        chunksRef.current = [];
+
+        recorder.ondataavailable =
+          (
+            event,
+          ) => {
+            if (
+              event.data.size >
+              0
+            ) {
+              chunksRef.current.push(
+                event.data,
+              );
+            }
+          };
+
+        recorder.start(
+          500,
+        );
+
+        recorderRef.current =
+          recorder;
+
+        sessionRef.current =
+          session;
+
+        startedAtRef.current =
+          new Date().toISOString();
+
+        setChallengeIndex(0);
+        setRecording(true);
+      } catch (captureError) {
+        stopCamera();
+
+        onError(
+          captureError instanceof
+            Error
+            ? captureError.message
+            : "Unable to start the live camera.",
+        );
+      } finally {
+        setCameraStarting(
+          false,
+        );
+      }
+    };
+
+  /* =======================================================
+     FINISH LIVE CHECK
+  ====================================================== */
+
+  const finishLiveness =
+    async () => {
+      const recorder =
+        recorderRef.current;
+
+      const session =
+        sessionRef.current;
+
+      const video =
+        videoRef.current;
+
+      if (
+        !recorder ||
+        !session ||
+        !video ||
+        challengeIndex <
+          session.challenges.length
+      ) {
+        return;
+      }
+
+      const completedAt =
+        new Date().toISOString();
+
+      const duration =
+        new Date(
+          completedAt,
+        ).getTime() -
+        new Date(
+          startedAtRef.current,
+        ).getTime();
+
+      if (
+        duration <
+        6000
+      ) {
+        onError(
+          "Keep the camera running for at least 6 seconds, then finish the live check.",
+        );
+
+        return;
+      }
+
+      try {
+        onError("");
+
+        const canvas =
+          document.createElement(
+            "canvas",
+          );
+
+        canvas.width =
+          video.videoWidth ||
+          720;
+
+        canvas.height =
+          video.videoHeight ||
+          720;
+
+        const context =
+          canvas.getContext(
+            "2d",
+          );
+
+        if (!context) {
+          throw new Error(
+            "Unable to capture the live selfie frame.",
+          );
+        }
+
+        context.drawImage(
+          video,
+          0,
+          0,
+          canvas.width,
+          canvas.height,
+        );
+
+        const selfieBlob =
+          await new Promise<Blob>(
+            (
+              resolve,
+              reject,
+            ) => {
+              canvas.toBlob(
+                (
+                  blob,
+                ) => {
+                  if (
+                    blob
+                  ) {
+                    resolve(
+                      blob,
+                    );
+                  } else {
+                    reject(
+                      new Error(
+                        "Unable to create the live selfie.",
+                      ),
+                    );
+                  }
+                },
+                "image/jpeg",
+                0.88,
+              );
+            },
+          );
+
+        const selfie =
+          await compressImage(
+            new File(
+              [
+                selfieBlob,
+              ],
+              "live-selfie.jpg",
+              {
+                type: "image/jpeg",
+              },
+            ),
+          );
+
+        const recordingBlob =
+          await new Promise<Blob>(
+            (
+              resolve,
+              reject,
+            ) => {
+              recorder.onerror =
+                () =>
+                  reject(
+                    new Error(
+                      "Live recording failed.",
+                    ),
+                  );
+
+              recorder.onstop =
+                () => {
+                  const type =
+                    recorder.mimeType.startsWith(
+                      "video/mp4",
+                    )
+                      ? "video/mp4"
+                      : "video/webm";
+
+                  resolve(
+                    new Blob(
+                      chunksRef.current,
+                      {
+                        type,
+                      },
+                    ),
+                  );
+                };
+
+              recorder.stop();
+            },
+          );
+
+        if (
+          !recordingBlob.size ||
+          recordingBlob.size >
+            8 *
+              1024 *
+              1024
+        ) {
+          throw new Error(
+            "The liveness recording must be smaller than 8 MB. Please retry.",
+          );
+        }
+
+        const extension =
+          recordingBlob.type ===
+          "video/mp4"
+            ? "mp4"
+            : "webm";
+
+        const liveness: CompletedLivenessCapture =
+          {
+            session,
+            startedAt:
+              startedAtRef.current,
+            completedAt,
+            selfie,
+            video:
+              new File(
+                [
+                  recordingBlob,
+                ],
+                `active-liveness.${extension}`,
+                {
+                  type:
+                    recordingBlob.type,
+                },
+              ),
+          };
+
+        setForm(
+          (
+            current,
+          ) => ({
+            ...current,
+            selfieImage:
+              selfie,
+            liveness,
+          }),
+        );
+
+        setRecording(false);
+        stopCamera();
+      } catch (captureError) {
+        if (
+          recorder.state !==
+          "inactive"
+        ) {
+          recorder.stop();
+        }
+
+        setRecording(false);
+        stopCamera();
+
+        onError(
+          captureError instanceof
+            Error
+            ? captureError.message
+            : "Unable to finish the live check.",
+        );
+      }
+    };
+
+  const session =
+    sessionRef.current;
+
+  const currentChallenge =
+    session?.challenges[
+      challengeIndex
+    ];
+
+  return (
+    <div>
+      <div className="flex items-start gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-300">
+          <ScanFace className="h-5 w-5" />
+        </div>
+
+        <div>
+          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-indigo-600 dark:text-indigo-400">
+            Step 03
+          </p>
+
+          <h2 className="mt-1 text-xl font-black tracking-tight text-foreground">
+            Live biometric checks
+          </h2>
+
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Complete the live camera challenge. After
+            your identity is verified, you can protect
+            payments with Windows Hello or your device passkey.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-7 grid gap-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(260px,.75fr)]">
+        {/* CAMERA */}
+        <section className="overflow-hidden rounded-[24px] border border-border bg-muted shadow-sm">
+          <div className="relative aspect-video overflow-hidden bg-slate-950">
+            <video
+              ref={videoRef}
+              muted
+              playsInline
+              className={`h-full w-full scale-x-[-1] object-cover ${
+                recording
+                  ? "block"
+                  : "hidden"
+              }`}
+            />
+
+            {!recording && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center text-white">
+                <div className="flex h-16 w-16 items-center justify-center rounded-[20px] border border-violet-200/10 bg-white/[0.07]">
+                  {form.liveness ? (
+                    <CheckCircle2 className="h-8 w-8 text-emerald-400" />
+                  ) : (
+                    <ScanFace className="h-8 w-8 text-violet-300" />
+                  )}
+                </div>
+
+                <p className="mt-4 text-base font-black">
+                  {form.liveness
+                    ? "Live check completed"
+                    : "Camera is off"}
+                </p>
+
+                <p className="mt-2 max-w-sm text-[10px] leading-5 text-slate-400">
+                  Use good lighting and keep your
+                  full face visible.
+                </p>
+              </div>
+            )}
+
+            {recording && (
+              <span className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full border border-rose-200/10 bg-rose-600 px-3 py-1.5 text-[9px] font-black text-white shadow-lg">
+                <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
+                LIVE
+              </span>
+            )}
+          </div>
+
+          <div className="bg-card p-4">
+            {recording &&
+            session ? (
+              <>
+                <div className="grid grid-cols-3 gap-2">
+                  {session.challenges.map(
+                    (
+                      challenge,
+                      index,
+                    ) => (
+                      <div
+                        key={
+                          challenge
+                        }
+                        className={`rounded-xl border p-2.5 text-center text-[9px] font-black ${
+                          index <
+                          challengeIndex
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/25 dark:text-emerald-300"
+                            : index ===
+                              challengeIndex
+                              ? "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-300"
+                              : "border-border bg-muted text-muted-foreground"
+                        }`}
+                      >
+                        {index <
+                        challengeIndex
+                          ? "✓ "
+                          : `${index + 1}. `}
+
+                        {challenge.replace(
+                          "_",
+                          " ",
+                        )}
+                      </div>
+                    ),
+                  )}
+                </div>
+
+                <div className="mt-5 rounded-[18px] border border-indigo-200 bg-indigo-50 p-4 text-center dark:border-indigo-900/60 dark:bg-indigo-950/25">
+                  <p className="text-[8px] font-black uppercase tracking-[0.14em] text-indigo-500 dark:text-indigo-400">
+                    Current action
+                  </p>
+
+                  <p className="mt-1 text-sm font-black text-foreground">
+                    {currentChallenge
+                      ? challengeLabels[
+                          currentChallenge
+                        ]
+                      : "All actions completed"}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    currentChallenge
+                      ? setChallengeIndex(
+                          (
+                            value,
+                          ) =>
+                            value +
+                            1,
+                        )
+                      : void finishLiveness()
+                  }
+                  className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 text-xs font-black text-white transition hover:from-indigo-700 hover:to-violet-700"
+                >
+                  {currentChallenge ? (
+                    <>
+                      <Check className="h-4 w-4" />
+                      I completed this action
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="h-4 w-4" />
+                      Finish live capture
+                    </>
+                  )}
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() =>
+                  void beginLiveness()
+                }
+                disabled={
+                  cameraStarting
+                }
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 text-xs font-black text-white transition hover:from-indigo-700 hover:to-violet-700 disabled:opacity-60"
+              >
+                {cameraStarting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Camera className="h-4 w-4" />
+                )}
+
+                {form.liveness
+                  ? "Retake live check"
+                  : cameraStarting
+                    ? "Starting camera..."
+                    : "Start live camera check"}
+              </button>
+            )}
+          </div>
+        </section>
+
+        {/* DEVICE BIOMETRIC */}
+        <section className="rounded-[24px] border border-border bg-muted/40 p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-card text-violet-600 shadow-sm dark:text-violet-300">
+              <Fingerprint className="h-6 w-6" />
+            </div>
+
+            <span className="rounded-full border border-violet-200 bg-background px-2.5 py-1 text-[8px] font-black text-violet-700 dark:border-violet-800 dark:text-violet-300">
+              After KYC
+            </span>
+          </div>
+
+          <h3 className="mt-5 text-sm font-black text-foreground">
+            Windows Hello protection
           </h3>
 
-          <p
-            className="
-              mt-1
-              text-xs
-              text-muted-foreground
-            "
-          >
-            Check your information before
-            submitting it for review.
+          <p className="mt-2 text-[10px] leading-5 text-muted-foreground">
+            Once e-KYC is verified, register this device
+            using Windows Hello, fingerprint, face unlock,
+            or device PIN. Your biometric never leaves the
+            device; the server stores only a public key.
           </p>
-        </div>
-      </div>
 
-      <div
-        className="
-          mt-6
-          rounded-[18px]
-          border
-          border-border
-          bg-muted/30
-          p-4
-        "
-      >
-        <ReviewRow
-          label="Document type"
-          value={formatDocumentType(
-            documentType
-          )}
-        />
-
-        <ReviewRow
-          label="Document number"
-          value={
-            documentNumber
-          }
-        />
-
-        <ReviewRow
-          label="Front image"
-          value={
-            frontImage?.name ??
-            "Missing"
-          }
-        />
-
-        <ReviewRow
-          label="Back image"
-          value={
-            backImage?.name ??
-            "Not provided"
-          }
-        />
-
-        <ReviewRow
-          label="Selfie"
-          value={
-            selfieImage?.name ??
-            "Missing"
-          }
-          last
-        />
-      </div>
-
-      <div
-        className="
-          mt-5
-          rounded-[16px]
-          border
-          border-primary/15
-          bg-primary/5
-          p-4
-        "
-      >
-        <div className="flex gap-3">
-          <LockKeyhole
-            className="
-              mt-0.5
-              h-4
-              w-4
-              shrink-0
-              text-primary
-            "
-          />
-
-          <p
-            className="
-              text-[10px]
-              leading-5
-              text-muted-foreground
-            "
-          >
-            By submitting, you confirm that
-            the information and uploaded
-            documents belong to you and are
-            accurate.
-          </p>
-        </div>
-      </div>
-
-      <div
-        className="
-          mt-7
-          flex
-          flex-col-reverse
-          gap-3
-          sm:flex-row
-          sm:items-center
-          sm:justify-between
-        "
-      >
-        <SecondaryButton
-          onClick={
-            onBack
-          }
-          disabled={
-            submitting
-          }
-        >
-          <ArrowLeft className="h-4 w-4" />
-
-          Back
-        </SecondaryButton>
-
-        <button
-          type="button"
-          onClick={
-            onSubmit
-          }
-          disabled={
-            submitting
-          }
-          className="
-            flex
-            h-12
-            items-center
-            justify-center
-            gap-2
-            rounded-[14px]
-            bg-primary
-            px-6
-            text-[11px]
-            font-extrabold
-            text-primary-foreground
-            shadow-[0_10px_25px_rgba(79,70,229,0.2)]
-            transition
-            hover:brightness-105
-            disabled:cursor-not-allowed
-            disabled:opacity-60
-          "
-        >
-          {submitting ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-
-              Uploading securely...
-            </>
-          ) : (
-            <>
-              <ShieldCheck className="h-4 w-4" />
-
-              Submit for Verification
-            </>
-          )}
-        </button>
+          <div className="mt-5 flex items-start gap-3 rounded-[18px] border border-indigo-200 bg-indigo-50 p-4 dark:border-indigo-900/60 dark:bg-indigo-950/25">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-400" />
+            <p className="text-[10px] leading-5 text-indigo-800 dark:text-indigo-200">
+              This is real WebAuthn device verification,
+              not a simulated fingerprint capture.
+            </p>
+          </div>
+        </section>
       </div>
     </div>
   );
@@ -3582,732 +2224,717 @@ function StepReview({
 ========================================================= */
 
 function UploadCard({
-  id,
-  icon: Icon,
   title,
-  description,
-  required,
+  hint,
   file,
-  onChange,
+  loading,
+  icon,
+  onSelect,
   onRemove,
-  selfie = false,
+  capture,
 }: {
-  id: string;
-
-  icon:
-    React.ElementType;
-
-  title:
-    string;
-
-  description:
-    string;
-
-  required:
-    boolean;
-
-  file:
-    File | null;
-
-  onChange:
-    (
-      file: File | null
-    ) => void;
-
-  onRemove:
-    () => void;
-
-  selfie?: boolean;
+  title: string;
+  hint: string;
+  file: File | null;
+  loading: boolean;
+  icon: ReactNode;
+  onSelect: (
+    file?: File,
+  ) => void;
+  onRemove: () => void;
+  capture?: "user";
 }) {
-  const [
-    previewUrl,
-    setPreviewUrl,
-  ] =
-    useState<string | null>(
-      null
-    );
-
-  useEffect(() => {
-    if (!file) {
-      setPreviewUrl(
-        null
-      );
-
-      return;
-    }
-
-    const url =
-      URL.createObjectURL(
+  const preview =
+    useMemo(
+      () =>
         file
-      );
-
-    setPreviewUrl(
-      url
+          ? URL.createObjectURL(
+              file,
+            )
+          : "",
+      [file],
     );
 
-    return () => {
-      URL.revokeObjectURL(
-        url
-      );
-    };
-  }, [
-    file,
-  ]);
+  const fileName =
+    file?.name ?? "";
 
-  if (
-    file &&
-    previewUrl
-  ) {
-    return (
-      <div
-        className="
-          overflow-hidden
-          rounded-[18px]
-          border
-          border-emerald-500/20
-          bg-card
-          shadow-sm
-        "
-      >
-        <div
-          className="
-            relative
-            h-[190px]
-            overflow-hidden
-            bg-muted
-          "
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={
-              previewUrl
-            }
-            alt={title}
-            className={`
-              h-full
-              w-full
-              ${
-                selfie
-                  ? "object-cover"
-                  : "object-contain"
-              }
-            `}
-          />
-
-          <div
-            className="
-              absolute
-              inset-x-0
-              bottom-0
-              h-20
-              bg-gradient-to-t
-              from-black/50
-              to-transparent
-            "
-          />
-
-          <button
-            type="button"
-            onClick={
-              onRemove
-            }
-            className="
-              absolute
-              right-3
-              top-3
-              flex
-              h-8
-              w-8
-              items-center
-              justify-center
-              rounded-[10px]
-              bg-black/55
-              text-white
-              backdrop-blur-md
-              transition
-              hover:bg-rose-500
-            "
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-
-          <div
-            className="
-              absolute
-              bottom-3
-              left-3
-              right-3
-              flex
-              items-center
-              gap-2
-              text-white
-            "
-          >
-            <CheckCircle2 className="h-4 w-4 text-emerald-300" />
-
-            <p
-              className="
-                min-w-0
-                flex-1
-                truncate
-                text-[10px]
-                font-bold
-              "
-            >
-              {
-                file.name
-              }
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <label
-      htmlFor={id}
-      className="
-        group
-        flex
-        min-h-[190px]
-        cursor-pointer
-        flex-col
-        items-center
-        justify-center
-        rounded-[18px]
-        border
-        border-dashed
-        border-border
-        bg-muted/20
-        p-5
-        text-center
-        transition-all
-        duration-200
-        hover:border-primary/40
-        hover:bg-primary/5
-      "
-    >
-      <input
-        id={id}
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        className="hidden"
-        onChange={(
-          event
-        ) => {
-          const selected =
-            event.target.files?.[0] ??
-            null;
-
-          onChange(
-            selected
-          );
-
-          event.target.value =
-            "";
-        }}
-      />
-
-      <div
-        className="relative"
-      >
-        <div
-          className="
-            flex
-            h-12
-            w-12
-            items-center
-            justify-center
-            rounded-[15px]
-            bg-primary/10
-            text-primary
-            transition
-            group-hover:scale-105
-            group-hover:bg-primary
-            group-hover:text-primary-foreground
-          "
-        >
-          <Icon className="h-5 w-5" />
-        </div>
-
-        <div
-          className="
-            absolute
-            -bottom-1
-            -right-1
-            flex
-            h-5
-            w-5
-            items-center
-            justify-center
-            rounded-full
-            border-2
-            border-card
-            bg-slate-900
-            text-white
-            dark:bg-white
-            dark:text-slate-900
-          "
-        >
-          <UploadCloud className="h-2.5 w-2.5" />
-        </div>
-      </div>
-
-      <p
-        className="
-          mt-4
-          text-xs
-          font-extrabold
-          text-card-foreground
-        "
-      >
-        {title}
-
-        {required && (
-          <span className="ml-1 text-rose-500">
-            *
-          </span>
-        )}
-      </p>
-
-      <p
-        className="
-          mt-1
-          text-[9px]
-          text-muted-foreground
-        "
-      >
-        {description}
-      </p>
-
-      <span
-        className="
-          mt-3
-          rounded-full
-          bg-card
-          px-3
-          py-1.5
-          text-[8px]
-          font-bold
-          text-muted-foreground
-          shadow-sm
-          ring-1
-          ring-border
-        "
-      >
-        Click to upload
-      </span>
-    </label>
+  useEffect(
+    () => () => {
+      if (preview) {
+        URL.revokeObjectURL(
+          preview,
+        );
+      }
+    },
+    [preview],
   );
-}
 
-/* =========================================================
-   REQUIREMENT CARD
-========================================================= */
-
-function RequirementCard({
-  number,
-  icon: Icon,
-  title,
-  description,
-}: {
-  number: string;
-
-  icon:
-    React.ElementType;
-
-  title:
-    string;
-
-  description:
-    string;
-}) {
   return (
     <motion.div
       whileHover={{
-        y: -3,
+        y: -2,
       }}
       transition={{
         duration: 0.2,
       }}
-      className="
-        rounded-[18px]
-        border
-        border-border
-        bg-muted/30
-        p-4
-        transition-shadow
-        hover:shadow-[0_12px_30px_rgba(17,47,78,0.06)]
-      "
+      className={`relative min-h-[255px] overflow-hidden rounded-[24px] border-2 border-dashed ${
+        file
+          ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900/60 dark:bg-emerald-950/20"
+          : "border-violet-200 bg-violet-50/50 dark:border-violet-900/60 dark:bg-violet-950/20"
+      }`}
     >
-      <div
-        className="
-          flex
-          items-center
-          justify-between
-        "
-      >
-        <div
-          className="
-            flex
-            h-10
-            w-10
-            items-center
-            justify-center
-            rounded-[12px]
-            bg-primary/10
-            text-primary
-          "
-        >
-          <Icon className="h-[17px] w-[17px]" />
-        </div>
+      {preview ? (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={preview}
+            alt={`${title} preview`}
+            className="h-[175px] w-full object-cover"
+          />
 
-        <span
-          className="
-            text-[9px]
-            font-black
-            text-muted-foreground/50
-          "
-        >
-          {number}
-        </span>
-      </div>
+          <div className="border-t border-border bg-card p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
 
-      <h3
-        className="
-          mt-4
-          text-[11px]
-          font-extrabold
-          text-card-foreground
-        "
-      >
-        {title}
-      </h3>
+                  <p className="truncate text-xs font-black text-foreground">
+                    {title}
+                  </p>
+                </div>
 
-      <p
-        className="
-          mt-1.5
-          text-[9px]
-          leading-4
-          text-muted-foreground
-        "
-      >
-        {description}
-      </p>
+                <p className="mt-1 truncate text-[9px] text-muted-foreground">
+                  {fileName}
+                </p>
+              </div>
+
+              <span className="rounded-full bg-emerald-50 px-2 py-1 text-[8px] font-black text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
+                Ready
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={onRemove}
+              className="mt-2 text-[10px] font-bold text-rose-600 hover:underline dark:text-rose-400"
+            >
+              Remove and replace
+            </button>
+          </div>
+        </>
+      ) : (
+        <label className="flex min-h-[255px] cursor-pointer flex-col items-center justify-center p-6 text-center transition hover:bg-card">
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            capture={capture}
+            className="sr-only"
+            onChange={(event) =>
+              onSelect(
+                event.target.files?.[0],
+              )
+            }
+          />
+
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-card text-violet-600 shadow-sm ring-1 ring-violet-100 dark:text-violet-300 dark:ring-violet-900/60">
+            {loading ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              icon
+            )}
+          </span>
+
+          <span className="mt-4 text-sm font-black text-foreground">
+            {loading
+              ? "Optimizing..."
+              : title}
+          </span>
+
+          <span className="mt-1 max-w-[220px] text-[10px] leading-5 text-muted-foreground">
+            {hint}
+          </span>
+
+          <span className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-[9px] font-black text-violet-700 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-300">
+            <UploadCloud className="h-3.5 w-3.5" />
+            Choose image
+          </span>
+
+          <span className="mt-3 text-[8px] font-semibold text-muted-foreground">
+            JPG · PNG · WEBP
+          </span>
+        </label>
+      )}
     </motion.div>
   );
 }
 
 /* =========================================================
-   INFO ROW
+   REVIEW
 ========================================================= */
 
-function InfoRow({
-  label,
-  value,
+function ReviewStep({
+  form,
 }: {
-  label:
-    string;
-
-  value:
-    string;
+  form: FormState;
 }) {
-  return (
-    <div
-      className="
-        flex
-        items-center
-        justify-between
-        gap-4
-        py-1
-      "
-    >
-      <span
-        className="
-          text-[9px]
-          text-muted-foreground
-        "
-      >
-        {label}
-      </span>
+  const rows = [
+    [
+      "Full name",
+      form.claimedName,
+    ],
 
-      <span
-        className="
-          max-w-[170px]
-          truncate
-          text-right
-          text-[9px]
-          font-bold
-          text-card-foreground
-        "
-      >
-        {value}
-      </span>
+    [
+      "Date of birth",
+      form.dateOfBirth,
+    ],
+
+    [
+      "NID number",
+      form.nid.replace(
+        /\d(?=\d{4})/g,
+        "•",
+      ),
+    ],
+
+    [
+      "NID front",
+      form.frontImage?.name ||
+        "Missing",
+    ],
+
+    [
+      "NID back",
+      form.backImage?.name ||
+        "Missing",
+    ],
+
+    [
+      "Selfie",
+      form.selfieImage?.name ||
+        "Missing",
+    ],
+
+    [
+      "Live challenge",
+      form.liveness
+        ? "Completed"
+        : "Missing",
+    ],
+
+    [
+      "Device biometric",
+      "Windows Hello setup becomes available after verification",
+    ],
+  ];
+
+  return (
+    <div>
+      <div className="flex items-start gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-50 text-violet-600 dark:bg-violet-950/30 dark:text-violet-300">
+          <CheckCircle2 className="h-5 w-5" />
+        </div>
+
+        <div>
+          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-violet-600 dark:text-violet-400">
+            Step 04
+          </p>
+
+          <h2 className="mt-1 text-xl font-black tracking-tight text-foreground">
+            Review and submit
+          </h2>
+
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            Confirm the information before starting
+            automated verification.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-7 overflow-hidden rounded-[22px] border border-border bg-card">
+        {rows.map(
+          (
+            [label, value],
+            index,
+          ) => (
+            <div
+              key={label}
+              className={`flex items-center justify-between gap-5 px-4 py-4 ${
+                index <
+                rows.length - 1
+                  ? "border-b border-border"
+                  : ""
+              }`}
+            >
+              <div className="min-w-0">
+                <p className="text-[8px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+                  {label}
+                </p>
+
+                <p className="mt-1 truncate text-xs font-bold text-foreground">
+                  {value}
+                </p>
+              </div>
+
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+            </div>
+          ),
+        )}
+      </div>
+
+      <div className="mt-5 flex items-start gap-3 rounded-[20px] border border-amber-200 bg-amber-50 p-4 text-[11px] leading-5 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/25 dark:text-amber-200">
+        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+
+        <div>
+          <p className="font-black">
+            Final confirmation
+          </p>
+
+          <p className="mt-1 opacity-75">
+            By submitting, you confirm that the
+            information and images belong to you and
+            may be used only for identity verification
+            and fraud prevention.
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
 
 /* =========================================================
-   REVIEW ROW
+   SECURITY ASIDE
 ========================================================= */
 
-function ReviewRow({
-  label,
-  value,
-  last = false,
-}: {
-  label:
-    string;
+function SecurityAside() {
+  const items = [
+    [
+      "Encrypted identity fields",
+      "AES-256-GCM protects sensitive values at rest.",
+    ],
 
-  value:
-    string;
+    [
+      "Private image delivery",
+      "Workers receive short-lived signed evidence URLs.",
+    ],
 
-  last?: boolean;
-}) {
-  return (
-    <div
-      className={`
-        flex
-        flex-col
-        gap-1.5
-        py-3
-        sm:flex-row
-        sm:items-center
-        sm:justify-between
-        ${
-          !last
-            ? "border-b border-border"
-            : ""
-        }
-      `}
-    >
-      <span
-        className="
-          text-[10px]
-          text-muted-foreground
-        "
-      >
-        {label}
-      </span>
+    [
+      "Layered verification",
+      "OCR, liveness, identity, duplicate and compliance checks.",
+    ],
 
-      <span
-        className="
-          max-w-[300px]
-          truncate
-          text-[10px]
-          font-bold
-          text-card-foreground
-        "
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
-
-/* =========================================================
-   PRIMARY BUTTON
-========================================================= */
-
-function PrimaryButton({
-  children,
-  onClick,
-  disabled = false,
-}: {
-  children:
-    React.ReactNode;
-
-  onClick:
-    () => void;
-
-  disabled?:
-    boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={
-        onClick
-      }
-      disabled={
-        disabled
-      }
-      className="
-        flex
-        h-11
-        items-center
-        justify-center
-        gap-2
-        rounded-[13px]
-        bg-primary
-        px-5
-        text-[11px]
-        font-extrabold
-        text-primary-foreground
-        shadow-[0_8px_20px_rgba(79,70,229,0.16)]
-        transition
-        hover:brightness-105
-        disabled:cursor-not-allowed
-        disabled:opacity-60
-      "
-    >
-      {children}
-    </button>
-  );
-}
-
-/* =========================================================
-   SECONDARY BUTTON
-========================================================= */
-
-function SecondaryButton({
-  children,
-  onClick,
-  disabled = false,
-}: {
-  children:
-    React.ReactNode;
-
-  onClick:
-    () => void;
-
-  disabled?:
-    boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={
-        onClick
-      }
-      disabled={
-        disabled
-      }
-      className="
-        flex
-        h-11
-        items-center
-        justify-center
-        gap-2
-        rounded-[13px]
-        border
-        border-border
-        bg-background
-        px-4
-        text-[11px]
-        font-bold
-        text-muted-foreground
-        transition
-        hover:border-primary/30
-        hover:bg-primary/5
-        hover:text-primary
-        disabled:cursor-not-allowed
-        disabled:opacity-60
-      "
-    >
-      {children}
-    </button>
-  );
-}
-
-/* =========================================================
-   MESSAGE ALERT
-========================================================= */
-
-function MessageAlert({
-  type,
-  message,
-  onClose,
-}: {
-  type:
-    | "error"
-    | "success";
-
-  message:
-    string;
-
-  onClose:
-    () => void;
-}) {
-  const success =
-    type ===
-    "success";
-
-  const Icon =
-    success
-      ? CheckCircle2
-      : AlertCircle;
+    [
+      "Tamper-evident history",
+      "Important actions are written to a hash-linked audit trail.",
+    ],
+  ];
 
   return (
-    <motion.div
+    <motion.aside
       initial={{
         opacity: 0,
-        y: -12,
+        x: 12,
+      }}
+      animate={{
+        opacity: 1,
+        x: 0,
+      }}
+      transition={{
+        duration: 0.4,
+      }}
+      className="relative overflow-hidden rounded-[30px] border border-violet-900/40 bg-gradient-to-br from-[#170C35] via-[#28144F] to-[#4A2A82] p-6 text-white shadow-[0_22px_65px_rgba(48,31,105,.18)]"
+    >
+      <div className="pointer-events-none absolute -right-16 -top-14 h-48 w-48 rounded-full bg-violet-300/10 blur-3xl" />
+
+      <div className="relative z-10">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/10">
+          <ShieldCheck className="h-5 w-5 text-violet-200" />
+        </div>
+
+        <p className="mt-5 text-[9px] font-black uppercase tracking-[0.16em] text-violet-200/60">
+          Secure pipeline
+        </p>
+
+        <h2 className="mt-1 text-xl font-black">
+          Protected verification
+        </h2>
+
+        <p className="mt-2 text-xs leading-5 text-violet-100/55">
+          Your evidence moves through a restricted
+          verification pipeline.
+        </p>
+
+        <div className="mt-7 space-y-5">
+          {items.map(
+            (
+              [title, text],
+              index,
+            ) => (
+              <motion.div
+                key={title}
+                initial={{
+                  opacity: 0,
+                  y: 8,
+                }}
+                animate={{
+                  opacity: 1,
+                  y: 0,
+                }}
+                transition={{
+                  delay:
+                    0.08 +
+                    index *
+                      0.06,
+                }}
+                className="flex gap-3"
+              >
+                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-400/10 text-violet-200">
+                  <Check className="h-3 w-3" />
+                </span>
+
+                <div>
+                  <p className="text-[10px] font-black text-white">
+                    {title}
+                  </p>
+
+                  <p className="mt-1 text-[9px] leading-4 text-slate-400">
+                    {text}
+                  </p>
+                </div>
+              </motion.div>
+            ),
+          )}
+        </div>
+      </div>
+    </motion.aside>
+  );
+}
+
+/* =========================================================
+   STATUS PANEL
+========================================================= */
+
+function StatusPanel({
+  verification,
+  onStartAgain,
+}: {
+  verification: EKYCVerification;
+  onStartAgain: () => void;
+}) {
+  const [passkeys, setPasskeys] =
+    useState<PasskeySummary[]>([]);
+
+  const [passkeyLoading, setPasskeyLoading] =
+    useState(false);
+
+  const [passkeyMessage, setPasskeyMessage] =
+    useState("");
+
+  const loadRegisteredPasskeys =
+    useCallback(async () => {
+      if (verification.status !== "VERIFIED") {
+        return;
+      }
+
+      try {
+        const registered =
+          await getPasskeys();
+
+        setPasskeys(registered);
+      } catch (passkeyError) {
+        setPasskeyMessage(
+          passkeyError instanceof Error
+            ? passkeyError.message
+            : "Unable to load registered devices.",
+        );
+      }
+    }, [verification.status]);
+
+  useEffect(() => {
+    void loadRegisteredPasskeys();
+  }, [loadRegisteredPasskeys]);
+
+  const setupDevicePasskey =
+    async () => {
+      try {
+        setPasskeyLoading(true);
+        setPasskeyMessage("");
+
+        await registerDevicePasskey(
+          "Windows Hello",
+        );
+
+        await loadRegisteredPasskeys();
+        setPasskeyMessage(
+          "Windows Hello was registered successfully.",
+        );
+      } catch (passkeyError) {
+        setPasskeyMessage(
+          passkeyError instanceof Error
+            ? passkeyError.message
+            : "Windows Hello registration failed.",
+        );
+      } finally {
+        setPasskeyLoading(false);
+      }
+    };
+
+  const config =
+    statusContent[
+      verification.status
+    ];
+
+  const Icon =
+    config.icon;
+
+  const activeStep =
+    verification.status ===
+    "QUEUED"
+      ? 1
+      : verification.status ===
+          "PROCESSING"
+        ? 2
+        : 3;
+
+  return (
+    <motion.section
+      initial={{
+        opacity: 0,
+        y: 14,
       }}
       animate={{
         opacity: 1,
         y: 0,
       }}
-      exit={{
-        opacity: 0,
-        y: -8,
+      transition={{
+        duration: 0.4,
       }}
-      className={`
-        flex
-        items-start
-        gap-3
-        rounded-[16px]
-        border
-        p-4
-        ${
-          success
-            ? "border-emerald-500/20 bg-emerald-500/10"
-            : "border-rose-500/20 bg-rose-500/10"
-        }
-      `}
+      className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]"
     >
-      <Icon
-        className={`
-          mt-0.5
-          h-4
-          w-4
-          shrink-0
-          ${
-            success
-              ? "text-emerald-600 dark:text-emerald-400"
-              : "text-rose-600 dark:text-rose-400"
-          }
-        `}
-      />
+      <div className="overflow-hidden rounded-[30px] border border-border bg-card shadow-[0_18px_55px_rgba(49,32,106,.06)] dark:shadow-none">
+        <div className="relative overflow-hidden bg-muted/35 p-6 sm:p-8">
+          <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-violet-500/5 blur-3xl" />
 
-      <p
-        className={`
-          min-w-0
-          flex-1
-          text-xs
-          font-semibold
-          leading-5
-          ${
-            success
-              ? "text-emerald-700 dark:text-emerald-300"
-              : "text-rose-700 dark:text-rose-300"
-          }
-        `}
-      >
-        {message}
-      </p>
+          <div className="relative z-10">
+            <div
+              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.13em] ${config.tone}`}
+            >
+              <Icon
+                className={`h-4 w-4 ${
+                  verification.status ===
+                  "PROCESSING"
+                    ? "animate-pulse"
+                    : ""
+                }`}
+              />
 
-      <button
-        type="button"
-        onClick={
-          onClose
-        }
-        className="shrink-0 text-muted-foreground"
-      >
-        <X className="h-4 w-4" />
-      </button>
-    </motion.div>
+              {verification.status.replaceAll(
+                "_",
+                " ",
+              )}
+            </div>
+
+            <h2 className="mt-6 text-2xl font-black tracking-tight text-foreground sm:text-3xl">
+              {config.title}
+            </h2>
+
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+              {
+                config.description
+              }
+            </p>
+
+            {verification.status ===
+              "REJECTED" && (
+              <div className="mt-5 flex items-start gap-3 rounded-[20px] border border-rose-200 bg-rose-50 p-4 dark:border-rose-900/60 dark:bg-rose-950/20">
+                <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600 dark:text-rose-400" />
+
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.12em] text-rose-600 dark:text-rose-400">
+                    Review reason
+                  </p>
+
+                  <p className="mt-1 text-xs leading-5 text-rose-700 dark:text-rose-200">
+                    {reasonMessage(
+                      verification.reasonCodes,
+                    )}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-8 grid gap-3 sm:grid-cols-3">
+              {[
+                "Application secured",
+                "Automated checks",
+                "Final decision",
+              ].map(
+                (
+                  label,
+                  index,
+                ) => {
+                  const done =
+                    index + 1 <=
+                    activeStep;
+
+                  return (
+                    <div
+                      key={label}
+                      className={`rounded-[20px] border p-4 ${
+                        done
+                          ? "border-indigo-200 bg-indigo-50 dark:border-indigo-900/60 dark:bg-indigo-950/25"
+                          : "border-border bg-muted"
+                      }`}
+                    >
+                      <div
+                        className={`flex h-8 w-8 items-center justify-center rounded-xl ${
+                          done
+                            ? "bg-gradient-to-br from-indigo-600 to-violet-600 text-white"
+                            : "bg-muted-foreground/10 text-muted-foreground"
+                        }`}
+                      >
+                        {done ? (
+                          <Check className="h-4 w-4" />
+                        ) : (
+                          index + 1
+                        )}
+                      </div>
+
+                      <p
+                        className={`mt-3 text-[9px] font-black ${
+                          done
+                            ? "text-indigo-700 dark:text-indigo-300"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {label}
+                      </p>
+                    </div>
+                  );
+                },
+              )}
+            </div>
+
+            {verification.canResubmit && (
+              <button
+                type="button"
+                onClick={
+                  onStartAgain
+                }
+                className="mt-7 inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 text-xs font-black text-white shadow-[0_12px_24px_rgba(79,70,229,.20)] transition hover:from-indigo-700 hover:to-violet-700"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Start a new attempt
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-[30px] border border-border bg-card p-6 shadow-[0_14px_45px_rgba(49,32,106,.05)] dark:shadow-none">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-300">
+            <FileCheck2 className="h-5 w-5" />
+          </div>
+
+          <div>
+            <p className="text-[9px] font-black uppercase tracking-[0.15em] text-muted-foreground">
+              Verification reference
+            </p>
+
+            <p className="mt-1 text-xs font-black text-foreground">
+              Current application
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-5 rounded-[20px] border border-indigo-200 bg-indigo-50 p-4 dark:border-indigo-900/60 dark:bg-indigo-950/25">
+          <p className="text-[8px] font-black uppercase tracking-[0.13em] text-indigo-500 dark:text-indigo-400">
+            Reference ID
+          </p>
+
+          <p className="mt-2 break-all font-mono text-xs font-bold leading-5 text-indigo-900 dark:text-indigo-200">
+            {verification.id}
+          </p>
+        </div>
+
+        <div className="mt-5 border-t border-border pt-5">
+          <p className="text-[9px] font-black uppercase tracking-[0.15em] text-muted-foreground">
+            Submitted
+          </p>
+
+          <p className="mt-2 text-xs font-bold text-foreground">
+            {verification.submittedAt
+              ? new Date(
+                  verification.submittedAt,
+                ).toLocaleString()
+              : "Just now"}
+          </p>
+        </div>
+
+        <div className="mt-5 rounded-[20px] border border-violet-200 bg-violet-50 p-4 dark:border-violet-900/60 dark:bg-violet-950/20">
+          <div className="flex items-start gap-3">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400" />
+
+            <p className="text-[10px] leading-5 text-muted-foreground">
+              Do not share your verification
+              reference or identity images with
+              anyone.
+            </p>
+          </div>
+        </div>
+
+        {verification.status === "VERIFIED" && (
+          <div className="mt-5 rounded-[20px] border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/20">
+            <div className="flex items-start gap-3">
+              <Fingerprint className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+
+              <div className="min-w-0 flex-1">
+                <p className="text-[9px] font-black uppercase tracking-[0.13em] text-emerald-600 dark:text-emerald-400">
+                  Payment protection
+                </p>
+
+                <p className="mt-1 text-xs font-black text-foreground">
+                  {passkeys.length > 0
+                    ? `${passkeys.length} device passkey${passkeys.length === 1 ? "" : "s"} registered`
+                    : "Set up Windows Hello"}
+                </p>
+
+                <p className="mt-2 text-[10px] leading-5 text-muted-foreground">
+                  Approve future payments with the biometric or PIN protected by this device. The server stores only the credential public key.
+                </p>
+
+                {passkeyMessage && (
+                  <p className="mt-3 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
+                    {passkeyMessage}
+                  </p>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    void setupDevicePasskey()
+                  }
+                  disabled={passkeyLoading}
+                  className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-[10px] font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {passkeyLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Fingerprint className="h-4 w-4" />
+                  )}
+
+                  {passkeyLoading
+                    ? "Waiting for Windows Hello..."
+                    : passkeys.length > 0
+                      ? "Add another device"
+                      : "Set up this device"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </motion.section>
   );
 }
 
@@ -4315,322 +2942,38 @@ function MessageAlert({
    LOADING
 ========================================================= */
 
-function KYCLoadingState() {
+function LoadingState() {
   return (
-    <div
-      className="
-        flex
-        min-h-[65vh]
-        items-center
-        justify-center
-        bg-background
-      "
-    >
-      <div
-        className="
-          flex
-          flex-col
-          items-center
-          text-center
-        "
-      >
-        <div
-          className="
-            relative
-            flex
-            h-16
-            w-16
-            items-center
-            justify-center
-            rounded-[20px]
-            bg-primary
-            text-primary-foreground
-            shadow-[0_15px_35px_rgba(79,70,229,0.2)]
-          "
-        >
-          <Fingerprint className="h-7 w-7" />
+    <main className="min-h-screen bg-background px-4 py-8">
+      <div className="mx-auto max-w-7xl">
+        <div className="overflow-hidden rounded-[30px] border border-border bg-card">
+          <div className="h-36 animate-pulse bg-gradient-to-r from-indigo-950/10 via-violet-950/10 to-slate-500/10" />
 
-          <div
-            className="
-              absolute
-              -inset-2
-              animate-ping
-              rounded-[24px]
-              border
-              border-primary/30
-            "
-          />
+          <div className="space-y-4 p-6 sm:p-8">
+            <div className="h-5 w-36 animate-pulse rounded-full bg-muted" />
+
+            <div className="h-8 w-64 animate-pulse rounded-xl bg-muted" />
+
+            <div className="h-4 max-w-xl animate-pulse rounded-full bg-muted" />
+
+            <div className="grid gap-4 pt-3 lg:grid-cols-[1fr_320px]">
+              <div className="h-52 animate-pulse rounded-2xl bg-muted" />
+
+              <div className="h-52 animate-pulse rounded-2xl bg-muted" />
+            </div>
+          </div>
         </div>
 
-        <h3
-          className="
-            mt-5
-            text-sm
-            font-extrabold
-            text-foreground
-          "
-        >
-          Loading verification
-        </h3>
+        <div className="flex items-center justify-center pt-8">
+          <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-5 py-3 shadow-sm">
+            <Loader2 className="h-5 w-5 animate-spin text-violet-600 dark:text-violet-400" />
 
-        <p
-          className="
-            mt-1
-            text-[10px]
-            text-muted-foreground
-          "
-        >
-          Checking your KYC status...
-        </p>
+            <p className="text-xs font-black text-muted-foreground">
+              Loading advanced e-KYC...
+            </p>
+          </div>
+        </div>
       </div>
-    </div>
-  );
-}
-
-/* =========================================================
-   STATUS CONFIG
-========================================================= */
-
-function getStatusConfig(
-  status: KYCStatus
-) {
-  switch (
-    status
-  ) {
-    case "pending":
-      return {
-        label:
-          "Pending",
-
-        title:
-          "Verification submitted",
-
-        description:
-          "Your identity documents have been submitted and are waiting for review.",
-
-        icon:
-          Clock3,
-      };
-
-    case "under_review":
-      return {
-        label:
-          "Under Review",
-
-        title:
-          "Review in progress",
-
-        description:
-          "Your submission is currently being reviewed by the verification team.",
-
-        icon:
-          ScanFace,
-      };
-
-    case "verified":
-      return {
-        label:
-          "Verified",
-
-        title:
-          "Identity verified",
-
-        description:
-          "Your identity has been successfully verified and your account is protected.",
-
-        icon:
-          BadgeCheck,
-      };
-
-    case "rejected":
-      return {
-        label:
-          "Needs Update",
-
-        title:
-          "Verification requires attention",
-
-        description:
-          "Your previous submission could not be approved. Review the feedback and submit again.",
-
-        icon:
-          AlertCircle,
-      };
-
-    default:
-      return {
-        label:
-          "Not Started",
-
-        title:
-          "Complete identity verification",
-
-        description:
-          "Start verification to protect your wallet and unlock verified account actions.",
-
-        icon:
-          Fingerprint,
-      };
-  }
-}
-
-/* =========================================================
-   STATUS ICON THEME
-========================================================= */
-
-function getStatusIconTheme(
-  status: KYCStatus
-): string {
-  switch (
-    status
-  ) {
-    case "pending":
-      return "bg-amber-500/10 text-amber-600 dark:text-amber-400";
-
-    case "under_review":
-      return "bg-primary/10 text-primary";
-
-    case "verified":
-      return "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
-
-    case "rejected":
-      return "bg-rose-500/10 text-rose-600 dark:text-rose-400";
-
-    default:
-      return "bg-primary/10 text-primary";
-  }
-}
-
-/* =========================================================
-   STATUS BADGE THEME
-========================================================= */
-
-function getStatusBadgeTheme(
-  status: KYCStatus
-): string {
-  switch (
-    status
-  ) {
-    case "pending":
-      return "bg-amber-500/10 text-amber-700 dark:text-amber-300";
-
-    case "under_review":
-      return "bg-primary/10 text-primary";
-
-    case "verified":
-      return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
-
-    case "rejected":
-      return "bg-rose-500/10 text-rose-700 dark:text-rose-300";
-
-    default:
-      return "bg-muted text-muted-foreground";
-  }
-}
-
-/* =========================================================
-   DOCUMENT TYPE
-========================================================= */
-
-function formatDocumentType(
-  type: DocumentType
-): string {
-  if (
-    type ===
-    "nid"
-  ) {
-    return "National ID";
-  }
-
-  if (
-    type ===
-    "driving_license"
-  ) {
-    return "Driving License";
-  }
-
-  return "Passport";
-}
-
-/* =========================================================
-   MASK DOCUMENT
-========================================================= */
-
-function maskDocumentNumber(
-  value: string
-): string {
-  if (
-    value.length <=
-    4
-  ) {
-    return value;
-  }
-
-  return `${"•".repeat(
-    Math.min(
-      8,
-      value.length -
-        4
-    )
-  )}${value.slice(
-    -4
-  )}`;
-}
-
-/* =========================================================
-   DATE
-========================================================= */
-
-function formatDate(
-  value: string
-): string {
-  const date =
-    new Date(
-      value
-    );
-
-  if (
-    Number.isNaN(
-      date.getTime()
-    )
-  ) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat(
-    "en-US",
-    {
-      day:
-        "2-digit",
-
-      month:
-        "short",
-
-      year:
-        "numeric",
-
-      hour:
-        "2-digit",
-
-      minute:
-        "2-digit",
-    }
-  ).format(
-    date
-  );
-}
-
-/* =========================================================
-   CAPITALIZE
-========================================================= */
-
-function capitalize(
-  value: string
-): string {
-  return (
-    value
-      .charAt(0)
-      .toUpperCase() +
-    value.slice(1)
+    </main>
   );
 }
