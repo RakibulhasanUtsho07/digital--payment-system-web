@@ -16,12 +16,12 @@ export default function KYCVerificationChecks({
   checks: VerificationCheck[];
 }) {
   return (
-    <section className="rounded-[22px] border border-[#DCE7F0] bg-white p-5">
-      <p className="text-[8px] font-black uppercase tracking-[0.14em] text-[#5B8BB7]">
+    <section className="rounded-[22px] border border-border bg-card p-5 text-card-foreground">
+      <p className="text-[8px] font-black uppercase tracking-[0.14em] text-indigo-500">
         Verification Checks
       </p>
 
-      <h3 className="mt-1 text-base font-black text-[#0F2745]">
+      <h3 className="mt-1 text-base font-black text-foreground">
         Evidence signals
       </h3>
 
@@ -34,7 +34,7 @@ export default function KYCVerificationChecks({
             />
           ))
         ) : (
-          <p className="rounded-[16px] border border-dashed border-slate-200 bg-slate-50 p-4 text-[9px] text-slate-400">
+          <p className="rounded-[16px] border border-dashed border-border bg-muted/35 p-4 text-[9px] text-muted-foreground">
             No verification checks have been recorded yet.
           </p>
         )}
@@ -53,24 +53,26 @@ function VerificationRow({
       ? {
           icon: CheckCircle2,
           className:
-            "border-emerald-100 bg-emerald-50 text-emerald-700",
+            "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300",
         }
       : check.status === "Fail"
         ? {
             icon: XCircle,
             className:
-              "border-rose-100 bg-rose-50 text-rose-700",
+              "border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-300",
           }
         : {
             icon: AlertCircle,
             className:
-              "border-amber-100 bg-amber-50 text-amber-700",
+              "border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-300",
           };
 
   const Icon = config.icon;
 
   return (
-    <div className={`flex items-start gap-3 rounded-[16px] border p-3 ${config.className}`}>
+    <div
+      className={`flex items-start gap-3 rounded-[16px] border p-3 ${config.className}`}
+    >
       <Icon className="mt-0.5 h-4 w-4 shrink-0" />
 
       <div className="min-w-0 flex-1">
