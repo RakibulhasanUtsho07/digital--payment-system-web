@@ -70,26 +70,62 @@ function isThemeMode(
    APPLY THEME
 ========================================================= */
 
-function getEffectiveTheme(theme: ThemeMode): "light" | "dark" {
-  if (theme === "dark") return "dark";
-  if (theme !== "system") return "light";
+function getEffectiveTheme(
+  theme: ThemeMode
+): "light" | "dark" {
+  if (theme === "dark") {
+    return "dark";
+  }
 
-  if (typeof window === "undefined") return "light";
+  if (theme !== "system") {
+    return "light";
+  }
 
-  return window.matchMedia("(prefers-color-scheme: dark)").matches
+  if (
+    typeof window ===
+    "undefined"
+  ) {
+    return "light";
+  }
+
+  return window.matchMedia(
+    "(prefers-color-scheme: dark)"
+  ).matches
     ? "dark"
     : "light";
 }
 
-function applyTheme(theme: ThemeMode) {
-  if (typeof document === "undefined") return;
+function applyTheme(
+  theme: ThemeMode
+) {
+  if (
+    typeof document ===
+    "undefined"
+  ) {
+    return;
+  }
 
-  const root = document.documentElement;
-  const effectiveTheme = getEffectiveTheme(theme);
+  const root =
+    document.documentElement;
 
-  root.setAttribute("data-theme-mode", theme);
-  root.setAttribute("data-theme", effectiveTheme);
-  root.classList.toggle("dark", effectiveTheme === "dark");
+  const effectiveTheme =
+    getEffectiveTheme(theme);
+
+  root.setAttribute(
+    "data-theme-mode",
+    theme
+  );
+
+  root.setAttribute(
+    "data-theme",
+    effectiveTheme
+  );
+
+  root.classList.toggle(
+    "dark",
+    effectiveTheme ===
+      "dark"
+  );
 }
 
 /* =========================================================
@@ -101,7 +137,8 @@ function extractTheme(
 ): ThemeMode | null {
   if (
     !response ||
-    typeof response !== "object"
+    typeof response !==
+      "object"
   ) {
     return null;
   }
@@ -173,18 +210,45 @@ export function ThemeProvider({
     );
 
   /* =======================================================
-     INITIAL LOAD
+     SYSTEM THEME LISTENER
   ======================================================= */
 
   useEffect(() => {
-    if (typeof window === "undefined" || theme !== "system") return;
+    if (
+      typeof window ===
+        "undefined" ||
+      theme !== "system"
+    ) {
+      return;
+    }
 
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const handleChange = () => applyTheme("system");
+    const media =
+      window.matchMedia(
+        "(prefers-color-scheme: dark)"
+      );
 
-    media.addEventListener("change", handleChange);
-    return () => media.removeEventListener("change", handleChange);
+    const handleChange =
+      () => {
+        applyTheme(
+          "system"
+        );
+      };
+
+    media.addEventListener(
+      "change",
+      handleChange
+    );
+
+    return () =>
+      media.removeEventListener(
+        "change",
+        handleChange
+      );
   }, [theme]);
+
+  /* =======================================================
+     INITIAL LOAD
+  ======================================================= */
 
   useEffect(() => {
     let cancelled =
@@ -243,19 +307,6 @@ export function ThemeProvider({
          * ---------------------------------------------------
          * STEP 2: BACKEND
          * ---------------------------------------------------
-         *
-         * GET /api/settings
-         *
-         * Expected:
-         *
-         * {
-         *   success: true,
-         *   preferences: {
-         *     appearance: {
-         *       theme: "dark"
-         *     }
-         *   }
-         * }
          */
 
         try {
@@ -268,9 +319,11 @@ export function ThemeProvider({
               preferences?: {
                 appearance?: {
                   theme?: ThemeMode;
+
                   density?:
                     | "comfortable"
                     | "compact";
+
                   reduceMotion?: boolean;
                 };
 
@@ -301,8 +354,8 @@ export function ThemeProvider({
             );
 
           /*
-           * Invalid/missing server theme should
-           * never break the UI.
+           * Invalid/missing server theme
+           * should never break UI.
            */
           if (
             !serverTheme
@@ -413,15 +466,7 @@ export function ThemeProvider({
        * BACKEND
        * ---------------------------------------------------
        *
-       * IMPORTANT:
-       *
-       * Backend settings endpoint expects
-       * the complete appearance object.
-       *
-       * We fetch current settings first so that
-       * changing only theme does not accidentally
-       * overwrite density/reduceMotion.
-       * ---------------------------------------------------
+       * Keep existing appearance values.
        */
 
       try {
@@ -459,8 +504,11 @@ export function ThemeProvider({
                   | "BDT"
                   | "USD"
                   | "EUR";
+
                 hideAmounts?: boolean;
+
                 requireConfirmation?: boolean;
+
                 confirmThreshold?: number;
               };
             };
@@ -479,13 +527,6 @@ export function ThemeProvider({
           !current.preferences
             ?.appearance
         ) {
-          /*
-           * Fallback:
-           * send only appearance.theme.
-           *
-           * This keeps compatibility with a backend
-           * that accepts partial preference updates.
-           */
           await saveThemeOnly(
             nextTheme
           );
@@ -499,7 +540,8 @@ export function ThemeProvider({
             .appearance;
 
         /*
-         * Keep existing values and replace only theme.
+         * Keep existing values and
+         * replace only theme.
          */
         const payload = {
           appearance: {
@@ -567,7 +609,7 @@ export function ThemeProvider({
           );
 
         /*
-         * Backend returned a valid theme.
+         * Backend returned valid theme.
          */
         if (
           savedTheme
@@ -598,8 +640,7 @@ export function ThemeProvider({
         error
       ) {
         /*
-         * If full settings GET/PATCH fails,
-         * attempt a small fallback request.
+         * Fallback request.
          */
         console.error(
           "Failed to save theme through settings preferences:",
