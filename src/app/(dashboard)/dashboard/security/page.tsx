@@ -22,6 +22,7 @@ import {
   History,
   Key,
   Laptop,
+  Loader2,
   Lock,
   LogOut,
   Mail,
@@ -31,12 +32,18 @@ import {
   Smartphone,
   Snowflake,
   Square,
+  Trash2,
   Wifi,
   X,
   XCircle,
 } from "lucide-react";
 
 import { apiClient } from "@/lib/api/client";
+import {
+  getPasskeys,
+  registerDevicePasskey,
+  type PasskeySummary,
+} from "@/lib/api/passkeyApi";
 
 /* =========================================================
    TYPES
@@ -549,6 +556,30 @@ export default function SecurityPage() {
   ] = useState(false);
 
   /* =======================================================
+     BIOMETRIC PAYMENT / PASSKEYS
+  ======================================================= */
+
+  const [
+    passkeys,
+    setPasskeys,
+  ] = useState<PasskeySummary[]>([]);
+
+  const [
+    passkeysLoading,
+    setPasskeysLoading,
+  ] = useState(false);
+
+  const [
+    passkeyAction,
+    setPasskeyAction,
+  ] = useState<string | null>(null);
+
+  const [
+    passkeyError,
+    setPasskeyError,
+  ] = useState("");
+
+  /* =======================================================
      ALERTS
   ======================================================= */
 
@@ -898,6 +929,122 @@ export default function SecurityPage() {
     );
 
   /* =======================================================
+     LOAD PASSKEYS
+  ======================================================= */
+
+  const loadPasskeys =
+    useCallback(
+      async () => {
+        setPasskeysLoading(true);
+        setPasskeyError("");
+
+        try {
+          const registered =
+            await getPasskeys();
+
+          setPasskeys(registered);
+        } catch (error) {
+          console.error(
+            "PASSKEY LIST ERROR:",
+            error
+          );
+
+          setPasskeyError(
+            error instanceof Error
+              ? error.message
+              : "Unable to load biometric payment devices."
+          );
+        } finally {
+          setPasskeysLoading(false);
+        }
+      },
+      []
+    );
+
+  const addPaymentPasskey =
+    async () => {
+      if (passkeyAction) return;
+
+      if (
+        typeof window === "undefined" ||
+        !("PublicKeyCredential" in window)
+      ) {
+        setPasskeyError(
+          "This browser or device does not support passkeys."
+        );
+        return;
+      }
+
+      setPasskeyAction("register");
+      setPasskeyError("");
+
+      try {
+        await registerDevicePasskey(
+          getCurrentDeviceLabel()
+        );
+
+        await loadPasskeys();
+
+        showToast(
+          "Biometric payment has been enabled for this device."
+        );
+      } catch (error) {
+        const message =
+          error instanceof Error &&
+          error.name === "NotAllowedError"
+            ? "Biometric setup was cancelled or timed out."
+            : error instanceof Error
+              ? error.message
+              : "Unable to register this device.";
+
+        setPasskeyError(message);
+        showToast(message, "error");
+      } finally {
+        setPasskeyAction(null);
+      }
+    };
+
+  const removePaymentPasskey =
+    async (passkeyId: string) => {
+      if (passkeyAction) return;
+
+      setPasskeyAction(passkeyId);
+      setPasskeyError("");
+
+      try {
+        await apiClient(
+          `/passkeys/${encodeURIComponent(
+            passkeyId
+          )}`,
+          {
+            method: "DELETE",
+          }
+        );
+
+        setPasskeys((current) =>
+          current.filter(
+            (item) =>
+              item._id !== passkeyId
+          )
+        );
+
+        showToast(
+          "Biometric payment access removed from the device."
+        );
+      } catch (error) {
+        const message =
+          error instanceof Error
+            ? error.message
+            : "Unable to remove this device.";
+
+        setPasskeyError(message);
+        showToast(message, "error");
+      } finally {
+        setPasskeyAction(null);
+      }
+    };
+
+  /* =======================================================
      REFRESH ALL
   ======================================================= */
 
@@ -960,6 +1107,24 @@ export default function SecurityPage() {
       );
     };
   }, [refreshAll]);
+
+  useEffect(() => {
+    if (
+      !loadingOverview &&
+      security.checklist
+        .kycCompleted
+    ) {
+      void loadPasskeys();
+    } else if (!loadingOverview) {
+      setPasskeys([]);
+      setPasskeyError("");
+    }
+  }, [
+    loadingOverview,
+    security.checklist
+      .kycCompleted,
+    loadPasskeys,
+  ]);
 
   /* =======================================================
      TOAST AUTO DISMISS
@@ -2177,6 +2342,36 @@ export default function SecurityPage() {
               }}
             />
 
+            {/* BIOMETRIC PAYMENT */}
+
+            <PasskeyCard
+              passkeys={passkeys}
+              loading={passkeysLoading}
+              action={passkeyAction}
+              error={passkeyError}
+              kycVerified={
+                security.checklist
+                  .kycCompleted
+              }
+              supported={
+                typeof window !==
+                  "undefined" &&
+                "PublicKeyCredential" in
+                  window
+              }
+              onRegister={() =>
+                void addPaymentPasskey()
+              }
+              onRemove={(id) =>
+                void removePaymentPasskey(
+                  id
+                )
+              }
+              onReload={() =>
+                void loadPasskeys()
+              }
+            />
+
             {/* PASSWORD */}
 
             <PasswordCard
@@ -3019,6 +3214,220 @@ function MethodCard({
       )}
     </button>
   );
+}
+
+/* =========================================================
+   BIOMETRIC PAYMENT / PASSKEY CARD
+========================================================= */
+
+function PasskeyCard({
+  passkeys,
+  loading,
+  action,
+  error,
+  kycVerified,
+  supported,
+  onRegister,
+  onRemove,
+  onReload,
+}: {
+  passkeys: PasskeySummary[];
+  loading: boolean;
+  action: string | null;
+  error: string;
+  kycVerified: boolean;
+  supported: boolean;
+  onRegister: () => void;
+  onRemove: (id: string) => void;
+  onReload: () => void;
+}) {
+  const canRegister =
+    kycVerified &&
+    supported &&
+    !action;
+
+  return (
+    <Card className="overflow-hidden">
+      <div className="flex flex-col justify-between gap-5 border-b border-border p-6 md:flex-row md:items-center md:p-8">
+        <div className="flex min-w-0 items-start gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-cyan-100 text-cyan-700 dark:bg-cyan-400/10 dark:text-cyan-300">
+            <Fingerprint className="h-6 w-6" />
+          </div>
+
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+              Passwordless authorization
+            </p>
+
+            <h2 className="mt-1 text-xl font-black text-card-foreground">
+              Biometric Payment
+            </h2>
+
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
+              Register Windows Hello or a device passkey, then authorize Send Money without entering your account password.
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          disabled={!canRegister}
+          onClick={onRegister}
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-600 to-violet-700 px-5 py-3 text-sm font-black text-white shadow-lg shadow-cyan-900/10 transition hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {action === "register" ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Fingerprint className="h-4 w-4" />
+          )}
+
+          {action === "register"
+            ? "Adding device..."
+            : "Add this device"}
+        </button>
+      </div>
+
+      <div className="p-6 md:p-8">
+        {!kycVerified ? (
+          <PasskeyNotice
+            tone="warning"
+            message="Complete KYC verification before enabling biometric payments."
+          />
+        ) : !supported ? (
+          <PasskeyNotice
+            tone="warning"
+            message="This browser or device does not support WebAuthn passkeys."
+          />
+        ) : null}
+
+        {error ? (
+          <div className="mb-4">
+            <PasskeyNotice
+              tone="error"
+              message={error}
+            />
+          </div>
+        ) : null}
+
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-black text-card-foreground">
+              Registered devices
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {passkeys.length} active {passkeys.length === 1 ? "passkey" : "passkeys"}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            disabled={loading || !kycVerified}
+            onClick={onReload}
+            className="inline-flex items-center gap-2 rounded-xl border border-border px-3 py-2 text-xs font-bold text-muted-foreground transition hover:bg-muted disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+            Refresh
+          </button>
+        </div>
+
+        {loading && !passkeys.length ? (
+          <div className="mt-5 flex items-center justify-center rounded-2xl border border-dashed border-border py-10 text-sm text-muted-foreground">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Loading devices...
+          </div>
+        ) : passkeys.length ? (
+          <div className="mt-5 space-y-3">
+            {passkeys.map((passkey) => (
+              <div
+                key={passkey._id}
+                className="flex flex-col justify-between gap-4 rounded-2xl border border-border bg-muted/30 p-4 sm:flex-row sm:items-center"
+              >
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300">
+                    <ShieldCheck className="h-4 w-4" />
+                  </span>
+
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-black text-card-foreground">
+                      {passkey.label || "This device"}
+                    </p>
+                    <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
+                      Added {formatDate(passkey.createdAt)}
+                      {passkey.lastUsedAt
+                        ? ` • Last used ${formatRelativeTime(passkey.lastUsedAt)}`
+                        : " • Not used yet"}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={Boolean(action)}
+                  onClick={() => onRemove(passkey._id)}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-black text-rose-600 transition hover:bg-rose-100 disabled:opacity-50 dark:border-rose-400/20 dark:bg-rose-400/10 dark:text-rose-300"
+                >
+                  {action === passkey._id ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-5 rounded-2xl border border-dashed border-border bg-muted/20 p-7 text-center">
+            <Fingerprint className="mx-auto h-8 w-8 text-muted-foreground/50" />
+            <p className="mt-3 text-sm font-black text-card-foreground">
+              No biometric payment device added
+            </p>
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
+              Use “Add this device” after your KYC is verified.
+            </p>
+          </div>
+        )}
+
+        <p className="mt-5 rounded-2xl border border-cyan-200/60 bg-cyan-50/60 p-4 text-[10px] leading-5 text-cyan-900 dark:border-cyan-400/15 dark:bg-cyan-950/20 dark:text-cyan-100/70">
+          Your fingerprint never leaves the device. The server stores only a public credential. Depending on your device, Windows Hello may offer fingerprint, face or PIN verification.
+        </p>
+      </div>
+    </Card>
+  );
+}
+
+function PasskeyNotice({
+  tone,
+  message,
+}: {
+  tone: "warning" | "error";
+  message: string;
+}) {
+  return (
+    <div
+      className={`flex items-start gap-2 rounded-2xl border p-4 text-xs font-semibold leading-5 ${
+        tone === "error"
+          ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-400/20 dark:bg-rose-950/25 dark:text-rose-200"
+          : "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-400/20 dark:bg-amber-950/20 dark:text-amber-200"
+      }`}
+    >
+      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+      <span>{message}</span>
+    </div>
+  );
+}
+
+function getCurrentDeviceLabel(): string {
+  if (typeof navigator === "undefined") {
+    return "This device";
+  }
+
+  const agent = navigator.userAgent.toLowerCase();
+  if (agent.includes("windows")) return "Windows Hello";
+  if (agent.includes("iphone") || agent.includes("ipad")) return "Apple passkey";
+  if (agent.includes("android")) return "Android passkey";
+  if (agent.includes("mac")) return "Mac passkey";
+  return "This device";
 }
 
 /* =========================================================
