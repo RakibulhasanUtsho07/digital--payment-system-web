@@ -7,6 +7,7 @@ import { apiClient } from "./client";
 export type ThemeMode =
   | "light"
   | "dark"
+  | "system"
   | "eye-care"
   | "ocean"
   | "forest";
@@ -30,6 +31,7 @@ export function isThemeMode(
   return (
     value === "light" ||
     value === "dark" ||
+    value === "system" ||
     value === "eye-care" ||
     value === "ocean" ||
     value === "forest"
@@ -40,8 +42,7 @@ export function isDensity(
   value: unknown
 ): value is Density {
   return (
-    value ===
-      "comfortable" ||
+    value === "comfortable" ||
     value === "compact"
   );
 }
