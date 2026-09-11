@@ -65,7 +65,9 @@ export interface KYCAIReview {
   missingSignals: string[];
   provider?: string;
   model?: string;
-  triggeredBy?: "automatic_submission" | "admin_rerun";
+  triggeredBy?:
+    | "automatic_submission"
+    | "admin_rerun";
   reviewedAt?: string;
   errorMessage?: string;
 }
