@@ -17,6 +17,7 @@ import { apiClient } from "@/lib/api/client";
 export type ThemeMode =
   | "light"
   | "dark"
+  | "system"
   | "eye-care"
   | "ocean"
   | "forest";
@@ -58,6 +59,7 @@ function isThemeMode(
   return (
     value === "light" ||
     value === "dark" ||
+    value === "system" ||
     value === "eye-care" ||
     value === "ocean" ||
     value === "forest"
@@ -68,36 +70,26 @@ function isThemeMode(
    APPLY THEME
 ========================================================= */
 
-function applyTheme(
-  theme: ThemeMode
-) {
-  if (
-    typeof document ===
-    "undefined"
-  ) {
-    return;
-  }
+function getEffectiveTheme(theme: ThemeMode): "light" | "dark" {
+  if (theme === "dark") return "dark";
+  if (theme !== "system") return "light";
 
-  const root =
-    document.documentElement;
+  if (typeof window === "undefined") return "light";
 
-  /*
-   * Custom theme selector
-   */
-  root.setAttribute(
-    "data-theme",
-    theme
-  );
+  return window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+}
 
-  /*
-   * Tailwind dark mode.
-   * Only real "dark" theme activates
-   * the .dark class.
-   */
-  root.classList.toggle(
-    "dark",
-    theme === "dark"
-  );
+function applyTheme(theme: ThemeMode) {
+  if (typeof document === "undefined") return;
+
+  const root = document.documentElement;
+  const effectiveTheme = getEffectiveTheme(theme);
+
+  root.setAttribute("data-theme-mode", theme);
+  root.setAttribute("data-theme", effectiveTheme);
+  root.classList.toggle("dark", effectiveTheme === "dark");
 }
 
 /* =========================================================
@@ -183,6 +175,16 @@ export function ThemeProvider({
   /* =======================================================
      INITIAL LOAD
   ======================================================= */
+
+  useEffect(() => {
+    if (typeof window === "undefined" || theme !== "system") return;
+
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const handleChange = () => applyTheme("system");
+
+    media.addEventListener("change", handleChange);
+    return () => media.removeEventListener("change", handleChange);
+  }, [theme]);
 
   useEffect(() => {
     let cancelled =

@@ -453,3 +453,40 @@
   background: var(--primary);
   color: var(--primary-foreground);
 }
+
+
+
+/* =========================================================
+   ADMIN SETTINGS THEME HELPERS
+========================================================= */
+
+.admin-settings-surface {
+  background: var(--card);
+  color: var(--card-foreground);
+  border-color: var(--border);
+}
+
+.admin-settings-muted {
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+
+.admin-settings-indigo {
+  background: #1e1b4b;
+  color: #ffffff;
+}
+
+.admin-settings-indigo-accent {
+  color: #6366f1;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+[data-theme="light"],
+[data-theme="eye-care"],
+[data-theme="ocean"],
+[data-theme="forest"] {
+  color-scheme: light;
+}
