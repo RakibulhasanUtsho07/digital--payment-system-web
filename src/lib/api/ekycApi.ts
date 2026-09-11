@@ -1,6 +1,8 @@
 import { apiClient } from "@/lib/api/client";
 import type {
+  ActiveLivenessChallengeSession,
   AdminEKYCVerification,
+  CompletedLivenessCapture,
   EKYCAuditItem,
   EKYCDocuments,
   EKYCOverview,
@@ -26,6 +28,16 @@ export interface EKYCSubmissionInput {
   frontImage: File;
   backImage: File;
   selfieImage: File;
+  liveness: CompletedLivenessCapture;
+}
+
+export async function createLivenessChallenge(): Promise<ActiveLivenessChallengeSession> {
+  const response = await apiClient<{
+    success: boolean;
+    session: ActiveLivenessChallengeSession;
+  }>("/ekyc/liveness/challenges", { method: "POST" });
+
+  return response.session;
 }
 
 export async function getCurrentEKYC(): Promise<EKYCVerification | null> {
@@ -42,6 +54,12 @@ export async function submitEKYC(input: EKYCSubmissionInput): Promise<Submission
   body.append("frontImage", input.frontImage);
   body.append("backImage", input.backImage);
   body.append("selfieImage", input.selfieImage);
+  body.append("livenessEvidence", input.liveness.video);
+  body.append("livenessSessionId", input.liveness.session.sessionId);
+  body.append("livenessChallenges", JSON.stringify(input.liveness.session.challenges));
+  body.append("livenessStartedAt", input.liveness.startedAt);
+  body.append("livenessCompletedAt", input.liveness.completedAt);
+
   return apiClient<SubmissionResponse>("/ekyc/verifications", {
     method: "POST",
     body,
@@ -89,7 +107,11 @@ export async function getAdminEKYCDetails(id: string): Promise<{
     verification: AdminEKYCVerification;
     audit: EKYCAuditItem[];
   }>(`/admin/ekyc/verifications/${id}`);
-  return { verification: response.verification, audit: response.audit };
+
+  return {
+    verification: response.verification,
+    audit: response.audit,
+  };
 }
 
 export async function getAdminEKYCDocuments(id: string): Promise<EKYCDocuments> {
@@ -97,6 +119,7 @@ export async function getAdminEKYCDocuments(id: string): Promise<EKYCDocuments> 
     success: boolean;
     documents: EKYCDocuments;
   }>(`/admin/ekyc/verifications/${id}/documents`);
+
   return response.documents;
 }
 
