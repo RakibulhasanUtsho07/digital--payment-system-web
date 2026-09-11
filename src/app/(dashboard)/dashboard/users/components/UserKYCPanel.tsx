@@ -3,8 +3,10 @@
 import React, { useState } from "react";
 
 import {
+  AlertCircle,
   CheckCircle2,
   FileCheck2,
+  LoaderCircle,
   RotateCcw,
   ShieldCheck,
   XCircle,
@@ -44,6 +46,7 @@ interface KycActionProps {
     | "warning"
     | "danger";
   disabled?: boolean;
+  loading?: boolean;
   onClick: () => void;
 }
 
@@ -61,6 +64,12 @@ export default function UserKYCPanel({
   ] = useState<KYCStatus | null>(
     null
   );
+  const [
+    errorMessage,
+    setErrorMessage,
+  ] = useState<string | null>(
+    null
+  );
 
   const handleSetStatus = async (
     kycStatus: KYCStatus
@@ -75,6 +84,9 @@ export default function UserKYCPanel({
     setUpdating(
       kycStatus
     );
+    setErrorMessage(
+      null
+    );
 
     try {
       await onUpdate(
@@ -82,6 +94,12 @@ export default function UserKYCPanel({
         {
           kycStatus,
         }
+      );
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to update KYC status."
       );
     } finally {
       setUpdating(
@@ -250,6 +268,10 @@ export default function UserKYCPanel({
               updating
             )
           }
+          loading={
+            updating ===
+            "verified"
+          }
           onClick={() =>
             void handleSetStatus(
               "verified"
@@ -266,6 +288,10 @@ export default function UserKYCPanel({
             Boolean(
               updating
             )
+          }
+          loading={
+            updating ===
+            "under_review"
           }
           onClick={() =>
             void handleSetStatus(
@@ -284,6 +310,10 @@ export default function UserKYCPanel({
               updating
             )
           }
+          loading={
+            updating ===
+            "rejected"
+          }
           onClick={() =>
             void handleSetStatus(
               "rejected"
@@ -291,6 +321,24 @@ export default function UserKYCPanel({
           }
         />
       </div>
+
+      {errorMessage ? (
+        <motion.div
+          role="alert"
+          initial={{
+            opacity: 0,
+            y: -6,
+          }}
+          animate={{
+            opacity: 1,
+            y: 0,
+          }}
+          className="flex items-start gap-2 rounded-2xl border border-rose-200 bg-rose-50 p-3 text-[10px] font-semibold leading-5 text-rose-700 dark:border-rose-400/20 dark:bg-rose-950/25 dark:text-rose-200"
+        >
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{errorMessage}</span>
+        </motion.div>
+      ) : null}
 
       {/* =================================================
           SECURITY NOTE
@@ -345,6 +393,7 @@ function KycAction({
   description,
   tone,
   disabled = false,
+  loading = false,
   onClick,
 }: KycActionProps) {
   const styles = {
@@ -434,11 +483,15 @@ function KycAction({
             current.color,
         }}
       >
-        <Icon className="h-4 w-4" />
+        {loading ? (
+          <LoaderCircle className="h-4 w-4 animate-spin" />
+        ) : (
+          <Icon className="h-4 w-4" />
+        )}
       </div>
 
       <p className="mt-3 text-xs font-black text-card-foreground">
-        {label}
+        {loading ? "Saving..." : label}
       </p>
 
       <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
