@@ -2,13 +2,16 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useState,
   type ReactNode,
 } from "react";
 
-import { apiClient } from "@/lib/api/client";
+import {
+  apiClient,
+} from "@/lib/api/client";
 
 /* =========================================================
    TYPES
@@ -46,6 +49,12 @@ const ThemeContext =
 const THEME_STORAGE_KEY =
   "coffer-dashboard-theme";
 
+const AUTH_STORAGE_KEY =
+  "is_authenticated";
+
+const AUTH_CHANGE_EVENT =
+  "coffer-auth-state-changed";
+
 const DEFAULT_THEME: ThemeMode =
   "light";
 
@@ -67,17 +76,86 @@ function isThemeMode(
 }
 
 /* =========================================================
-   APPLY THEME
+   AUTH STATE
+========================================================= */
+
+function hasLocalAuthenticationFlag(): boolean {
+  if (
+    typeof window ===
+    "undefined"
+  ) {
+    return false;
+  }
+
+  try {
+    return (
+      window.localStorage.getItem(
+        AUTH_STORAGE_KEY
+      ) === "true"
+    );
+  } catch {
+    return false;
+  }
+}
+
+/* =========================================================
+   EXPECTED AUTH ERROR
+========================================================= */
+
+function isAuthenticationError(
+  error: unknown
+): boolean {
+  if (
+    !(error instanceof Error)
+  ) {
+    return false;
+  }
+
+  const message =
+    error.message
+      .toLowerCase();
+
+  return (
+    message.includes(
+      "not authorized"
+    ) ||
+    message.includes(
+      "unauthorized"
+    ) ||
+    message.includes(
+      "authentication"
+    ) ||
+    message.includes(
+      "no token"
+    ) ||
+    message.includes(
+      "invalid token"
+    ) ||
+    message.includes(
+      "session has been revoked"
+    ) ||
+    message.includes(
+      "session is no longer active"
+    )
+  );
+}
+
+/* =========================================================
+   EFFECTIVE THEME
 ========================================================= */
 
 function getEffectiveTheme(
   theme: ThemeMode
 ): "light" | "dark" {
-  if (theme === "dark") {
+  if (
+    theme === "dark"
+  ) {
     return "dark";
   }
 
-  if (theme !== "system") {
+  if (
+    theme !== "system"
+  ) {
     return "light";
   }
 
@@ -95,9 +173,13 @@ function getEffectiveTheme(
     : "light";
 }
 
+/* =========================================================
+   APPLY THEME
+========================================================= */
+
 function applyTheme(
   theme: ThemeMode
-) {
+): void {
   if (
     typeof document ===
     "undefined"
@@ -109,7 +191,9 @@ function applyTheme(
     document.documentElement;
 
   const effectiveTheme =
-    getEffectiveTheme(theme);
+    getEffectiveTheme(
+      theme
+    );
 
   root.setAttribute(
     "data-theme-mode",
@@ -129,7 +213,73 @@ function applyTheme(
 }
 
 /* =========================================================
-   GET THEME FROM RESPONSE
+   READ LOCAL THEME
+========================================================= */
+
+function getLocalTheme(): ThemeMode {
+  if (
+    typeof window ===
+    "undefined"
+  ) {
+    return DEFAULT_THEME;
+  }
+
+  try {
+    const stored =
+      window.localStorage.getItem(
+        THEME_STORAGE_KEY
+      );
+
+    if (
+      isThemeMode(
+        stored
+      )
+    ) {
+      return stored;
+    }
+  } catch (
+    error
+  ) {
+    console.warn(
+      "Unable to read cached theme:",
+      error
+    );
+  }
+
+  return DEFAULT_THEME;
+}
+
+/* =========================================================
+   SAVE LOCAL THEME
+========================================================= */
+
+function saveLocalTheme(
+  theme: ThemeMode
+): void {
+  if (
+    typeof window ===
+    "undefined"
+  ) {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(
+      THEME_STORAGE_KEY,
+      theme
+    );
+  } catch (
+    error
+  ) {
+    console.warn(
+      "Unable to cache theme:",
+      error
+    );
+  }
+}
+
+/* =========================================================
+   EXTRACT THEME
 ========================================================= */
 
 function extractTheme(
@@ -154,39 +304,29 @@ function extractTheme(
       };
     };
 
-  /*
-   * Preferred structure:
-   *
-   * preferences.appearance.theme
-   */
-  const nestedTheme =
+  const nested =
     data.preferences
       ?.appearance
       ?.theme;
 
   if (
     isThemeMode(
-      nestedTheme
+      nested
     )
   ) {
-    return nestedTheme;
+    return nested;
   }
 
-  /*
-   * Backward compatibility:
-   *
-   * preferences.theme
-   */
-  const flatTheme =
+  const legacy =
     data.preferences
       ?.theme;
 
   if (
     isThemeMode(
-      flatTheme
+      legacy
     )
   ) {
-    return flatTheme;
+    return legacy;
   }
 
   return null;
@@ -210,129 +350,52 @@ export function ThemeProvider({
     );
 
   /* =======================================================
-     SYSTEM THEME LISTENER
+     LOAD SERVER THEME
   ======================================================= */
 
-  useEffect(() => {
-    if (
-      typeof window ===
-        "undefined" ||
-      theme !== "system"
-    ) {
-      return;
-    }
-
-    const media =
-      window.matchMedia(
-        "(prefers-color-scheme: dark)"
-      );
-
-    const handleChange =
-      () => {
-        applyTheme(
-          "system"
-        );
-      };
-
-    media.addEventListener(
-      "change",
-      handleChange
-    );
-
-    return () =>
-      media.removeEventListener(
-        "change",
-        handleChange
-      );
-  }, [theme]);
-
-  /* =======================================================
-     INITIAL LOAD
-  ======================================================= */
-
-  useEffect(() => {
-    let cancelled =
-      false;
-
-    const loadTheme =
+  const loadServerTheme =
+    useCallback(
       async () => {
         /*
-         * ---------------------------------------------------
-         * STEP 1: LOCAL CACHE
-         * ---------------------------------------------------
+         * Do not call protected endpoint before login.
+         *
+         * This prevents:
+         *
+         * GET /settings
+         * -> 401
+         * -> "Not authorized, no token provided"
          */
-
-        let localTheme:
-          ThemeMode =
-          DEFAULT_THEME;
-
-        try {
-          const storedTheme =
-            window.localStorage.getItem(
-              THEME_STORAGE_KEY
-            );
-
-          if (
-            isThemeMode(
-              storedTheme
-            )
-          ) {
-            localTheme =
-              storedTheme;
-          }
-        } catch (
-          error
-        ) {
-          console.error(
-            "Failed to read local theme:",
-            error
-          );
-        }
-
         if (
-          cancelled
+          !hasLocalAuthenticationFlag()
         ) {
           return;
         }
 
-        setThemeState(
-          localTheme
-        );
-
-        applyTheme(
-          localTheme
-        );
-
-        /*
-         * ---------------------------------------------------
-         * STEP 2: BACKEND
-         * ---------------------------------------------------
-         */
-
         try {
           const response =
             await apiClient<{
-              success: boolean;
-
-              profile?: unknown;
+              success:
+                boolean;
 
               preferences?: {
                 appearance?: {
-                  theme?: ThemeMode;
+                  theme?:
+                    ThemeMode;
 
                   density?:
                     | "comfortable"
                     | "compact";
 
-                  reduceMotion?: boolean;
+                  reduceMotion?:
+                    boolean;
                 };
 
-                theme?: ThemeMode;
+                theme?:
+                  ThemeMode;
               };
 
-              wallet?: unknown;
-
-              message?: string;
+              message?:
+                string;
             }>(
               "/settings",
               {
@@ -342,7 +405,6 @@ export function ThemeProvider({
             );
 
           if (
-            cancelled ||
             !response?.success
           ) {
             return;
@@ -353,10 +415,6 @@ export function ThemeProvider({
               response
             );
 
-          /*
-           * Invalid/missing server theme
-           * should never break UI.
-           */
           if (
             !serverTheme
           ) {
@@ -371,71 +429,217 @@ export function ThemeProvider({
             serverTheme
           );
 
-          try {
-            window.localStorage.setItem(
-              THEME_STORAGE_KEY,
-              serverTheme
-            );
-          } catch (
-            storageError
-          ) {
-            console.error(
-              "Failed to cache server theme:",
-              storageError
-            );
-          }
+          saveLocalTheme(
+            serverTheme
+          );
         } catch (
           error
         ) {
           /*
-           * Backend failure is non-fatal.
-           * Local theme remains active.
+           * Authentication errors are expected when:
+           *
+           * - session expired
+           * - logout happened
+           * - local auth flag became stale
+           *
+           * Theme fallback should remain silent.
            */
-          console.error(
-            "Failed to load user theme:",
+          if (
+            isAuthenticationError(
+              error
+            )
+          ) {
+            return;
+          }
+
+          console.warn(
+            "Unable to load server theme:",
             error
           );
         }
-      };
-
-    void loadTheme();
-
-    return () => {
-      cancelled =
-        true;
-    };
-  }, []);
+      },
+      []
+    );
 
   /* =======================================================
-     CHANGE THEME
+     INITIAL LOCAL THEME
+  ======================================================= */
+
+  useEffect(
+    () => {
+      const localTheme =
+        getLocalTheme();
+
+      setThemeState(
+        localTheme
+      );
+
+      applyTheme(
+        localTheme
+      );
+
+      void loadServerTheme();
+    },
+    [
+      loadServerTheme,
+    ]
+  );
+
+  /* =======================================================
+     AUTH STATE CHANGE
+
+     Login page can dispatch:
+     window.dispatchEvent(
+       new Event(
+         "coffer-auth-state-changed"
+       )
+     );
+  ======================================================= */
+
+  useEffect(
+    () => {
+      const handleAuthChange =
+        () => {
+          if (
+            hasLocalAuthenticationFlag()
+          ) {
+            void loadServerTheme();
+          }
+        };
+
+      window.addEventListener(
+        AUTH_CHANGE_EVENT,
+        handleAuthChange
+      );
+
+      return () => {
+        window.removeEventListener(
+          AUTH_CHANGE_EVENT,
+          handleAuthChange
+        );
+      };
+    },
+    [
+      loadServerTheme,
+    ]
+  );
+
+  /* =======================================================
+     STORAGE SYNC
+  ======================================================= */
+
+  useEffect(
+    () => {
+      const handleStorage =
+        (
+          event:
+            StorageEvent
+        ) => {
+          if (
+            event.key ===
+            THEME_STORAGE_KEY &&
+            isThemeMode(
+              event.newValue
+            )
+          ) {
+            setThemeState(
+              event.newValue
+            );
+
+            applyTheme(
+              event.newValue
+            );
+          }
+
+          if (
+            event.key ===
+            AUTH_STORAGE_KEY &&
+            event.newValue ===
+            "true"
+          ) {
+            void loadServerTheme();
+          }
+        };
+
+      window.addEventListener(
+        "storage",
+        handleStorage
+      );
+
+      return () => {
+        window.removeEventListener(
+          "storage",
+          handleStorage
+        );
+      };
+    },
+    [
+      loadServerTheme,
+    ]
+  );
+
+  /* =======================================================
+     SYSTEM THEME LISTENER
+  ======================================================= */
+
+  useEffect(
+    () => {
+      if (
+        theme !==
+        "system"
+      ) {
+        return;
+      }
+
+      const media =
+        window.matchMedia(
+          "(prefers-color-scheme: dark)"
+        );
+
+      const handleChange =
+        () => {
+          applyTheme(
+            "system"
+          );
+        };
+
+      media.addEventListener(
+        "change",
+        handleChange
+      );
+
+      return () => {
+        media.removeEventListener(
+          "change",
+          handleChange
+        );
+      };
+    },
+    [
+      theme,
+    ]
+  );
+
+  /* =======================================================
+     SET THEME
   ======================================================= */
 
   const setTheme =
     async (
-      nextTheme: ThemeMode
-    ) => {
-      /*
-       * Validate before doing anything.
-       */
+      nextTheme:
+        ThemeMode
+    ): Promise<void> => {
       if (
         !isThemeMode(
           nextTheme
         )
       ) {
-        console.error(
-          "Invalid theme value:",
-          nextTheme
-        );
-
         return;
       }
 
       /*
-       * ---------------------------------------------------
-       * OPTIMISTIC UI
-       * ---------------------------------------------------
+       * Immediate UI update.
        */
-
       setThemeState(
         nextTheme
       );
@@ -444,76 +648,44 @@ export function ThemeProvider({
         nextTheme
       );
 
+      saveLocalTheme(
+        nextTheme
+      );
+
       /*
-       * Cache immediately.
+       * Anonymous/login pages:
+       *
+       * keep local theme only.
        */
-      try {
-        window.localStorage.setItem(
-          THEME_STORAGE_KEY,
-          nextTheme
-        );
-      } catch (
-        error
+      if (
+        !hasLocalAuthenticationFlag()
       ) {
-        console.error(
-          "Failed to cache theme:",
-          error
-        );
+        return;
       }
 
-      /*
-       * ---------------------------------------------------
-       * BACKEND
-       * ---------------------------------------------------
-       *
-       * Keep existing appearance values.
-       */
-
       try {
+        /*
+         * First load current appearance so density /
+         * reduceMotion remain unchanged.
+         */
         const current =
           await apiClient<{
-            success: boolean;
+            success:
+              boolean;
 
             preferences?: {
               appearance?: {
-                theme?: ThemeMode;
+                theme?:
+                  ThemeMode;
 
                 density?:
                   | "comfortable"
                   | "compact";
 
-                reduceMotion?: boolean;
-              };
-
-              notifications?: {
-                email?: boolean;
-                push?: boolean;
-                sms?: boolean;
-                marketing?: boolean;
-              };
-
-              privacy?: {
-                analytics?: boolean;
-                discoverability?: boolean;
-                personalization?: boolean;
-                showTransactionNames?: boolean;
-              };
-
-              wallet?: {
-                defaultCurrency?:
-                  | "BDT"
-                  | "USD"
-                  | "EUR";
-
-                hideAmounts?: boolean;
-
-                requireConfirmation?: boolean;
-
-                confirmThreshold?: number;
+                reduceMotion?:
+                  boolean;
               };
             };
-
-            message?: string;
           }>(
             "/settings",
             {
@@ -522,59 +694,41 @@ export function ThemeProvider({
             }
           );
 
-        if (
-          !current?.success ||
-          !current.preferences
-            ?.appearance
-        ) {
-          await saveThemeOnly(
-            nextTheme
-          );
-
-          return;
-        }
-
         const appearance =
-          current
-            .preferences
-            .appearance;
+          current.preferences
+            ?.appearance;
 
-        /*
-         * Keep existing values and
-         * replace only theme.
-         */
         const payload = {
           appearance: {
             theme:
               nextTheme,
 
             density:
-              appearance.density ??
+              appearance
+                ?.density ??
               "comfortable",
 
             reduceMotion:
-              appearance.reduceMotion ??
+              appearance
+                ?.reduceMotion ??
               false,
           },
         };
 
         const response =
           await apiClient<{
-            success: boolean;
-
-            message?: string;
+            success:
+              boolean;
 
             preferences?: {
               appearance?: {
-                theme?: ThemeMode;
-
-                density?:
-                  | "comfortable"
-                  | "compact";
-
-                reduceMotion?: boolean;
+                theme?:
+                  ThemeMode;
               };
             };
+
+            message?:
+              string;
           }>(
             "/settings/preferences",
             {
@@ -586,20 +740,16 @@ export function ThemeProvider({
                   "application/json",
               },
 
-              body: JSON.stringify(
-                payload
-              ),
+              body:
+                JSON.stringify(
+                  payload
+                ),
             }
           );
 
         if (
-          !response?.success
+          !response.success
         ) {
-          console.error(
-            "Theme preference save failed:",
-            response?.message
-          );
-
           return;
         }
 
@@ -608,9 +758,6 @@ export function ThemeProvider({
             response
           );
 
-        /*
-         * Backend returned valid theme.
-         */
         if (
           savedTheme
         ) {
@@ -622,49 +769,30 @@ export function ThemeProvider({
             savedTheme
           );
 
-          try {
-            window.localStorage.setItem(
-              THEME_STORAGE_KEY,
-              savedTheme
-            );
-          } catch (
-            error
-          ) {
-            console.error(
-              "Failed to cache saved theme:",
-              error
-            );
-          }
+          saveLocalTheme(
+            savedTheme
+          );
         }
       } catch (
         error
       ) {
-        /*
-         * Fallback request.
-         */
-        console.error(
-          "Failed to save theme through settings preferences:",
+        if (
+          isAuthenticationError(
+            error
+          )
+        ) {
+          /*
+           * Keep local theme.
+           */
+          return;
+        }
+
+        console.warn(
+          "Unable to persist theme:",
           error
         );
-
-        try {
-          await saveThemeOnly(
-            nextTheme
-          );
-        } catch (
-          fallbackError
-        ) {
-          console.error(
-            "Theme fallback save failed:",
-            fallbackError
-          );
-        }
       }
     };
-
-  /* =======================================================
-     PROVIDER
-  ======================================================= */
 
   return (
     <ThemeContext.Provider
@@ -679,57 +807,6 @@ export function ThemeProvider({
 }
 
 /* =========================================================
-   FALLBACK THEME SAVE
-========================================================= */
-
-async function saveThemeOnly(
-  theme: ThemeMode
-) {
-  const response =
-    await apiClient<{
-      success: boolean;
-
-      message?: string;
-
-      preferences?: {
-        appearance?: {
-          theme?: ThemeMode;
-        };
-
-        theme?: ThemeMode;
-      };
-    }>(
-      "/settings/preferences",
-      {
-        method:
-          "PATCH",
-
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
-
-        body: JSON.stringify({
-          appearance: {
-            theme,
-          },
-        }),
-      }
-    );
-
-  if (
-    !response?.success
-  ) {
-    throw new Error(
-      response?.message ||
-        "Unable to save theme preference."
-    );
-  }
-
-  return response;
-}
-
-/* =========================================================
    HOOK
 ========================================================= */
 
@@ -739,7 +816,9 @@ export function useTheme() {
       ThemeContext
     );
 
-  if (!context) {
+  if (
+    !context
+  ) {
     throw new Error(
       "useTheme must be used inside ThemeProvider"
     );
