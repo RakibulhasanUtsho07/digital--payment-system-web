@@ -350,6 +350,11 @@ const handleSubmit = async (
       "is_authenticated",
       "true"
     );
+    window.dispatchEvent(
+  new Event(
+    "coffer-auth-state-changed"
+  )
+);
 
     router.replace(
       "/dashboard"
