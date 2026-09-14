@@ -1,193 +1,577 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import {
+  useRouter,
+} from "next/navigation";
 
 import AdminDashboardOverview from "@/components/dashboard/views/AdminDashboardOverview";
 import UserDashboardOverview from "@/components/dashboard/views/UserDashboardOverview";
-import { apiClient } from "@/lib/api/client";
 
-type UserRole = "admin" | "user";
-type KYCStatus = "not_started" | "pending" | "under_review" | "verified" | "rejected";
-type TransactionType = "TRANSFER" | "DEPOSIT" | "WITHDRAW";
-type TransactionStatus = "PENDING" | "COMPLETED" | "FAILED";
-type RiskScore = "LOW" | "MEDIUM" | "HIGH";
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
 
-interface CurrentUser {
-  _id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  role: UserRole;
-  kycStatus: KYCStatus;
-}
+import {
+  apiClient,
+} from "@/lib/api/client";
 
-interface ProfileResponse {
-  success: boolean;
-  user: CurrentUser;
-}
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
+
+/* =========================================================
+   TYPES
+========================================================= */
 
 interface WalletData {
   _id: string;
+
   userId: string;
+
   balance: number;
-  [key: string]: unknown;
+
+  [key: string]:
+    unknown;
 }
 
 interface WalletResponse {
   success: boolean;
-  wallet: WalletData;
+
+  wallet:
+    WalletData;
+
+  message?: string;
 }
+
+/* =========================================================
+   TRANSACTION TYPES
+========================================================= */
+
+type TransactionType =
+  | "TRANSFER"
+  | "DEPOSIT"
+  | "WITHDRAW";
+
+type TransactionStatus =
+  | "PENDING"
+  | "COMPLETED"
+  | "FAILED";
+
+type RiskScore =
+  | "LOW"
+  | "MEDIUM"
+  | "HIGH";
 
 interface PopulatedUser {
   _id: string;
+
   name?: string;
+
   email?: string;
 }
 
 interface TransactionData {
   _id: string;
-  senderId: string | PopulatedUser;
-  receiverId: string | PopulatedUser;
+
+  senderId:
+    | string
+    | PopulatedUser;
+
+  receiverId:
+    | string
+    | PopulatedUser;
+
   amount: number;
+
   currency: string;
-  type: TransactionType;
-  status: TransactionStatus;
+
+  type:
+    TransactionType;
+
+  status:
+    TransactionStatus;
+
   reference?: string;
-  riskScore: RiskScore;
+
+  riskScore:
+    RiskScore;
+
   createdAt?: string;
+
   updatedAt?: string;
 }
 
 interface TransactionsResponse {
   success: boolean;
+
   count: number;
-  transactions: TransactionData[];
+
+  transactions:
+    TransactionData[];
+
+  message?: string;
 }
 
-const REQUEST_TIMEOUT_MS = 12_000;
+/* =========================================================
+   CONSTANT
+========================================================= */
 
-export default function DashboardPage() {
-  const router = useRouter();
-  const [user, setUser] = useState<CurrentUser | null>(null);
-  const [wallet, setWallet] = useState<WalletData | null>(null);
-  const [transactions, setTransactions] = useState<TransactionData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [retryKey, setRetryKey] = useState(0);
+const REQUEST_TIMEOUT_MS =
+  12_000;
 
-  useEffect(() => {
-    let mounted = true;
+/* =========================================================
+   TIMEOUT
+========================================================= */
 
-    async function loadDashboard() {
-      try {
-        setLoading(true);
-        setErrorMessage("");
-
-        // Load the profile first. Admin overview does not require a personal
-        // wallet or personal transaction request.
-        const profileResponse = await withTimeout(
-          apiClient<ProfileResponse>("/users/profile"),
-          REQUEST_TIMEOUT_MS,
-          "Profile request timed out. Check that the backend is running on port 5000.",
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string
+): Promise<T> {
+  return new Promise<T>(
+    (
+      resolve,
+      reject
+    ) => {
+      const timer =
+        globalThis.setTimeout(
+          () => {
+            reject(
+              new Error(
+                message
+              )
+            );
+          },
+          timeoutMs
         );
 
-        if (!mounted) return;
+      promise.then(
+        (
+          value
+        ) => {
+          globalThis.clearTimeout(
+            timer
+          );
 
-        if (!profileResponse.success || !profileResponse.user) {
-          throw new Error("Unable to load your profile.");
+          resolve(
+            value
+          );
+        },
+        (
+          error
+        ) => {
+          globalThis.clearTimeout(
+            timer
+          );
+
+          reject(
+            error
+          );
         }
-
-        setUser(profileResponse.user);
-
-        if (profileResponse.user.role === "admin") {
-          return;
-        }
-
-        const [walletResponse, transactionsResponse] = await Promise.all([
-          withTimeout(
-            apiClient<WalletResponse>("/wallet"),
-            REQUEST_TIMEOUT_MS,
-            "Wallet request timed out.",
-          ),
-          withTimeout(
-            apiClient<TransactionsResponse>("/transactions"),
-            REQUEST_TIMEOUT_MS,
-            "Transaction request timed out.",
-          ),
-        ]);
-
-        if (!mounted) return;
-
-        if (!walletResponse.success || !walletResponse.wallet) {
-          throw new Error("Unable to load your wallet.");
-        }
-
-        if (!transactionsResponse.success) {
-          throw new Error("Unable to load transactions.");
-        }
-
-        setWallet(walletResponse.wallet);
-        setTransactions(
-          Array.isArray(transactionsResponse.transactions)
-            ? transactionsResponse.transactions
-            : [],
-        );
-      } catch (error) {
-        if (!mounted) return;
-
-        const message = error instanceof Error ? error.message : "Failed to load dashboard.";
-        console.error("Dashboard loading error:", error);
-        setErrorMessage(message);
-
-        if (isAuthenticationError(message)) {
-          localStorage.removeItem("auth_user");
-          localStorage.removeItem("is_authenticated");
-          localStorage.removeItem("token");
-          localStorage.removeItem("digital_wallet_token");
-          router.replace("/login");
-        }
-      } finally {
-        if (mounted) setLoading(false);
-      }
+      );
     }
+  );
+}
 
-    void loadDashboard();
+/* =========================================================
+   GREETING
+========================================================= */
 
-    return () => {
-      mounted = false;
-    };
-  }, [router, retryKey]);
+function getGreeting():
+  string {
+  const hour =
+    new Date()
+      .getHours();
 
-  if (loading) {
-    return (
-      <div className="flex min-h-[70vh] items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#1F5EA8]">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-          </div>
-          <div className="text-center">
-            <p className="text-sm font-bold text-slate-800">Loading dashboard</p>
-            <p className="mt-1 text-xs text-slate-400">Checking your dashboard data...</p>
-          </div>
+  if (
+    hour <
+    12
+  ) {
+    return "Good morning";
+  }
+
+  if (
+    hour <
+    18
+  ) {
+    return "Good afternoon";
+  }
+
+  return "Good evening";
+}
+
+/* =========================================================
+   LOADING
+========================================================= */
+
+function DashboardLoading({
+  message =
+    "Loading dashboard...",
+}: {
+  message?: string;
+}) {
+  return (
+    <div className="flex min-h-[70vh] items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <div
+          className="flex h-14 w-14 items-center justify-center rounded-2xl"
+          style={{
+            background:
+              "var(--dashboard-primary)",
+          }}
+        >
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+        </div>
+
+        <div className="text-center">
+          <p className="text-sm font-bold text-foreground">
+            Loading dashboard
+          </p>
+
+          <p className="mt-1 text-xs text-muted-foreground">
+            {message}
+          </p>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   PAGE
+========================================================= */
+
+export default function DashboardPage() {
+  const router =
+    useRouter();
+
+  /*
+   * User has already been loaded and validated
+   * by DashboardLayout.
+   *
+   * No second /users/profile request.
+   */
+  const {
+    user,
+  } =
+    useDashboardSession();
+
+  const [
+    wallet,
+    setWallet,
+  ] =
+    useState<
+      WalletData |
+      null
+    >(
+      null
+    );
+
+  const [
+    transactions,
+    setTransactions,
+  ] =
+    useState<
+      TransactionData[]
+    >(
+      []
+    );
+
+  const [
+    loading,
+    setLoading,
+  ] =
+    useState(
+      user.role ===
+        "user"
+    );
+
+  const [
+    errorMessage,
+    setErrorMessage,
+  ] =
+    useState(
+      ""
+    );
+
+  const [
+    retryKey,
+    setRetryKey,
+  ] =
+    useState(
+      0
+    );
+
+  /* =======================================================
+     DEFENSIVE ROLE REDIRECT
+
+     Layout already redirects these roles.
+
+     This is an extra safety fallback.
+  ======================================================= */
+
+  useEffect(
+    () => {
+      if (
+        user.role ===
+          "merchant" ||
+        user.role ===
+          "analyst" ||
+        user.role ===
+          "support"
+      ) {
+        router.replace(
+          getDashboardHome(
+            user.role
+          )
+        );
+      }
+    },
+    [
+      router,
+      user.role,
+    ]
+  );
+
+  /* =======================================================
+     NORMAL USER DATA ONLY
+
+     Merchant:
+       NO wallet dashboard request
+
+     Analyst:
+       NO personal transaction request
+
+     Support:
+       NO personal wallet request
+
+     Admin:
+       NO personal wallet request
+  ======================================================= */
+
+  useEffect(
+    () => {
+      if (
+        user.role !==
+        "user"
+      ) {
+        return;
+      }
+
+      let mounted =
+        true;
+
+      async function loadUserDashboard() {
+        try {
+          setLoading(
+            true
+          );
+
+          setErrorMessage(
+            ""
+          );
+
+          const [
+            walletResponse,
+            transactionsResponse,
+          ] =
+            await Promise.all([
+              withTimeout(
+                apiClient<WalletResponse>(
+                  "/wallet"
+                ),
+
+                REQUEST_TIMEOUT_MS,
+
+                "Wallet request timed out."
+              ),
+
+              withTimeout(
+                apiClient<TransactionsResponse>(
+                  "/transactions"
+                ),
+
+                REQUEST_TIMEOUT_MS,
+
+                "Transaction request timed out."
+              ),
+            ]);
+
+          if (
+            !mounted
+          ) {
+            return;
+          }
+
+          if (
+            !walletResponse.success ||
+            !walletResponse.wallet
+          ) {
+            throw new Error(
+              walletResponse.message ||
+                "Unable to load your wallet."
+            );
+          }
+
+          if (
+            !transactionsResponse.success
+          ) {
+            throw new Error(
+              transactionsResponse.message ||
+                "Unable to load transactions."
+            );
+          }
+
+          setWallet(
+            walletResponse.wallet
+          );
+
+          setTransactions(
+            Array.isArray(
+              transactionsResponse.transactions
+            )
+              ? transactionsResponse.transactions
+              : []
+          );
+        } catch (
+          error
+        ) {
+          if (
+            !mounted
+          ) {
+            return;
+          }
+
+          console.error(
+            "User dashboard data error:",
+            error
+          );
+
+          setErrorMessage(
+            error instanceof
+              Error
+              ? error.message
+              : "Failed to load dashboard."
+          );
+        } finally {
+          if (
+            mounted
+          ) {
+            setLoading(
+              false
+            );
+          }
+        }
+      }
+
+      void loadUserDashboard();
+
+      return () => {
+        mounted =
+          false;
+      };
+    },
+    [
+      retryKey,
+      user.role,
+    ]
+  );
+
+  /* =======================================================
+     ADMIN
+  ======================================================= */
+
+  if (
+    user.role ===
+      "admin" ||
+    user.role ===
+      "super_admin"
+  ) {
+    return (
+      <AdminDashboardOverview />
     );
   }
 
-  if (errorMessage || !user || (user.role !== "admin" && !wallet)) {
+  /* =======================================================
+     MERCHANT / ANALYST / SUPPORT REDIRECTING
+  ======================================================= */
+
+  if (
+    user.role ===
+      "merchant" ||
+    user.role ===
+      "analyst" ||
+    user.role ===
+      "support"
+  ) {
+    return (
+      <DashboardLoading
+        message={`Opening ${
+          user.role
+        } workspace...`}
+      />
+    );
+  }
+
+  /* =======================================================
+     USER LOADING
+  ======================================================= */
+
+  if (
+    loading
+  ) {
+    return (
+      <DashboardLoading
+        message="Loading your wallet and transactions..."
+      />
+    );
+  }
+
+  /* =======================================================
+     USER ERROR
+  ======================================================= */
+
+  if (
+    errorMessage ||
+    !wallet
+  ) {
     return (
       <div className="flex min-h-[70vh] items-center justify-center px-4">
-        <div className="w-full max-w-md rounded-3xl border border-red-200 bg-white p-7 text-center shadow-sm">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-xl font-black text-red-600">!</div>
-          <h2 className="mt-4 text-xl font-extrabold text-slate-900">Unable to load dashboard</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-500">
-            {errorMessage || "Dashboard information is currently unavailable."}
+        <div className="w-full max-w-md rounded-3xl border border-border bg-card p-7 text-center shadow-sm">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-xl font-black text-red-600 dark:bg-red-950/20 dark:text-red-400">
+            !
+          </div>
+
+          <h2 className="mt-4 text-xl font-extrabold text-card-foreground">
+            Unable to load dashboard
+          </h2>
+
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            {errorMessage ||
+              "Dashboard information is currently unavailable."}
           </p>
+
           <button
             type="button"
-            onClick={() => setRetryKey((current) => current + 1)}
-            className="mt-6 rounded-xl bg-[#1F5EA8] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#17466F]"
+            onClick={() => {
+              setRetryKey(
+                (
+                  current
+                ) =>
+                  current +
+                  1
+              );
+            }}
+            className="mt-6 rounded-xl px-5 py-3 text-sm font-bold text-white transition hover:opacity-90"
+            style={{
+              background:
+                "var(--dashboard-primary)",
+            }}
           >
             Try Again
           </button>
@@ -196,54 +580,31 @@ export default function DashboardPage() {
     );
   }
 
-  if (user.role === "admin") {
-    return <AdminDashboardOverview />;
-  }
+  /* =======================================================
+     NORMAL USER
+  ======================================================= */
 
   return (
     <UserDashboardOverview
       user={{
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        greeting: getGreeting(),
-        kycStatus: user.kycStatus,
+        name:
+          user.name,
+
+        email:
+          user.email,
+
+        greeting:
+          getGreeting(),
+
+        kycStatus:
+          user.kycStatus,
       }}
-      wallet={wallet!}
-      transactions={transactions}
+      wallet={
+        wallet
+      }
+      transactions={
+        transactions
+      }
     />
   );
-}
-
-function isAuthenticationError(message: string) {
-  const value = message.toLowerCase();
-  return value.includes("unauthorized") ||
-    value.includes("not authorized") ||
-    value.includes("authentication") ||
-    value.includes("invalid token") ||
-    value.includes("token failed") ||
-    value.includes("401");
-}
-
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = globalThis.setTimeout(() => reject(new Error(message)), timeoutMs);
-    promise.then(
-      (value) => {
-        globalThis.clearTimeout(timer);
-        resolve(value);
-      },
-      (error) => {
-        globalThis.clearTimeout(timer);
-        reject(error);
-      },
-    );
-  });
-}
-
-function getGreeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return "Good morning";
-  if (hour < 18) return "Good afternoon";
-  return "Good evening";
 }
