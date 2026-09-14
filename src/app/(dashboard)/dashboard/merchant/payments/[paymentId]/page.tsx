@@ -30,7 +30,7 @@ import {
   XCircle,
   Zap,
 } from "lucide-react";
-
+import IssueRefundButton from "../components/IssueRefundButton";
 import { apiClient } from "@/lib/api/client";
 
 /* =========================================================
@@ -956,76 +956,117 @@ export default function MerchantPaymentDetailsPage() {
 
           {/* Header */}
 
-          <header className="mb-6 rounded-2xl border p-5 sm:p-6 merchant-border merchant-surface merchant-shadow">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${statusMeta.className}`}
-                  >
-                    <StatusIcon className="h-3.5 w-3.5" />
-                    {statusMeta.label}
-                  </span>
+   {/* Payment header */}
 
-                  <span
-                    className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-bold ${
-                      normalizeStatus(
-                        payment.mode
-                      ) === "live"
-                        ? "merchant-mode-live"
-                        : "merchant-mode-test"
-                    }`}
-                  >
-                    {normalizeStatus(
-                      payment.mode
-                    ) === "live"
-                      ? "Live mode"
-                      : "Test mode"}
-                  </span>
-                </div>
+<header className="mb-6 rounded-2xl border p-5 sm:p-6 merchant-border merchant-surface merchant-shadow">
+  <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+    {/* Payment status and information */}
 
-                <h1 className="mt-4 break-all font-mono text-xl font-bold tracking-tight merchant-text sm:text-2xl">
-                  {payment.paymentId}
-                </h1>
+    <div className="min-w-0">
+      <div className="flex flex-wrap items-center gap-2">
+        <span
+          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${statusMeta.className}`}
+        >
+          <StatusIcon className="h-3.5 w-3.5" />
 
-                <p className="mt-2 max-w-2xl text-sm leading-6 merchant-muted">
-                  {statusMeta.description}
-                </p>
+          {statusMeta.label}
+        </span>
 
-                <div className="mt-4">
-                  <CopyButton
-                    value={
-                      payment.paymentId
-                    }
-                  />
-                </div>
-              </div>
+        <span
+          className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-bold ${
+            normalizeStatus(
+              payment.mode
+            ) === "live"
+              ? "merchant-mode-live"
+              : "merchant-mode-test"
+          }`}
+        >
+          {normalizeStatus(
+            payment.mode
+          ) === "live"
+            ? "Live mode"
+            : "Test mode"}
+        </span>
+      </div>
 
-              <button
-                type="button"
-                onClick={() =>
-                  void fetchPayment({
-                    silent: true,
-                  })
-                }
-                disabled={refreshing}
-                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-semibold merchant-border merchant-surface merchant-text transition hover:merchant-primary-soft disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <RefreshCw
-                  className={`h-4 w-4 ${
-                    refreshing
-                      ? "animate-spin"
-                      : ""
-                  }`}
-                />
+      <h1 className="mt-4 break-all font-mono text-xl font-bold tracking-tight merchant-text sm:text-2xl">
+        {payment.paymentId}
+      </h1>
 
-                {refreshing
-                  ? "Refreshing..."
-                  : "Refresh"}
-              </button>
-            </div>
-          </header>
+      <p className="mt-2 max-w-2xl text-sm leading-6 merchant-muted">
+        {statusMeta.description}
+      </p>
 
+      <div className="mt-4">
+        <CopyButton
+          value={
+            payment.paymentId
+          }
+        />
+      </div>
+    </div>
+
+    {/* Header actions */}
+
+    <div className="flex shrink-0 flex-col gap-3 sm:flex-row">
+      <IssueRefundButton
+        paymentId={
+          payment.paymentId
+        }
+        paymentAmount={
+          getDecimalNumber(
+            payment.amount
+          )
+        }
+        currency={
+          currency
+        }
+        status={
+          payment.status
+        }
+        sourceType={
+          payment.sourceType
+        }
+        provider={
+          payment.provider
+        }
+        mode={
+          payment.mode
+        }
+        onCompleted={() =>
+          void fetchPayment({
+            silent: true,
+          })
+        }
+      />
+
+      <button
+        type="button"
+        onClick={() =>
+          void fetchPayment({
+            silent: true,
+          })
+        }
+        disabled={
+          refreshing
+        }
+        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-semibold merchant-border merchant-surface merchant-text transition hover:merchant-primary-soft disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <RefreshCw
+          className={`h-4 w-4 ${
+            refreshing
+              ? "animate-spin"
+              : ""
+          }`}
+        />
+
+        {refreshing
+          ? "Refreshing..."
+          : "Refresh"}
+      </button>
+    </div>
+  </div>
+</header>
           {/* Financial summary */}
 
           <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
