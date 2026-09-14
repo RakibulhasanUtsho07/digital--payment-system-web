@@ -2,9 +2,13 @@
 
 import React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import {
+  usePathname,
+} from "next/navigation";
+
 import {
   Activity,
+  BadgeCheck,
   BarChart3,
   BookOpen,
   BriefcaseBusiness,
@@ -12,6 +16,7 @@ import {
   CreditCard,
   FileBarChart,
   FileText,
+  FlaskConical,
   HandCoins,
   LayoutDashboard,
   LogOut,
@@ -28,7 +33,9 @@ import {
 } from "lucide-react";
 
 interface MerchantSidebarProps {
-  onLogout: () => void | Promise<void>;
+  onLogout:
+    () => void | Promise<void>;
+
   onClose?: () => void;
 }
 
@@ -45,23 +52,33 @@ const mainItems: NavItem[] = [
     icon: LayoutDashboard,
   },
   {
+    label: "Verification",
+    href:
+      "/dashboard/merchant/verification",
+    icon: BadgeCheck,
+  },
+  {
     label: "Payments",
-    href: "/dashboard/merchant/payments",
+    href:
+      "/dashboard/merchant/payments",
     icon: CreditCard,
   },
   {
     label: "Transactions",
-    href: "/dashboard/merchant/transactions",
+    href:
+      "/dashboard/merchant/transactions",
     icon: Activity,
   },
   {
     label: "Orders",
-    href: "/dashboard/merchant/orders",
+    href:
+      "/dashboard/merchant/orders",
     icon: BriefcaseBusiness,
   },
   {
     label: "Customers",
-    href: "/dashboard/merchant/customers",
+    href:
+      "/dashboard/merchant/customers",
     icon: Users,
   },
 ];
@@ -69,32 +86,38 @@ const mainItems: NavItem[] = [
 const financeItems: NavItem[] = [
   {
     label: "Refunds",
-    href: "/dashboard/merchant/refunds",
+    href:
+      "/dashboard/merchant/refunds",
     icon: RefreshCcw,
   },
   {
     label: "Invoices",
-    href: "/dashboard/merchant/invoices",
+    href:
+      "/dashboard/merchant/invoices",
     icon: FileText,
   },
   {
     label: "Subscriptions",
-    href: "/dashboard/merchant/subscriptions",
+    href:
+      "/dashboard/merchant/subscriptions",
     icon: Receipt,
   },
   {
     label: "Payouts",
-    href: "/dashboard/merchant/payouts",
+    href:
+      "/dashboard/merchant/payouts",
     icon: HandCoins,
   },
   {
     label: "Settlement",
-    href: "/dashboard/merchant/settlement",
+    href:
+      "/dashboard/merchant/settlement",
     icon: WalletCards,
   },
   {
     label: "Disputes",
-    href: "/dashboard/merchant/disputes",
+    href:
+      "/dashboard/merchant/disputes",
     icon: ShieldCheck,
   },
 ];
@@ -102,12 +125,14 @@ const financeItems: NavItem[] = [
 const analyticsItems: NavItem[] = [
   {
     label: "Analytics",
-    href: "/dashboard/merchant/analytics",
+    href:
+      "/dashboard/merchant/analytics",
     icon: BarChart3,
   },
   {
     label: "Reports",
-    href: "/dashboard/merchant/reports",
+    href:
+      "/dashboard/merchant/reports",
     icon: FileBarChart,
   },
 ];
@@ -115,17 +140,26 @@ const analyticsItems: NavItem[] = [
 const developerItems: NavItem[] = [
   {
     label: "API Keys",
-    href: "/dashboard/merchant/api-keys",
+    href:
+      "/dashboard/merchant/api-keys",
     icon: Code2,
   },
   {
+    label: "Test Payments",
+    href:
+      "/dashboard/merchant/test-payments",
+    icon: FlaskConical,
+  },
+  {
     label: "Webhooks",
-    href: "/dashboard/merchant/webhooks",
+    href:
+      "/dashboard/merchant/webhooks",
     icon: Webhook,
   },
   {
     label: "Developers",
-    href: "/dashboard/merchant/developers",
+    href:
+      "/dashboard/merchant/developers",
     icon: BookOpen,
   },
 ];
@@ -133,17 +167,29 @@ const developerItems: NavItem[] = [
 const settingsItems: NavItem[] = [
   {
     label: "Settings",
-    href: "/dashboard/merchant/settings",
+    href:
+      "/dashboard/merchant/settings",
     icon: Settings,
   },
 ];
 
-function isItemActive(pathname: string, href: string) {
-  if (href === "/dashboard/merchant") {
+function isItemActive(
+  pathname: string,
+  href: string
+): boolean {
+  if (
+    href ===
+    "/dashboard/merchant"
+  ) {
     return pathname === href;
   }
 
-  return pathname === href || pathname.startsWith(`${href}/`);
+  return (
+    pathname === href ||
+    pathname.startsWith(
+      `${href}/`
+    )
+  );
 }
 
 function NavSection({
@@ -162,42 +208,54 @@ function NavSection({
       </p>
 
       <div className="space-y-1">
-        {items.map((item) => {
-          const Icon = item.icon;
-          const active = isItemActive(pathname, item.href);
+        {items.map(
+          (item) => {
+            const Icon =
+              item.icon;
 
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`
-                group relative flex items-center gap-3 rounded-xl px-3 py-2.5
-                text-sm font-semibold transition-all duration-200
-                ${
-                  active
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }
-              `}
-            >
-              <Icon
+            const active =
+              isItemActive(
+                pathname,
+                item.href
+              );
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
                 className={`
-                  h-[18px] w-[18px] shrink-0 transition-transform duration-200
-                  group-hover:scale-105
-                  ${active ? "text-primary-foreground" : ""}
+                  group relative flex items-center gap-3 rounded-xl px-3 py-2.5
+                  text-sm font-semibold transition-all duration-200
+                  ${
+                    active
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }
                 `}
-              />
+              >
+                <Icon
+                  className={`
+                    h-[18px] w-[18px] shrink-0 transition-transform duration-200
+                    group-hover:scale-105
+                    ${
+                      active
+                        ? "text-primary-foreground"
+                        : ""
+                    }
+                  `}
+                />
 
-              <span className="truncate">
-                {item.label}
-              </span>
+                <span className="truncate">
+                  {item.label}
+                </span>
 
-              {active && (
-                <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary-foreground" />
-              )}
-            </Link>
-          );
-        })}
+                {active && (
+                  <span className="ml-auto h-1.5 w-1.5 rounded-full bg-primary-foreground" />
+                )}
+              </Link>
+            );
+          }
+        )}
       </div>
     </div>
   );
@@ -207,7 +265,8 @@ export default function MerchantSidebar({
   onLogout,
   onClose,
 }: MerchantSidebarProps) {
-  const pathname = usePathname();
+  const pathname =
+    usePathname();
 
   return (
     <div
@@ -230,7 +289,8 @@ export default function MerchantSidebar({
               rounded-2xl text-white shadow-sm
             "
             style={{
-              background: "var(--dashboard-primary)",
+              background:
+                "var(--dashboard-primary)",
             }}
           >
             <Store className="h-5 w-5" />
@@ -288,6 +348,7 @@ export default function MerchantSidebar({
 
               <div className="mt-1 flex items-center gap-1.5">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+
                 <span className="text-[10px] font-semibold text-muted-foreground">
                   Merchant Active
                 </span>
@@ -349,6 +410,7 @@ export default function MerchantSidebar({
             <p className="truncate text-xs font-bold">
               Manage Payments
             </p>
+
             <p className="truncate text-[10px] font-medium text-muted-foreground">
               View your latest payment activity
             </p>
