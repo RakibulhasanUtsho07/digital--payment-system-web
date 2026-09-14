@@ -1,4 +1,5 @@
 // src/app/(dashboard)/dashboard/support/page.tsx
+// ADMIN SUPPORT PAGE — kept separate from /dashboard/support-dashboard
 "use client";
 
 import React, {
@@ -537,7 +538,7 @@ function SupportHeader({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2.5">
             <h1 className="text-2xl font-black tracking-tight text-white md:text-[30px]">
-              Support Operations
+              Admin Support Operations
             </h1>
 
             <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/30 bg-emerald-400/10 px-2.5 py-1 text-[10px] font-black text-emerald-100">
@@ -546,7 +547,7 @@ function SupportHeader({
             </span>
 
             <span className="rounded-full border border-indigo-300/40 bg-indigo-400/10 px-2.5 py-1 text-[10px] font-black text-indigo-100">
-              Administrator
+              Administrator Support
             </span>
           </div>
 
@@ -682,7 +683,7 @@ function SupportPulse({
           </div>
 
           <span className="rounded-full border border-white/10 bg-card/5 px-3 py-1.5 text-[9px] font-bold text-blue-100/70">
-            Admin intelligence
+            Admin support intelligence
           </span>
         </div>
 
