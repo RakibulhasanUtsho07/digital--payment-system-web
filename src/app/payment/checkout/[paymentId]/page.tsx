@@ -1,6 +1,6 @@
 "use client";
 
-import React, {
+import {
   useCallback,
   useEffect,
   useMemo,
@@ -13,9 +13,12 @@ import {
   ArrowLeft,
   CheckCircle2,
   CircleAlert,
+  Clock3,
   CreditCard,
   Loader2,
   LockKeyhole,
+  LogIn,
+  RefreshCw,
   ShieldCheck,
   Store,
   Wallet,
@@ -28,6 +31,10 @@ import {
   type CheckoutPayment,
 } from "@/lib/api/merchantPaymentApi";
 
+import {
+  authorizeMerchantPaymentWithPasskey,
+} from "@/lib/api/passkeyApi";
+
 /* =========================================================
    TYPES
 ========================================================= */
@@ -39,7 +46,7 @@ type PageState =
   | "success"
   | "error";
 
-interface PageProps {
+interface CheckoutPageProps {
   params: Promise<{
     paymentId: string;
   }>;
@@ -49,10 +56,10 @@ interface PageProps {
    HELPERS
 ========================================================= */
 
-const formatMoney = (
-  amount: string,
+function formatMoney(
+  amount: string | number,
   currency: string
-): string => {
+): string {
   const numericAmount =
     Number(amount);
 
@@ -81,20 +88,126 @@ const formatMoney = (
       2
     )}`;
   }
-};
+}
 
-const getMerchantDisplayName = (
-  payment: CheckoutPayment
-): string => {
-  /*
-   * Current Payment response does not contain
-   * merchant businessName.
-   *
-   * We therefore display a safe generic label
-   * instead of inventing merchant data.
-   */
-  return "DAMO Merchant";
-};
+function formatDate(
+  value?: string
+): string {
+  if (!value) {
+    return "—";
+  }
+
+  const date =
+    new Date(value);
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return "—";
+  }
+
+  return new Intl.DateTimeFormat(
+    "en-BD",
+    {
+      dateStyle:
+        "medium",
+
+      timeStyle:
+        "short",
+    }
+  ).format(date);
+}
+
+function getErrorMessage(
+  error: unknown
+): string {
+  return error instanceof Error
+    ? error.message
+    : "Unable to process this payment.";
+}
+
+function isAuthenticationError(
+  message: string
+): boolean {
+  const normalized =
+    message.toLowerCase();
+
+  return (
+    normalized.includes(
+      "authentication required"
+    ) ||
+    normalized.includes(
+      "not authorized"
+    ) ||
+    normalized.includes(
+      "unauthorized"
+    )
+  );
+}
+
+/* =========================================================
+   SAFE MERCHANT REDIRECT
+
+   Adds non-sensitive payment status information to the
+   merchant's return/cancel URL.
+========================================================= */
+
+function createMerchantRedirectUrl(
+  rawUrl: string,
+  paymentId: string,
+  result:
+    | "completed"
+    | "not_completed"
+): string {
+  try {
+    const url =
+      new URL(rawUrl);
+
+    url.searchParams.set(
+      "coffer_payment_id",
+      paymentId
+    );
+
+    url.searchParams.set(
+      "coffer_result",
+      result
+    );
+
+    return url.toString();
+  } catch {
+    return rawUrl;
+  }
+}
+
+/* =========================================================
+   LOADING SCREEN
+========================================================= */
+
+function CheckoutLoading() {
+  return (
+    <main className="min-h-screen bg-slate-50">
+      <div className="flex min-h-screen items-center justify-center px-4">
+        <div className="w-full max-w-md rounded-[28px] border border-slate-200 bg-white p-8 shadow-xl">
+          <div className="flex flex-col items-center text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-violet-50">
+              <Loader2 className="h-7 w-7 animate-spin text-violet-600" />
+            </div>
+
+            <h1 className="mt-5 text-xl font-black text-slate-950">
+              Loading Coffer Checkout
+            </h1>
+
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              Please wait while we securely load your payment details.
+            </p>
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
 
 /* =========================================================
    PAGE
@@ -102,7 +215,7 @@ const getMerchantDisplayName = (
 
 export default function CheckoutPage({
   params,
-}: PageProps) {
+}: CheckoutPageProps) {
   const [
     paymentId,
     setPaymentId,
@@ -127,8 +240,12 @@ export default function CheckoutPage({
   const [
     error,
     setError,
-  ] =
-    useState("");
+  ] = useState("");
+
+  const [
+    needsAuthentication,
+    setNeedsAuthentication,
+  ] = useState(false);
 
   const [
     walletBalance,
@@ -139,15 +256,17 @@ export default function CheckoutPage({
     );
 
   /* =======================================================
-     READ PARAM
-  ======================================================== */
+     RESOLVE ROUTE PARAM
+  ======================================================= */
 
   useEffect(() => {
-    let mounted = true;
+    let mounted =
+      true;
 
     void params.then(
       ({
-        paymentId: resolvedPaymentId,
+        paymentId:
+          resolvedPaymentId,
       }) => {
         if (!mounted) {
           return;
@@ -160,13 +279,32 @@ export default function CheckoutPage({
     );
 
     return () => {
-      mounted = false;
+      mounted =
+        false;
     };
   }, [params]);
 
   /* =======================================================
+     LOGIN RETURN URL
+  ======================================================= */
+
+  const loginUrl =
+    useMemo(() => {
+      const callbackUrl =
+        paymentId
+          ? `/payment/checkout/${encodeURIComponent(
+              paymentId
+            )}`
+          : "/dashboard";
+
+      return `/login?callbackUrl=${encodeURIComponent(
+        callbackUrl
+      )}`;
+    }, [paymentId]);
+
+  /* =======================================================
      LOAD PAYMENT
-  ======================================================== */
+  ======================================================= */
 
   const loadPayment =
     useCallback(
@@ -182,6 +320,10 @@ export default function CheckoutPage({
 
           setError("");
 
+          setNeedsAuthentication(
+            false
+          );
+
           const result =
             await getCheckoutPayment(
               paymentId
@@ -191,10 +333,6 @@ export default function CheckoutPage({
             result
           );
 
-          /*
-           * Completed payment:
-           * show success immediately.
-           */
           if (
             result.status ===
             "completed"
@@ -206,19 +344,16 @@ export default function CheckoutPage({
             return;
           }
 
-          /*
-           * Non-payable state.
-           */
           if (
             result.status !==
             "pending"
           ) {
-            setPageState(
-              "error"
-            );
-
             setError(
               `This payment is currently ${result.status}.`
+            );
+
+            setPageState(
+              "error"
             );
 
             return;
@@ -228,22 +363,30 @@ export default function CheckoutPage({
             "ready"
           );
         } catch (
-          requestError
+          loadError
         ) {
+          const message =
+            getErrorMessage(
+              loadError
+            );
+
           console.error(
-            "CHECKOUT LOAD ERROR:",
-            requestError
+            "COFFER CHECKOUT LOAD ERROR:",
+            loadError
+          );
+
+          setError(
+            message
+          );
+
+          setNeedsAuthentication(
+            isAuthenticationError(
+              message
+            )
           );
 
           setPageState(
             "error"
-          );
-
-          setError(
-            requestError instanceof
-              Error
-              ? requestError.message
-              : "Unable to load payment."
           );
         }
       },
@@ -255,8 +398,51 @@ export default function CheckoutPage({
   }, [loadPayment]);
 
   /* =======================================================
+     SUCCESS REDIRECT
+
+     Webhook remains the merchant's trusted payment source.
+     Query values here are only for frontend navigation.
+  ======================================================= */
+
+  useEffect(() => {
+    if (
+      pageState !==
+        "success" ||
+      !payment?.returnUrl
+    ) {
+      return;
+    }
+
+    const redirectUrl =
+      createMerchantRedirectUrl(
+        payment.returnUrl,
+        payment.id,
+        "completed"
+      );
+
+    const timer =
+      window.setTimeout(
+        () => {
+          window.location.assign(
+            redirectUrl
+          );
+        },
+        1800
+      );
+
+    return () => {
+      window.clearTimeout(
+        timer
+      );
+    };
+  }, [
+    pageState,
+    payment,
+  ]);
+
+  /* =======================================================
      PAY
-  ======================================================== */
+  ======================================================= */
 
   const handlePay =
     async () => {
@@ -276,9 +462,15 @@ export default function CheckoutPage({
 
         setError("");
 
+        const authorizationToken =
+          await authorizeMerchantPaymentWithPasskey(
+            paymentId
+          );
+
         const result =
           await confirmCheckoutPayment(
-            paymentId
+            paymentId,
+            authorizationToken
           );
 
         if (
@@ -293,52 +485,45 @@ export default function CheckoutPage({
         setPayment(
           (
             previous
-          ) =>
-            previous
-              ? {
-                  ...previous,
+          ) => {
+            if (!previous) {
+              return previous;
+            }
 
-                  status:
-                    result.payment
-                      .status,
+            return {
+              ...previous,
 
-                  completedAt:
-                    result.payment
-                      .completedAt,
-                }
-              : previous
+              status:
+                result.payment
+                  .status,
+
+              customerId:
+                result.payment
+                  .customerId,
+
+              authorizedAt:
+                result.payment
+                  .authorizedAt,
+
+              capturedAt:
+                result.payment
+                  .capturedAt,
+
+              completedAt:
+                result.payment
+                  .completedAt,
+            };
+          }
         );
 
         if (
-          result.payment.status ===
+          result.payment
+            .status ===
           "completed"
         ) {
           setPageState(
             "success"
           );
-
-          /*
-           * Merchant return URL is controlled by
-           * merchant when payment was created.
-           *
-           * Give DAMO checkout a moment to show
-           * success before redirecting.
-           */
-          const returnUrl =
-            payment.returnUrl;
-
-          if (
-            returnUrl
-          ) {
-            window.setTimeout(
-              () => {
-                window.location.assign(
-                  returnUrl
-                );
-              },
-              1400
-            );
-          }
 
           return;
         }
@@ -347,48 +532,89 @@ export default function CheckoutPage({
           "ready"
         );
       } catch (
-        requestError
+        paymentError
       ) {
+        const message =
+          paymentError instanceof Error &&
+          paymentError.name ===
+            "NotAllowedError"
+            ? "Passkey verification was cancelled or timed out."
+            : getErrorMessage(
+                paymentError
+              );
+
         console.error(
-          "CHECKOUT PAYMENT ERROR:",
-          requestError
+          "COFFER PAYMENT ERROR:",
+          paymentError
+        );
+
+        setError(
+          message
+        );
+
+        setNeedsAuthentication(
+          isAuthenticationError(
+            message
+          )
         );
 
         setPageState(
           "ready"
         );
-
-        setError(
-          requestError instanceof
-            Error
-            ? requestError.message
-            : "Payment failed. Please try again."
-        );
       }
     };
 
   /* =======================================================
-     CANCEL
-  ======================================================== */
+     RETURN TO MERCHANT
 
-  const handleCancel =
+     This does not falsely mark the backend payment as
+     cancelled. It only returns the customer to the
+     merchant's cancel URL.
+  ======================================================= */
+
+  const handleReturnToMerchant =
     () => {
       if (
         payment?.cancelUrl
       ) {
+        const redirectUrl =
+          createMerchantRedirectUrl(
+            payment.cancelUrl,
+            payment.id,
+            "not_completed"
+          );
+
         window.location.assign(
-          payment.cancelUrl
+          redirectUrl
         );
 
         return;
       }
 
-      window.history.back();
+      if (
+        window.history.length >
+        1
+      ) {
+        window.history.back();
+
+        return;
+      }
+
+      window.location.assign(
+        "/dashboard"
+      );
     };
 
   /* =======================================================
-     MONEY
-  ======================================================== */
+     DISPLAY VALUES
+  ======================================================= */
+
+  const merchantName =
+    payment?.merchant
+      ?.displayName ||
+    payment?.merchant
+      ?.businessName ||
+    "Coffer Merchant";
 
   const formattedAmount =
     useMemo(() => {
@@ -402,41 +628,26 @@ export default function CheckoutPage({
       );
     }, [payment]);
 
+  const isProcessing =
+    pageState ===
+    "processing";
+
   /* =======================================================
      LOADING
-  ======================================================== */
+  ======================================================= */
 
   if (
     pageState ===
     "loading"
   ) {
     return (
-      <main className="min-h-screen bg-slate-50">
-        <div className="flex min-h-screen items-center justify-center px-4">
-          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-xl">
-            <div className="flex flex-col items-center text-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100">
-                <Loader2 className="h-7 w-7 animate-spin text-slate-700" />
-              </div>
-
-              <h1 className="mt-5 text-xl font-black text-slate-900">
-                Loading secure checkout
-              </h1>
-
-              <p className="mt-2 text-sm leading-6 text-slate-500">
-                Please wait while we securely
-                load your payment details.
-              </p>
-            </div>
-          </div>
-        </div>
-      </main>
+      <CheckoutLoading />
     );
   }
 
   /* =======================================================
-     ERROR
-  ======================================================== */
+     ERROR SCREEN
+  ======================================================= */
 
   if (
     pageState ===
@@ -446,36 +657,58 @@ export default function CheckoutPage({
     return (
       <main className="min-h-screen bg-slate-50">
         <div className="flex min-h-screen items-center justify-center px-4 py-10">
-          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-7 shadow-xl">
+          <div className="w-full max-w-md rounded-[28px] border border-slate-200 bg-white p-7 shadow-xl">
             <div className="flex flex-col items-center text-center">
               <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-red-50">
                 <CircleAlert className="h-7 w-7 text-red-600" />
               </div>
 
-              <h1 className="mt-5 text-xl font-black text-slate-900">
-                Checkout unavailable
+              <p className="mt-5 text-[10px] font-black uppercase tracking-[0.18em] text-red-500">
+                Coffer Checkout
+              </p>
+
+              <h1 className="mt-2 text-xl font-black text-slate-950">
+                {needsAuthentication
+                  ? "Sign in required"
+                  : "Checkout unavailable"}
               </h1>
 
               <p className="mt-3 text-sm leading-6 text-slate-500">
-                {error ||
-                  "We could not load this payment."}
+                {needsAuthentication
+                  ? "Sign in to your Coffer account to continue this wallet payment."
+                  : error ||
+                    "We could not load this payment."}
               </p>
 
-              <div className="mt-6 flex w-full gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    void loadPayment();
-                  }}
-                  className="flex-1 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white transition hover:bg-slate-800"
-                >
-                  Try again
-                </button>
+              <div className="mt-6 flex w-full flex-col gap-3 sm:flex-row">
+                {needsAuthentication ? (
+                  <Link
+                    href={
+                      loginUrl
+                    }
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white transition hover:bg-violet-700"
+                  >
+                    <LogIn className="h-4 w-4" />
+                    Sign in
+                  </Link>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void loadPayment()
+                    }
+                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white transition hover:bg-slate-800"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    Try again
+                  </button>
+                )}
 
                 <Link
                   href="/dashboard"
-                  className="flex flex-1 items-center justify-center rounded-2xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50"
                 >
+                  <ArrowLeft className="h-4 w-4" />
                   Dashboard
                 </Link>
               </div>
@@ -487,8 +720,8 @@ export default function CheckoutPage({
   }
 
   /* =======================================================
-     SUCCESS
-  ======================================================== */
+     SUCCESS SCREEN
+  ======================================================= */
 
   if (
     pageState ===
@@ -499,7 +732,7 @@ export default function CheckoutPage({
     return (
       <main className="min-h-screen bg-slate-50">
         <div className="flex min-h-screen items-center justify-center px-4 py-10">
-          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-xl">
+          <div className="w-full max-w-md rounded-[30px] border border-slate-200 bg-white p-8 shadow-xl">
             <div className="flex flex-col items-center text-center">
               <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-50">
                 <CheckCircle2 className="h-10 w-10 text-emerald-600" />
@@ -514,12 +747,15 @@ export default function CheckoutPage({
               </h1>
 
               <p className="mt-3 max-w-sm text-sm leading-6 text-slate-500">
-                Your payment has been completed
-                successfully.
+                Your payment to{" "}
+                <span className="font-bold text-slate-700">
+                  {merchantName}
+                </span>{" "}
+                has been completed successfully.
               </p>
 
-              <div className="mt-7 w-full rounded-2xl border border-slate-100 bg-slate-50 p-4 text-left">
-                <div className="flex items-center justify-between gap-4">
+              <div className="mt-7 w-full divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-slate-50 text-left">
+                <div className="flex items-center justify-between gap-4 p-4">
                   <span className="text-xs font-semibold text-slate-500">
                     Payment ID
                   </span>
@@ -529,7 +765,17 @@ export default function CheckoutPage({
                   </span>
                 </div>
 
-                <div className="mt-3 flex items-center justify-between gap-4">
+                <div className="flex items-center justify-between gap-4 p-4">
+                  <span className="text-xs font-semibold text-slate-500">
+                    Merchant
+                  </span>
+
+                  <span className="max-w-[210px] truncate text-xs font-black text-slate-800">
+                    {merchantName}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between gap-4 p-4">
                   <span className="text-xs font-semibold text-slate-500">
                     Status
                   </span>
@@ -541,16 +787,14 @@ export default function CheckoutPage({
 
                 {walletBalance !==
                   null && (
-                  <div className="mt-3 flex items-center justify-between gap-4">
+                  <div className="flex items-center justify-between gap-4 p-4">
                     <span className="text-xs font-semibold text-slate-500">
                       Wallet balance
                     </span>
 
                     <span className="text-xs font-black text-slate-800">
                       {formatMoney(
-                        walletBalance.toFixed(
-                          2
-                        ),
+                        walletBalance,
                         payment.currency
                       )}
                     </span>
@@ -558,19 +802,18 @@ export default function CheckoutPage({
                 )}
               </div>
 
-              {!payment.returnUrl && (
+              {payment.returnUrl ? (
+                <div className="mt-6 flex items-center gap-2 text-xs font-semibold text-slate-400">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Returning to {merchantName}...
+                </div>
+              ) : (
                 <Link
                   href="/dashboard"
-                  className="mt-6 flex w-full items-center justify-center rounded-2xl bg-slate-900 px-4 py-3.5 text-sm font-black text-white transition hover:bg-slate-800"
+                  className="mt-6 inline-flex w-full items-center justify-center rounded-2xl bg-slate-950 px-4 py-3.5 text-sm font-black text-white transition hover:bg-slate-800"
                 >
-                  Back to Dashboard
+                  Back to Coffer
                 </Link>
-              )}
-
-              {payment.returnUrl && (
-                <p className="mt-5 text-xs text-slate-400">
-                  Returning to merchant...
-                </p>
               )}
             </div>
           </div>
@@ -580,90 +823,84 @@ export default function CheckoutPage({
   }
 
   /* =======================================================
-     CHECKOUT
-  ======================================================== */
-
-  const merchantName =
-    getMerchantDisplayName(
-      payment
-    );
-
-  const isProcessing =
-    pageState ===
-    "processing";
+     CHECKOUT SCREEN
+  ======================================================= */
 
   return (
     <main className="min-h-screen bg-slate-50">
-      {/* =====================================================
-          TOP BAR
-      ====================================================== */}
+      {/* Header */}
 
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white">
+          <Link
+            href="/dashboard"
+            className="flex items-center gap-3"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-600 text-white shadow-sm">
               <Wallet className="h-5 w-5" />
             </div>
 
             <div>
               <p className="text-sm font-black tracking-tight text-slate-950">
-                DAMO
+                Coffer
               </p>
 
               <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
                 Secure Wallet Checkout
               </p>
             </div>
-          </div>
+          </Link>
 
           <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
             <LockKeyhole className="h-4 w-4" />
-            Secure payment
+            Protected payment
           </div>
         </div>
       </header>
 
-      {/* =====================================================
-          CONTENT
-      ====================================================== */}
-
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+        {payment.mode ===
+          "test" && (
+          <div className="mb-5 flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
+            <CircleAlert className="h-4 w-4 shrink-0" />
+
+            <p className="text-xs font-bold">
+              Test mode payment — no live settlement will be created.
+            </p>
+          </div>
+        )}
+
         <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-          {/* =================================================
-              PAYMENT SUMMARY
-          ================================================== */}
+          {/* Payment summary */}
 
-          <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-slate-600">
-                  <ShieldCheck className="h-3.5 w-3.5" />
-                  Verified checkout
-                </div>
-
-                <h1 className="mt-5 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
-                  Review your payment
-                </h1>
-
-                <p className="mt-2 text-sm leading-6 text-slate-500">
-                  Confirm the details below before
-                  paying from your DAMO wallet.
-                </p>
+          <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+            <div>
+              <div className="inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-violet-700">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                Coffer protected
               </div>
+
+              <h1 className="mt-5 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+                Review your payment
+              </h1>
+
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                Confirm the merchant and amount before paying from your Coffer wallet.
+              </p>
             </div>
 
-            <div className="mt-8 rounded-3xl bg-slate-950 p-6 text-white">
+            <div className="mt-8 rounded-[26px] bg-slate-950 p-6 text-white">
               <div className="flex items-center gap-3">
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/10">
                   <Store className="h-5 w-5" />
                 </div>
 
-                <div>
+                <div className="min-w-0">
                   <p className="text-[10px] font-black uppercase tracking-[0.15em] text-white/50">
-                    Merchant
+                    Paying to
                   </p>
 
-                  <p className="mt-1 text-sm font-black">
+                  <p className="mt-1 truncate text-sm font-black">
                     {merchantName}
                   </p>
                 </div>
@@ -671,7 +908,7 @@ export default function CheckoutPage({
 
               <div className="mt-8">
                 <p className="text-[10px] font-black uppercase tracking-[0.15em] text-white/50">
-                  Amount
+                  Total amount
                 </p>
 
                 <p className="mt-1 text-4xl font-black tracking-tight">
@@ -680,11 +917,7 @@ export default function CheckoutPage({
               </div>
             </div>
 
-            {/* =================================================
-                DETAILS
-            ================================================== */}
-
-            <div className="mt-6 divide-y divide-slate-100 rounded-2xl border border-slate-100">
+            <div className="mt-6 divide-y divide-slate-100 rounded-2xl border border-slate-200">
               <div className="flex items-center justify-between gap-5 p-4">
                 <span className="text-xs font-semibold text-slate-500">
                   Payment ID
@@ -711,15 +944,27 @@ export default function CheckoutPage({
                 </span>
 
                 <span className="inline-flex items-center gap-2 text-xs font-black text-slate-800">
-                  <Wallet className="h-4 w-4 text-slate-500" />
-                  DAMO Wallet
+                  <Wallet className="h-4 w-4 text-violet-600" />
+                  Coffer Wallet
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between gap-5 p-4">
+                <span className="text-xs font-semibold text-slate-500">
+                  Created
+                </span>
+
+                <span className="text-right text-xs font-black text-slate-800">
+                  {formatDate(
+                    payment.createdAt
+                  )}
                 </span>
               </div>
 
               {payment.orderId && (
                 <div className="flex items-center justify-between gap-5 p-4">
                   <span className="text-xs font-semibold text-slate-500">
-                    Order ID
+                    Coffer order
                   </span>
 
                   <span className="max-w-[60%] truncate text-right text-xs font-black text-slate-800">
@@ -731,7 +976,7 @@ export default function CheckoutPage({
               {payment.merchantReference && (
                 <div className="flex items-center justify-between gap-5 p-4">
                   <span className="text-xs font-semibold text-slate-500">
-                    Reference
+                    Merchant reference
                   </span>
 
                   <span className="max-w-[60%] truncate text-right text-xs font-black text-slate-800">
@@ -742,15 +987,13 @@ export default function CheckoutPage({
             </div>
           </section>
 
-          {/* =================================================
-              PAY PANEL
-          ================================================== */}
+          {/* Payment action */}
 
           <section className="lg:pt-2">
-            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xl sm:p-8">
+            <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-xl sm:p-8">
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100">
-                  <CreditCard className="h-5 w-5 text-slate-700" />
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-50">
+                  <CreditCard className="h-5 w-5 text-violet-600" />
                 </div>
 
                 <div>
@@ -759,30 +1002,29 @@ export default function CheckoutPage({
                   </p>
 
                   <p className="mt-1 text-base font-black text-slate-950">
-                    Your DAMO Wallet
+                    Coffer Wallet
                   </p>
                 </div>
               </div>
 
-              <div className="mt-7 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+              <div className="mt-7 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
                 <div className="flex items-start gap-3">
                   <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
 
                   <div>
-                    <p className="text-sm font-black text-slate-900">
-                      Secure wallet payment
+                    <p className="text-sm font-black text-emerald-950">
+                      Protected wallet payment
                     </p>
 
-                    <p className="mt-1 text-xs leading-5 text-slate-500">
-                      Your wallet is charged only after
-                      you approve this payment.
+                    <p className="mt-1 text-xs leading-5 text-emerald-800/70">
+                      Your wallet will be charged only after you confirm this payment.
                     </p>
                   </div>
                 </div>
               </div>
 
               {error && (
-                <div className="mt-5 flex items-start gap-3 rounded-2xl border border-red-100 bg-red-50 p-4">
+                <div className="mt-5 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4">
                   <CircleAlert className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
 
                   <div>
@@ -793,6 +1035,18 @@ export default function CheckoutPage({
                     <p className="mt-1 text-xs leading-5 text-red-700">
                       {error}
                     </p>
+
+                    {needsAuthentication && (
+                      <Link
+                        href={
+                          loginUrl
+                        }
+                        className="mt-3 inline-flex items-center gap-2 text-xs font-black text-red-800 underline"
+                      >
+                        <LogIn className="h-3.5 w-3.5" />
+                        Sign in again
+                      </Link>
+                    )}
                   </div>
                 </div>
               )}
@@ -816,7 +1070,7 @@ export default function CheckoutPage({
                   disabled={
                     isProcessing
                   }
-                  className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-4 text-sm font-black text-white shadow-lg transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-violet-600 px-5 py-4 text-sm font-black text-white shadow-lg shadow-violet-600/20 transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isProcessing ? (
                     <>
@@ -826,7 +1080,7 @@ export default function CheckoutPage({
                   ) : (
                     <>
                       <LockKeyhole className="h-4 w-4" />
-                      Pay {formattedAmount}
+                      Verify and Pay {formattedAmount}
                     </>
                   )}
                 </button>
@@ -834,7 +1088,7 @@ export default function CheckoutPage({
                 <button
                   type="button"
                   onClick={
-                    handleCancel
+                    handleReturnToMerchant
                   }
                   disabled={
                     isProcessing
@@ -842,19 +1096,15 @@ export default function CheckoutPage({
                   className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 px-5 py-3.5 text-sm font-black text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <XCircle className="h-4 w-4" />
-                  Cancel
+                  Return without paying
                 </button>
               </div>
 
               <div className="mt-7 flex items-start gap-3 border-t border-slate-100 pt-6">
-                <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
+                <Clock3 className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
 
                 <p className="text-[11px] leading-5 text-slate-400">
-                  You are securely approving this
-                  payment through your authenticated
-                  DAMO wallet session. Never share your
-                  wallet password or authentication
-                  information with the merchant.
+                  The merchant should verify the final payment through Coffer&apos;s signed webhook, not from browser redirect parameters.
                 </p>
               </div>
             </div>
@@ -863,7 +1113,7 @@ export default function CheckoutPage({
 
         <div className="mt-6 flex items-center justify-center gap-2 text-[11px] font-semibold text-slate-400">
           <ShieldCheck className="h-4 w-4" />
-          DAMO protected payment session
+          Payments protected by Coffer
         </div>
       </div>
     </main>
