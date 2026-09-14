@@ -5,597 +5,230 @@ import React, {
   useState,
 } from "react";
 
-import { useRouter } from "next/navigation";
+import {
+  usePathname,
+  useRouter,
+} from "next/navigation";
 
-import UserSidebar from "@/components/dashboard/layout/UserSidebar";
 import AdminSidebar from "@/components/dashboard/layout/AdminSidebar";
+import AnalystSidebar from "@/components/dashboard/layout/AnalystSidebar";
 import MerchantSidebar from "@/components/dashboard/layout/MerchantSidebar";
+import SupportSidebar from "@/components/dashboard/layout/SupportSidebar";
 import TopNavbar from "@/components/dashboard/layout/TopNavbar";
+import UserSidebar from "@/components/dashboard/layout/UserSidebar";
 
-import { apiClient } from "@/lib/api/client";
+import {
+  DashboardSessionProvider,
+  type DashboardKYCStatus,
+  type DashboardUser,
+} from "@/context/DashboardSessionContext";
+
+import {
+  apiClient,
+} from "@/lib/api/client";
+
+import {
+  getDashboardHome,
+  getRoleRedirectPath,
+  isDashboardRole,
+  type DashboardRole,
+} from "@/lib/auth/dashboardRoles";
 
 /* =========================================================
-   TYPES
+   PROFILE RESPONSE
 ========================================================= */
 
-type UserRole =
-  | "admin"
-  | "user"
-  | "merchant"
-  | "support"
-  | "analyst"
-  | "super_admin";
+interface RawProfileUser {
+  _id?: unknown;
 
-type KYCStatus =
-  | "not_started"
-  | "pending"
-  | "under_review"
-  | "verified"
-  | "rejected";
+  name?: unknown;
 
-interface CurrentUser {
-  _id: string;
-  name: string;
-  email: string;
-  phone?: string;
-  role: UserRole;
-  kycStatus: KYCStatus;
+  email?: unknown;
+
+  phone?: unknown;
+
+  role?: unknown;
+
+  kycStatus?: unknown;
+
+  avatarUrl?: unknown;
 }
 
 interface ProfileResponse {
-  success: boolean;
-  user: CurrentUser;
+  success:
+    boolean;
+
+  user?:
+    RawProfileUser;
+
+  message?:
+    string;
 }
 
 /* =========================================================
-   DASHBOARD LAYOUT
+   KYC STATUS
 ========================================================= */
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const router = useRouter();
+function isKYCStatus(
+  value: unknown
+): value is DashboardKYCStatus {
+  return (
+    value ===
+      "not_started" ||
+    value ===
+      "pending" ||
+    value ===
+      "under_review" ||
+    value ===
+      "verified" ||
+    value ===
+      "rejected"
+  );
+}
 
-  const [user, setUser] =
-    useState<CurrentUser | null>(null);
+/* =========================================================
+   NORMALIZE PROFILE
 
-  const [loading, setLoading] =
-    useState(true);
+   IMPORTANT:
+   Backend profile is the source of truth.
 
-  const [
-    errorMessage,
-    setErrorMessage,
-  ] = useState("");
+   localStorage role is NOT trusted.
+========================================================= */
 
-  const [
-    retryKey,
-    setRetryKey,
-  ] = useState(0);
+function normalizeProfileUser(
+  raw:
+    RawProfileUser
+): DashboardUser {
+  if (
+    !raw._id
+  ) {
+    throw new Error(
+      "Authenticated user ID is missing."
+    );
+  }
 
-  const [
-    mobileMenuOpen,
-    setMobileMenuOpen,
-  ] = useState(false);
+  if (
+    !isDashboardRole(
+      raw.role
+    )
+  ) {
+    throw new Error(
+      "This account has an unsupported dashboard role."
+    );
+  }
 
-  /* =======================================================
-     LOAD USER
-  ======================================================= */
+  return {
+    _id:
+      String(
+        raw._id
+      ),
 
-  useEffect(() => {
-    let mounted = true;
+    name:
+      typeof raw.name ===
+        "string" &&
+      raw.name.trim()
+        ? raw.name.trim()
+        : "My Account",
 
-    const loadCurrentUser =
-      async () => {
-        try {
-          setLoading(true);
-          setErrorMessage("");
+    email:
+      typeof raw.email ===
+        "string"
+        ? raw.email
+        : "",
 
-          const response =
-            await withTimeout(
-              apiClient<ProfileResponse>(
-                "/users/profile"
-              ),
-              12_000,
-              "Profile request timed out. Check that the backend is running on port 5000."
-            );
+    phone:
+      typeof raw.phone ===
+        "string"
+        ? raw.phone
+        : undefined,
 
-          if (!mounted) {
-            return;
-          }
+    role:
+      raw.role,
 
-          if (
-            !response.success ||
-            !response.user
-          ) {
-            throw new Error(
-              "Unable to load authenticated user."
-            );
-          }
+    kycStatus:
+      isKYCStatus(
+        raw.kycStatus
+      )
+        ? raw.kycStatus
+        : "not_started",
 
-          setUser(
-            response.user
-          );
-
-          localStorage.setItem(
-            "auth_user",
-            JSON.stringify(
-              response.user
-            )
-          );
-
-          localStorage.setItem(
-            "is_authenticated",
-            "true"
-          );
-        } catch (error) {
-          console.error(
-            "Dashboard user loading error:",
-            error
-          );
-
-          if (!mounted) {
-            return;
-          }
-
-          const message =
-            error instanceof Error
-              ? error.message
-              : "Unable to verify your account.";
-
-          setErrorMessage(
-            message
-          );
-
-          const normalizedMessage =
-            message.toLowerCase();
-
-          const isAuthenticationError =
-            normalizedMessage.includes(
-              "unauthorized"
-            ) ||
-            normalizedMessage.includes(
-              "not authorized"
-            ) ||
-            normalizedMessage.includes(
-              "authentication"
-            ) ||
-            normalizedMessage.includes(
-              "invalid token"
-            ) ||
-            normalizedMessage.includes(
-              "token failed"
-            ) ||
-            normalizedMessage.includes(
-              "401"
-            );
-
-          if (
-            isAuthenticationError
-          ) {
-            localStorage.removeItem(
-              "auth_user"
-            );
-
-            localStorage.removeItem(
-              "is_authenticated"
-            );
-
-            localStorage.removeItem(
-              "token"
-            );
-
-            localStorage.removeItem(
-              "digital_wallet_token"
-            );
-
-            router.replace(
-              "/login"
-            );
-          }
-        } finally {
-          if (mounted) {
-            setLoading(false);
-          }
-        }
-      };
-
-    loadCurrentUser();
-
-    return () => {
-      mounted = false;
-    };
-  }, [
-    router,
-    retryKey,
-  ]);
-
-  /* =======================================================
-     MOBILE SIDEBAR
-  ======================================================= */
-
-  const closeMobileMenu = () => {
-    setMobileMenuOpen(false);
+    avatarUrl:
+      typeof raw.avatarUrl ===
+        "string" &&
+      raw.avatarUrl.trim()
+        ? raw.avatarUrl
+        : undefined,
   };
+}
 
-  const toggleMobileMenu = () => {
-    setMobileMenuOpen(
-      (current) => !current
-    );
-  };
+/* =========================================================
+   LOCAL AUTH CACHE
 
-  /* =======================================================
-     LOGOUT
-  ======================================================= */
+   This is UI cache only.
 
-  const handleLogout =
-    async () => {
-      try {
-        await apiClient(
-          "/auth/logout",
-          {
-            method: "POST",
-          }
-        );
-      } catch (error) {
-        console.error(
-          "Logout API error:",
-          error
-        );
-      } finally {
-        localStorage.removeItem(
-          "auth_user"
-        );
+   It is NOT used for authorization.
+========================================================= */
 
-        localStorage.removeItem(
-          "is_authenticated"
-        );
-
-        localStorage.removeItem(
-          "token"
-        );
-
-        localStorage.removeItem(
-          "digital_wallet_token"
-        );
-
-        setUser(null);
-
-        closeMobileMenu();
-
-        router.replace(
-          "/login"
-        );
-
-        router.refresh();
-      }
-    };
-
-  /* =======================================================
-     LOADING
-  ======================================================= */
-
-  if (loading) {
-    return (
-      <div
-        className="
-          flex
-          min-h-dvh
-          w-full
-          items-center
-          justify-center
-          bg-background
-          text-foreground
-        "
-      >
-        <div className="flex flex-col items-center gap-4">
-          <div
-            className="
-              flex
-              h-14
-              w-14
-              items-center
-              justify-center
-              rounded-2xl
-              shadow-lg
-            "
-            style={{
-              background:
-                "var(--dashboard-primary)",
-              boxShadow:
-                "var(--dashboard-shadow)",
-            }}
-          >
-            <div
-              className="
-                h-6
-                w-6
-                animate-spin
-                rounded-full
-                border-2
-                border-white/30
-                border-t-white
-              "
-            />
-          </div>
-
-          <div className="text-center">
-            <p className="text-sm font-bold text-foreground">
-              Loading dashboard
-            </p>
-
-            <p className="mt-1 text-xs text-muted-foreground">
-              Checking your account and permissions...
-            </p>
-          </div>
-        </div>
-      </div>
-    );
+function clearLocalAuth(): void {
+  if (
+    typeof window ===
+    "undefined"
+  ) {
+    return;
   }
 
-  /* =======================================================
-     AUTH ERROR
-  ======================================================= */
+  localStorage.removeItem(
+    "auth_user"
+  );
 
-  if (errorMessage) {
-    return (
-      <div
-        className="
-          flex
-          min-h-dvh
-          w-full
-          items-center
-          justify-center
-          bg-background
-          px-4
-          text-foreground
-        "
-      >
-        <div
-          className="
-            w-full
-            max-w-md
-            rounded-3xl
-            border
-            border-border
-            bg-card
-            p-7
-            text-center
-            shadow-sm
-          "
-        >
-          <div
-            className="
-              mx-auto
-              flex
-              h-14
-              w-14
-              items-center
-              justify-center
-              rounded-2xl
-              bg-red-50
-              text-xl
-              font-black
-              text-red-600
-              dark:bg-red-950/20
-              dark:text-red-400
-            "
-          >
-            !
-          </div>
+  localStorage.removeItem(
+    "is_authenticated"
+  );
 
-          <h2 className="mt-4 text-xl font-extrabold text-card-foreground">
-            Unable to verify account
-          </h2>
+  localStorage.removeItem(
+    "token"
+  );
 
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            {errorMessage}
-          </p>
+  localStorage.removeItem(
+    "digital_wallet_token"
+  );
+}
 
-          <button
-            type="button"
-            onClick={() =>
-              setRetryKey(
-                (current) =>
-                  current + 1
-              )
-            }
-            className="
-              mt-6
-              rounded-xl
-              px-5
-              py-3
-              text-sm
-              font-bold
-              text-white
-              transition
-              hover:opacity-90
-            "
-            style={{
-              background:
-                "var(--dashboard-primary)",
-            }}
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    );
-  }
+/* =========================================================
+   AUTH ERROR
+========================================================= */
 
-  /* =======================================================
-     USER CHECK
-  ======================================================= */
-
-  if (!user) {
-    return null;
-  }
+function isAuthenticationError(
+  message: string
+): boolean {
+  const value =
+    message.toLowerCase();
 
   return (
-    <div
-      className="
-        flex
-        min-h-dvh
-        w-full
-        bg-background
-        text-foreground
-        transition-colors
-        duration-300
-      "
-    >
-      {/* ===================================================
-          MOBILE BACKDROP
-      =================================================== */}
-
-      {mobileMenuOpen && (
-        <button
-          type="button"
-          aria-label="Close sidebar"
-          onClick={
-            closeMobileMenu
-          }
-          className="
-            fixed
-            inset-0
-            z-40
-            bg-black/40
-            backdrop-blur-[4px]
-            lg:hidden
-          "
-        />
-      )}
-
-      {/* ===================================================
-          SIDEBAR
-      =================================================== */}
-
-      <aside
-        className={`
-          fixed
-          inset-y-0
-          left-0
-          z-50
-          h-dvh
-          w-[280px]
-          shrink-0
-          overflow-hidden
-          transform
-          transition-transform
-          duration-300
-          ease-[cubic-bezier(0.22,1,0.36,1)]
-          lg:sticky
-          lg:top-0
-          lg:z-40
-          lg:translate-x-0
-          ${
-            mobileMenuOpen
-              ? "translate-x-0"
-              : "-translate-x-full"
-          }
-        `}
-      >
-        {/* =================================================
-            ADMIN / SUPER ADMIN
-        ================================================= */}
-
-        {user.role === "admin" ||
-        user.role === "super_admin" ? (
-          <AdminSidebar
-            onLogout={
-              handleLogout
-            }
-          />
-        ) : user.role === "merchant" ? (
-          /* ===============================================
-             MERCHANT
-          =============================================== */
-
-          <MerchantSidebar
-            onLogout={
-              handleLogout
-            }
-            onClose={
-              closeMobileMenu
-            }
-          />
-        ) : (
-          /* ===============================================
-             NORMAL USER
-          =============================================== */
-
-          <UserSidebar
-            onLogout={
-              handleLogout
-            }
-          />
-        )}
-      </aside>
-
-      {/* ===================================================
-          RIGHT SIDE
-      =================================================== */}
-
-      <div
-        className="
-          flex
-          min-h-dvh
-          min-w-0
-          flex-1
-          flex-col
-          bg-background
-        "
-      >
-        <TopNavbar
-          onMenuClick={
-            toggleMobileMenu
-          }
-          userName={
-            user.name ||
-            "My Account"
-          }
-          userEmail={
-            user.email || ""
-          }
-          userRole={
-            user.role
-          }
-        />
-
-        {/* ===============================================
-            PAGE CONTENT
-
-            IMPORTANT:
-            No hard-coded #F4F7FB here.
-        =============================================== */}
-
-        <main
-          className="
-            min-h-0
-            flex-1
-            overflow-x-hidden
-            bg-background
-            p-4
-            transition-colors
-            duration-300
-            sm:p-5
-            md:p-6
-            lg:p-7
-            xl:p-8
-          "
-        >
-          <div
-            className="
-              mx-auto
-              w-full
-              max-w-[1440px]
-            "
-          >
-            {children}
-          </div>
-        </main>
-      </div>
-    </div>
+    value.includes(
+      "unauthorized"
+    ) ||
+    value.includes(
+      "not authorized"
+    ) ||
+    value.includes(
+      "authentication"
+    ) ||
+    value.includes(
+      "invalid token"
+    ) ||
+    value.includes(
+      "token failed"
+    ) ||
+    value.includes(
+      "session has been revoked"
+    ) ||
+    value.includes(
+      "session is no longer active"
+    ) ||
+    value.includes(
+      "401"
+    )
   );
 }
 
@@ -626,21 +259,657 @@ function withTimeout<T>(
         );
 
       promise.then(
-        (value) => {
+        (
+          value
+        ) => {
           globalThis.clearTimeout(
             timer
           );
 
-          resolve(value);
+          resolve(
+            value
+          );
         },
-        (error) => {
+        (
+          error
+        ) => {
           globalThis.clearTimeout(
             timer
           );
 
-          reject(error);
+          reject(
+            error
+          );
         }
       );
     }
+  );
+}
+
+/* =========================================================
+   LOADING SCREEN
+========================================================= */
+
+function LoadingScreen({
+  message =
+    "Checking your account and permissions...",
+}: {
+  message?: string;
+}) {
+  return (
+    <div className="flex min-h-dvh w-full items-center justify-center bg-background text-foreground">
+      <div className="flex flex-col items-center gap-4">
+        <div
+          className="flex h-14 w-14 items-center justify-center rounded-2xl shadow-lg"
+          style={{
+            background:
+              "var(--dashboard-primary)",
+
+            boxShadow:
+              "var(--dashboard-shadow)",
+          }}
+        >
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+        </div>
+
+        <div className="text-center">
+          <p className="text-sm font-bold text-foreground">
+            Loading dashboard
+          </p>
+
+          <p className="mt-1 text-xs text-muted-foreground">
+            {message}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   ROLE SIDEBAR
+========================================================= */
+
+function RoleSidebar({
+  role,
+  onLogout,
+  onClose,
+}: {
+  role:
+    DashboardRole;
+
+  onLogout:
+    () => Promise<void>;
+
+  onClose:
+    () => void;
+}) {
+  switch (role) {
+    /* =====================================================
+       ADMIN
+    ====================================================== */
+
+    case "admin":
+    case "super_admin":
+      return (
+        <AdminSidebar
+          onLogout={
+            onLogout
+          }
+        />
+      );
+
+    /* =====================================================
+       MERCHANT
+    ====================================================== */
+
+    case "merchant":
+      return (
+        <MerchantSidebar
+          onLogout={
+            onLogout
+          }
+          onClose={
+            onClose
+          }
+        />
+      );
+
+    /* =====================================================
+       ANALYST
+    ====================================================== */
+
+    case "analyst":
+      return (
+        <AnalystSidebar
+          onLogout={
+            onLogout
+          }
+          onClose={
+            onClose
+          }
+        />
+      );
+
+    /* =====================================================
+       SUPPORT
+    ====================================================== */
+
+    case "support":
+      return (
+        <SupportSidebar
+          onLogout={
+            onLogout
+          }
+          onClose={
+            onClose
+          }
+        />
+      );
+
+    /* =====================================================
+       NORMAL USER
+    ====================================================== */
+
+    case "user":
+    default:
+      return (
+        <UserSidebar
+          onLogout={
+            onLogout
+          }
+        />
+      );
+  }
+}
+
+/* =========================================================
+   DASHBOARD LAYOUT
+========================================================= */
+
+export default function DashboardLayout({
+  children,
+}: {
+  children:
+    React.ReactNode;
+}) {
+  const router =
+    useRouter();
+
+  const pathname =
+    usePathname();
+
+  const [
+    user,
+    setUser,
+  ] =
+    useState<
+      DashboardUser |
+      null
+    >(
+      null
+    );
+
+  const [
+    loading,
+    setLoading,
+  ] =
+    useState(
+      true
+    );
+
+  const [
+    errorMessage,
+    setErrorMessage,
+  ] =
+    useState(
+      ""
+    );
+
+  const [
+    authRedirecting,
+    setAuthRedirecting,
+  ] =
+    useState(
+      false
+    );
+
+  const [
+    retryKey,
+    setRetryKey,
+  ] =
+    useState(
+      0
+    );
+
+  const [
+    mobileMenuOpen,
+    setMobileMenuOpen,
+  ] =
+    useState(
+      false
+    );
+
+  /* =======================================================
+     LOAD AUTHENTICATED USER
+
+     Role always comes from backend profile.
+  ======================================================= */
+
+  useEffect(
+    () => {
+      let mounted =
+        true;
+
+      async function loadCurrentUser() {
+        try {
+          setLoading(
+            true
+          );
+
+          setErrorMessage(
+            ""
+          );
+
+          setAuthRedirecting(
+            false
+          );
+
+          const response =
+            await withTimeout(
+              apiClient<ProfileResponse>(
+                "/users/profile"
+              ),
+
+              12_000,
+
+              "Profile request timed out. Check that the backend is running."
+            );
+
+          if (
+            !mounted
+          ) {
+            return;
+          }
+
+          if (
+            !response.success ||
+            !response.user
+          ) {
+            throw new Error(
+              response.message ||
+                "Unable to load authenticated user."
+            );
+          }
+
+          const authenticatedUser =
+            normalizeProfileUser(
+              response.user
+            );
+
+          /*
+           * SERVER ROLE is source of truth.
+           */
+          setUser(
+            authenticatedUser
+          );
+
+          /*
+           * localStorage is only UI cache.
+           */
+          localStorage.setItem(
+            "auth_user",
+            JSON.stringify(
+              authenticatedUser
+            )
+          );
+
+          localStorage.setItem(
+            "is_authenticated",
+            "true"
+          );
+        } catch (
+          error
+        ) {
+          if (
+            !mounted
+          ) {
+            return;
+          }
+
+          const message =
+            error instanceof
+              Error
+              ? error.message
+              : "Unable to verify your account.";
+
+          console.error(
+            "Dashboard authentication error:",
+            error
+          );
+
+          if (
+            isAuthenticationError(
+              message
+            )
+          ) {
+            setAuthRedirecting(
+              true
+            );
+
+            clearLocalAuth();
+
+            setUser(
+              null
+            );
+
+            router.replace(
+              "/login"
+            );
+
+            return;
+          }
+
+          setErrorMessage(
+            message
+          );
+        } finally {
+          if (
+            mounted
+          ) {
+            setLoading(
+              false
+            );
+          }
+        }
+      }
+
+      void loadCurrentUser();
+
+      return () => {
+        mounted =
+          false;
+      };
+    },
+    [
+      retryKey,
+      router,
+    ]
+  );
+
+  /* =======================================================
+     ROLE ROUTE PROTECTION / REDIRECT
+  ======================================================= */
+
+  const roleRedirectPath =
+    user
+      ? getRoleRedirectPath(
+          user.role,
+          pathname
+        )
+      : null;
+
+  useEffect(
+    () => {
+      if (
+        !user ||
+        !roleRedirectPath
+      ) {
+        return;
+      }
+
+      closeMobileMenu();
+
+      router.replace(
+        roleRedirectPath
+      );
+    },
+    [
+      roleRedirectPath,
+      router,
+      user,
+    ]
+  );
+
+  /* =======================================================
+     MOBILE MENU
+  ======================================================= */
+
+  function closeMobileMenu() {
+    setMobileMenuOpen(
+      false
+    );
+  }
+
+  /* =======================================================
+     LOGOUT
+  ======================================================= */
+
+  async function handleLogout():
+    Promise<void> {
+    try {
+      await apiClient(
+        "/auth/logout",
+        {
+          method:
+            "POST",
+        }
+      );
+    } catch (
+      error
+    ) {
+      console.warn(
+        "Logout request failed:",
+        error
+      );
+    } finally {
+      clearLocalAuth();
+
+      setUser(
+        null
+      );
+
+      closeMobileMenu();
+
+      window.dispatchEvent(
+        new Event(
+          "coffer-auth-state-changed"
+        )
+      );
+
+      router.replace(
+        "/login"
+      );
+
+      router.refresh();
+    }
+  }
+
+  /* =======================================================
+     INITIAL LOADING
+  ======================================================= */
+
+  if (
+    loading
+  ) {
+    return (
+      <LoadingScreen />
+    );
+  }
+
+  /* =======================================================
+     AUTH REDIRECT
+  ======================================================= */
+
+  if (
+    authRedirecting
+  ) {
+    return (
+      <LoadingScreen
+        message="Opening login..."
+      />
+    );
+  }
+
+  /* =======================================================
+     ERROR
+  ======================================================= */
+
+  if (
+    errorMessage
+  ) {
+    return (
+      <div className="flex min-h-dvh w-full items-center justify-center bg-background px-4 text-foreground">
+        <div className="w-full max-w-md rounded-3xl border border-border bg-card p-7 text-center shadow-sm">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-xl font-black text-red-600 dark:bg-red-950/20 dark:text-red-400">
+            !
+          </div>
+
+          <h2 className="mt-4 text-xl font-extrabold text-card-foreground">
+            Unable to verify account
+          </h2>
+
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            {errorMessage}
+          </p>
+
+          <button
+            type="button"
+            onClick={() => {
+              setRetryKey(
+                (
+                  current
+                ) =>
+                  current +
+                  1
+              );
+            }}
+            className="mt-6 rounded-xl px-5 py-3 text-sm font-bold text-white transition hover:opacity-90"
+            style={{
+              background:
+                "var(--dashboard-primary)",
+            }}
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  /* =======================================================
+     NO USER
+  ======================================================= */
+
+  if (
+    !user
+  ) {
+    return null;
+  }
+
+  /* =======================================================
+     WAIT WHILE ROLE REDIRECTS
+  ======================================================= */
+
+  if (
+    roleRedirectPath
+  ) {
+    return (
+      <LoadingScreen
+        message={`Opening ${
+          user.role
+        } workspace...`}
+      />
+    );
+  }
+
+  /* =======================================================
+     DASHBOARD UI
+  ======================================================= */
+
+  return (
+    <DashboardSessionProvider
+      user={
+        user
+      }
+    >
+      <div className="flex min-h-dvh w-full bg-background text-foreground transition-colors duration-300">
+        {/* =================================================
+            MOBILE OVERLAY
+        ================================================= */}
+
+        {mobileMenuOpen && (
+          <button
+            type="button"
+            aria-label="Close sidebar"
+            onClick={
+              closeMobileMenu
+            }
+            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[4px] lg:hidden"
+          />
+        )}
+
+        {/* =================================================
+            ROLE SIDEBAR
+        ================================================= */}
+
+        <aside
+          className={`fixed inset-y-0 left-0 z-50 h-dvh w-[280px] shrink-0 overflow-hidden transform transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:sticky lg:top-0 lg:z-40 lg:translate-x-0 ${
+            mobileMenuOpen
+              ? "translate-x-0"
+              : "-translate-x-full"
+          }`}
+        >
+          <RoleSidebar
+            role={
+              user.role
+            }
+            onLogout={
+              handleLogout
+            }
+            onClose={
+              closeMobileMenu
+            }
+          />
+        </aside>
+
+        {/* =================================================
+            CONTENT
+        ================================================= */}
+
+        <div className="flex min-h-dvh min-w-0 flex-1 flex-col bg-background">
+          <TopNavbar
+            onMenuClick={() => {
+              setMobileMenuOpen(
+                (
+                  current
+                ) =>
+                  !current
+              );
+            }}
+            userName={
+              user.name ||
+              "My Account"
+            }
+            userEmail={
+              user.email ||
+              ""
+            }
+            userRole={
+              user.role
+            }
+            avatarUrl={
+              user.avatarUrl
+            }
+          />
+
+          <main className="min-h-0 flex-1 overflow-x-hidden bg-background p-4 transition-colors duration-300 sm:p-5 md:p-6 lg:p-7 xl:p-8">
+            <div className="mx-auto w-full max-w-[1600px]">
+              {children}
+            </div>
+          </main>
+        </div>
+      </div>
+    </DashboardSessionProvider>
   );
 }
