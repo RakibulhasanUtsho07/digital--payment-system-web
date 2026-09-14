@@ -1,9 +1,8 @@
 "use client";
 
-import React, {
+import {
   type ReactNode,
   useEffect,
-  useState,
 } from "react";
 
 import Link from "next/link";
@@ -16,166 +15,99 @@ import {
 import {
   AnimatePresence,
   motion,
+  useReducedMotion,
 } from "framer-motion";
 
 import {
-  Fingerprint,
+  Building2,
+  CheckCircle2,
   LogIn,
   ShieldCheck,
-  Sparkles,
-  TrendingUp,
   UserPlus,
+  UserRound,
   WalletCards,
-  Zap,
   type LucideIcon,
 } from "lucide-react";
 
-import Navbar from "@/components/shared/Navbar";
+type AccountMode =
+  | "user"
+  | "merchant";
 
-/* =========================================================
-   TYPES
-========================================================= */
-
-type AuthMode =
+type AuthView =
   | "signin"
   | "signup";
 
-interface HeroFeature {
-  icon: LucideIcon;
-  title: string;
-  description: string;
-}
-
-interface HeroContent {
-  badge: string;
-  title: string;
-  highlight: string;
-  description: string;
-  features: HeroFeature[];
-}
-
-/* =========================================================
-   CONTENT
-========================================================= */
-
-const HERO_CONTENT: Record<
-  AuthMode,
-  HeroContent
-> = {
-  signin: {
-    badge:
-      "Secure Access",
-
-    title:
-      "Welcome back.",
-
-    highlight:
-      "Your money. Your control.",
-
-    description:
-      "Access your digital wallet, manage payments, review transactions and stay in control of your financial activity from one protected workspace.",
-
-    features: [
-      {
-        icon:
-          ShieldCheck,
-
-        title:
-          "Secure authentication",
-
-        description:
-          "Protected access designed for every session.",
-      },
-
-      {
-        icon: Zap,
-
-        title:
-          "Fast payments",
-
-        description:
-          "Move funds through a simple and responsive workflow.",
-      },
-
-      {
-        icon:
-          TrendingUp,
-
-        title:
-          "Financial overview",
-
-        description:
-          "Track wallet activity and understand your transactions.",
-      },
-    ],
+const themes = {
+  user: {
+    accent: "#4F46E5",
+    background:
+      "linear-gradient(135deg, #0F172A 0%, #1E1B4B 52%, #312E81 100%)",
+    glowOne:
+      "rgba(99,102,241,0.28)",
+    glowTwo:
+      "rgba(56,189,248,0.12)",
   },
 
-  signup: {
-    badge:
-      "Secure Onboarding",
-
-    title:
-      "Start smarter.",
-
-    highlight:
-      "Build your wallet securely.",
-
-    description:
-      "Create your account and access secure payments, transfers, identity verification and modern financial tools from one connected wallet.",
-
-    features: [
-      {
-        icon:
-          ShieldCheck,
-
-        title:
-          "Protected wallet",
-
-        description:
-          "Security-first account and payment workflows.",
-      },
-
-      {
-        icon:
-          Fingerprint,
-
-        title:
-          "Identity verification",
-
-        description:
-          "Secure verification built into your onboarding.",
-      },
-
-      {
-        icon: Zap,
-
-        title:
-          "Modern financial tools",
-
-        description:
-          "Manage transfers and wallet activity effortlessly.",
-      },
-    ],
+  merchant: {
+    accent: "#7C3AED",
+    background:
+      "linear-gradient(135deg, #170B29 0%, #31145B 52%, #581C87 100%)",
+    glowOne:
+      "rgba(168,85,247,0.25)",
+    glowTwo:
+      "rgba(236,72,153,0.10)",
   },
-};
+} satisfies Record<
+  AccountMode,
+  {
+    accent: string;
+    background: string;
+    glowOne: string;
+    glowTwo: string;
+  }
+>;
 
-/* =========================================================
-   GET MODE
-========================================================= */
-
-function getMode(
+function getAccountMode(
   pathname: string
-): AuthMode {
-  return pathname.includes(
-    "/register"
+): AccountMode {
+  return pathname.startsWith(
+    "/merchant/"
   )
+    ? "merchant"
+    : "user";
+}
+
+function getAuthView(
+  pathname: string
+): AuthView {
+  return pathname ===
+      "/register" ||
+    pathname.endsWith(
+      "/sign-up"
+    )
     ? "signup"
     : "signin";
 }
 
-/* =========================================================
-   AUTH LAYOUT
-========================================================= */
+function getRoute(
+  account: AccountMode,
+  view: AuthView
+): string {
+  if (
+    account ===
+    "merchant"
+  ) {
+    return view ===
+      "signin"
+      ? "/merchant/sign-in"
+      : "/merchant/sign-up";
+  }
+
+  return view ===
+    "signin"
+    ? "/login"
+    : "/register";
+}
 
 export default function AuthLayout({
   children,
@@ -188,331 +120,349 @@ export default function AuthLayout({
   const router =
     useRouter();
 
-  const routeMode =
-    getMode(
+  const reduceMotion =
+    useReducedMotion();
+
+  const account =
+    getAccountMode(
       pathname
     );
 
-  const [
-    mode,
-    setMode,
-  ] =
-    useState<AuthMode>(
-      routeMode
+  const view =
+    getAuthView(
+      pathname
     );
 
-  const isSignIn =
-    mode === "signin";
+  const onboarding =
+    pathname ===
+    "/merchant/onboarding";
 
-  /* =========================================================
-     PREFETCH
-  ========================================================== */
+  const theme =
+    themes[account];
 
   useEffect(() => {
-    router.prefetch(
-      "/login"
-    );
-
-    router.prefetch(
-      "/register"
+    [
+      "/login",
+      "/register",
+      "/merchant/sign-in",
+      "/merchant/sign-up",
+      "/merchant/onboarding",
+    ].forEach(
+      (route) => {
+        router.prefetch(
+          route
+        );
+      }
     );
   }, [router]);
 
-  /* =========================================================
-     BROWSER BACK/FORWARD SYNC
-  ========================================================== */
-
-  useEffect(() => {
-    setMode(
-      routeMode
-    );
-  }, [routeMode]);
-
-  /* =========================================================
-     SWITCH
-  ========================================================== */
-
-  const handleSwitch = (
-    nextMode: AuthMode
-  ) => {
-    if (
-      nextMode === mode
-    ) {
-      return;
-    }
-
-    /*
-     * Change visual position immediately.
-     */
-    setMode(
-      nextMode
-    );
-
-    /*
-     * Then change route.
-     */
-    router.push(
-      nextMode ===
-        "signin"
-        ? "/login"
-        : "/register"
-    );
-  };
+  const width =
+    onboarding
+      ? "max-w-5xl"
+      : view ===
+          "signup"
+        ? "max-w-2xl"
+        : "max-w-xl";
 
   return (
-    <>
-      <Navbar />
-
-      <main
-        className="
-          relative
-
-          flex
-          min-h-[calc(100dvh-76px)]
-          items-center
-          justify-center
-
-          overflow-hidden
-
-          bg-[#F3F7FB]
-
-          px-3
-          py-6
-
-          sm:px-5
-
-          lg:px-7
-          lg:py-8
-        "
+    <main className="relative min-h-dvh overflow-x-hidden bg-slate-950 px-4 py-5 sm:px-6 sm:py-7 lg:px-8">
+      <AnimatePresence
+        initial={false}
       >
-        {/* =====================================================
-            BACKGROUND DECORATION
-        ====================================================== */}
-
         <motion.div
+          key={account}
           aria-hidden="true"
-          animate={{
-            x: [
-              0,
-              30,
-              0,
-            ],
-
-            y: [
-              0,
-              18,
-              0,
-            ],
-
-            scale: [
-              1,
-              1.1,
-              1,
-            ],
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              theme.background,
           }}
-          transition={{
-            duration: 15,
-            repeat:
-              Infinity,
-            ease:
-              "easeInOut",
-          }}
-          className="
-            pointer-events-none
-
-            absolute
-            -left-44
-            -top-36
-
-            h-[500px]
-            w-[500px]
-
-            rounded-full
-
-            bg-[#1F5EA8]/[0.065]
-
-            blur-[140px]
-          "
-        />
-
-        <motion.div
-          aria-hidden="true"
-          animate={{
-            x: [
-              0,
-              -30,
-              0,
-            ],
-
-            y: [
-              0,
-              -18,
-              0,
-            ],
-
-            scale: [
-              1,
-              1.12,
-              1,
-            ],
-          }}
-          transition={{
-            duration: 18,
-            repeat:
-              Infinity,
-            ease:
-              "easeInOut",
-          }}
-          className="
-            pointer-events-none
-
-            absolute
-            -bottom-44
-            -right-44
-
-            h-[500px]
-            w-[500px]
-
-            rounded-full
-
-            bg-sky-400/[0.07]
-
-            blur-[150px]
-          "
-        />
-
-        {/* =====================================================
-            CENTER WRAPPER
-        ====================================================== */}
-
-        <motion.div
           initial={{
             opacity: 0,
-            y: 22,
-            scale:
-              0.985,
           }}
           animate={{
             opacity: 1,
-            y: 0,
-            scale: 1,
+          }}
+          exit={{
+            opacity: 0,
           }}
           transition={{
             duration:
-              0.65,
-
-            ease: [
-              0.16,
-              1,
-              0.3,
-              1,
-            ],
+              reduceMotion
+                ? 0.15
+                : 0.62,
+            ease:
+              "easeInOut",
           }}
-          className="
-            relative
-            z-10
+        />
+      </AnimatePresence>
 
-            mx-auto
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 opacity-[0.16]"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.08) 1px, transparent 1px)",
+          backgroundSize:
+            "42px 42px",
+          maskImage:
+            "linear-gradient(to bottom, black, transparent 82%)",
+        }}
+      />
 
-            w-full
-            max-w-[1280px]
-          "
+      <motion.div
+        aria-hidden="true"
+        className="pointer-events-none absolute -left-36 -top-36 h-[28rem] w-[28rem] rounded-full blur-3xl"
+        style={{
+          background:
+            theme.glowOne,
+        }}
+        animate={
+          reduceMotion
+            ? undefined
+            : {
+                x: [
+                  0,
+                  34,
+                  0,
+                ],
+                y: [
+                  0,
+                  22,
+                  0,
+                ],
+              }
+        }
+        transition={{
+          duration: 14,
+          repeat: Infinity,
+          ease:
+            "easeInOut",
+        }}
+      />
+
+      <motion.div
+        aria-hidden="true"
+        className="pointer-events-none absolute -bottom-44 -right-28 h-[32rem] w-[32rem] rounded-full blur-3xl"
+        style={{
+          background:
+            theme.glowTwo,
+        }}
+        animate={
+          reduceMotion
+            ? undefined
+            : {
+                x: [
+                  0,
+                  -30,
+                  0,
+                ],
+                y: [
+                  0,
+                  -20,
+                  0,
+                ],
+              }
+        }
+        transition={{
+          duration: 17,
+          repeat: Infinity,
+          ease:
+            "easeInOut",
+        }}
+      />
+
+      <header className="relative z-20 mx-auto flex w-full max-w-6xl items-center justify-between gap-4">
+        <Link
+          href="/"
+          className="group inline-flex items-center gap-3 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
         >
-          {/* ===================================================
-              MOBILE AUTH SWITCH
-          ==================================================== */}
+          <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-white shadow-lg backdrop-blur-xl transition group-hover:bg-white/15">
+            <WalletCards className="h-5 w-5" />
+          </span>
 
-          <div
-            className="
-              mb-5
+          <span>
+            <span className="block text-base font-black tracking-[-0.03em] text-white">
+              Coffer
+            </span>
+            <span className="block text-[9px] font-bold uppercase tracking-[0.2em] text-white/55">
+              Digital wallet
+            </span>
+          </span>
+        </Link>
 
-              flex
-              justify-center
+        <div className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[0.07] px-4 py-2 text-[10px] font-bold text-white/70 backdrop-blur-xl sm:flex">
+          <ShieldCheck className="h-3.5 w-3.5 text-emerald-300" />
+          Secure authentication
+        </div>
+      </header>
 
-              lg:hidden
-            "
-          >
-            <AuthSwitch
-              isSignIn={
-                isSignIn
-              }
-              onSwitch={
-                handleSwitch
-              }
-            />
-          </div>
+      <section
+        className={`relative z-10 mx-auto mt-5 w-full ${width} sm:mt-7`}
+      >
+        <div
+          className="relative"
+          style={{
+            perspective:
+              "1500px",
+          }}
+        >
+          <div className="pointer-events-none absolute inset-x-10 -bottom-5 h-12 rounded-full bg-black/40 blur-2xl" />
 
-          {/* ===================================================
-              AUTH CARD
-          ==================================================== */}
+          <div className="relative overflow-hidden rounded-[28px] border border-white/20 bg-white/[0.97] shadow-[0_30px_90px_rgba(0,0,0,0.34)] backdrop-blur-2xl dark:bg-slate-950/[0.96]">
+            {onboarding ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 bg-slate-50/85 px-5 py-4 dark:border-white/10 dark:bg-white/[0.035] sm:px-7">
+                <span className="inline-flex items-center gap-2 text-xs font-black text-violet-700 dark:text-violet-300">
+                  <Building2 className="h-4 w-4" />
+                  Merchant onboarding
+                </span>
 
-          <div
-            className="
-              relative
+                <Link
+                  href="/merchant/sign-in"
+                  className="text-[11px] font-extrabold text-slate-500 transition hover:text-violet-700 dark:text-slate-400 dark:hover:text-violet-300"
+                >
+                  Use another account
+                </Link>
+              </div>
+            ) : (
+              <div className="border-b border-slate-200/80 bg-slate-50/85 px-4 py-4 dark:border-white/10 dark:bg-white/[0.035] sm:px-6">
+                <SegmentedControl
+                  ariaLabel="Account type"
+                  accent={
+                    theme.accent
+                  }
+                  options={[
+                    {
+                      active:
+                        account ===
+                        "user",
+                      icon:
+                        UserRound,
+                      label:
+                        "Personal Wallet",
+                      onClick: () => {
+                        router.push(
+                          getRoute(
+                            "user",
+                            view
+                          )
+                        );
+                      },
+                    },
+                    {
+                      active:
+                        account ===
+                        "merchant",
+                      icon:
+                        Building2,
+                      label:
+                        "Merchant Business",
+                      onClick: () => {
+                        router.push(
+                          getRoute(
+                            "merchant",
+                            view
+                          )
+                        );
+                      },
+                    },
+                  ]}
+                />
 
-              overflow-hidden
+                <div className="mt-3">
+                  <SegmentedControl
+                    ariaLabel="Authentication action"
+                    accent={
+                      theme.accent
+                    }
+                    subtle
+                    options={[
+                      {
+                        active:
+                          view ===
+                          "signin",
+                        icon: LogIn,
+                        label:
+                          "Sign In",
+                        onClick: () => {
+                          router.push(
+                            getRoute(
+                              account,
+                              "signin"
+                            )
+                          );
+                        },
+                      },
+                      {
+                        active:
+                          view ===
+                          "signup",
+                        icon:
+                          UserPlus,
+                        label:
+                          "Sign Up",
+                        onClick: () => {
+                          router.push(
+                            getRoute(
+                              account,
+                              "signup"
+                            )
+                          );
+                        },
+                      },
+                    ]}
+                  />
+                </div>
+              </div>
+            )}
 
-              rounded-[30px]
-
-              border
-              border-[#DFE7EF]
-
-              bg-white
-
-              shadow-[0_35px_105px_rgba(17,39,66,0.12)]
-            "
-          >
-            {/* =================================================
-                MOBILE
-            ================================================== */}
-
-            <div className="lg:hidden">
+            <div className="relative p-5 sm:p-7 md:p-9">
               <AnimatePresence
                 mode="wait"
-                initial={
-                  false
-                }
+                initial={false}
               >
                 <motion.div
-                  key={
-                    pathname
+                  key={pathname}
+                  initial={
+                    reduceMotion
+                      ? {
+                          opacity: 0,
+                        }
+                      : {
+                          opacity: 0,
+                          rotateY:
+                            view ===
+                            "signin"
+                              ? -76
+                              : 76,
+                          scale: 0.985,
+                        }
                   }
-                  initial={{
-                    opacity: 0,
-
-                    x:
-                      routeMode ===
-                      "signin"
-                        ? -20
-                        : 20,
-
-                    filter:
-                      "blur(4px)",
-                  }}
                   animate={{
                     opacity: 1,
-
-                    x: 0,
-
-                    filter:
-                      "blur(0px)",
+                    rotateY: 0,
+                    scale: 1,
                   }}
-                  exit={{
-                    opacity: 0,
-
-                    x:
-                      routeMode ===
-                      "signin"
-                        ? 20
-                        : -20,
-
-                    filter:
-                      "blur(4px)",
-                  }}
+                  exit={
+                    reduceMotion
+                      ? {
+                          opacity: 0,
+                        }
+                      : {
+                          opacity: 0,
+                          rotateY:
+                            view ===
+                            "signin"
+                              ? 76
+                              : -76,
+                          scale: 0.985,
+                        }
+                  }
                   transition={{
                     duration:
-                      0.32,
-
+                      reduceMotion
+                        ? 0.16
+                        : 0.5,
                     ease: [
                       0.22,
                       1,
@@ -520,1108 +470,130 @@ export default function AuthLayout({
                       1,
                     ],
                   }}
-                  className="
-                    relative
-                    z-10
-
-                    px-5
-                    py-8
-
-                    pointer-events-auto
-
-                    sm:px-8
-                    sm:py-10
-                  "
+                  style={{
+                    backfaceVisibility:
+                      "hidden",
+                    transformStyle:
+                      "preserve-3d",
+                  }}
                 >
                   {children}
                 </motion.div>
               </AnimatePresence>
             </div>
-
-            {/* =================================================
-                DESKTOP 50 / 50
-            ================================================== */}
-
-            <div
-              className="
-                hidden
-
-                h-[720px]
-                w-full
-
-                lg:flex
-
-                xl:h-[740px]
-              "
-              style={{
-                perspective:
-                  "1800px",
-              }}
-            >
-              {/* ===============================================
-                  HERO PANEL
-              ================================================ */}
-
-              <motion.section
-                layout
-                initial={false}
-                transition={{
-                  layout: {
-                    type:
-                      "spring",
-
-                    stiffness:
-                      125,
-
-                    damping:
-                      23,
-
-                    mass:
-                      0.85,
-                  },
-
-                  boxShadow: {
-                    duration:
-                      0.35,
-                  },
-                }}
-                animate={{
-                  scale: 1,
-
-                  boxShadow:
-                    isSignIn
-                      ? "20px 0 60px rgba(8,26,44,0.06)"
-                      : "-20px 0 60px rgba(8,26,44,0.06)",
-                }}
-                style={{
-                  order:
-                    isSignIn
-                      ? 1
-                      : 2,
-
-                  width:
-                    "50%",
-
-                  minWidth: 0,
-
-                  position:
-                    "relative",
-
-                  zIndex: 10,
-
-                  pointerEvents:
-                    "auto",
-
-                  transformStyle:
-                    "preserve-3d",
-                }}
-              >
-                <AuthHeroPanel
-                  mode={mode}
-                />
-              </motion.section>
-
-              {/* ===============================================
-                  FORM PANEL
-              ================================================ */}
-
-              <motion.section
-                layout
-                initial={false}
-                transition={{
-                  layout: {
-                    type:
-                      "spring",
-
-                    stiffness:
-                      125,
-
-                    damping:
-                      23,
-
-                    mass:
-                      0.85,
-                  },
-
-                  boxShadow: {
-                    duration:
-                      0.35,
-                  },
-                }}
-                animate={{
-                  scale: 1,
-
-                  boxShadow:
-                    isSignIn
-                      ? "-20px 0 60px rgba(8,26,44,0.055)"
-                      : "20px 0 60px rgba(8,26,44,0.055)",
-                }}
-                style={{
-                  order:
-                    isSignIn
-                      ? 2
-                      : 1,
-
-                  width:
-                    "50%",
-
-                  minWidth: 0,
-
-                  position:
-                    "relative",
-
-                  zIndex: 20,
-
-                  pointerEvents:
-                    "auto",
-
-                  background:
-                    "#ffffff",
-
-                  transformStyle:
-                    "preserve-3d",
-                }}
-              >
-                {/* =============================================
-                    SWITCH
-                ============================================== */}
-
-                <div
-                  className="
-                    absolute
-                    left-1/2
-                    top-7
-                    z-30
-
-                    w-[310px]
-                    max-w-[calc(100%-40px)]
-
-                    -translate-x-1/2
-
-                    pointer-events-auto
-                  "
-                >
-                  <AuthSwitch
-                    isSignIn={
-                      isSignIn
-                    }
-                    onSwitch={
-                      handleSwitch
-                    }
-                  />
-                </div>
-
-                {/* =============================================
-                    FORM AREA
-                ============================================== */}
-
-                <div
-                  className="
-                    relative
-                    z-20
-
-                    h-full
-
-                    overflow-y-auto
-
-                    px-8
-                    pb-10
-                    pt-[108px]
-
-                    pointer-events-auto
-
-                    [scrollbar-width:none]
-                    [-ms-overflow-style:none]
-                    [&::-webkit-scrollbar]:hidden
-
-                    xl:px-12
-                  "
-                >
-                  <div
-                    className="
-                      mx-auto
-
-                      flex
-                      min-h-full
-                      w-full
-                      max-w-[470px]
-                      items-center
-
-                      pointer-events-auto
-                    "
-                  >
-                    <div
-                      className="
-                        relative
-                        z-30
-                        w-full
-                        pointer-events-auto
-                      "
-                    >
-                      <AnimatePresence
-                        mode="wait"
-                        initial={
-                          false
-                        }
-                      >
-                        <motion.div
-                          key={
-                            pathname
-                          }
-                          initial={{
-                            opacity: 0,
-
-                            y: 14,
-
-                            scale:
-                              0.985,
-
-                            filter:
-                              "blur(3px)",
-                          }}
-                          animate={{
-                            opacity: 1,
-
-                            y: 0,
-
-                            scale: 1,
-
-                            filter:
-                              "blur(0px)",
-                          }}
-                          exit={{
-                            opacity: 0,
-
-                            y: -10,
-
-                            scale:
-                              0.99,
-
-                            filter:
-                              "blur(3px)",
-                          }}
-                          transition={{
-                            duration:
-                              0.28,
-
-                            ease: [
-                              0.22,
-                              1,
-                              0.36,
-                              1,
-                            ],
-                          }}
-                          className="
-                            relative
-                            z-30
-                            pointer-events-auto
-                          "
-                        >
-                          {
-                            children
-                          }
-                        </motion.div>
-                      </AnimatePresence>
-                    </div>
-                  </div>
-                </div>
-              </motion.section>
-            </div>
           </div>
+        </div>
+      </section>
 
-          {/* ===================================================
-              SECURITY FOOTER
-          ==================================================== */}
+      <footer className="relative z-10 mx-auto mt-6 flex max-w-6xl flex-col items-center justify-between gap-3 text-center text-[10px] font-semibold text-white/55 sm:flex-row sm:text-left">
+        <span>
+          © {new Date().getFullYear()} Coffer. Protected financial access.
+        </span>
 
-          <div
-            className="
-              mt-4
-
-              flex
-              items-center
-              justify-center
-              gap-2
-
-              text-[9px]
-              font-semibold
-              text-[#8997A6]
-            "
-          >
-            <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-
-            Secure digital wallet authentication
-          </div>
-        </motion.div>
-      </main>
-    </>
+        <span className="inline-flex items-center gap-2">
+          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-300" />
+          Encrypted session · HttpOnly authentication
+        </span>
+      </footer>
+    </main>
   );
 }
 
-/* =========================================================
-   HERO PANEL
-========================================================= */
+interface SegmentOption {
+  active: boolean;
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+}
 
-function AuthHeroPanel({
-  mode,
+function SegmentedControl({
+  ariaLabel,
+  accent,
+  options,
+  subtle = false,
 }: {
-  mode: AuthMode;
+  ariaLabel: string;
+  accent: string;
+  options: [
+    SegmentOption,
+    SegmentOption,
+  ];
+  subtle?: boolean;
 }) {
-  const content =
-    HERO_CONTENT[mode];
+  const activeIndex =
+    options[1].active
+      ? 1
+      : 0;
 
   return (
     <div
-      className="
-        relative
-
-        h-full
-        w-full
-
-        overflow-hidden
-
-        bg-[#071321]
-      "
+      role="tablist"
+      aria-label={ariaLabel}
+      className={`relative grid grid-cols-2 p-1 ${
+        subtle
+          ? "h-11 rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-slate-900"
+          : "h-12 rounded-2xl bg-slate-200/70 dark:bg-white/[0.07]"
+      }`}
     >
-      {/* GRID */}
-
-      <div
-        className="
-          pointer-events-none
-
-          absolute
-          inset-0
-
-          bg-[linear-gradient(to_right,rgba(255,255,255,0.024)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.024)_1px,transparent_1px)]
-
-          bg-[size:34px_34px]
-        "
-      />
-
-      {/* GLOW */}
-
-      <motion.div
+      <motion.span
         aria-hidden="true"
+        className="pointer-events-none absolute bottom-1 top-1 w-[calc(50%-4px)] rounded-xl shadow-sm"
         animate={{
-          x: [
-            0,
-            28,
-            0,
-          ],
-
-          y: [
-            0,
-            16,
-            0,
-          ],
-
-          scale: [
-            1,
-            1.15,
-            1,
-          ],
-
-          opacity: [
-            0.12,
-            0.25,
-            0.12,
-          ],
+          x:
+            activeIndex === 0
+              ? 4
+              : "calc(100% + 4px)",
         }}
         transition={{
-          duration: 10,
-
-          repeat:
-            Infinity,
-
-          ease:
-            "easeInOut",
+          type: "spring",
+          stiffness: 420,
+          damping: 34,
         }}
-        className="
-          pointer-events-none
-
-          absolute
-          -left-28
-          -top-28
-
-          h-[450px]
-          w-[450px]
-
-          rounded-full
-
-          bg-[#1F5EA8]/30
-
-          blur-[130px]
-        "
+        style={{
+          background:
+            subtle
+              ? `${accent}18`
+              : accent,
+        }}
       />
 
-      <motion.div
-        aria-hidden="true"
-        animate={{
-          scale: [
-            1,
-            1.15,
-            1,
-          ],
-
-          opacity: [
-            0.06,
-            0.14,
-            0.06,
-          ],
-        }}
-        transition={{
-          duration: 12,
-
-          repeat:
-            Infinity,
-
-          ease:
-            "easeInOut",
-        }}
-        className="
-          pointer-events-none
-
-          absolute
-          -bottom-28
-          -right-24
-
-          h-[380px]
-          w-[380px]
-
-          rounded-full
-
-          bg-sky-400/20
-
-          blur-[115px]
-        "
-      />
-
-      {/* ORBIT */}
-
-      <motion.div
-        aria-hidden="true"
-        animate={{
-          rotate: 360,
-        }}
-        transition={{
-          duration: 30,
-
-          repeat:
-            Infinity,
-
-          ease:
-            "linear",
-        }}
-        className="
-          pointer-events-none
-
-          absolute
-          -right-24
-          top-20
-
-          h-[220px]
-          w-[220px]
-
-          rounded-full
-
-          border
-          border-white/[0.04]
-        "
-      >
-        <span
-          className="
-            absolute
-            left-1/2
-            top-[-4px]
-
-            h-2
-            w-2
-
-            rounded-full
-
-            bg-[#63B4EC]
-
-            shadow-[0_0_14px_rgba(99,180,236,0.8)]
-          "
-        />
-      </motion.div>
-
-      {/* CONTENT */}
-
-      <div
-        className="
-          relative
-          z-10
-
-          flex
-          h-full
-          flex-col
-
-          px-10
-          py-10
-
-          xl:px-14
-          xl:py-12
-        "
-      >
-        {/* BRAND */}
-
-        <Link
-          href="/"
-          className="
-            group
-
-            flex
-            w-fit
-            items-center
-            gap-3
-          "
-        >
-          <motion.div
-            whileHover={{
-              rotate: -5,
-              scale: 1.05,
-            }}
-            className="
-              flex
-              h-11
-              w-11
-              items-center
-              justify-center
-
-              rounded-[14px]
-
-              border
-              border-white/10
-
-              bg-white/[0.07]
-
-              text-[#72BDF0]
-
-              shadow-[0_10px_28px_rgba(0,0,0,0.15)]
-            "
-          >
-            <WalletCards className="h-5 w-5" />
-          </motion.div>
-
-          <div>
-            <p
-              className="
-                text-[18px]
-                font-black
-                tracking-[-0.035em]
-                text-white
-              "
-            >
-              Coffer
-            </p>
-
-            <p
-              className="
-                mt-0.5
-
-                text-[8px]
-                font-extrabold
-                uppercase
-                tracking-[0.2em]
-
-                text-[#5CA8DD]
-              "
-            >
-              Digital Wallet
-            </p>
-          </div>
-        </Link>
-
-        {/* MODE CONTENT */}
-
-        <div className="my-auto">
-          <AnimatePresence
-            mode="wait"
-            initial={
-              false
+      {options.map(
+        ({
+          active,
+          icon: Icon,
+          label,
+          onClick,
+        }) => (
+          <button
+            key={label}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            onClick={onClick}
+            className={`relative z-10 inline-flex min-w-0 items-center justify-center gap-2 rounded-xl px-2 text-[11px] font-black transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400/70 sm:text-xs ${
+              active
+                ? subtle
+                  ? "text-slate-950 dark:text-white"
+                  : "text-white"
+                : "text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white"
+            }`}
+            style={
+              active &&
+              subtle
+                ? {
+                    color:
+                      accent,
+                  }
+                : undefined
             }
           >
-            <motion.div
-              key={mode}
-              initial={{
-                opacity: 0,
-                y: 18,
-              }}
-              animate={{
-                opacity: 1,
-                y: 0,
-              }}
-              exit={{
-                opacity: 0,
-                y: -14,
-              }}
-              transition={{
-                duration:
-                  0.35,
-
-                ease: [
-                  0.22,
-                  1,
-                  0.36,
-                  1,
-                ],
-              }}
-            >
-              {/* BADGE */}
-
-              <div
-                className="
-                  inline-flex
-                  items-center
-                  gap-2
-
-                  rounded-full
-
-                  border
-                  border-[#438BC4]/25
-
-                  bg-[#1F5EA8]/10
-
-                  px-3
-                  py-1.5
-                "
-              >
-                <Sparkles className="h-3.5 w-3.5 text-[#68B9EE]" />
-
-                <span
-                  className="
-                    text-[9px]
-                    font-extrabold
-                    uppercase
-                    tracking-[0.16em]
-
-                    text-[#7BC5F3]
-                  "
-                >
-                  {
-                    content.badge
-                  }
-                </span>
-              </div>
-
-              {/* TITLE */}
-
-              <h2
-                className="
-                  mt-6
-
-                  max-w-[470px]
-
-                  text-[36px]
-                  font-black
-                  leading-[1.08]
-                  tracking-[-0.05em]
-
-                  text-white
-
-                  xl:text-[45px]
-                "
-              >
-                {
-                  content.title
-                }
-
-                <span
-                  className="
-                    mt-1.5
-                    block
-
-                    bg-gradient-to-r
-                    from-[#75C8FA]
-                    via-[#4898D6]
-                    to-[#A6CCEF]
-
-                    bg-clip-text
-                    text-transparent
-                  "
-                >
-                  {
-                    content.highlight
-                  }
-                </span>
-              </h2>
-
-              {/* DESCRIPTION */}
-
-              <p
-                className="
-                  mt-5
-
-                  max-w-[455px]
-
-                  text-[13px]
-                  font-medium
-                  leading-7
-
-                  text-[#94A5B8]
-                "
-              >
-                {
-                  content.description
-                }
-              </p>
-
-              {/* FEATURES */}
-
-              <div className="mt-8 space-y-3">
-                {content.features.map(
-                  (
-                    feature,
-                    index
-                  ) => {
-                    const Icon =
-                      feature.icon;
-
-                    return (
-                      <motion.div
-                        key={
-                          feature.title
-                        }
-                        initial={{
-                          opacity: 0,
-                          x: -12,
-                        }}
-                        animate={{
-                          opacity: 1,
-                          x: 0,
-                        }}
-                        transition={{
-                          delay:
-                            0.1 +
-                            index *
-                              0.06,
-                        }}
-                        whileHover={{
-                          x: 5,
-                        }}
-                        className="
-                          flex
-
-                          max-w-[450px]
-
-                          items-center
-                          gap-3
-
-                          rounded-[15px]
-
-                          border
-                          border-white/[0.055]
-
-                          bg-white/[0.03]
-
-                          px-3.5
-                          py-3
-
-                          transition-colors
-
-                          hover:bg-white/[0.055]
-                        "
-                      >
-                        <div
-                          className="
-                            flex
-                            h-10
-                            w-10
-                            shrink-0
-                            items-center
-                            justify-center
-
-                            rounded-[12px]
-
-                            bg-[#1F5EA8]/15
-
-                            text-[#6ABAF0]
-                          "
-                        >
-                          <Icon className="h-4 w-4" />
-                        </div>
-
-                        <div>
-                          <p className="text-[11px] font-extrabold text-white">
-                            {
-                              feature.title
-                            }
-                          </p>
-
-                          <p className="mt-0.5 text-[9px] leading-4 text-[#8091A5]">
-                            {
-                              feature.description
-                            }
-                          </p>
-                        </div>
-                      </motion.div>
-                    );
-                  }
-                )}
-              </div>
-            </motion.div>
-          </AnimatePresence>
-        </div>
-
-        {/* FOOTER */}
-
-        <div
-          className="
-            flex
-            items-center
-            gap-2
-
-            text-[9px]
-            font-semibold
-            text-[#718196]
-          "
-        >
-          <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
-
-          Protected account access
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* =========================================================
-   AUTH SWITCH
-========================================================= */
-
-function AuthSwitch({
-  isSignIn,
-  onSwitch,
-}: {
-  isSignIn: boolean;
-
-  onSwitch: (
-    mode: AuthMode
-  ) => void;
-}) {
-  return (
-    <div
-      className="
-        relative
-
-        mx-auto
-
-        w-full
-        max-w-[310px]
-
-        pointer-events-auto
-      "
-    >
-      {/* SHADOW */}
-
-      <div
-        className="
-          pointer-events-none
-
-          absolute
-          inset-x-8
-          -bottom-3
-
-          h-6
-
-          rounded-full
-
-          bg-[#1F5EA8]/15
-
-          blur-xl
-        "
-      />
-
-      {/* BODY */}
-
-      <div
-        className="
-          relative
-
-          grid
-          h-[56px]
-          grid-cols-2
-
-          overflow-hidden
-
-          rounded-[17px]
-
-          border
-          border-[#DCE6EF]
-
-          bg-white/95
-
-          p-1
-
-          shadow-[0_14px_34px_rgba(27,65,104,0.13)]
-
-          backdrop-blur-2xl
-
-          pointer-events-auto
-        "
-      >
-        {/* ACTIVE BACKGROUND */}
-
-        <motion.div
-          initial={
-            false
-          }
-          animate={{
-            x:
-              isSignIn
-                ? "0%"
-                : "100%",
-          }}
-          transition={{
-            type:
-              "spring",
-
-            stiffness:
-              420,
-
-            damping:
-              32,
-
-            mass:
-              0.62,
-          }}
-          className="
-            pointer-events-none
-
-            absolute
-            bottom-1
-            left-1
-            top-1
-
-            w-[calc(50%_-_4px)]
-
-            rounded-[13px]
-
-            bg-gradient-to-br
-            from-[#2A73B7]
-            via-[#1F5EA8]
-            to-[#17466F]
-
-            shadow-[0_9px_23px_rgba(31,94,168,0.28)]
-          "
-        />
-
-        {/* SIGN IN */}
-
-        <button
-          type="button"
-          onClick={() =>
-            onSwitch(
-              "signin"
-            )
-          }
-          className="
-            relative
-            z-20
-
-            flex
-            items-center
-            justify-center
-
-            cursor-pointer
-            pointer-events-auto
-          "
-        >
-          <div className="flex items-center gap-2">
-            <LogIn
-              className={`h-4 w-4 ${
-                isSignIn
-                  ? "text-white"
-                  : "text-[#60738A]"
-              }`}
-            />
-
-            <span
-              className={`text-xs font-extrabold ${
-                isSignIn
-                  ? "text-white"
-                  : "text-[#60738A]"
-              }`}
-            >
-              Sign In
+            <Icon className="h-4 w-4 shrink-0" />
+            <span className="truncate">
+              {label}
             </span>
-
-            {isSignIn && (
-              <motion.span
-                layoutId="auth-dot"
-                className="
-                  h-1.5
-                  w-1.5
-
-                  rounded-full
-
-                  bg-sky-200
-
-                  shadow-[0_0_9px_rgba(186,230,253,0.95)]
-                "
-              />
-            )}
-          </div>
-        </button>
-
-        {/* SIGN UP */}
-
-        <button
-          type="button"
-          onClick={() =>
-            onSwitch(
-              "signup"
-            )
-          }
-          className="
-            relative
-            z-20
-
-            flex
-            items-center
-            justify-center
-
-            cursor-pointer
-            pointer-events-auto
-          "
-        >
-          <div className="flex items-center gap-2">
-            <UserPlus
-              className={`h-4 w-4 ${
-                !isSignIn
-                  ? "text-white"
-                  : "text-[#60738A]"
-              }`}
-            />
-
-            <span
-              className={`text-xs font-extrabold ${
-                !isSignIn
-                  ? "text-white"
-                  : "text-[#60738A]"
-              }`}
-            >
-              Sign Up
-            </span>
-
-            {!isSignIn && (
-              <motion.span
-                layoutId="auth-dot"
-                className="
-                  h-1.5
-                  w-1.5
-
-                  rounded-full
-
-                  bg-sky-200
-
-                  shadow-[0_0_9px_rgba(186,230,253,0.95)]
-                "
-              />
-            )}
-          </div>
-        </button>
-      </div>
+          </button>
+        )
+      )}
     </div>
   );
 }
