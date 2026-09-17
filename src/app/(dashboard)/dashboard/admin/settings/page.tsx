@@ -757,7 +757,7 @@ export default function AdminSettingsPage() {
     void loadPlatformSettings();
 
   }, []);
-  
+
   const loadAdminSessions = useCallback(async (silent = false) => {
     if (!silent) setSessionsLoading(true);
     setSessionsError("");

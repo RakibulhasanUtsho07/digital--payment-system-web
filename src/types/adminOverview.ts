@@ -67,4 +67,3 @@ export interface AdminOverviewResponse {
   attentionQueue: AttentionQueueItem[];
   serviceHealth: ServiceHealthItem[];
 }
-

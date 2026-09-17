@@ -313,7 +313,7 @@ export default function InsightsPage() {
     >
       {/* ===================================================
           TOP HEADER
-          
+
           IMPORTANT:
           No overflow-hidden here.
           This allows dropdown to escape parent bounds.

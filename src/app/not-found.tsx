@@ -39,7 +39,7 @@ export default function NotFound() {
           MAIN CONTENT CONTAINER
       ===================================================== */}
       <div className="relative z-10 w-full max-w-2xl mx-auto text-center">
-        
+
         {/* Top Badge */}
         <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium text-purple-300 shadow-lg backdrop-blur-xl">
           <Sparkles className="h-3.5 w-3.5 text-purple-400" />
@@ -52,7 +52,7 @@ export default function NotFound() {
         <div className="relative mx-auto mb-10 flex h-48 w-48 items-center justify-center sm:h-56 sm:w-56">
           {/* Outer Rotating Security Ring */}
           <div className="absolute inset-0 rounded-full border border-purple-500/30 animate-[spin_15s_linear_infinite]" />
-          
+
           {/* Inner Counter-Rotating Ring */}
           <div className="absolute inset-3 rounded-full border border-cyan-500/20 border-dashed animate-[spin_10s_linear_infinite_reverse]" />
 
