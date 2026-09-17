@@ -8,7 +8,10 @@ import {
 } from "react";
 
 import Link from "next/link";
-import { useParams } from "next/navigation";
+
+import {
+  useParams,
+} from "next/navigation";
 
 import {
   AlertCircle,
@@ -25,13 +28,22 @@ import {
   Loader2,
   RefreshCw,
   ShieldCheck,
+  Sparkles,
   UserRound,
   WalletCards,
   XCircle,
   Zap,
 } from "lucide-react";
+
+import {
+  motion,
+} from "framer-motion";
+
 import IssueRefundButton from "../components/IssueRefundButton";
-import { apiClient } from "@/lib/api/client";
+
+import {
+  apiClient,
+} from "@/lib/api/client";
 
 /* =========================================================
    TYPES
@@ -59,41 +71,31 @@ interface MerchantSummary {
 
 interface MerchantPayment {
   _id?: string;
-
   paymentId: string;
   merchantId?: string;
-
   customerId?: string | null;
   orderId?: string | null;
-
   amount: DecimalValue;
   feeAmount?: DecimalValue;
   netAmount?: DecimalValue;
-
   currency: string;
-
   sourceType?: string;
   provider?: string;
   mode?: string;
   status?: string;
-
   providerPaymentId?: string | null;
   merchantReference?: string | null;
-
   failureCode?: string | null;
   failureMessage?: string | null;
-
   returnUrl?: string | null;
   cancelUrl?: string | null;
   checkoutUrl?: string | null;
-
   authorizedAt?: string | null;
   capturedAt?: string | null;
   completedAt?: string | null;
   failedAt?: string | null;
   cancelledAt?: string | null;
   expiredAt?: string | null;
-
   createdAt?: string;
   updatedAt?: string;
 }
@@ -115,54 +117,176 @@ interface TimelineItem {
 }
 
 /* =========================================================
+   PURPLE BACKGROUND
+========================================================= */
+
+function PurpleAuroraBackground() {
+  return (
+    <>
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "linear-gradient(132deg,#240B4A 0%,#4C1D95 30%,#6D28D9 60%,#7C3AED 80%,#9333EA 100%)",
+        }}
+      />
+
+      <motion.div
+        animate={{
+          x: [0, 90, 10, 0],
+          y: [0, 30, 70, 0],
+          scale: [1, 1.18, 0.92, 1],
+        }}
+        transition={{
+          duration: 18,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+        className="
+          pointer-events-none
+          absolute
+          -left-32
+          -top-40
+          h-[420px]
+          w-[420px]
+          rounded-full
+          bg-fuchsia-400/30
+          blur-[110px]
+        "
+      />
+
+      <motion.div
+        animate={{
+          x: [0, -75, 25, 0],
+          y: [0, -35, 50, 0],
+          scale: [1, 0.9, 1.2, 1],
+        }}
+        transition={{
+          duration: 21,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+        className="
+          pointer-events-none
+          absolute
+          -bottom-44
+          right-[-60px]
+          h-[450px]
+          w-[450px]
+          rounded-full
+          bg-violet-300/30
+          blur-[115px]
+        "
+      />
+
+      <motion.div
+        animate={{
+          rotate: [0, 360],
+        }}
+        transition={{
+          duration: 46,
+          repeat: Infinity,
+          ease: "linear",
+        }}
+        className="
+          pointer-events-none
+          absolute
+          right-[10%]
+          top-[-190px]
+          h-[390px]
+          w-[390px]
+          rounded-full
+          border
+          border-white/10
+        "
+      />
+
+      <div
+        className="
+          pointer-events-none
+          absolute
+          inset-0
+          opacity-[0.07]
+          [background-image:radial-gradient(circle_at_center,white_1px,transparent_1px)]
+          [background-size:24px_24px]
+        "
+      />
+    </>
+  );
+}
+
+/* =========================================================
    HELPERS
 ========================================================= */
 
 function getDecimalNumber(
-  value: DecimalValue | undefined
+  value:
+    DecimalValue |
+    undefined
 ): number {
   if (
-    typeof value === "object" &&
+    typeof value ===
+      "object" &&
     value !== null
   ) {
-    const decimal =
-      value.$numberDecimal;
-
     const amount =
-      Number(decimal ?? 0);
+      Number(
+        value.$numberDecimal ??
+          0
+      );
 
-    return Number.isFinite(amount)
+    return Number.isFinite(
+      amount
+    )
       ? amount
       : 0;
   }
 
   const amount =
-    Number(value ?? 0);
+    Number(
+      value ?? 0
+    );
 
-  return Number.isFinite(amount)
+  return Number.isFinite(
+    amount
+  )
     ? amount
     : 0;
 }
 
 function formatMoney(
-  value: DecimalValue | undefined,
-  currency = "BDT"
+  value:
+    DecimalValue |
+    undefined,
+  currency =
+    "BDT"
 ): string {
   const amount =
-    getDecimalNumber(value);
+    getDecimalNumber(
+      value
+    );
 
   try {
     return new Intl.NumberFormat(
       "en-BD",
       {
-        style: "currency",
+        style:
+          "currency",
+
         currency:
-          currency || "BDT",
-        maximumFractionDigits: 2,
+          currency ||
+          "BDT",
+
+        maximumFractionDigits:
+          2,
       }
-    ).format(amount);
+    ).format(
+      amount
+    );
   } catch {
-    return `${currency || "BDT"} ${amount.toFixed(2)}`;
+    return `${currency || "BDT"} ${amount.toFixed(
+      2
+    )}`;
   }
 }
 
@@ -174,7 +298,9 @@ function formatDate(
   }
 
   const date =
-    new Date(value);
+    new Date(
+      value
+    );
 
   if (
     Number.isNaN(
@@ -187,10 +313,15 @@ function formatDate(
   return new Intl.DateTimeFormat(
     "en-BD",
     {
-      dateStyle: "medium",
-      timeStyle: "short",
+      dateStyle:
+        "medium",
+
+      timeStyle:
+        "short",
     }
-  ).format(date);
+  ).format(
+    date
+  );
 }
 
 function humanize(
@@ -201,10 +332,15 @@ function humanize(
   }
 
   return value
-    .replace(/_/g, " ")
+    .replace(
+      /_/g,
+      " "
+    )
     .replace(
       /\b\w/g,
-      (character) =>
+      (
+        character
+      ) =>
         character.toUpperCase()
     );
 }
@@ -224,75 +360,114 @@ function getStatusMeta(
   status?: string
 ) {
   const normalized =
-    normalizeStatus(status);
+    normalizeStatus(
+      status
+    );
 
-  switch (normalized) {
+  switch (
+    normalized
+  ) {
     case "completed":
       return {
-        label: "Completed",
-        icon: CheckCircle2,
+        label:
+          "Completed",
+
+        icon:
+          CheckCircle2,
+
         className:
-          "merchant-status-success",
+          "border-emerald-200 bg-emerald-500/10 text-emerald-700 dark:border-emerald-900/50 dark:text-emerald-300",
+
         description:
           "The payment completed successfully.",
       };
 
     case "authorized":
       return {
-        label: "Authorized",
-        icon: ShieldCheck,
+        label:
+          "Authorized",
+
+        icon:
+          ShieldCheck,
+
         className:
-          "merchant-status-info",
+          "border-violet-300/30 bg-violet-500/10 text-violet-700 dark:text-violet-300",
+
         description:
           "The payment was authorized and is ready for capture.",
       };
 
     case "captured":
       return {
-        label: "Captured",
-        icon: CreditCard,
+        label:
+          "Captured",
+
+        icon:
+          CreditCard,
+
         className:
-          "merchant-status-info",
+          "border-violet-300/30 bg-violet-500/10 text-violet-700 dark:text-violet-300",
+
         description:
           "The authorized payment amount was captured.",
       };
 
     case "failed":
       return {
-        label: "Failed",
-        icon: XCircle,
+        label:
+          "Failed",
+
+        icon:
+          XCircle,
+
         className:
-          "merchant-status-danger",
+          "border-red-200 bg-red-500/10 text-red-700 dark:border-red-900/50 dark:text-red-300",
+
         description:
           "The payment could not be completed.",
       };
 
     case "cancelled":
       return {
-        label: "Cancelled",
-        icon: XCircle,
+        label:
+          "Cancelled",
+
+        icon:
+          XCircle,
+
         className:
-          "merchant-status-danger",
+          "border-red-200 bg-red-500/10 text-red-700 dark:border-red-900/50 dark:text-red-300",
+
         description:
           "The payment was cancelled.",
       };
 
     case "expired":
       return {
-        label: "Expired",
-        icon: Clock3,
+        label:
+          "Expired",
+
+        icon:
+          Clock3,
+
         className:
-          "merchant-status-warning",
+          "border-amber-200 bg-amber-500/10 text-amber-700 dark:border-amber-900/50 dark:text-amber-300",
+
         description:
           "The payment expired before completion.",
       };
 
     default:
       return {
-        label: "Pending",
-        icon: Clock3,
+        label:
+          "Pending",
+
+        icon:
+          Clock3,
+
         className:
-          "merchant-status-warning",
+          "border-amber-200 bg-amber-500/10 text-amber-700 dark:border-amber-900/50 dark:text-amber-300",
+
         description:
           "The payment is waiting for further processing.",
       };
@@ -309,33 +484,49 @@ function getMethodMeta(
   ) {
     case "wallet":
       return {
-        icon: Zap,
-        label: "Wallet",
+        icon:
+          WalletCards,
+
+        label:
+          "Wallet",
       };
 
     case "paypal":
       return {
-        icon: CreditCard,
-        label: "PayPal",
+        icon:
+          CreditCard,
+
+        label:
+          "PayPal",
       };
 
     case "card":
       return {
-        icon: CreditCard,
-        label: "Card",
+        icon:
+          CreditCard,
+
+        label:
+          "Card",
       };
 
     case "local_psp":
       return {
-        icon: WalletCards,
-        label: "Local PSP",
+        icon:
+          Zap,
+
+        label:
+          "Local PSP",
       };
 
     default:
       return {
-        icon: CreditCard,
+        icon:
+          CreditCard,
+
         label:
-          humanize(sourceType),
+          humanize(
+            sourceType
+          ),
       };
   }
 }
@@ -349,11 +540,15 @@ function safeExternalUrl(
 
   try {
     const url =
-      new URL(value);
+      new URL(
+        value
+      );
 
     if (
-      url.protocol !== "https:" &&
-      url.protocol !== "http:"
+      url.protocol !==
+        "https:" &&
+      url.protocol !==
+        "http:"
     ) {
       return null;
     }
@@ -365,16 +560,24 @@ function safeExternalUrl(
 }
 
 /* =========================================================
-   COPY BUTTON
+   COPY
 ========================================================= */
 
 function CopyButton({
   value,
+  inverted =
+    false,
 }: {
   value?: string | null;
+  inverted?: boolean;
 }) {
-  const [copied, setCopied] =
-    useState(false);
+  const [
+    copied,
+    setCopied,
+  ] =
+    useState(
+      false
+    );
 
   if (!value) {
     return null;
@@ -387,28 +590,55 @@ function CopyButton({
           value
         );
 
-        setCopied(true);
+        setCopied(
+          true
+        );
 
         window.setTimeout(
-          () => setCopied(false),
+          () =>
+            setCopied(
+              false
+            ),
           1500
         );
       } catch {
-        setCopied(false);
+        setCopied(
+          false
+        );
       }
     };
 
   return (
-    <button
+    <motion.button
       type="button"
+      whileTap={{
+        scale:
+          0.96,
+      }}
       onClick={() =>
         void copyValue()
       }
-      className="inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold merchant-border merchant-surface merchant-muted transition hover:merchant-primary-soft hover:merchant-primary"
-      aria-label={`Copy ${value}`}
+      className={`
+        inline-flex
+        h-8
+        items-center
+        gap-1.5
+        rounded-lg
+        border
+        px-2.5
+        text-xs
+        font-black
+        transition
+
+        ${
+          inverted
+            ? "border-white/15 bg-white/10 text-white hover:bg-white/15"
+            : "border-violet-300/20 bg-violet-500/[0.04] text-violet-600 hover:bg-violet-500/10"
+        }
+      `}
     >
       {copied ? (
-        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+        <CheckCircle2 className="h-3.5 w-3.5" />
       ) : (
         <Copy className="h-3.5 w-3.5" />
       )}
@@ -416,7 +646,7 @@ function CopyButton({
       {copied
         ? "Copied"
         : "Copy"}
-    </button>
+    </motion.button>
   );
 }
 
@@ -427,44 +657,86 @@ function CopyButton({
 function DetailRow({
   label,
   value,
-  mono = false,
-  copy = false,
+  mono =
+    false,
+  copy =
+    false,
 }: {
-  label: string;
+  label:
+    string;
+
   value?: string | null;
-  mono?: boolean;
-  copy?: boolean;
+
+  mono?:
+    boolean;
+
+  copy?:
+    boolean;
 }) {
   const displayValue =
     value?.trim() ||
     "Not available";
 
   return (
-    <div className="flex flex-col gap-2 border-b py-4 last:border-b-0 sm:flex-row sm:items-center sm:justify-between merchant-border">
+    <motion.div
+      whileHover={{
+        x:
+          3,
+      }}
+      className="
+        flex
+        flex-col
+        gap-2
+        border-b
+        border-violet-300/10
+        py-4
+
+        last:border-b-0
+
+        sm:flex-row
+        sm:items-center
+        sm:justify-between
+      "
+    >
       <div className="min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-wide merchant-muted">
-          {label}
+        <p className="text-[9px] font-black uppercase tracking-[0.12em] text-violet-500/75">
+          {
+            label
+          }
         </p>
 
         <p
-          className={`mt-1 break-all text-sm font-semibold merchant-text ${
-            mono
-              ? "font-mono"
-              : ""
-          }`}
+          className={`
+            mt-1
+            break-all
+            text-sm
+            font-bold
+            text-foreground
+
+            ${
+              mono
+                ? "font-mono"
+                : ""
+            }
+          `}
         >
-          {displayValue}
+          {
+            displayValue
+          }
         </p>
       </div>
 
-      {copy && value && (
-        <div className="shrink-0">
-          <CopyButton
-            value={value}
-          />
-        </div>
-      )}
-    </div>
+      {copy &&
+        value && (
+          <div className="shrink-0">
+            <CopyButton
+              value={
+                value
+              }
+            />
+          </div>
+        )}
+    </motion.div>
   );
 }
 
@@ -476,51 +748,122 @@ function SummaryCard({
   title,
   value,
   description,
-  icon: Icon,
+  icon:
+    Icon,
+  index,
 }: {
   title: string;
   value: string;
   description: string;
   icon: typeof Banknote;
+  index: number;
 }) {
   return (
-    <section className="rounded-2xl border p-5 merchant-border merchant-surface merchant-shadow">
+    <motion.section
+      initial={{
+        opacity: 0,
+        y: 14,
+      }}
+      animate={{
+        opacity: 1,
+        y: 0,
+      }}
+      transition={{
+        delay:
+          index *
+          0.05,
+      }}
+      whileHover={{
+        y: -5,
+      }}
+      className="
+        group
+        relative
+        overflow-hidden
+        rounded-[22px]
+        border
+        merchant-border
+        bg-[linear-gradient(145deg,rgba(124,58,237,.06),rgba(255,255,255,.92))]
+        p-5
+
+        dark:bg-[linear-gradient(145deg,rgba(124,58,237,.10),rgba(15,23,42,.9))]
+      "
+    >
+      <div
+        className="
+          absolute
+          inset-x-0
+          top-0
+          h-[3px]
+          bg-gradient-to-r
+          from-violet-700
+          via-purple-500
+          to-fuchsia-400
+        "
+      />
+
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-bold uppercase tracking-wide merchant-muted">
-            {title}
+          <p className="text-[9px] font-black uppercase tracking-[0.13em] text-violet-500/75">
+            {
+              title
+            }
           </p>
 
-          <p className="mt-3 break-words text-xl font-bold merchant-text">
-            {value}
+          <p className="mt-3 break-words text-xl font-black text-violet-800 dark:text-violet-100">
+            {
+              value
+            }
           </p>
 
           <p className="mt-2 text-xs leading-5 merchant-muted">
-            {description}
+            {
+              description
+            }
           </p>
         </div>
 
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl merchant-primary-soft merchant-primary">
+        <motion.div
+          whileHover={{
+            rotate:
+              7,
+            scale:
+              1.1,
+          }}
+          className="
+            flex
+            h-11
+            w-11
+            shrink-0
+            items-center
+            justify-center
+            rounded-xl
+            bg-violet-500/10
+            text-violet-600
+
+            dark:text-violet-300
+          "
+        >
           <Icon className="h-5 w-5" />
-        </div>
+        </motion.div>
       </div>
-    </section>
+    </motion.section>
   );
 }
 
 /* =========================================================
-   LOADING
+   LOADING + ERROR
 ========================================================= */
 
 function LoadingState() {
   return (
     <div className="flex min-h-[520px] items-center justify-center">
       <div className="text-center">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl merchant-primary-soft">
-          <Loader2 className="h-7 w-7 animate-spin merchant-primary" />
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/10">
+          <Loader2 className="h-7 w-7 animate-spin text-violet-600" />
         </div>
 
-        <p className="mt-4 text-sm font-semibold merchant-text">
+        <p className="mt-4 text-sm font-black text-foreground">
           Loading payment details
         </p>
 
@@ -532,47 +875,52 @@ function LoadingState() {
   );
 }
 
-/* =========================================================
-   ERROR
-========================================================= */
-
 function ErrorState({
   message,
   onRetry,
 }: {
-  message: string;
-  onRetry: () => void;
+  message:
+    string;
+
+  onRetry:
+    () => void;
 }) {
   return (
     <div className="flex min-h-[520px] items-center justify-center px-4">
-      <div className="w-full max-w-lg rounded-2xl border p-6 text-center merchant-border merchant-surface merchant-shadow">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl merchant-danger-soft">
-          <AlertCircle className="h-7 w-7 merchant-danger" />
+      <div className="w-full max-w-lg rounded-2xl border merchant-border merchant-surface p-6 text-center">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-500/10">
+          <AlertCircle className="h-7 w-7 text-red-500" />
         </div>
 
-        <h2 className="mt-4 text-lg font-bold merchant-text">
+        <h2 className="mt-4 text-lg font-black text-foreground">
           Unable to load payment
         </h2>
 
         <p className="mt-2 text-sm leading-6 merchant-muted">
-          {message}
+          {
+            message
+          }
         </p>
 
         <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
           <Link
             href="/dashboard/merchant/payments"
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-semibold merchant-border merchant-surface merchant-text"
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border merchant-border px-4 text-sm font-black text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
+
             Back to payments
           </Link>
 
           <button
             type="button"
-            onClick={onRetry}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold text-white merchant-gradient"
+            onClick={
+              onRetry
+            }
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 text-sm font-black text-white"
           >
             <RefreshCw className="h-4 w-4" />
+
             Try again
           </button>
         </div>
@@ -593,54 +941,82 @@ export default function MerchantPaymentDetailsPage() {
     params?.paymentId;
 
   const paymentId =
-    Array.isArray(rawPaymentId)
+    Array.isArray(
+      rawPaymentId
+    )
       ? rawPaymentId[0]
       : typeof rawPaymentId ===
           "string"
         ? rawPaymentId
         : "";
 
-  const [data, setData] =
+  const [
+    data,
+    setData,
+  ] =
     useState<PaymentDetailResponse | null>(
       null
     );
 
-  const [loading, setLoading] =
-    useState(true);
+  const [
+    loading,
+    setLoading,
+  ] =
+    useState(
+      true
+    );
 
-  const [refreshing, setRefreshing] =
-    useState(false);
+  const [
+    refreshing,
+    setRefreshing,
+  ] =
+    useState(
+      false
+    );
 
-  const [error, setError] =
+  const [
+    error,
+    setError,
+  ] =
     useState("");
-
-  /* =======================================================
-     FETCH PAYMENT
-  ======================================================== */
 
   const fetchPayment =
     useCallback(
       async ({
-        silent = false,
+        silent =
+          false,
       }: {
         silent?: boolean;
       } = {}) => {
-        if (!paymentId) {
+        if (
+          !paymentId
+        ) {
           setError(
             "A valid payment ID is required."
           );
 
-          setLoading(false);
+          setLoading(
+            false
+          );
+
           return;
         }
 
         try {
-          setError("");
+          setError(
+            ""
+          );
 
-          if (silent) {
-            setRefreshing(true);
+          if (
+            silent
+          ) {
+            setRefreshing(
+              true
+            );
           } else {
-            setLoading(true);
+            setLoading(
+              true
+            );
           }
 
           const response =
@@ -649,7 +1025,8 @@ export default function MerchantPaymentDetailsPage() {
                 paymentId
               )}`,
               {
-                method: "GET",
+                method:
+                  "GET",
               }
             );
 
@@ -662,33 +1039,52 @@ export default function MerchantPaymentDetailsPage() {
             );
           }
 
-          setData(response);
-        } catch (err) {
+          setData(
+            response
+          );
+        } catch (
+          err
+        ) {
           const message =
-            err instanceof Error
+            err instanceof
+              Error
               ? err.message
               : "Unable to load payment details.";
 
-          setError(message);
+          setError(
+            message
+          );
 
-          if (!silent) {
-            setData(null);
+          if (
+            !silent
+          ) {
+            setData(
+              null
+            );
           }
         } finally {
-          setLoading(false);
-          setRefreshing(false);
+          setLoading(
+            false
+          );
+
+          setRefreshing(
+            false
+          );
         }
       },
-      [paymentId]
+      [
+        paymentId,
+      ]
     );
 
-  useEffect(() => {
-    void fetchPayment();
-  }, [fetchPayment]);
-
-  /* =======================================================
-     DERIVED DATA
-  ======================================================== */
+  useEffect(
+    () => {
+      void fetchPayment();
+    },
+    [
+      fetchPayment,
+    ]
+  );
 
   const payment =
     data?.payment;
@@ -753,7 +1149,9 @@ export default function MerchantPaymentDetailsPage() {
   const timeline =
     useMemo<TimelineItem[]>(
       () => {
-        if (!payment) {
+        if (
+          !payment
+        ) {
           return [];
         }
 
@@ -762,125 +1160,178 @@ export default function MerchantPaymentDetailsPage() {
             payment.status
           );
 
-        const items: TimelineItem[] =
-          [
-            {
-              key: "created",
-              title:
-                "Payment created",
-              description:
-                "The merchant payment was created.",
-              date:
-                payment.createdAt,
-              completed: Boolean(
+        const items:
+          TimelineItem[] = [
+          {
+            key:
+              "created",
+
+            title:
+              "Payment created",
+
+            description:
+              "The merchant payment was created.",
+
+            date:
+              payment.createdAt,
+
+            completed:
+              Boolean(
                 payment.createdAt
               ),
-            },
-            {
-              key: "authorized",
-              title:
-                "Payment authorized",
-              description:
-                "The payment received authorization.",
-              date:
-                payment.authorizedAt,
-              completed: Boolean(
+          },
+
+          {
+            key:
+              "authorized",
+
+            title:
+              "Payment authorized",
+
+            description:
+              "The payment received authorization.",
+
+            date:
+              payment.authorizedAt,
+
+            completed:
+              Boolean(
                 payment.authorizedAt
               ),
-            },
-            {
-              key: "captured",
-              title:
-                "Payment captured",
-              description:
-                "The authorized payment amount was captured.",
-              date:
-                payment.capturedAt,
-              completed: Boolean(
+          },
+
+          {
+            key:
+              "captured",
+
+            title:
+              "Payment captured",
+
+            description:
+              "The authorized payment amount was captured.",
+
+            date:
+              payment.capturedAt,
+
+            completed:
+              Boolean(
                 payment.capturedAt
               ),
-            },
-            {
-              key: "completed",
-              title:
-                "Payment completed",
-              description:
-                "The payment completed successfully.",
-              date:
-                payment.completedAt,
-              completed:
-                Boolean(
-                  payment.completedAt
-                ) ||
-                status ===
-                  "completed",
-            },
-          ];
+          },
+
+          {
+            key:
+              "completed",
+
+            title:
+              "Payment completed",
+
+            description:
+              "The payment completed successfully.",
+
+            date:
+              payment.completedAt,
+
+            completed:
+              Boolean(
+                payment.completedAt
+              ) ||
+              status ===
+                "completed",
+          },
+        ];
 
         if (
-          status === "failed" ||
+          status ===
+            "failed" ||
           payment.failedAt
         ) {
           items.push({
-            key: "failed",
+            key:
+              "failed",
+
             title:
               "Payment failed",
+
             description:
               payment.failureMessage ||
               "The payment could not be completed.",
+
             date:
               payment.failedAt,
-            completed: true,
-            danger: true,
+
+            completed:
+              true,
+
+            danger:
+              true,
           });
         }
 
         if (
-          status === "cancelled" ||
+          status ===
+            "cancelled" ||
           payment.cancelledAt
         ) {
           items.push({
-            key: "cancelled",
+            key:
+              "cancelled",
+
             title:
               "Payment cancelled",
+
             description:
               "The payment was cancelled.",
+
             date:
               payment.cancelledAt,
-            completed: true,
-            danger: true,
+
+            completed:
+              true,
+
+            danger:
+              true,
           });
         }
 
         if (
-          status === "expired" ||
+          status ===
+            "expired" ||
           payment.expiredAt
         ) {
           items.push({
-            key: "expired",
+            key:
+              "expired",
+
             title:
               "Payment expired",
+
             description:
               "The payment expired before completion.",
+
             date:
               payment.expiredAt,
-            completed: true,
-            danger: true,
+
+            completed:
+              true,
+
+            danger:
+              true,
           });
         }
 
         return items;
       },
-      [payment]
+      [
+        payment,
+      ]
     );
 
-  /* =======================================================
-     STATES
-  ======================================================== */
-
-  if (loading) {
+  if (
+    loading
+  ) {
     return (
-      <div className="merchant-theme min-h-full bg-[var(--merchant-background)]">
+      <div className="merchant-theme min-h-full">
         <LoadingState />
       </div>
     );
@@ -891,9 +1342,11 @@ export default function MerchantPaymentDetailsPage() {
     !data
   ) {
     return (
-      <div className="merchant-theme min-h-full bg-[var(--merchant-background)]">
+      <div className="merchant-theme min-h-full">
         <ErrorState
-          message={error}
+          message={
+            error
+          }
           onRetry={() =>
             void fetchPayment()
           }
@@ -907,7 +1360,7 @@ export default function MerchantPaymentDetailsPage() {
     !merchant
   ) {
     return (
-      <div className="merchant-theme min-h-full bg-[var(--merchant-background)]">
+      <div className="merchant-theme min-h-full">
         <ErrorState
           message="Payment details were not found."
           onRetry={() =>
@@ -918,210 +1371,356 @@ export default function MerchantPaymentDetailsPage() {
     );
   }
 
-  /* =======================================================
-     RENDER
-  ======================================================== */
-
   return (
     <div className="merchant-theme min-h-full">
-      <div className="min-h-full bg-[var(--merchant-background)] px-4 py-5 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-[1500px]">
-          {/* Back navigation */}
+      <div className="min-h-full px-4 py-5 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-[1500px] space-y-6">
 
           <Link
             href="/dashboard/merchant/payments"
-            className="mb-5 inline-flex items-center gap-2 text-sm font-semibold merchant-muted transition hover:merchant-primary"
+            className="
+              inline-flex
+              items-center
+              gap-2
+              text-sm
+              font-black
+              text-violet-600
+              transition
+
+              hover:text-fuchsia-600
+            "
           >
             <ArrowLeft className="h-4 w-4" />
+
             Back to payments
           </Link>
 
-          {/* Error while refreshing */}
+          {error &&
+            data && (
+              <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-500/[0.06] p-4">
+                <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
 
-          {error && data && (
-            <div className="mb-5 flex items-start gap-3 rounded-2xl border p-4 merchant-border merchant-danger-soft">
-              <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 merchant-danger" />
+                <div>
+                  <p className="text-sm font-black text-foreground">
+                    Refresh failed
+                  </p>
 
-              <div>
-                <p className="text-sm font-semibold merchant-text">
-                  Refresh failed
+                  <p className="mt-1 text-sm merchant-muted">
+                    {
+                      error
+                    }
+                  </p>
+                </div>
+              </div>
+            )}
+
+          {/* =================================================
+              PURPLE PAYMENT HERO
+          ================================================== */}
+
+          <motion.header
+            initial={{
+              opacity: 0,
+              y: 18,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+            }}
+            className="
+              relative
+              overflow-hidden
+              rounded-[30px]
+              p-6
+              text-white
+
+              sm:p-7
+              lg:p-8
+            "
+          >
+            <PurpleAuroraBackground />
+
+            <div
+              className="
+                relative
+                z-10
+                flex
+                flex-col
+                gap-7
+
+                lg:flex-row
+                lg:items-end
+                lg:justify-between
+              "
+            >
+              <div className="min-w-0 max-w-[850px]">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`
+                      inline-flex
+                      items-center
+                      gap-1.5
+                      rounded-full
+                      border
+                      px-3
+                      py-1.5
+                      text-xs
+                      font-black
+
+                      ${statusMeta.className}
+                    `}
+                  >
+                    <StatusIcon className="h-3.5 w-3.5" />
+
+                    {
+                      statusMeta.label
+                    }
+                  </span>
+
+                  <span
+                    className="
+                      inline-flex
+                      items-center
+                      rounded-full
+                      border
+                      border-white/15
+                      bg-white/10
+                      px-3
+                      py-1.5
+                      text-xs
+                      font-black
+                      text-white
+                    "
+                  >
+                    {normalizeStatus(
+                      payment.mode
+                    ) ===
+                    "live"
+                      ? "Live mode"
+                      : "Test mode"}
+                  </span>
+                </div>
+
+                <div className="mt-6 flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.19em] text-fuchsia-100/60">
+                  <Sparkles className="h-3.5 w-3.5" />
+
+                  Payment record
+                </div>
+
+                <h1
+                  className="
+                    mt-3
+                    break-all
+                    font-mono
+                    text-[25px]
+                    font-black
+                    tracking-[-0.04em]
+
+                    sm:text-[30px]
+                    lg:text-[34px]
+                  "
+                >
+                  {
+                    payment.paymentId
+                  }
+                </h1>
+
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-white/65">
+                  {
+                    statusMeta.description
+                  }
                 </p>
 
-                <p className="mt-1 text-sm merchant-muted">
-                  {error}
-                </p>
+                <div className="mt-4">
+                  <CopyButton
+                    value={
+                      payment.paymentId
+                    }
+                    inverted
+                  />
+                </div>
+              </div>
+
+              <div className="flex shrink-0 flex-col gap-3 sm:flex-row">
+                <IssueRefundButton
+                  paymentId={
+                    payment.paymentId
+                  }
+                  paymentAmount={getDecimalNumber(
+                    payment.amount
+                  )}
+                  currency={
+                    currency
+                  }
+                  status={
+                    payment.status
+                  }
+                  sourceType={
+                    payment.sourceType
+                  }
+                  provider={
+                    payment.provider
+                  }
+                  mode={
+                    payment.mode
+                  }
+                  onCompleted={() =>
+                    void fetchPayment({
+                      silent:
+                        true,
+                    })
+                  }
+                />
+
+                <motion.button
+                  type="button"
+                  whileHover={{
+                    y: -3,
+                  }}
+                  onClick={() =>
+                    void fetchPayment({
+                      silent:
+                        true,
+                    })
+                  }
+                  disabled={
+                    refreshing
+                  }
+                  className="
+                    inline-flex
+                    h-11
+                    items-center
+                    justify-center
+                    gap-2
+                    rounded-xl
+                    bg-white
+                    px-4
+                    text-sm
+                    font-black
+                    text-violet-700
+
+                    disabled:opacity-60
+                  "
+                >
+                  <RefreshCw
+                    className={`
+                      h-4
+                      w-4
+
+                      ${
+                        refreshing
+                          ? "animate-spin"
+                          : ""
+                      }
+                    `}
+                  />
+
+                  {refreshing
+                    ? "Refreshing..."
+                    : "Refresh"}
+                </motion.button>
               </div>
             </div>
-          )}
+          </motion.header>
 
-          {/* Header */}
+          {/* =================================================
+              SUMMARY
+          ================================================== */}
 
-   {/* Payment header */}
-
-<header className="mb-6 rounded-2xl border p-5 sm:p-6 merchant-border merchant-surface merchant-shadow">
-  <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-    {/* Payment status and information */}
-
-    <div className="min-w-0">
-      <div className="flex flex-wrap items-center gap-2">
-        <span
-          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold ${statusMeta.className}`}
-        >
-          <StatusIcon className="h-3.5 w-3.5" />
-
-          {statusMeta.label}
-        </span>
-
-        <span
-          className={`inline-flex items-center rounded-full px-3 py-1.5 text-xs font-bold ${
-            normalizeStatus(
-              payment.mode
-            ) === "live"
-              ? "merchant-mode-live"
-              : "merchant-mode-test"
-          }`}
-        >
-          {normalizeStatus(
-            payment.mode
-          ) === "live"
-            ? "Live mode"
-            : "Test mode"}
-        </span>
-      </div>
-
-      <h1 className="mt-4 break-all font-mono text-xl font-bold tracking-tight merchant-text sm:text-2xl">
-        {payment.paymentId}
-      </h1>
-
-      <p className="mt-2 max-w-2xl text-sm leading-6 merchant-muted">
-        {statusMeta.description}
-      </p>
-
-      <div className="mt-4">
-        <CopyButton
-          value={
-            payment.paymentId
-          }
-        />
-      </div>
-    </div>
-
-    {/* Header actions */}
-
-    <div className="flex shrink-0 flex-col gap-3 sm:flex-row">
-      <IssueRefundButton
-        paymentId={
-          payment.paymentId
-        }
-        paymentAmount={
-          getDecimalNumber(
-            payment.amount
-          )
-        }
-        currency={
-          currency
-        }
-        status={
-          payment.status
-        }
-        sourceType={
-          payment.sourceType
-        }
-        provider={
-          payment.provider
-        }
-        mode={
-          payment.mode
-        }
-        onCompleted={() =>
-          void fetchPayment({
-            silent: true,
-          })
-        }
-      />
-
-      <button
-        type="button"
-        onClick={() =>
-          void fetchPayment({
-            silent: true,
-          })
-        }
-        disabled={
-          refreshing
-        }
-        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-semibold merchant-border merchant-surface merchant-text transition hover:merchant-primary-soft disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        <RefreshCw
-          className={`h-4 w-4 ${
-            refreshing
-              ? "animate-spin"
-              : ""
-          }`}
-        />
-
-        {refreshing
-          ? "Refreshing..."
-          : "Refresh"}
-      </button>
-    </div>
-  </div>
-</header>
-          {/* Financial summary */}
-
-          <div className="mb-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <SummaryCard
               title="Payment amount"
-              value={amount}
+              value={
+                amount
+              }
               description="Original payment amount"
-              icon={Banknote}
+              icon={
+                Banknote
+              }
+              index={
+                0
+              }
             />
 
             <SummaryCard
               title="Processing fee"
-              value={feeAmount}
+              value={
+                feeAmount
+              }
               description="Fee applied to this payment"
-              icon={CreditCard}
+              icon={
+                CreditCard
+              }
+              index={
+                1
+              }
             />
 
             <SummaryCard
               title="Net amount"
-              value={netAmount}
+              value={
+                netAmount
+              }
               description="Merchant settlement amount"
-              icon={WalletCards}
+              icon={
+                WalletCards
+              }
+              index={
+                2
+              }
             />
 
             <SummaryCard
               title="Payment method"
-              value={methodMeta.label}
+              value={
+                methodMeta.label
+              }
               description={humanize(
                 payment.provider
               )}
-              icon={MethodIcon}
+              icon={
+                MethodIcon
+              }
+              index={
+                3
+              }
             />
           </div>
 
           <div className="grid gap-6 xl:grid-cols-[1.45fr_0.85fr]">
-            {/* Left column */}
+
+            {/* LEFT */}
 
             <div className="space-y-6">
-              {/* Payment information */}
 
-              <section className="rounded-2xl border merchant-border merchant-surface merchant-shadow">
-                <div className="border-b px-5 py-4 merchant-border">
+              {/* PAYMENT INFO */}
+
+              <motion.section
+                whileHover={{
+                  y: -3,
+                }}
+                className="
+                  overflow-hidden
+                  rounded-[24px]
+                  border
+                  merchant-border
+                  merchant-surface
+                "
+              >
+                <div className="border-b border-violet-300/15 bg-violet-500/[0.035] px-5 py-4">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl merchant-primary-soft merchant-primary">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600">
                       <CreditCard className="h-5 w-5" />
                     </div>
 
                     <div>
-                      <h2 className="font-bold merchant-text">
+                      <p className="text-[8px] font-black uppercase tracking-[0.15em] text-violet-500">
+                        Core details
+                      </p>
+
+                      <h2 className="mt-0.5 font-black text-foreground">
                         Payment information
                       </h2>
-
-                      <p className="mt-0.5 text-xs merchant-muted">
-                        Core payment and provider information
-                      </p>
                     </div>
                   </div>
                 </div>
@@ -1177,28 +1776,41 @@ export default function MerchantPaymentDetailsPage() {
 
                   <DetailRow
                     label="Currency"
-                    value={currency}
+                    value={
+                      currency
+                    }
                   />
                 </div>
-              </section>
+              </motion.section>
 
-              {/* Customer and order */}
+              {/* CUSTOMER */}
 
-              <section className="rounded-2xl border merchant-border merchant-surface merchant-shadow">
-                <div className="border-b px-5 py-4 merchant-border">
+              <motion.section
+                whileHover={{
+                  y: -3,
+                }}
+                className="
+                  overflow-hidden
+                  rounded-[24px]
+                  border
+                  merchant-border
+                  merchant-surface
+                "
+              >
+                <div className="border-b border-violet-300/15 bg-violet-500/[0.035] px-5 py-4">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl merchant-primary-soft merchant-primary">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600">
                       <UserRound className="h-5 w-5" />
                     </div>
 
                     <div>
-                      <h2 className="font-bold merchant-text">
+                      <p className="text-[8px] font-black uppercase tracking-[0.15em] text-violet-500">
+                        References
+                      </p>
+
+                      <h2 className="mt-0.5 font-black text-foreground">
                         Customer and order
                       </h2>
-
-                      <p className="mt-0.5 text-xs merchant-muted">
-                        References connected with this payment
-                      </p>
                     </div>
                   </div>
                 </div>
@@ -1234,28 +1846,39 @@ export default function MerchantPaymentDetailsPage() {
                     copy
                   />
                 </div>
-              </section>
+              </motion.section>
 
-              {/* Payment URLs */}
+              {/* URLS */}
 
               {(checkoutUrl ||
                 returnUrl ||
                 cancelUrl) && (
-                <section className="rounded-2xl border merchant-border merchant-surface merchant-shadow">
-                  <div className="border-b px-5 py-4 merchant-border">
+                <motion.section
+                  whileHover={{
+                    y: -3,
+                  }}
+                  className="
+                    overflow-hidden
+                    rounded-[24px]
+                    border
+                    merchant-border
+                    merchant-surface
+                  "
+                >
+                  <div className="border-b border-violet-300/15 bg-violet-500/[0.035] px-5 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl merchant-primary-soft merchant-primary">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600">
                         <ExternalLink className="h-5 w-5" />
                       </div>
 
                       <div>
-                        <h2 className="font-bold merchant-text">
+                        <p className="text-[8px] font-black uppercase tracking-[0.15em] text-violet-500">
+                          Redirects
+                        </p>
+
+                        <h2 className="mt-0.5 font-black text-foreground">
                           Payment URLs
                         </h2>
-
-                        <p className="mt-0.5 text-xs merchant-muted">
-                          Redirect and checkout destinations
-                        </p>
                       </div>
                     </div>
                   </div>
@@ -1264,42 +1887,46 @@ export default function MerchantPaymentDetailsPage() {
                     {checkoutUrl && (
                       <ExternalUrl
                         label="Checkout URL"
-                        url={checkoutUrl}
+                        url={
+                          checkoutUrl
+                        }
                       />
                     )}
 
                     {returnUrl && (
                       <ExternalUrl
                         label="Return URL"
-                        url={returnUrl}
+                        url={
+                          returnUrl
+                        }
                       />
                     )}
 
                     {cancelUrl && (
                       <ExternalUrl
                         label="Cancel URL"
-                        url={cancelUrl}
+                        url={
+                          cancelUrl
+                        }
                       />
                     )}
                   </div>
-                </section>
+                </motion.section>
               )}
-
-              {/* Failure */}
 
               {(payment.failureCode ||
                 payment.failureMessage) && (
-                <section className="rounded-2xl border p-5 merchant-border merchant-danger-soft">
+                <section className="rounded-2xl border border-red-200 bg-red-500/[0.06] p-5">
                   <div className="flex items-start gap-3">
-                    <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 merchant-danger" />
+                    <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
 
                     <div className="min-w-0">
-                      <h2 className="font-bold merchant-text">
+                      <h2 className="font-black text-foreground">
                         Failure information
                       </h2>
 
                       {payment.failureCode && (
-                        <p className="mt-3 font-mono text-sm font-semibold merchant-danger">
+                        <p className="mt-3 font-mono text-sm font-black text-red-500">
                           {
                             payment.failureCode
                           }
@@ -1319,162 +1946,280 @@ export default function MerchantPaymentDetailsPage() {
               )}
             </div>
 
-            {/* Right column */}
+            {/* RIGHT */}
 
             <div className="space-y-6">
-              {/* Timeline */}
 
-              <section className="rounded-2xl border merchant-border merchant-surface merchant-shadow">
-                <div className="border-b px-5 py-4 merchant-border">
+              {/* SECOND PURPLE SECTION */}
+
+              <motion.section
+                initial={{
+                  opacity: 0,
+                  x: 15,
+                }}
+                animate={{
+                  opacity: 1,
+                  x: 0,
+                }}
+                className="
+                  relative
+                  overflow-hidden
+                  rounded-[25px]
+                  p-5
+                  text-white
+
+                  sm:p-6
+                "
+              >
+                <PurpleAuroraBackground />
+
+                <div className="relative z-10">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl merchant-primary-soft merchant-primary">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-white/10">
                       <CalendarClock className="h-5 w-5" />
                     </div>
 
                     <div>
-                      <h2 className="font-bold merchant-text">
+                      <p className="text-[8px] font-black uppercase tracking-[0.15em] text-fuchsia-100/55">
+                        Lifecycle
+                      </p>
+
+                      <h2 className="mt-0.5 font-black">
                         Payment timeline
                       </h2>
-
-                      <p className="mt-0.5 text-xs merchant-muted">
-                        Payment lifecycle events
-                      </p>
                     </div>
                   </div>
-                </div>
 
-                <div className="p-5">
-                  {timeline.map(
-                    (item, index) => (
-                      <div
-                        key={item.key}
-                        className="relative flex gap-4 pb-6 last:pb-0"
-                      >
-                        {index <
-                          timeline.length -
-                            1 && (
-                          <div className="absolute left-[15px] top-8 h-[calc(100%-1rem)] w-px merchant-timeline-line" />
-                        )}
-
-                        <div
-                          className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border ${
-                            item.danger
-                              ? "merchant-danger-soft merchant-danger merchant-border"
-                              : item.completed
-                                ? "merchant-primary-soft merchant-primary merchant-border"
-                                : "merchant-surface-soft merchant-muted merchant-border"
-                          }`}
+                  <div className="mt-6">
+                    {timeline.map(
+                      (
+                        item,
+                        index
+                      ) => (
+                        <motion.div
+                          key={
+                            item.key
+                          }
+                          initial={{
+                            opacity: 0,
+                            x: 10,
+                          }}
+                          animate={{
+                            opacity: 1,
+                            x: 0,
+                          }}
+                          transition={{
+                            delay:
+                              index *
+                              0.06,
+                          }}
+                          className="relative flex gap-4 pb-6 last:pb-0"
                         >
-                          {item.danger ? (
-                            <XCircle className="h-4 w-4" />
-                          ) : item.completed ? (
-                            <CheckCircle2 className="h-4 w-4" />
-                          ) : (
-                            <Clock3 className="h-4 w-4" />
+                          {index <
+                            timeline.length -
+                              1 && (
+                            <div className="absolute left-[15px] top-8 h-[calc(100%-1rem)] w-px bg-white/15" />
                           )}
-                        </div>
 
-                        <div className="min-w-0">
-                          <p className="text-sm font-bold merchant-text">
-                            {item.title}
-                          </p>
+                          <motion.div
+                            whileHover={{
+                              scale: 1.12,
+                            }}
+                            className={`
+                              relative
+                              z-10
+                              flex
+                              h-8
+                              w-8
+                              shrink-0
+                              items-center
+                              justify-center
+                              rounded-full
+                              border
+                              backdrop-blur
 
-                          <p className="mt-1 text-xs leading-5 merchant-muted">
-                            {
-                              item.description
-                            }
-                          </p>
-
-                          <p className="mt-2 text-xs font-semibold merchant-muted">
-                            {formatDate(
-                              item.date
+                              ${
+                                item.danger
+                                  ? "border-red-200/20 bg-red-300/15 text-red-100"
+                                  : item.completed
+                                    ? "border-white/15 bg-white/15 text-fuchsia-100"
+                                    : "border-white/10 bg-white/[0.06] text-white/45"
+                              }
+                            `}
+                          >
+                            {item.danger ? (
+                              <XCircle className="h-4 w-4" />
+                            ) : item.completed ? (
+                              <CheckCircle2 className="h-4 w-4" />
+                            ) : (
+                              <Clock3 className="h-4 w-4" />
                             )}
-                          </p>
-                        </div>
-                      </div>
-                    )
-                  )}
+                          </motion.div>
+
+                          <div className="min-w-0">
+                            <p className="text-sm font-black">
+                              {
+                                item.title
+                              }
+                            </p>
+
+                            <p className="mt-1 text-xs leading-5 text-white/55">
+                              {
+                                item.description
+                              }
+                            </p>
+
+                            <p className="mt-2 text-[10px] font-bold text-fuchsia-100/60">
+                              {formatDate(
+                                item.date
+                              )}
+                            </p>
+                          </div>
+                        </motion.div>
+                      )
+                    )}
+                  </div>
                 </div>
-              </section>
+              </motion.section>
 
-              {/* Merchant */}
+              {/* THIRD PURPLE SECTION */}
 
-              <section className="rounded-2xl border merchant-border merchant-surface merchant-shadow">
-                <div className="border-b px-5 py-4 merchant-border">
+              <motion.section
+                whileHover={{
+                  y: -3,
+                }}
+                className="
+                  relative
+                  overflow-hidden
+                  rounded-[24px]
+                  p-5
+                  text-white
+                "
+              >
+                <PurpleAuroraBackground />
+
+                <div className="relative z-10">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl merchant-primary-soft merchant-primary">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-white/10">
                       <Layers3 className="h-5 w-5" />
                     </div>
 
                     <div>
-                      <h2 className="font-bold merchant-text">
+                      <p className="text-[8px] font-black uppercase tracking-[0.15em] text-fuchsia-100/55">
+                        Merchant
+                      </p>
+
+                      <h2 className="mt-0.5 font-black">
                         Merchant account
                       </h2>
-
-                      <p className="mt-0.5 text-xs merchant-muted">
-                        Owner of this payment
-                      </p>
                     </div>
                   </div>
-                </div>
 
-                <div className="px-5">
-                  <DetailRow
-                    label="Business name"
-                    value={
-                      merchant.businessName ||
-                      merchant.displayName
-                    }
-                  />
+                  <div className="mt-5 divide-y divide-white/10">
+                    {[
+                      {
+                        label:
+                          "Business name",
 
-                  <DetailRow
-                    label="Merchant slug"
-                    value={
-                      merchant.slug
-                    }
-                    mono
-                  />
+                        value:
+                          merchant.businessName ||
+                          merchant.displayName ||
+                          "Not available",
+                      },
 
-                  <DetailRow
-                    label="Account status"
-                    value={humanize(
-                      merchant.status
+                      {
+                        label:
+                          "Merchant slug",
+
+                        value:
+                          merchant.slug ||
+                          "Not available",
+                      },
+
+                      {
+                        label:
+                          "Account status",
+
+                        value:
+                          humanize(
+                            merchant.status
+                          ),
+                      },
+
+                      {
+                        label:
+                          "Verification",
+
+                        value:
+                          humanize(
+                            merchant.verificationStatus
+                          ),
+                      },
+
+                      {
+                        label:
+                          "Default currency",
+
+                        value:
+                          merchant.defaultCurrency ||
+                          "Not available",
+                      },
+                    ].map(
+                      (
+                        item
+                      ) => (
+                        <div
+                          key={
+                            item.label
+                          }
+                          className="py-3.5"
+                        >
+                          <p className="text-[8px] font-black uppercase tracking-[0.12em] text-fuchsia-100/45">
+                            {
+                              item.label
+                            }
+                          </p>
+
+                          <p className="mt-1 text-sm font-black">
+                            {
+                              item.value
+                            }
+                          </p>
+                        </div>
+                      )
                     )}
-                  />
-
-                  <DetailRow
-                    label="Verification"
-                    value={humanize(
-                      merchant.verificationStatus
-                    )}
-                  />
-
-                  <DetailRow
-                    label="Default currency"
-                    value={
-                      merchant.defaultCurrency
-                    }
-                  />
+                  </div>
                 </div>
-              </section>
+              </motion.section>
 
-              {/* Record metadata */}
+              {/* METADATA */}
 
-              <section className="rounded-2xl border merchant-border merchant-surface merchant-shadow">
-                <div className="border-b px-5 py-4 merchant-border">
+              <motion.section
+                whileHover={{
+                  y: -3,
+                }}
+                className="
+                  overflow-hidden
+                  rounded-[24px]
+                  border
+                  merchant-border
+                  merchant-surface
+                "
+              >
+                <div className="border-b border-violet-300/15 bg-violet-500/[0.035] px-5 py-4">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl merchant-primary-soft merchant-primary">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600">
                       <Hash className="h-5 w-5" />
                     </div>
 
                     <div>
-                      <h2 className="font-bold merchant-text">
+                      <p className="text-[8px] font-black uppercase tracking-[0.15em] text-violet-500">
+                        Technical record
+                      </p>
+
+                      <h2 className="mt-0.5 font-black text-foreground">
                         Record metadata
                       </h2>
-
-                      <p className="mt-0.5 text-xs merchant-muted">
-                        Creation and update information
-                      </p>
                     </div>
                   </div>
                 </div>
@@ -1496,12 +2241,14 @@ export default function MerchantPaymentDetailsPage() {
 
                   <DetailRow
                     label="Internal record ID"
-                    value={payment._id}
+                    value={
+                      payment._id
+                    }
                     mono
                     copy
                   />
                 </div>
-              </section>
+              </motion.section>
             </div>
           </div>
         </div>
@@ -1518,36 +2265,91 @@ function ExternalUrl({
   label,
   url,
 }: {
-  label: string;
-  url: string;
+  label:
+    string;
+
+  url:
+    string;
 }) {
   return (
-    <div className="rounded-xl border p-4 merchant-border merchant-surface-soft">
-      <p className="text-xs font-bold uppercase tracking-wide merchant-muted">
-        {label}
+    <motion.div
+      whileHover={{
+        x:
+          3,
+      }}
+      className="
+        rounded-xl
+        border
+        border-violet-300/20
+        bg-violet-500/[0.025]
+        p-4
+        transition
+
+        hover:bg-violet-500/[0.05]
+      "
+    >
+      <p className="text-[9px] font-black uppercase tracking-[0.12em] text-violet-500">
+        {
+          label
+        }
       </p>
 
       <div className="mt-2 flex items-start justify-between gap-3">
-        <p className="min-w-0 break-all font-mono text-xs leading-5 merchant-text">
-          {url}
+        <p
+          className="
+            min-w-0
+            flex-1
+            overflow-x-auto
+            scroll-smooth
+            whitespace-nowrap
+            font-mono
+            text-xs
+            leading-5
+            text-foreground
+
+            [scrollbar-width:none]
+            [-ms-overflow-style:none]
+            [&::-webkit-scrollbar]:hidden
+          "
+        >
+          {
+            url
+          }
         </p>
 
         <div className="flex shrink-0 items-center gap-2">
           <CopyButton
-            value={url}
+            value={
+              url
+            }
           />
 
           <a
-            href={url}
+            href={
+              url
+            }
             target="_blank"
             rel="noreferrer"
-            className="inline-flex h-8 items-center justify-center rounded-lg border px-2.5 merchant-border merchant-surface merchant-primary transition hover:merchant-primary-soft"
-            aria-label={`Open ${label}`}
+            className="
+              inline-flex
+              h-8
+              items-center
+              justify-center
+              rounded-lg
+              border
+              border-violet-300/20
+              bg-violet-500/[0.04]
+              px-2.5
+              text-violet-600
+              transition
+
+              hover:bg-violet-500/10
+            "
           >
             <ExternalLink className="h-3.5 w-3.5" />
           </a>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
