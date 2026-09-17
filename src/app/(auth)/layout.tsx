@@ -22,9 +22,12 @@ import {
   Code2,
   CreditCard,
   Landmark,
+  LogIn,
   LockKeyhole,
   ShieldCheck,
   Sparkles,
+  UserPlus,
+  UserRound,
   WalletCards,
   Webhook,
   Zap,
@@ -240,6 +243,199 @@ function getFormWidth(
   }
 
   return "max-w-[560px]";
+}
+
+function AuthPortalSwitcher({
+  pathname,
+  currentLabel,
+  reduceMotion,
+}: {
+  pathname: string;
+  currentLabel: string;
+  reduceMotion: boolean;
+}) {
+  const isMerchant =
+    pathname.startsWith(
+      "/merchant/",
+    );
+
+  const isOnboarding =
+    pathname ===
+    "/merchant/onboarding";
+
+  const isSignUp =
+    pathname ===
+      "/register" ||
+    pathname ===
+      "/merchant/sign-up" ||
+    isOnboarding;
+
+  const personalHref =
+    isSignUp
+      ? "/register"
+      : "/login";
+
+  const merchantHref =
+    isOnboarding
+      ? "/merchant/onboarding"
+      : isSignUp
+        ? "/merchant/sign-up"
+        : "/merchant/sign-in";
+
+  const signInHref =
+    isMerchant
+      ? "/merchant/sign-in"
+      : "/login";
+
+  const signUpHref =
+    isMerchant
+      ? isOnboarding
+        ? "/merchant/onboarding"
+        : "/merchant/sign-up"
+      : "/register";
+
+  const springTransition =
+    reduceMotion
+      ? {
+          duration: 0,
+        }
+      : {
+          type: "spring" as const,
+          stiffness: 410,
+          damping: 34,
+          mass: 0.72,
+        };
+
+  return (
+    <nav
+      aria-label={`Authentication portal — ${currentLabel}`}
+      className="relative flex w-full flex-col gap-1.5 overflow-hidden rounded-[20px] border border-white/15 bg-[#160b35]/35 p-1.5 shadow-[0_18px_42px_rgba(24,8,64,0.22),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-2xl sm:w-auto sm:flex-row sm:items-center"
+    >
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute -left-8 top-0 h-16 w-32 rotate-12 bg-white/[0.06] blur-2xl"
+      />
+
+      <div className="relative grid min-w-0 flex-1 grid-cols-2 gap-1 sm:flex-none">
+        <Link
+          href={personalHref}
+          aria-current={
+            !isMerchant
+              ? "page"
+              : undefined
+          }
+          className={`relative isolate flex h-9 min-w-0 items-center justify-center gap-1.5 overflow-hidden rounded-[13px] px-3 text-[9px] font-black uppercase tracking-[0.11em] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white/75 sm:min-w-[104px] ${
+            !isMerchant
+              ? "text-[#261444]"
+              : "text-white/62 hover:bg-white/[0.07] hover:text-white"
+          }`}
+        >
+          {!isMerchant && (
+            <motion.span
+              layoutId="auth-portal-pill"
+              aria-hidden="true"
+              transition={springTransition}
+              className="absolute inset-0 -z-10 rounded-[13px] border border-white/85 bg-[linear-gradient(135deg,#ffffff,#eee9ff)] shadow-[0_9px_24px_rgba(30,12,70,0.22),inset_0_1px_0_#fff]"
+            />
+          )}
+          <UserRound className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">
+            Personal
+          </span>
+        </Link>
+
+        <Link
+          href={merchantHref}
+          aria-current={
+            isMerchant
+              ? "page"
+              : undefined
+          }
+          className={`relative isolate flex h-9 min-w-0 items-center justify-center gap-1.5 overflow-hidden rounded-[13px] px-3 text-[9px] font-black uppercase tracking-[0.11em] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white/75 sm:min-w-[104px] ${
+            isMerchant
+              ? "text-[#261444]"
+              : "text-white/62 hover:bg-white/[0.07] hover:text-white"
+          }`}
+        >
+          {isMerchant && (
+            <motion.span
+              layoutId="auth-portal-pill"
+              aria-hidden="true"
+              transition={springTransition}
+              className="absolute inset-0 -z-10 rounded-[13px] border border-white/85 bg-[linear-gradient(135deg,#ffffff,#eee9ff)] shadow-[0_9px_24px_rgba(30,12,70,0.22),inset_0_1px_0_#fff]"
+            />
+          )}
+          <Building2 className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">
+            Merchant
+          </span>
+        </Link>
+      </div>
+
+      <span
+        aria-hidden="true"
+        className="mx-1 hidden h-5 w-px bg-white/12 sm:block"
+      />
+
+      <div className="relative grid min-w-0 flex-1 grid-cols-2 gap-1 sm:flex-none">
+        <Link
+          href={signInHref}
+          aria-current={
+            !isSignUp
+              ? "page"
+              : undefined
+          }
+          className={`relative isolate flex h-9 min-w-0 items-center justify-center gap-1.5 overflow-hidden rounded-[13px] px-3 text-[9px] font-black uppercase tracking-[0.11em] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white/75 sm:min-w-[92px] ${
+            !isSignUp
+              ? "text-white"
+              : "text-white/58 hover:bg-white/[0.07] hover:text-white"
+          }`}
+        >
+          {!isSignUp && (
+            <motion.span
+              layoutId="auth-action-pill"
+              aria-hidden="true"
+              transition={springTransition}
+              className="absolute inset-0 -z-10 rounded-[13px] border border-violet-200/25 bg-[linear-gradient(135deg,rgba(91,51,220,0.96),rgba(168,40,245,0.96))] shadow-[0_9px_24px_rgba(76,29,149,0.34),inset_0_1px_0_rgba(255,255,255,0.22)]"
+            />
+          )}
+          <LogIn className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">
+            Sign in
+          </span>
+        </Link>
+
+        <Link
+          href={signUpHref}
+          aria-current={
+            isSignUp
+              ? "page"
+              : undefined
+          }
+          className={`relative isolate flex h-9 min-w-0 items-center justify-center gap-1.5 overflow-hidden rounded-[13px] px-3 text-[9px] font-black uppercase tracking-[0.11em] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white/75 sm:min-w-[92px] ${
+            isSignUp
+              ? "text-white"
+              : "text-white/58 hover:bg-white/[0.07] hover:text-white"
+          }`}
+        >
+          {isSignUp && (
+            <motion.span
+              layoutId="auth-action-pill"
+              aria-hidden="true"
+              transition={springTransition}
+              className="absolute inset-0 -z-10 rounded-[13px] border border-violet-200/25 bg-[linear-gradient(135deg,rgba(91,51,220,0.96),rgba(168,40,245,0.96))] shadow-[0_9px_24px_rgba(76,29,149,0.34),inset_0_1px_0_rgba(255,255,255,0.22)]"
+            />
+          )}
+          <UserPlus className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">
+            {isOnboarding
+              ? "Setup"
+              : "Sign up"}
+          </span>
+        </Link>
+      </div>
+    </nav>
+  );
 }
 
 export default function AuthLayout({
@@ -604,21 +800,24 @@ export default function AuthLayout({
           <div
             className={`relative z-10 w-full ${formWidth}`}
           >
-            <div className="mb-4 flex items-center justify-between gap-4 px-1 text-white">
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.16em] backdrop-blur-xl">
-                {isMerchant ? (
-                  <Building2 className="h-3.5 w-3.5 text-fuchsia-200" />
-                ) : (
-                  <WalletCards className="h-3.5 w-3.5 text-cyan-200" />
-                )}
-                {
+            <div className="mb-4 flex flex-col gap-3 px-1 text-white sm:flex-row sm:items-center sm:justify-between">
+              <AuthPortalSwitcher
+                pathname={
+                  pathname
+                }
+                currentLabel={
                   experience.accountLabel
                 }
-              </span>
+                reduceMotion={
+                  Boolean(
+                    reduceMotion,
+                  )
+                }
+              />
 
               <Link
                 href="/"
-                className="group inline-flex items-center gap-1.5 rounded-lg text-[10px] font-bold text-white/65 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+                className="group inline-flex shrink-0 self-end items-center gap-1.5 rounded-lg px-1 py-1 text-[10px] font-bold text-white/65 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 sm:self-auto"
               >
                 Back home
                 <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
