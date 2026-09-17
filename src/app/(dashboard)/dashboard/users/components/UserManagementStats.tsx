@@ -1,5 +1,11 @@
 "use client";
 
+import React from "react";
+
+import {
+  motion,
+} from "framer-motion";
+
 import {
   Activity,
   AlertTriangle,
@@ -7,109 +13,147 @@ import {
   TrendingUp,
   UserCheck,
   Users,
+  type LucideIcon,
 } from "lucide-react";
-import { motion } from "framer-motion";
 
 import type {
   UserStats,
 } from "./UserManagementTypes";
 
-const statMeta = [
-  {
-    key: "totalUsers",
-    title: "Total Users",
-    icon: Users,
-    note: "+8.4% this month",
-    tone: "blue",
-  },
-  {
-    key: "activeUsers",
-    title: "Active Users",
-    icon: Activity,
-    note: "87% of user base",
-    tone: "emerald",
-  },
-  {
-    key: "pendingKyc",
-    title: "Pending KYC",
-    icon: UserCheck,
-    note: "Requires attention",
-    tone: "amber",
-  },
-  {
-    key: "suspended",
-    title: "Suspended",
-    icon: ShieldAlert,
-    note: "Account restrictions",
-    tone: "rose",
-  },
-  {
-    key: "highRisk",
-    title: "High Risk",
-    icon: AlertTriangle,
-    note: "Review recommended",
-    tone: "orange",
-  },
-  {
-    key: "newThisWeek",
-    title: "New This Week",
-    icon: TrendingUp,
-    note: "Fresh registrations",
-    tone: "cyan",
-  },
-] as const;
+/* =========================================================
+   TYPES
+========================================================= */
 
-type StatTone =
-  | "blue"
-  | "emerald"
-  | "amber"
-  | "rose"
-  | "orange"
-  | "cyan";
+interface UserManagementStatsProps {
+  stats: UserStats;
+}
 
-const toneMap: Record<
-  StatTone,
-  string
-> = {
-  blue:
-    "bg-blue-50 text-blue-600",
-  emerald:
-    "bg-emerald-50 text-emerald-600",
-  amber:
-    "bg-amber-50 text-amber-600",
-  rose:
-    "bg-rose-50 text-rose-600",
-  orange:
-    "bg-orange-50 text-orange-600",
-  cyan:
-    "bg-cyan-50 text-cyan-600",
-};
+interface StatItemConfig {
+  key: keyof UserStats;
+
+  label: string;
+
+  note: string;
+
+  icon: LucideIcon;
+
+  colorVariable:
+    | "primary"
+    | "success"
+    | "warning"
+    | "danger";
+}
+
+/* =========================================================
+   CONFIG
+========================================================= */
+
+const STAT_ITEMS: readonly StatItemConfig[] =
+  [
+    {
+      key: "totalUsers",
+      label: "Total users",
+      note: "All registered accounts",
+      icon: Users,
+      colorVariable:
+        "primary",
+    },
+
+    {
+      key: "activeUsers",
+      label: "Active users",
+      note: "Currently enabled",
+      icon: Activity,
+      colorVariable:
+        "success",
+    },
+
+    {
+      key: "pendingKyc",
+      label: "Pending KYC",
+      note: "Requires attention",
+      icon: UserCheck,
+      colorVariable:
+        "warning",
+    },
+
+    {
+      key: "suspended",
+      label: "Suspended",
+      note: "Account restrictions",
+      icon: ShieldAlert,
+      colorVariable:
+        "danger",
+    },
+
+    {
+      key: "highRisk",
+      label: "High risk",
+      note: "Review recommended",
+      icon: AlertTriangle,
+      colorVariable:
+        "danger",
+    },
+
+    {
+      key: "newThisWeek",
+      label: "New this week",
+      note: "Fresh registrations",
+      icon: TrendingUp,
+      colorVariable:
+        "primary",
+    },
+  ] as const;
+
+/* =========================================================
+   COMPONENT
+========================================================= */
 
 export default function UserManagementStats({
   stats,
-}: {
-  stats: UserStats;
-}) {
+}: UserManagementStatsProps) {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
-      {statMeta.map(
-        (item, index) => {
+    <section
+      aria-label="User statistics"
+      className="
+        grid
+        grid-cols-2
+        gap-3
+        md:grid-cols-3
+        2xl:grid-cols-6
+      "
+    >
+      {STAT_ITEMS.map(
+        (
+          item,
+          index
+        ) => {
           const Icon =
             item.icon;
 
           const value =
-            stats[
-              item.key
-            ];
+            Number(
+              stats[
+                item.key
+              ] ?? 0
+            );
+
+          const color =
+            getColor(
+              item.colorVariable
+            );
+
+          const softBackground =
+            `color-mix(in srgb, ${color} 11%, var(--card))`;
 
           return (
-            <motion.div
+            <motion.article
               key={
                 item.key
               }
               initial={{
                 opacity: 0,
-                y: 12,
+                y: 14,
               }}
               animate={{
                 opacity: 1,
@@ -118,41 +162,170 @@ export default function UserManagementStats({
               transition={{
                 delay:
                   index *
-                  0.05,
+                  0.055,
+                duration:
+                  0.35,
               }}
               whileHover={{
-                y: -3,
+                y: -4,
               }}
-              className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_8px_25px_rgba(15,23,42,0.035)]"
+              className="
+                group
+                min-w-0
+                overflow-hidden
+                rounded-[22px]
+                border
+                border-border
+                bg-card
+                p-4
+                shadow-[var(--dashboard-shadow)]
+                transition-colors
+                duration-300
+                sm:p-5
+              "
             >
-              <div className="flex items-center justify-between gap-3">
-                <div
-                  className={`flex h-10 w-10 items-center justify-center rounded-xl ${toneMap[item.tone]}`}
+              {/* =================================================
+                  TOP ROW
+              ================================================= */}
+
+              <div className="flex items-center justify-between gap-2">
+                <motion.span
+                  whileHover={{
+                    rotate:
+                      -4,
+                    scale:
+                      1.04,
+                  }}
+                  className="
+                    flex
+                    h-10
+                    w-10
+                    shrink-0
+                    items-center
+                    justify-center
+                    rounded-xl
+                  "
+                  style={{
+                    background:
+                      softBackground,
+                    color,
+                  }}
                 >
                   <Icon className="h-4 w-4" />
-                </div>
+                </motion.span>
 
-                {index === 0 && (
-                  <span className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-bold text-emerald-700">
-                    Growing
+                {index ===
+                  0 && (
+                  <span
+                    className="
+                      inline-flex
+                      items-center
+                      gap-1.5
+                      rounded-full
+                      px-2
+                      py-1
+                      text-[8px]
+                      font-black
+                      uppercase
+                      tracking-wide
+                    "
+                    style={{
+                      background:
+                        `color-mix(in srgb, var(--dashboard-success) 10%, var(--card))`,
+                      color:
+                        "var(--dashboard-success)",
+                    }}
+                  >
+                    <span
+                      className="
+                        h-1.5
+                        w-1.5
+                        animate-pulse
+                        rounded-full
+                      "
+                      style={{
+                        background:
+                          "var(--dashboard-success)",
+                      }}
+                    />
+
+                    Live
                   </span>
                 )}
               </div>
 
-              <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
-                {item.title}
+              {/* =================================================
+                  LABEL
+              ================================================= */}
+
+              <p className="
+                mt-4
+                truncate
+                text-[9px]
+                font-black
+                uppercase
+                tracking-[0.12em]
+                text-muted-foreground
+              ">
+                {
+                  item.label
+                }
               </p>
 
-              <p className="mt-1 text-2xl font-black tracking-tight text-[#0F2745]">
-                {value.toLocaleString()}
+              {/* =================================================
+                  VALUE
+              ================================================= */}
+
+              <p className="
+                mt-1
+                text-2xl
+                font-black
+                tracking-[-0.03em]
+                text-card-foreground
+              ">
+                {value.toLocaleString(
+                  "en-BD"
+                )}
               </p>
 
-              <p className="mt-2 text-[10px] leading-4 text-slate-400">
-                {item.note}
+              {/* =================================================
+                  NOTE
+              ================================================= */}
+
+              <p className="
+                mt-1
+                truncate
+                text-[10px]
+                text-muted-foreground
+              ">
+                {
+                  item.note
+                }
               </p>
 
-              <div className="mt-4 flex items-end gap-1">
-                {[12, 19, 15, 24, 18, 30, 26].map(
+              {/* =================================================
+                  MICRO CHART
+              ================================================= */}
+
+              <div
+                className="
+                  mt-4
+                  flex
+                  h-8
+                  items-end
+                  gap-1
+                "
+                aria-hidden="true"
+              >
+                {[
+                  12,
+                  20,
+                  15,
+                  25,
+                  18,
+                  30,
+                  24,
+                ].map(
                   (
                     height,
                     barIndex
@@ -168,44 +341,95 @@ export default function UserManagementStats({
                         height,
                       }}
                       transition={{
-                        duration:
-                          0.35,
                         delay:
                           index *
-                            0.05 +
+                            0.055 +
                           barIndex *
-                            0.03,
+                            0.035,
+                        duration:
+                          0.35,
+                        ease:
+                          "easeOut",
                       }}
-                      className={`w-full rounded-full ${toneMap[item.tone].split(" ")[0].replace("bg-", "bg-")}`}
+                      className="
+                        min-w-0
+                        flex-1
+                        rounded-full
+                      "
                       style={{
                         background:
-                          item.tone ===
-                          "emerald"
-                            ? "#10B981"
-                            : item.tone ===
-                              "amber"
-                            ? "#F59E0B"
-                            : item.tone ===
-                              "rose"
-                            ? "#F43F5E"
-                            : item.tone ===
-                              "orange"
-                            ? "#F97316"
-                            : item.tone ===
-                              "cyan"
-                            ? "#06B6D4"
-                            : "#3B82F6",
+                          color,
                         opacity:
-                          0.35,
+                          0.28,
                       }}
                     />
                   )
                 )}
               </div>
-            </motion.div>
+
+              {/* =================================================
+                  BOTTOM ACCENT
+              ================================================= */}
+
+              <motion.div
+                initial={{
+                  scaleX: 0,
+                }}
+                animate={{
+                  scaleX: 1,
+                }}
+                transition={{
+                  delay:
+                    index *
+                    0.055 +
+                    0.25,
+                  duration:
+                    0.35,
+                }}
+                className="
+                  mt-4
+                  h-[3px]
+                  origin-left
+                  rounded-full
+                "
+                style={{
+                  background:
+                    `linear-gradient(90deg, ${color}, transparent)`,
+                }}
+              />
+            </motion.article>
           );
         }
       )}
-    </div>
+    </section>
   );
+}
+
+/* =========================================================
+   COLOR RESOLVER
+========================================================= */
+
+function getColor(
+  type:
+    | "primary"
+    | "success"
+    | "warning"
+    | "danger"
+) {
+  switch (
+    type
+  ) {
+    case "success":
+      return "var(--dashboard-success)";
+
+    case "warning":
+      return "var(--dashboard-warning)";
+
+    case "danger":
+      return "var(--dashboard-danger)";
+
+    case "primary":
+    default:
+      return "var(--dashboard-primary)";
+  }
 }

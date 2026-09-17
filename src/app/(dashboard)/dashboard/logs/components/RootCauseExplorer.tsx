@@ -1,63 +1,214 @@
-import React from "react";
+"use client";
+
+import React, {
+  useState,
+} from "react";
 import { motion } from "framer-motion";
-import { Server, Database, Globe, AlertCircle, ArrowDown } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowDown,
+  Database,
+  Globe,
+  Server,
+} from "lucide-react";
 
 const causeNodes = [
-  { id: 1, service: "Transfer Service", event: "Transaction Failed", type: "error", icon: Server },
-  { id: 2, service: "Wallet Service", event: "State Unavailable", type: "warn", icon: Globe },
-  { id: 3, service: "Database", event: "Connection Timeout", type: "critical", icon: Database },
+  {
+    id: 1,
+    service:
+      "Transfer Service",
+    event:
+      "Transaction Failed",
+    type:
+      "error",
+    icon:
+      Server,
+    detail:
+      "A transfer request crossed the error threshold after repeated state checks.",
+  },
+  {
+    id: 2,
+    service:
+      "Wallet Service",
+    event:
+      "State Unavailable",
+    type:
+      "warn",
+    icon:
+      Globe,
+    detail:
+      "Wallet state could not be confirmed inside the expected latency budget.",
+  },
+  {
+    id: 3,
+    service:
+      "Database",
+    event:
+      "Connection Timeout",
+    type:
+      "critical",
+    icon:
+      Database,
+    detail:
+      "The correlated request ended after database connection acquisition exceeded its timeout.",
+  },
 ];
 
 export function RootCauseExplorer() {
+  const [
+    activeId,
+    setActiveId,
+  ] =
+    useState(
+      causeNodes[
+        causeNodes.length -
+          1
+      ]?.id ??
+        1
+    );
+
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-sm font-semibold text-white">Root Cause Explorer</h3>
-        <span className="text-xs text-slate-500 italic bg-slate-950 px-2 py-1 rounded">Demo correlation view</span>
+    <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_14px_45px_rgba(15,39,69,0.05)]">
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-blue-500">
+          Correlation path
+        </p>
+
+        <h3 className="mt-1 text-lg font-black text-[#0F2745]">
+          Root Cause Explorer
+        </h3>
+
+        <p className="mt-1 text-xs leading-5 text-slate-500">
+          Follow a correlated failure chain and inspect each contributing event.
+        </p>
       </div>
 
-      <div className="relative pl-6">
-        {causeNodes.map((node, index) => {
-          const Icon = node.icon;
-          const isLast = index === causeNodes.length - 1;
-          const statusColor = node.type === "critical" ? "text-rose-500 border-rose-500/30 bg-rose-500/10" 
-                            : node.type === "warn" ? "text-amber-500 border-amber-500/30 bg-amber-500/10"
-                            : "text-rose-400 border-rose-400/30 bg-rose-400/10";
+      <div className="relative mt-5 pl-5">
+        {causeNodes.map(
+          (
+            node,
+            index
+          ) => {
+            const Icon =
+              node.icon;
 
-          return (
-            <div key={node.id} className="relative pb-8">
-              {/* Vertical connector line */}
-              {!isLast && (
-                <motion.div 
-                  initial={{ height: 0 }}
-                  animate={{ height: "100%" }}
-                  transition={{ duration: 0.5, delay: index * 0.4 }}
-                  className="absolute left-[11px] top-8 w-0.5 bg-slate-700"
-                />
-              )}
+            const isLast =
+              index ===
+              causeNodes.length -
+                1;
 
-              <motion.div 
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.3, delay: index * 0.4 }}
-                className="flex items-start gap-4"
+            const active =
+              node.id ===
+              activeId;
+
+            return (
+              <div
+                key={
+                  node.id
+                }
+                className="relative pb-5 last:pb-0"
               >
-                <div className={`relative z-10 w-6 h-6 rounded-full border flex items-center justify-center shrink-0 ${statusColor}`}>
-                  {node.type === "critical" ? <AlertCircle className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
-                </div>
-                
-                <div className="flex-1 bg-slate-950/50 border border-slate-800/80 rounded-lg p-3 mt-[-6px]">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Icon className="w-4 h-4 text-slate-400" />
-                    <span className="text-sm font-medium text-slate-200">{node.service}</span>
+                {!isLast && (
+                  <motion.div
+                    initial={{
+                      height: 0,
+                    }}
+                    animate={{
+                      height:
+                        "100%",
+                    }}
+                    transition={{
+                      duration:
+                        0.5,
+
+                      delay:
+                        index *
+                        0.15,
+                    }}
+                    className="absolute left-[13px] top-8 w-px bg-gradient-to-b from-blue-300 to-slate-200"
+                  />
+                )}
+
+                <motion.button
+                  type="button"
+                  onClick={() =>
+                    setActiveId(
+                      node.id
+                    )
+                  }
+                  initial={{
+                    opacity: 0,
+                    x: -8,
+                  }}
+                  animate={{
+                    opacity: 1,
+                    x: 0,
+                  }}
+                  transition={{
+                    delay:
+                      index *
+                      0.1,
+                  }}
+                  className={`relative z-10 flex w-full items-start gap-3 rounded-[20px] border p-3 text-left transition ${
+                    active
+                      ? "border-blue-200 bg-blue-50"
+                      : "border-slate-200 bg-slate-50/70 hover:bg-white"
+                  }`}
+                >
+                  <span
+                    className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border ${
+                      node.type ===
+                      "critical"
+                        ? "border-rose-200 bg-rose-50 text-rose-500"
+                        : node.type ===
+                            "warn"
+                          ? "border-amber-200 bg-amber-50 text-amber-500"
+                          : "border-blue-200 bg-blue-50 text-blue-500"
+                    }`}
+                  >
+                    {node.type ===
+                    "critical" ? (
+                      <AlertCircle className="h-3.5 w-3.5" />
+                    ) : (
+                      <ArrowDown className="h-3.5 w-3.5" />
+                    )}
+                  </span>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <Icon className="h-4 w-4 text-slate-400" />
+
+                      <span className="text-xs font-black text-slate-800">
+                        {node.service}
+                      </span>
+                    </div>
+
+                    <p className="mt-1 text-[11px] text-slate-500">
+                      {node.event}
+                    </p>
+
+                    {active && (
+                      <motion.p
+                        initial={{
+                          opacity: 0,
+                          y: 4,
+                        }}
+                        animate={{
+                          opacity: 1,
+                          y: 0,
+                        }}
+                        className="mt-2 text-[11px] leading-5 text-blue-800"
+                      >
+                        {node.detail}
+                      </motion.p>
+                    )}
                   </div>
-                  <div className="text-xs text-slate-500">{node.event}</div>
-                </div>
-              </motion.div>
-            </div>
-          );
-        })}
+                </motion.button>
+              </div>
+            );
+          }
+        )}
       </div>
-    </div>
+    </section>
   );
 }

@@ -1,41 +1,52 @@
 "use client";
 
 import {
+  AnimatePresence,
+  motion,
+} from "framer-motion";
+
+import {
   ArrowDown,
+  ArrowRight,
   ArrowUp,
+  Check,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
-  MoreHorizontal,
+  FileText,
+  ShieldAlert,
 } from "lucide-react";
-import { motion } from "framer-motion";
 
-import type {
-  KYCRequest,
-} from "./KYCManagementTypes";
+import {
+  useState,
+  type ReactNode,
+} from "react";
+
+import type { KYCRequest } from "./KYCManagementTypes";
 
 function badge(value: string) {
   switch (value) {
     case "Verified":
     case "Passed":
     case "Low":
-      return "bg-emerald-50 text-emerald-700";
+      return "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300";
 
     case "Pending":
     case "Under Review":
     case "Needs Review":
     case "Medium":
-      return "bg-amber-50 text-amber-700";
+      return "border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-300";
 
     case "High":
-      return "bg-orange-50 text-orange-700";
+      return "border-orange-500/20 bg-orange-500/10 text-orange-600 dark:text-orange-300";
 
     case "Critical":
     case "Rejected":
     case "Failed":
-      return "bg-rose-50 text-rose-700";
+      return "border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-300";
 
     default:
-      return "bg-slate-100 text-slate-600";
+      return "border-border bg-muted text-muted-foreground";
   }
 }
 
@@ -85,36 +96,35 @@ export default function KYCQueue({
     );
 
   return (
-    <section className="overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-col gap-3 border-b border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+    <motion.section
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="overflow-hidden rounded-[26px] border border-border bg-card text-card-foreground shadow-[0_12px_38px_rgba(0,0,0,0.04)]"
+    >
+      <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">
+          <p className="text-[8px] font-black uppercase tracking-[0.16em] text-indigo-500">
             Compliance Queue
           </p>
 
-          <h2 className="mt-1 text-lg font-black text-[#0F2745]">
+          <h2 className="mt-1 text-lg font-black text-foreground">
             Review Queue
           </h2>
+
+          <p className="mt-1 text-[9px] text-muted-foreground">
+            Click any row to open the complete manual review workspace.
+          </p>
         </div>
 
-        <select
+        <PageSizeDropdown
           value={pageSize}
-          onChange={(event) =>
-            onPageSizeChange(
-              Number(event.target.value)
-            )
-          }
-          className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-[10px] font-bold text-slate-600"
-        >
-          <option value={25}>25 / page</option>
-          <option value={50}>50 / page</option>
-          <option value={100}>100 / page</option>
-        </select>
+          onChange={onPageSizeChange}
+        />
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="min-w-[1200px] w-full border-collapse">
-          <thead className="bg-slate-50/80">
+      <div className="overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        <table className="w-full min-w-[1040px] border-collapse">
+          <thead className="bg-muted/40">
             <tr>
               <th className="w-12 px-4 py-3 text-center">
                 <input
@@ -125,7 +135,7 @@ export default function KYCQueue({
                       event.target.checked
                     )
                   }
-                  className="h-4 w-4 accent-[#1F5EA8]"
+                  className="h-4 w-4 accent-indigo-600"
                   aria-label="Select current page"
                 />
               </th>
@@ -142,20 +152,16 @@ export default function KYCQueue({
                 }
               />
 
-              <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-slate-400">
+              <th className="px-4 py-3 text-left text-[8px] font-black uppercase tracking-[0.1em] text-muted-foreground">
                 Case
               </th>
 
-              <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-slate-400">
+              <th className="px-4 py-3 text-left text-[8px] font-black uppercase tracking-[0.1em] text-muted-foreground">
                 Document
               </th>
 
-              <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-slate-400">
+              <th className="px-4 py-3 text-left text-[8px] font-black uppercase tracking-[0.1em] text-muted-foreground">
                 Status
-              </th>
-
-              <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                Verification
               </th>
 
               <SortHeader
@@ -182,11 +188,7 @@ export default function KYCQueue({
                 }
               />
 
-              <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-slate-400">
-                Reviewer
-              </th>
-
-              <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wide text-slate-400">
+              <th className="px-4 py-3 text-left text-[8px] font-black uppercase tracking-[0.1em] text-muted-foreground">
                 SLA
               </th>
 
@@ -194,97 +196,114 @@ export default function KYCQueue({
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-slate-100">
+          <tbody className="divide-y divide-border">
             {requests.map((request, index) => {
               const selected =
-                selectedIds.has(
-                  request.id
-                );
+                selectedIds.has(request.id);
 
               return (
                 <motion.tr
                   key={request.id}
                   initial={{
                     opacity: 0,
+                    y: 4,
                   }}
                   animate={{
                     opacity: 1,
+                    y: 0,
                   }}
                   transition={{
-                    delay:
-                      index * 0.01,
+                    duration: 0.28,
+                    delay: index * 0.02,
                   }}
-                  className={`transition ${
+                  tabIndex={0}
+                  role="button"
+                  onClick={() =>
+                    onOpen(request)
+                  }
+                  onKeyDown={(event) => {
+                    if (
+                      event.key === "Enter" ||
+                      event.key === " "
+                    ) {
+                      event.preventDefault();
+                      onOpen(request);
+                    }
+                  }}
+                  className={`group cursor-pointer outline-none transition ${
                     selected
-                      ? "bg-blue-50/60"
-                      : "hover:bg-slate-50"
+                      ? "bg-indigo-500/10"
+                      : "hover:bg-indigo-500/5 focus-visible:bg-indigo-500/10"
                   }`}
                 >
-                  <td className="px-4 py-4 text-center">
+                  <td
+                    className="px-4 py-4 text-center"
+                    onClick={(event) =>
+                      event.stopPropagation()
+                    }
+                  >
                     <input
                       type="checkbox"
                       checked={selected}
                       onChange={() =>
-                        onToggle(
-                          request.id
-                        )
+                        onToggle(request.id)
                       }
-                      className="h-4 w-4 accent-[#1F5EA8]"
+                      className="h-4 w-4 accent-indigo-600"
                       aria-label={`Select ${request.caseId}`}
                     />
                   </td>
 
                   <td className="px-4 py-4">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onOpen(
-                          request
-                        )
-                      }
-                      className="flex items-center gap-3 text-left"
-                    >
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#1F5EA8] to-cyan-400 text-xs font-black text-white">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[14px] bg-[linear-gradient(135deg,#4F46E5,#7C3AED)] text-[10px] font-black text-white shadow-sm">
                         {getInitials(
                           request.applicantName
                         )}
                       </div>
 
                       <div className="min-w-0">
-                        <p className="max-w-[180px] truncate text-xs font-extrabold text-slate-900">
+                        <p className="max-w-[180px] truncate text-[10px] font-black text-foreground">
                           {request.applicantName}
                         </p>
 
-                        <p className="max-w-[200px] truncate text-[10px] text-slate-400">
+                        <p className="mt-0.5 max-w-[190px] truncate text-[8px] text-muted-foreground">
                           {request.email}
                         </p>
                       </div>
-                    </button>
+                    </div>
                   </td>
 
                   <td className="px-4 py-4">
-                    <p className="text-[10px] font-black text-slate-800">
+                    <p className="text-[9px] font-black text-foreground">
                       {request.caseId}
                     </p>
 
-                    <p className="mt-1 text-[9px] text-slate-400">
+                    <p className="mt-1 max-w-[130px] truncate text-[8px] text-muted-foreground">
                       {request.applicantId}
                     </p>
                   </td>
 
                   <td className="px-4 py-4">
-                    <p className="text-xs font-bold text-slate-800">
-                      {request.documentType}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-xl border border-indigo-500/15 bg-indigo-500/10 text-indigo-500">
+                        <FileText className="h-3.5 w-3.5" />
+                      </span>
 
-                    <p className="mt-1 text-[9px] text-slate-400">
-                      {request.documentNumber}
-                    </p>
+                      <div>
+                        <p className="text-[9px] font-black text-foreground">
+                          {request.documentType}
+                        </p>
+
+                        <p className="mt-0.5 text-[8px] text-muted-foreground">
+                          {request.documentNumber}
+                        </p>
+                      </div>
+                    </div>
                   </td>
 
                   <td className="px-4 py-4">
                     <span
-                      className={`rounded-full px-2.5 py-1 text-[9px] font-bold ${badge(
+                      className={`inline-flex rounded-full border px-2.5 py-1.5 text-[8px] font-black ${badge(
                         request.status
                       )}`}
                     >
@@ -294,44 +313,38 @@ export default function KYCQueue({
 
                   <td className="px-4 py-4">
                     <span
-                      className={`rounded-full px-2.5 py-1 text-[9px] font-bold ${badge(
-                        request.verificationResult
-                      )}`}
-                    >
-                      {request.verificationResult}
-                    </span>
-                  </td>
-
-                  <td className="px-4 py-4">
-                    <span
-                      className={`rounded-full px-2.5 py-1 text-[9px] font-bold ${badge(
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[8px] font-black ${badge(
                         request.riskLevel
                       )}`}
                     >
-                      {request.riskLevel}{" "}
-                      {request.riskScore}
+                      <ShieldAlert className="h-3 w-3" />
+
+                      {request.riskLevel}
+
+                      {request.riskScore > 0 && (
+                        <>
+                          {" "}
+                          {request.riskScore}
+                        </>
+                      )}
                     </span>
                   </td>
 
-                  <td className="px-4 py-4 text-[10px] font-semibold text-slate-500">
+                  <td className="px-4 py-4 text-[9px] font-semibold text-muted-foreground">
                     {formatDate(
                       request.submittedAt
                     )}
                   </td>
 
-                  <td className="px-4 py-4 text-[10px] font-semibold text-slate-500">
-                    {request.reviewer}
-                  </td>
-
                   <td className="px-4 py-4">
                     <span
-                      className={`rounded-full px-2.5 py-1 text-[9px] font-bold ${
+                      className={`inline-flex rounded-full border px-2.5 py-1.5 text-[8px] font-black ${
                         request.slaMinutes <= 0
-                          ? "bg-rose-50 text-rose-700"
+                          ? "border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-300"
                           : request.slaMinutes <=
                               15
-                            ? "bg-amber-50 text-amber-700"
-                            : "bg-emerald-50 text-emerald-700"
+                            ? "border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-300"
+                            : "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300"
                       }`}
                     >
                       {formatSLA(
@@ -340,36 +353,26 @@ export default function KYCQueue({
                     </span>
                   </td>
 
-                  <td className="px-4 py-4">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onOpen(
-                          request
-                        )
-                      }
-                      className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-300 hover:bg-slate-100 hover:text-[#1F5EA8]"
-                      aria-label={`Open ${request.caseId}`}
-                    >
-                      <MoreHorizontal className="h-4 w-4" />
-                    </button>
+                  <td className="px-4 py-4 text-right">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-background text-muted-foreground transition group-hover:border-indigo-500/25 group-hover:bg-indigo-500/5 group-hover:text-indigo-500">
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </span>
                   </td>
                 </motion.tr>
               );
             })}
 
-            {requests.length ===
-              0 && (
+            {requests.length === 0 && (
               <tr>
                 <td
-                  colSpan={11}
+                  colSpan={9}
                   className="px-6 py-16 text-center"
                 >
-                  <p className="text-sm font-bold text-slate-800">
+                  <p className="text-sm font-black text-foreground">
                     Queue is clear
                   </p>
 
-                  <p className="mt-1 text-xs text-slate-400">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     No KYC requests match the current filters.
                   </p>
                 </td>
@@ -379,61 +382,44 @@ export default function KYCQueue({
         </table>
       </div>
 
-      <div className="flex flex-col gap-3 border-t border-slate-100 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-[10px] font-semibold text-slate-400">
+      <div className="flex flex-col gap-3 border-t border-border p-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-[9px] font-semibold text-muted-foreground">
           Showing{" "}
           {total === 0
             ? 0
-            : (page - 1) *
-                pageSize +
-              1}
-          –
-          {Math.min(
-            page *
-              pageSize,
-            total
-          )}{" "}
+            : (page - 1) * pageSize + 1}
+          {" – "}
+          {Math.min(page * pageSize, total)}{" "}
           of {total}
         </p>
 
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
+        <div className="flex items-center gap-1.5">
+          <PaginationButton
             disabled={page <= 1}
             onClick={() =>
               onPageChange(1)
             }
-            className="rounded-lg border border-slate-200 px-3 py-2 text-[10px] font-bold text-slate-500 disabled:opacity-30"
           >
             First
-          </button>
+          </PaginationButton>
 
-          <button
-            type="button"
+          <PaginationSquare
             disabled={page <= 1}
             onClick={() =>
               onPageChange(
-                Math.max(
-                  1,
-                  page - 1
-                )
+                Math.max(1, page - 1)
               )
             }
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 disabled:opacity-30"
           >
             <ChevronLeft className="h-4 w-4" />
-          </button>
+          </PaginationSquare>
 
-          <span className="rounded-lg bg-[#1F5EA8] px-3 py-2 text-[10px] font-bold text-white">
+          <span className="flex h-9 min-w-9 items-center justify-center rounded-xl bg-indigo-600 px-3 text-[9px] font-black text-white shadow-sm">
             {page}
           </span>
 
-          <button
-            type="button"
-            disabled={
-              page >=
-              totalPages
-            }
+          <PaginationSquare
+            disabled={page >= totalPages}
             onClick={() =>
               onPageChange(
                 Math.min(
@@ -442,29 +428,23 @@ export default function KYCQueue({
                 )
               )
             }
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 disabled:opacity-30"
           >
             <ChevronRight className="h-4 w-4" />
-          </button>
+          </PaginationSquare>
 
-          <button
-            type="button"
+          <PaginationButton
             disabled={
-              page >=
-              totalPages
+              page >= totalPages
             }
             onClick={() =>
-              onPageChange(
-                totalPages
-              )
+              onPageChange(totalPages)
             }
-            className="rounded-lg border border-slate-200 px-3 py-2 text-[10px] font-bold text-slate-500 disabled:opacity-30"
           >
             Last
-          </button>
+          </PaginationButton>
         </div>
       </div>
-    </section>
+    </motion.section>
   );
 }
 
@@ -483,14 +463,16 @@ function SortHeader({
     <th className="px-4 py-3 text-left">
       <button
         type="button"
-        onClick={onClick}
-        className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400 hover:text-slate-700"
+        onClick={(event) => {
+          event.stopPropagation();
+          onClick();
+        }}
+        className="inline-flex items-center gap-1 text-[8px] font-black uppercase tracking-[0.1em] text-muted-foreground transition hover:text-indigo-500"
       >
         {label}
 
         {active &&
-          (direction ===
-          "asc" ? (
+          (direction === "asc" ? (
             <ArrowUp className="h-3 w-3" />
           ) : (
             <ArrowDown className="h-3 w-3" />
@@ -500,47 +482,171 @@ function SortHeader({
   );
 }
 
-function getInitials(
-  value: string
-) {
-  return value
-    .split(" ")
-    .slice(0, 2)
-    .map((part) =>
-      part.charAt(0)
-    )
-    .join("")
-    .toUpperCase();
-}
+function PageSizeDropdown({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
 
-function formatDate(
-  value: string
-) {
-  return new Date(
-    value
-  ).toLocaleDateString(
-    "en-BD",
-    {
-      day: "2-digit",
-      month: "short",
-    }
+  const options = [25, 50, 100];
+
+  return (
+    <div className="relative z-40">
+      <button
+        type="button"
+        onClick={() =>
+          setOpen((current) => !current)
+        }
+        className="inline-flex h-10 items-center gap-2 rounded-xl border border-border bg-background px-3 text-[9px] font-black text-muted-foreground transition hover:border-indigo-500/25 hover:bg-indigo-500/5"
+      >
+        {value} / page
+
+        <ChevronDown
+          className={`h-3.5 w-3.5 transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <>
+            <button
+              type="button"
+              className="fixed inset-0 z-40 cursor-default"
+              onClick={() => setOpen(false)}
+              aria-label="Close page size menu"
+            />
+
+            <motion.div
+              initial={{
+                opacity: 0,
+                y: -5,
+              }}
+              animate={{
+                opacity: 1,
+                y: 0,
+              }}
+              exit={{
+                opacity: 0,
+                y: -4,
+              }}
+              className="absolute right-0 top-[calc(100%+6px)] z-50 min-w-[135px] rounded-[14px] border border-border bg-card p-1.5 text-card-foreground shadow-[0_18px_45px_rgba(0,0,0,0.14)]"
+            >
+              {options.map((option) => (
+                <button
+                  type="button"
+                  key={option}
+                  onClick={() => {
+                    onChange(option);
+                    setOpen(false);
+                  }}
+                  className={`flex w-full items-center justify-between rounded-[10px] px-2.5 py-2 text-[9px] font-black transition ${
+                    option === value
+                      ? "bg-indigo-500/10 text-indigo-500"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }`}
+                >
+                  {option} / page
+
+                  {option === value && (
+                    <Check className="h-3.5 w-3.5" />
+                  )}
+                </button>
+              ))}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
 
-function formatSLA(
-  minutes: number
-) {
+function PaginationButton({
+  disabled,
+  onClick,
+  children,
+}: {
+  disabled: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="h-9 rounded-xl border border-border bg-background px-3 text-[9px] font-black text-muted-foreground transition hover:border-indigo-500/25 hover:bg-indigo-500/5 hover:text-indigo-500 disabled:cursor-not-allowed disabled:opacity-30"
+    >
+      {children}
+    </button>
+  );
+}
+
+function PaginationSquare({
+  disabled,
+  onClick,
+  children,
+}: {
+  disabled: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-background text-muted-foreground transition hover:border-indigo-500/25 hover:bg-indigo-500/5 hover:text-indigo-500 disabled:cursor-not-allowed disabled:opacity-30"
+    >
+      {children}
+    </button>
+  );
+}
+
+function getInitials(value: string) {
+  const parts = value
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  return (
+    parts
+      .slice(0, 2)
+      .map(
+        (part) =>
+          part[0]?.toUpperCase() ?? ""
+      )
+      .join("") || "KY"
+  );
+}
+
+function formatDate(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function formatSLA(minutes: number) {
   if (minutes <= 0) {
     return "Overdue";
   }
 
-  const hours =
-    Math.floor(
-      minutes / 60
-    );
-
-  const remaining =
-    minutes % 60;
+  const hours = Math.floor(minutes / 60);
+  const remaining = minutes % 60;
 
   return hours > 0
     ? `${hours}h ${remaining}m`

@@ -1,209 +1,986 @@
 "use client";
 
-import React from "react";
-import Link from "next/link";
-import { AnimatePresence, motion } from "framer-motion";
-import { LogIn, UserPlus, ShieldCheck } from "lucide-react";
-import { usePathname, useRouter } from "next/navigation";
+import type {
+  ReactNode,
+} from "react";
 
-type AuthMode = "signin" | "signup";
+import Link from "next/link";
+import {
+  usePathname,
+} from "next/navigation";
+
+import {
+  motion,
+  useReducedMotion,
+} from "framer-motion";
+
+import {
+  ArrowUpRight,
+  BadgeCheck,
+  Building2,
+  CheckCircle2,
+  Code2,
+  CreditCard,
+  Landmark,
+  LogIn,
+  LockKeyhole,
+  ShieldCheck,
+  Sparkles,
+  UserPlus,
+  UserRound,
+  WalletCards,
+  Webhook,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
+
+type AuthExperience = {
+  eyebrow: string;
+  title: string;
+  highlight: string;
+  description: string;
+  accountLabel: string;
+  sceneLabel: string;
+  sceneStatus: string;
+  features: Array<{
+    icon: LucideIcon;
+    title: string;
+    description: string;
+  }>;
+};
+
+const PERSONAL_LOGIN: AuthExperience = {
+  eyebrow: "Personal wallet access",
+  title: "Your money, movement and goals—",
+  highlight: "finally in one calm place.",
+  description:
+    "Sign in to pay, transfer, track activity and manage your verified Coffer wallet from one protected workspace.",
+  accountLabel: "Personal account",
+  sceneLabel: "Wallet network",
+  sceneStatus: "Ready",
+  features: [
+    {
+      icon: ShieldCheck,
+      title: "Protected access",
+      description: "Secure sessions and account controls",
+    },
+    {
+      icon: Zap,
+      title: "Faster transfers",
+      description: "Move funds without unnecessary steps",
+    },
+    {
+      icon: CreditCard,
+      title: "Clear activity",
+      description: "Keep every payment easy to follow",
+    },
+  ],
+};
+
+const PERSONAL_REGISTER: AuthExperience = {
+  eyebrow: "Create your Coffer wallet",
+  title: "A secure financial home—",
+  highlight: "built around your next move.",
+  description:
+    "Create your identity, verify your email and unlock a wallet designed for everyday payments, transfers and visibility.",
+  accountLabel: "Personal registration",
+  sceneLabel: "Account setup",
+  sceneStatus: "Protected",
+  features: [
+    {
+      icon: BadgeCheck,
+      title: "Verified identity",
+      description: "A safer foundation for every transaction",
+    },
+    {
+      icon: LockKeyhole,
+      title: "Private by design",
+      description: "Sensitive access stays protected",
+    },
+    {
+      icon: Sparkles,
+      title: "Ready to grow",
+      description: "Start simple and unlock more over time",
+    },
+  ],
+};
+
+const MERCHANT_SIGN_IN: AuthExperience = {
+  eyebrow: "Coffer payment gateway",
+  title: "One secure doorway to—",
+  highlight: "every payment operation.",
+  description:
+    "Sign in to manage checkout, API credentials, webhooks, transactions, refunds and settlement activity for your business.",
+  accountLabel: "Merchant gateway",
+  sceneLabel: "Gateway status",
+  sceneStatus: "Operational",
+  features: [
+    {
+      icon: Code2,
+      title: "API control",
+      description: "Manage test and live integrations",
+    },
+    {
+      icon: Webhook,
+      title: "Reliable events",
+      description: "Track webhook delivery and payment state",
+    },
+    {
+      icon: Landmark,
+      title: "Settlement visibility",
+      description: "Follow balances, payouts and refunds",
+    },
+  ],
+};
+
+const MERCHANT_SIGN_UP: AuthExperience = {
+  eyebrow: "Merchant gateway registration",
+  title: "Create the identity behind—",
+  highlight: "your payment integration.",
+  description:
+    "Register the authorized owner first. You will add business details, verification information and gateway settings next.",
+  accountLabel: "Merchant registration",
+  sceneLabel: "Gateway onboarding",
+  sceneStatus: "Step 1 of 2",
+  features: [
+    {
+      icon: ShieldCheck,
+      title: "Secure owner access",
+      description: "Keep the business account accountable",
+    },
+    {
+      icon: Code2,
+      title: "Sandbox first",
+      description: "Prepare your integration safely",
+    },
+    {
+      icon: CreditCard,
+      title: "Checkout ready",
+      description: "Move toward accepting customer payments",
+    },
+  ],
+};
+
+const MERCHANT_ONBOARDING: AuthExperience = {
+  eyebrow: "Business onboarding",
+  title: "From business details to—",
+  highlight: "a gateway ready for testing.",
+  description:
+    "Tell Coffer who will accept payments. After onboarding, test-mode checkout becomes available while verification prepares live access.",
+  accountLabel: "Merchant onboarding",
+  sceneLabel: "Integration path",
+  sceneStatus: "Test mode next",
+  features: [
+    {
+      icon: Building2,
+      title: "Business profile",
+      description: "Connect the legal and customer-facing identity",
+    },
+    {
+      icon: Code2,
+      title: "Sandbox access",
+      description: "Create keys and test checkout flows",
+    },
+    {
+      icon: BadgeCheck,
+      title: "Live verification",
+      description: "Complete approval before real payments",
+    },
+  ],
+};
+
+function getExperience(
+  pathname: string,
+): AuthExperience {
+  if (
+    pathname ===
+    "/register"
+  ) {
+    return PERSONAL_REGISTER;
+  }
+
+  if (
+    pathname ===
+    "/merchant/sign-in"
+  ) {
+    return MERCHANT_SIGN_IN;
+  }
+
+  if (
+    pathname ===
+    "/merchant/sign-up"
+  ) {
+    return MERCHANT_SIGN_UP;
+  }
+
+  if (
+    pathname ===
+    "/merchant/onboarding"
+  ) {
+    return MERCHANT_ONBOARDING;
+  }
+
+  return PERSONAL_LOGIN;
+}
+
+function getFormWidth(
+  pathname: string,
+): string {
+  if (
+    pathname ===
+    "/merchant/onboarding"
+  ) {
+    return "max-w-[900px]";
+  }
+
+  if (
+    pathname ===
+      "/register" ||
+    pathname ===
+      "/merchant/sign-up"
+  ) {
+    return "max-w-[760px]";
+  }
+
+  return "max-w-[560px]";
+}
+
+function AuthPortalSwitcher({
+  pathname,
+  currentLabel,
+  reduceMotion,
+}: {
+  pathname: string;
+  currentLabel: string;
+  reduceMotion: boolean;
+}) {
+  const isMerchant =
+    pathname.startsWith(
+      "/merchant/",
+    );
+
+  const isOnboarding =
+    pathname ===
+    "/merchant/onboarding";
+
+  const isSignUp =
+    pathname ===
+      "/register" ||
+    pathname ===
+      "/merchant/sign-up" ||
+    isOnboarding;
+
+  const personalHref =
+    isSignUp
+      ? "/register"
+      : "/login";
+
+  const merchantHref =
+    isOnboarding
+      ? "/merchant/onboarding"
+      : isSignUp
+        ? "/merchant/sign-up"
+        : "/merchant/sign-in";
+
+  const signInHref =
+    isMerchant
+      ? "/merchant/sign-in"
+      : "/login";
+
+  const signUpHref =
+    isMerchant
+      ? isOnboarding
+        ? "/merchant/onboarding"
+        : "/merchant/sign-up"
+      : "/register";
+
+  const springTransition =
+    reduceMotion
+      ? {
+          duration: 0,
+        }
+      : {
+          type: "spring" as const,
+          stiffness: 410,
+          damping: 34,
+          mass: 0.72,
+        };
+
+  return (
+    <nav
+      aria-label={`Authentication portal — ${currentLabel}`}
+      className="relative flex w-full flex-col gap-1.5 overflow-hidden rounded-[20px] border border-white/15 bg-[#160b35]/35 p-1.5 shadow-[0_18px_42px_rgba(24,8,64,0.22),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-2xl sm:w-auto sm:flex-row sm:items-center"
+    >
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute -left-8 top-0 h-16 w-32 rotate-12 bg-white/[0.06] blur-2xl"
+      />
+
+      <div className="relative grid min-w-0 flex-1 grid-cols-2 gap-1 sm:flex-none">
+        <Link
+          href={personalHref}
+          aria-current={
+            !isMerchant
+              ? "page"
+              : undefined
+          }
+          className={`relative isolate flex h-9 min-w-0 items-center justify-center gap-1.5 overflow-hidden rounded-[13px] px-3 text-[9px] font-black uppercase tracking-[0.11em] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white/75 sm:min-w-[104px] ${
+            !isMerchant
+              ? "text-[#261444]"
+              : "text-white/62 hover:bg-white/[0.07] hover:text-white"
+          }`}
+        >
+          {!isMerchant && (
+            <motion.span
+              layoutId="auth-portal-pill"
+              aria-hidden="true"
+              transition={springTransition}
+              className="absolute inset-0 -z-10 rounded-[13px] border border-white/85 bg-[linear-gradient(135deg,#ffffff,#eee9ff)] shadow-[0_9px_24px_rgba(30,12,70,0.22),inset_0_1px_0_#fff]"
+            />
+          )}
+          <UserRound className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">
+            Personal
+          </span>
+        </Link>
+
+        <Link
+          href={merchantHref}
+          aria-current={
+            isMerchant
+              ? "page"
+              : undefined
+          }
+          className={`relative isolate flex h-9 min-w-0 items-center justify-center gap-1.5 overflow-hidden rounded-[13px] px-3 text-[9px] font-black uppercase tracking-[0.11em] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white/75 sm:min-w-[104px] ${
+            isMerchant
+              ? "text-[#261444]"
+              : "text-white/62 hover:bg-white/[0.07] hover:text-white"
+          }`}
+        >
+          {isMerchant && (
+            <motion.span
+              layoutId="auth-portal-pill"
+              aria-hidden="true"
+              transition={springTransition}
+              className="absolute inset-0 -z-10 rounded-[13px] border border-white/85 bg-[linear-gradient(135deg,#ffffff,#eee9ff)] shadow-[0_9px_24px_rgba(30,12,70,0.22),inset_0_1px_0_#fff]"
+            />
+          )}
+          <Building2 className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">
+            Merchant
+          </span>
+        </Link>
+      </div>
+
+      <span
+        aria-hidden="true"
+        className="mx-1 hidden h-5 w-px bg-white/12 sm:block"
+      />
+
+      <div className="relative grid min-w-0 flex-1 grid-cols-2 gap-1 sm:flex-none">
+        <Link
+          href={signInHref}
+          aria-current={
+            !isSignUp
+              ? "page"
+              : undefined
+          }
+          className={`relative isolate flex h-9 min-w-0 items-center justify-center gap-1.5 overflow-hidden rounded-[13px] px-3 text-[9px] font-black uppercase tracking-[0.11em] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white/75 sm:min-w-[92px] ${
+            !isSignUp
+              ? "text-white"
+              : "text-white/58 hover:bg-white/[0.07] hover:text-white"
+          }`}
+        >
+          {!isSignUp && (
+            <motion.span
+              layoutId="auth-action-pill"
+              aria-hidden="true"
+              transition={springTransition}
+              className="absolute inset-0 -z-10 rounded-[13px] border border-violet-200/25 bg-[linear-gradient(135deg,rgba(91,51,220,0.96),rgba(168,40,245,0.96))] shadow-[0_9px_24px_rgba(76,29,149,0.34),inset_0_1px_0_rgba(255,255,255,0.22)]"
+            />
+          )}
+          <LogIn className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">
+            Sign in
+          </span>
+        </Link>
+
+        <Link
+          href={signUpHref}
+          aria-current={
+            isSignUp
+              ? "page"
+              : undefined
+          }
+          className={`relative isolate flex h-9 min-w-0 items-center justify-center gap-1.5 overflow-hidden rounded-[13px] px-3 text-[9px] font-black uppercase tracking-[0.11em] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white/75 sm:min-w-[92px] ${
+            isSignUp
+              ? "text-white"
+              : "text-white/58 hover:bg-white/[0.07] hover:text-white"
+          }`}
+        >
+          {isSignUp && (
+            <motion.span
+              layoutId="auth-action-pill"
+              aria-hidden="true"
+              transition={springTransition}
+              className="absolute inset-0 -z-10 rounded-[13px] border border-violet-200/25 bg-[linear-gradient(135deg,rgba(91,51,220,0.96),rgba(168,40,245,0.96))] shadow-[0_9px_24px_rgba(76,29,149,0.34),inset_0_1px_0_rgba(255,255,255,0.22)]"
+            />
+          )}
+          <UserPlus className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">
+            {isOnboarding
+              ? "Setup"
+              : "Sign up"}
+          </span>
+        </Link>
+      </div>
+    </nav>
+  );
+}
 
 export default function AuthLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
-  const pathname = usePathname();
-  const router = useRouter();
+  const pathname =
+    usePathname();
 
-  const mode: AuthMode = pathname.includes("/register")
-    ? "signup"
-    : "signin";
+  const reduceMotion =
+    useReducedMotion();
 
-  const isSignIn = mode === "signin";
-
-  const handleSwitch = (nextMode: AuthMode) => {
-    if (nextMode === mode) return;
-
-    router.push(
-      nextMode === "signin"
-        ? "/login"
-        : "/register"
+  const experience =
+    getExperience(
+      pathname,
     );
-  };
+
+  const isMerchant =
+    pathname.startsWith(
+      "/merchant/",
+    );
+
+  const formWidth =
+    getFormWidth(
+      pathname,
+    );
+
+  const cardTheme =
+    isMerchant
+      ? "dark:border-white/10 dark:bg-[linear-gradient(145deg,rgba(15,10,35,0.98),rgba(24,16,55,0.96))]"
+      : "dark:border-white/25 dark:bg-[linear-gradient(145deg,rgba(255,255,255,0.985),rgba(245,243,255,0.96))]";
 
   return (
-    <main className="min-h-screen bg-[#F4F7FB] px-3 py-5 sm:px-5 lg:px-8 lg:py-8">
-      <div className="mx-auto w-full max-w-[1440px]">
+    <main className="relative isolate min-h-[100svh] overflow-x-clip bg-[#070414]">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 -z-20 bg-[#070414]"
+      />
 
-        {/* =====================================================
-            TOP AUTH SWITCH
-        ====================================================== */}
-        <div className="mb-7 flex justify-center lg:mb-9">
-          <div className="relative w-full max-w-[360px]">
-            {/* soft shadow / depth */}
-            <div className="pointer-events-none absolute inset-x-8 bottom-[-8px] h-5 rounded-full bg-[#1F5EA8]/10 blur-xl" />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 -z-10 opacity-70"
+        style={{
+          background:
+            "radial-gradient(circle at 12% 12%, rgba(79,70,229,0.28), transparent 30%), radial-gradient(circle at 86% 18%, rgba(168,85,247,0.30), transparent 31%), radial-gradient(circle at 70% 88%, rgba(79,70,229,0.24), transparent 36%), #070414",
+        }}
+      />
 
-            <div className="relative rounded-full border border-white/80 bg-white/65 p-1.5 shadow-[0_10px_35px_rgba(23,54,93,0.08)] backdrop-blur-xl">
+      <div className="relative z-10 mx-auto grid min-h-[100svh] w-full max-w-[1720px] lg:grid-cols-[minmax(360px,0.88fr)_minmax(560px,1.12fr)]">
+        <section className="relative flex min-h-[510px] overflow-hidden border-white/10 px-6 py-7 text-white sm:px-9 sm:py-9 lg:sticky lg:top-0 lg:h-[100svh] lg:min-h-0 lg:self-start lg:border-r xl:px-14 xl:py-11">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0"
+            style={{
+              background:
+                "linear-gradient(145deg, rgba(8,5,28,0.98) 0%, rgba(22,15,63,0.96) 48%, rgba(30,27,75,0.92) 100%)",
+            }}
+          />
 
-              {/* =================================================
-                  MOVING 3D ACTIVE PILL
-              ================================================== */}
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 opacity-[0.17]"
+            style={{
+              backgroundImage:
+                "linear-gradient(rgba(255,255,255,0.09) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.09) 1px, transparent 1px)",
+              backgroundSize:
+                "46px 46px",
+              maskImage:
+                "linear-gradient(to bottom, black, transparent 88%)",
+            }}
+          />
+
+          <motion.div
+            aria-hidden="true"
+            className="pointer-events-none absolute -left-40 -top-40 h-[31rem] w-[31rem] rounded-full bg-indigo-500/25 blur-[110px]"
+            animate={
+              reduceMotion
+                ? undefined
+                : {
+                    x: [
+                      0,
+                      42,
+                      0,
+                    ],
+                    y: [
+                      0,
+                      28,
+                      0,
+                    ],
+                    scale: [
+                      1,
+                      1.08,
+                      1,
+                    ],
+                  }
+            }
+            transition={{
+              duration: 16,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+          />
+
+          <motion.div
+            aria-hidden="true"
+            className="pointer-events-none absolute -bottom-48 -right-36 h-[30rem] w-[30rem] rounded-full bg-fuchsia-500/20 blur-[120px]"
+            animate={
+              reduceMotion
+                ? undefined
+                : {
+                    x: [
+                      0,
+                      -34,
+                      0,
+                    ],
+                    y: [
+                      0,
+                      -30,
+                      0,
+                    ],
+                    scale: [
+                      1,
+                      1.1,
+                      1,
+                    ],
+                  }
+            }
+            transition={{
+              duration: 19,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+          />
+
+          <div className="relative z-10 flex w-full flex-col">
+            <Link
+              href="/"
+              className="group inline-flex w-fit items-center gap-3 rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-300"
+            >
+              <span className="relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-[15px] border border-white/15 bg-white/10 text-violet-100 shadow-[0_14px_34px_rgba(8,5,28,0.28)] backdrop-blur-xl transition duration-300 group-hover:-translate-y-0.5 group-hover:bg-white/15">
+                <span className="absolute inset-0 bg-gradient-to-br from-white/15 to-transparent" />
+                <WalletCards className="relative h-5 w-5" />
+              </span>
+
+              <span>
+                <span className="block text-base font-black tracking-[-0.035em] text-white">
+                  Coffer
+                </span>
+                <span className="block text-[9px] font-bold uppercase tracking-[0.21em] text-violet-200/65">
+                  Digital payments
+                </span>
+              </span>
+            </Link>
+
+            <div className="my-auto py-8 sm:py-10 lg:py-6 xl:py-10">
               <motion.div
-                initial={false}
+                initial={
+                  reduceMotion
+                    ? {
+                        opacity: 0,
+                      }
+                    : {
+                        opacity: 0,
+                        y: 22,
+                      }
+                }
                 animate={{
-                  left: isSignIn
-                    ? "6px"
-                    : "calc(50% + 0px)",
+                  opacity: 1,
+                  y: 0,
                 }}
                 transition={{
-                  type: "spring",
-                  stiffness: 380,
-                  damping: 28,
-                  mass: 0.65,
+                  duration: 0.7,
+                  ease: [
+                    0.22,
+                    1,
+                    0.36,
+                    1,
+                  ],
                 }}
-                className="absolute bottom-1.5 top-1.5 w-[calc(50%-6px)] rounded-full bg-gradient-to-br from-[#2A72B9] via-[#1F5EA8] to-[#17466F] shadow-[0_8px_20px_rgba(31,94,168,0.28)]"
               >
-                {/* top highlight */}
-                <div className="pointer-events-none absolute left-4 right-4 top-1 h-px rounded-full bg-white/30" />
+                <div className="inline-flex items-center gap-2 rounded-full border border-violet-300/20 bg-violet-300/[0.08] px-3.5 py-2 text-[9px] font-black uppercase tracking-[0.2em] text-violet-100 backdrop-blur-xl">
+                  <Sparkles className="h-3.5 w-3.5 text-fuchsia-300" />
+                  {experience.eyebrow}
+                </div>
 
-                {/* inner glow */}
-                <div className="pointer-events-none absolute inset-0 rounded-full bg-white/[0.04]" />
+                <h1 className="mt-6 max-w-[650px] text-[2.25rem] font-black leading-[1.03] tracking-[-0.055em] text-white sm:text-[3rem] lg:text-[2.75rem] xl:text-[3.55rem]">
+                  {experience.title}{" "}
+                  <span className="bg-gradient-to-r from-violet-200 via-fuchsia-200 to-cyan-200 bg-clip-text text-transparent">
+                    {experience.highlight}
+                  </span>
+                </h1>
+
+                <p className="mt-5 max-w-[590px] text-[13px] font-medium leading-7 text-slate-300/90 sm:text-sm">
+                  {experience.description}
+                </p>
               </motion.div>
 
-              {/* SIGN IN */}
-              <button
-                type="button"
-                onClick={() => handleSwitch("signin")}
-                className="relative z-10 flex h-12 w-1/2 items-center justify-center gap-2 rounded-full"
-              >
-                <motion.div
-                  animate={{
-                    scale: isSignIn ? 1 : 0.92,
-                    opacity: isSignIn ? 1 : 0.7,
-                  }}
-                  transition={{
-                    duration: 0.25,
-                    ease: [0.22, 1, 0.36, 1],
-                  }}
-                  className="flex items-center gap-2"
-                >
-                  <LogIn
-                    className={`h-4 w-4 ${
-                      isSignIn
-                        ? "text-white"
-                        : "text-[#718095]"
-                    }`}
-                  />
+              <div className="mt-7 hidden gap-3 sm:grid sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+                {experience.features.map(
+                  (
+                    feature,
+                    index,
+                  ) => {
+                    const Icon =
+                      feature.icon;
 
-                  <span
-                    className={`text-sm font-bold ${
-                      isSignIn
-                        ? "text-white"
-                        : "text-[#718095]"
-                    }`}
-                  >
-                    Sign In
-                  </span>
+                    return (
+                      <motion.div
+                        key={
+                          feature.title
+                        }
+                        initial={
+                          reduceMotion
+                            ? {
+                                opacity: 0,
+                              }
+                            : {
+                                opacity: 0,
+                                y: 16,
+                              }
+                        }
+                        animate={{
+                          opacity: 1,
+                          y: 0,
+                        }}
+                        transition={{
+                          delay:
+                            0.12 +
+                            index *
+                              0.08,
+                          duration: 0.5,
+                        }}
+                        className="rounded-[20px] border border-white/10 bg-white/[0.055] p-3.5 backdrop-blur-xl"
+                      >
+                        <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-violet-300/15 bg-violet-300/10 text-violet-200">
+                          <Icon className="h-4 w-4" />
+                        </span>
 
-                  {isSignIn && (
-                    <motion.span
-                      layoutId="auth-active-dot"
-                      className="h-1.5 w-1.5 rounded-full bg-[#B9E5FF] shadow-[0_0_10px_rgba(185,229,255,0.9)]"
-                    />
-                  )}
-                </motion.div>
-              </button>
+                        <p className="mt-3 text-[11px] font-extrabold text-white">
+                          {feature.title}
+                        </p>
 
-              {/* SIGN UP */}
-              <button
-                type="button"
-                onClick={() => handleSwitch("signup")}
-                className="relative z-10 -mt-12 ml-[50%] flex h-12 w-1/2 items-center justify-center gap-2 rounded-full"
-              >
-                <motion.div
-                  animate={{
-                    scale: !isSignIn ? 1 : 0.92,
-                    opacity: !isSignIn ? 1 : 0.7,
-                  }}
-                  transition={{
-                    duration: 0.25,
-                    ease: [0.22, 1, 0.36, 1],
-                  }}
-                  className="flex items-center gap-2"
-                >
-                  <UserPlus
-                    className={`h-4 w-4 ${
-                      !isSignIn
-                        ? "text-white"
-                        : "text-[#718095]"
-                    }`}
-                  />
+                        <p className="mt-1 text-[9px] font-medium leading-4 text-slate-400">
+                          {
+                            feature.description
+                          }
+                        </p>
+                      </motion.div>
+                    );
+                  },
+                )}
+              </div>
 
-                  <span
-                    className={`text-sm font-bold ${
-                      !isSignIn
-                        ? "text-white"
-                        : "text-[#718095]"
-                    }`}
-                  >
-                    Sign Up
-                  </span>
+              <PaymentScene
+                isMerchant={
+                  isMerchant
+                }
+                label={
+                  experience.sceneLabel
+                }
+                status={
+                  experience.sceneStatus
+                }
+                reduceMotion={
+                  Boolean(
+                    reduceMotion,
+                  )
+                }
+              />
+            </div>
 
-                  {!isSignIn && (
-                    <motion.span
-                      layoutId="auth-active-dot"
-                      className="h-1.5 w-1.5 rounded-full bg-[#B9E5FF] shadow-[0_0_10px_rgba(185,229,255,0.9)]"
-                    />
-                  )}
-                </motion.div>
-              </button>
+            <div className="flex flex-wrap items-center justify-between gap-3 text-[9px] font-semibold text-white/45">
+              <span>
+                © {new Date().getFullYear()} Coffer
+              </span>
+
+              <span className="inline-flex items-center gap-2">
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-300" />
+                Protected financial access
+              </span>
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* =====================================================
-            AUTH CONTENT
-        ====================================================== */}
-        <div className="overflow-hidden rounded-[2rem] border border-white/80 bg-white shadow-[0_30px_100px_rgba(23,54,93,0.11)]">
-          <AnimatePresence mode="wait" initial={false}>
+        <section className="relative flex min-h-[100svh] items-center justify-center overflow-hidden bg-gradient-to-br from-indigo-700 via-violet-700 to-purple-800 px-4 py-6 sm:px-7 sm:py-9 lg:px-9 lg:py-11 xl:px-14">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 opacity-[0.13]"
+            style={{
+              backgroundImage:
+                "radial-gradient(circle, rgba(255,255,255,0.9) 1px, transparent 1px)",
+              backgroundSize:
+                "30px 30px",
+              maskImage:
+                "linear-gradient(145deg, black, transparent 78%)",
+            }}
+          />
+
+          <motion.div
+            aria-hidden="true"
+            className="pointer-events-none absolute -right-28 top-[7%] h-80 w-80 rounded-full bg-fuchsia-400/30 blur-[95px]"
+            animate={
+              reduceMotion
+                ? undefined
+                : {
+                    x: [
+                      0,
+                      -46,
+                      0,
+                    ],
+                    y: [
+                      0,
+                      38,
+                      0,
+                    ],
+                    opacity: [
+                      0.42,
+                      0.72,
+                      0.42,
+                    ],
+                  }
+            }
+            transition={{
+              duration: 15,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+          />
+
+          <motion.div
+            aria-hidden="true"
+            className="pointer-events-none absolute -bottom-28 left-[4%] h-96 w-96 rounded-full bg-cyan-300/20 blur-[110px]"
+            animate={
+              reduceMotion
+                ? undefined
+                : {
+                    x: [
+                      0,
+                      54,
+                      0,
+                    ],
+                    y: [
+                      0,
+                      -40,
+                      0,
+                    ],
+                    scale: [
+                      1,
+                      1.12,
+                      1,
+                    ],
+                  }
+            }
+            transition={{
+              duration: 18,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+          />
+
+          <div
+            className={`relative z-10 w-full ${formWidth}`}
+          >
+            <div className="mb-4 flex flex-col gap-3 px-1 text-white sm:flex-row sm:items-center sm:justify-between">
+              <AuthPortalSwitcher
+                pathname={
+                  pathname
+                }
+                currentLabel={
+                  experience.accountLabel
+                }
+                reduceMotion={
+                  Boolean(
+                    reduceMotion,
+                  )
+                }
+              />
+
+              <Link
+                href="/"
+                className="group inline-flex shrink-0 self-end items-center gap-1.5 rounded-lg px-1 py-1 text-[10px] font-bold text-white/65 transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 sm:self-auto"
+              >
+                Back home
+                <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+              </Link>
+            </div>
+
             <motion.div
-              key={pathname}
-              initial={{
-                opacity: 0,
-                x: isSignIn ? 18 : -18,
-                filter: "blur(3px)",
-              }}
+              initial={
+                reduceMotion
+                  ? {
+                      opacity: 0,
+                    }
+                  : {
+                      opacity: 0,
+                      y: 24,
+                      scale: 0.985,
+                    }
+              }
               animate={{
                 opacity: 1,
-                x: 0,
-                filter: "blur(0px)",
-              }}
-              exit={{
-                opacity: 0,
-                x: isSignIn ? -18 : 18,
-                filter: "blur(3px)",
+                y: 0,
+                scale: 1,
               }}
               transition={{
-                duration: 0.42,
-                ease: [0.22, 1, 0.36, 1],
+                duration: 0.62,
+                ease: [
+                  0.22,
+                  1,
+                  0.36,
+                  1,
+                ],
               }}
+              className={`relative rounded-[30px] border border-white/30 bg-[linear-gradient(145deg,rgba(255,255,255,0.985),rgba(245,243,255,0.96))] p-5 shadow-[0_36px_100px_rgba(20,8,55,0.38),inset_0_1px_0_rgba(255,255,255,0.92)] backdrop-blur-2xl sm:p-7 md:p-9 ${cardTheme}`}
             >
-              <main>
-                {children}
-              </main>
+              <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-white to-transparent" />
+              {children}
             </motion.div>
-          </AnimatePresence>
-        </div>
 
-        {/* =====================================================
-            SMALL SECURITY FOOTER
-        ====================================================== */}
-        <div className="mt-5 flex items-center justify-center gap-2 text-[9px] font-medium text-[#96A3B2]">
-          <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
-          Secure digital wallet authentication
-        </div>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 px-2 text-center text-[9px] font-semibold text-white/55 sm:justify-between">
+              <span className="inline-flex items-center gap-1.5">
+                <ShieldCheck className="h-3.5 w-3.5 text-emerald-300" />
+                Encrypted session
+              </span>
+
+              <span>
+                No account data is exposed in the interface
+              </span>
+            </div>
+          </div>
+        </section>
       </div>
     </main>
+  );
+}
+
+function PaymentScene({
+  isMerchant,
+  label,
+  status,
+  reduceMotion,
+}: {
+  isMerchant: boolean;
+  label: string;
+  status: string;
+  reduceMotion: boolean;
+}) {
+  return (
+    <div className="relative mt-7 hidden h-[126px] overflow-hidden rounded-[24px] border border-white/10 bg-black/15 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl xl:block">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 opacity-20"
+        style={{
+          background:
+            "radial-gradient(circle at center, rgba(167,139,250,0.34), transparent 46%)",
+        }}
+      />
+
+      <div className="relative flex items-center justify-between gap-4">
+        <div>
+          <p className="text-[8px] font-black uppercase tracking-[0.2em] text-violet-200/65">
+            {label}
+          </p>
+          <p className="mt-1.5 text-xs font-extrabold text-white">
+            {status}
+          </p>
+        </div>
+
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/15 bg-emerald-300/10 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.14em] text-emerald-200">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-300 shadow-[0_0_10px_rgba(110,231,183,0.9)]" />
+          Secure
+        </span>
+      </div>
+
+      <div className="relative mt-4 flex items-center gap-3">
+        <motion.div
+          animate={
+            reduceMotion
+              ? undefined
+              : {
+                  y: [
+                    0,
+                    -4,
+                    0,
+                  ],
+                }
+          }
+          transition={{
+            duration: 4.5,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.065] px-3 py-2.5"
+        >
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-violet-400/15 text-violet-200">
+            {isMerchant ? (
+              <Code2 className="h-4 w-4" />
+            ) : (
+              <WalletCards className="h-4 w-4" />
+            )}
+          </span>
+
+          <span className="min-w-0">
+            <span className="block truncate text-[9px] font-extrabold text-white">
+              {isMerchant
+                ? "Checkout authorized"
+                : "Transfer completed"}
+            </span>
+            <span className="mt-0.5 block truncate text-[8px] font-medium text-slate-400">
+              {isMerchant
+                ? "Event delivered to your integration"
+                : "Activity protected by Coffer"}
+            </span>
+          </span>
+        </motion.div>
+
+        <motion.span
+          animate={
+            reduceMotion
+              ? undefined
+              : {
+                  rotate: [
+                    0,
+                    7,
+                    0,
+                    -7,
+                    0,
+                  ],
+                }
+          }
+          transition={{
+            duration: 7,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-gradient-to-br from-violet-400/20 to-fuchsia-400/10 text-fuchsia-200"
+        >
+          {isMerchant ? (
+            <Webhook className="h-5 w-5" />
+          ) : (
+            <CheckCircle2 className="h-5 w-5" />
+          )}
+        </motion.span>
+      </div>
+    </div>
   );
 }

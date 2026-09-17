@@ -1,23 +1,21 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { motion, type Variants } from "framer-motion";
-import { Menu, LogOut, Loader2 } from "lucide-react";
-
-import { Button } from "@/components/ui/button";
+import { usePathname, useRouter } from "next/navigation";
+import { AnimatePresence, motion } from "framer-motion";
 import {
-  Sheet,
-  SheetContent,
-  SheetTrigger,
-  SheetClose,
-  SheetTitle,
-} from "@/components/ui/sheet";
+  ArrowRight,
+  LayoutDashboard,
+  Loader2,
+  LogOut,
+} from "lucide-react";
 
-import AnimatedFeatureButton from "../button/AnimatedFeatureButton";
 import { apiClient } from "@/lib/api/client";
 
-const PRIMARY = "#1A202C";
+import FeaturesDrawer from "@/components/navigation/FeaturesDrawer";
+import SecurityDrawer from "@/components/navigation/SecurityDrawer";
+import FaqDrawer from "@/components/navigation/FaqDrawer";
 
 interface CurrentUser {
   _id: string;
@@ -32,61 +30,107 @@ interface CurrentUser {
     | "rejected";
 }
 
-const navLinks = [
-  { name: "Product", href: "/product" },
-  { name: "Security", href: "/security" },
-  { name: "Pricing", href: "/pricing" },
+interface ProfileResponse {
+  success: boolean;
+  user: CurrentUser;
+}
+
+/* =========================================================
+   MENU CONFIG
+
+   Each entry with a `drawer` id is hover-triggered. Entries
+   without one behave exactly like before (plain anchor
+   links / scroll targets).
+========================================================= */
+
+type DrawerId = "features" | "security" | "faq";
+
+const HOVER_MENU_ITEMS: {
+  label: string;
+  href: string;
+  drawer: DrawerId;
+}[] = [
+  { label: "Features", href: "/#features", drawer: "features" },
+  { label: "Security", href: "/#security", drawer: "security" },
+  { label: "FAQ", href: "/#faq", drawer: "faq" },
 ];
 
-const linkVariants: Variants = {
-  hidden: {
-    opacity: 0,
-    y: -8,
-  },
-
-  visible: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: {
-      delay: 0.15 + i * 0.08,
-      duration: 0.4,
-      ease: "easeOut",
-    },
-  }),
-};
+/* Delay before closing on mouse-leave, so moving the cursor
+   from the trigger link down into the drawer doesn't close it
+   mid-transition. */
+const CLOSE_DELAY_MS = 150;
 
 export default function Navbar() {
-  const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+  const router = useRouter();
 
-  const [user, setUser] =
-    useState<CurrentUser | null>(null);
+  const [user, setUser] = useState<CurrentUser | null>(null);
+  const [loadingUser, setLoadingUser] = useState(true);
+  const [loggingOut, setLoggingOut] = useState(false);
 
-  const [loadingUser, setLoadingUser] =
-    useState(true);
+  const [openDrawer, setOpenDrawer] = useState<DrawerId | null>(null);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [loggingOut, setLoggingOut] =
-    useState(false);
+  const isLoginPage =
+    pathname === "/login" || pathname === "/sign-in";
 
-  /* =========================================================
-     CHECK CURRENT USER
-  ========================================================== */
+  const isRegisterPage =
+    pathname === "/register" || pathname === "/sign-up";
+
+  const isAuthRoute = isLoginPage || isRegisterPage;
 
   useEffect(() => {
     let mounted = true;
 
-    const loadUser = async () => {
+    const loadCurrentUser = async () => {
+      /*
+       * আগে localStorage থেকে user দেখানো হবে।
+       * এতে page refresh করলে Navbar flash করবে না।
+       */
       try {
-        const data = await apiClient<{
-          success: boolean;
-          user: CurrentUser;
-        }>("/users/profile");
+        const storedUser = localStorage.getItem("auth_user");
 
-        if (mounted && data?.user) {
-          setUser(data.user);
+        if (storedUser && mounted) {
+          const parsedUser = JSON.parse(
+            storedUser
+          ) as CurrentUser;
+
+          if (parsedUser?._id && parsedUser?.role) {
+            setUser(parsedUser);
+          }
+        }
+      } catch {
+        localStorage.removeItem("auth_user");
+      }
+
+      /*
+       * Backend হচ্ছে authentication-এর মূল source।
+       */
+      try {
+        const response =
+          await apiClient<ProfileResponse>("/users/profile");
+
+        if (
+          mounted &&
+          response?.success &&
+          response.user
+        ) {
+          setUser(response.user);
+
+          localStorage.setItem(
+            "auth_user",
+            JSON.stringify(response.user)
+          );
+
+          localStorage.setItem(
+            "is_authenticated",
+            "true"
+          );
         }
       } catch {
         if (mounted) {
           setUser(null);
+          clearStoredAuthentication();
         }
       } finally {
         if (mounted) {
@@ -95,269 +139,244 @@ export default function Navbar() {
       }
     };
 
-    loadUser();
+    void loadCurrentUser();
 
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [pathname]);
 
   /* =========================================================
-     LOGOUT
+     CLOSE DRAWER ON ROUTE CHANGE / ESCAPE
   ========================================================== */
 
+  useEffect(() => {
+    setOpenDrawer(null);
+  }, [pathname]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpenDrawer(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) {
+        clearTimeout(closeTimerRef.current);
+      }
+    };
+  }, []);
+
+  const cancelScheduledClose = () => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+  };
+
+  const scheduleClose = () => {
+    cancelScheduledClose();
+
+    closeTimerRef.current = setTimeout(() => {
+      setOpenDrawer(null);
+    }, CLOSE_DELAY_MS);
+  };
+
+  const openDrawerNow = (drawer: DrawerId) => {
+    cancelScheduledClose();
+    setOpenDrawer(drawer);
+  };
+
   const handleLogout = async () => {
+    if (loggingOut) return;
+
     try {
       setLoggingOut(true);
 
       await apiClient("/auth/logout", {
         method: "POST",
       });
-
-      setUser(null);
-      setOpen(false);
-
-      window.location.href = "/";
     } catch (error) {
       console.error("Logout failed:", error);
-
-      setUser(null);
-      setOpen(false);
-
-      window.location.href = "/";
     } finally {
+      setUser(null);
+      clearStoredAuthentication();
       setLoggingOut(false);
+
+      router.replace("/");
+      router.refresh();
     }
   };
 
+  const dashboardLabel =
+    user?.role === "admin" ? "Dashboard" : "My Wallet";
+
+  const isAuthenticated = Boolean(user);
+
   return (
-    <motion.header
-      initial={{
-        opacity: 0,
-        y: -20,
-      }}
-      animate={{
-        opacity: 1,
-        y: 0,
-      }}
-      transition={{
-        duration: 0.5,
-        ease: "easeOut",
-      }}
-      className="relative z-50 overflow-visible rounded-t-[2rem] bg-[#F1F3ED] shadow-sm"
+    <nav
+      aria-label="Primary navigation"
+      className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4"
+      onMouseLeave={scheduleClose}
     >
-      <nav className="mx-auto flex w-[95%] items-center justify-between gap-4 overflow-visible px-4 py-4 sm:px-6 lg:px-12">
-        
-        {/* =====================================================
-            LEFT: MOBILE MENU + LOGO
-        ====================================================== */}
+      {/* =====================================================
+          HOVER DRAWER
 
-        <div className="flex items-center gap-1 lg:flex-1 lg:justify-start">
-          <Sheet
-            open={open}
-            onOpenChange={setOpen}
-          >
-            <SheetTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Toggle navigation menu"
-                className="mr-1 shrink-0 text-[#1A202C] hover:bg-black/5 hover:text-[#1F5EA8] lg:hidden"
-              >
-                <Menu className="h-5 w-5" />
-              </Button>
-            </SheetTrigger>
+          Docked directly above the floating nav pill (the
+          nav itself sits at bottom-6), sliding into place as
+          it opens/closes.
+      ====================================================== */}
 
-            <SheetContent
-              side="left"
-              className="w-64 border-none bg-[#F1F3ED]"
-            >
-              <SheetTitle className="text-left font-serif text-lg font-semibold text-[#1A202C]">
-                Coffer
-              </SheetTitle>
-
-              <ul className="mt-8 flex flex-col gap-1 text-[15px] font-medium text-gray-700">
-                {navLinks.map((link) => (
-                  <li key={link.href}>
-                    <SheetClose asChild>
-                      <Link
-                        href={link.href}
-                        className="block rounded-md px-3 py-2 transition-colors hover:bg-black/5 hover:text-[#1F5EA8]"
-                      >
-                        {link.name}
-                      </Link>
-                    </SheetClose>
-                  </li>
-                ))}
-
-                {/* Mobile auth */}
-
-                {user ? (
-                  <>
-                    <li>
-                      <SheetClose asChild>
-                        <Link
-                          href="/dashboard"
-                          className="block rounded-md px-3 py-2 transition-colors hover:bg-black/5 hover:text-[#1F5EA8]"
-                        >
-                          Dashboard
-                        </Link>
-                      </SheetClose>
-                    </li>
-
-                    <li className="mt-3 border-t border-black/5 pt-3">
-                      <button
-                        type="button"
-                        disabled={loggingOut}
-                        onClick={handleLogout}
-                        className="flex w-full items-center gap-2 rounded-md px-3 py-2 font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-60"
-                      >
-                        {loggingOut ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <LogOut className="h-4 w-4" />
-                        )}
-
-                        {loggingOut
-                          ? "Logging out..."
-                          : "Logout"}
-                      </button>
-                    </li>
-                  </>
-                ) : (
-                  <li>
-                    <SheetClose asChild>
-                      <Link
-                        href="/login"
-                        className="block rounded-md px-3 py-2 transition-colors hover:bg-black/5 hover:text-[#1F5EA8]"
-                      >
-                        Log in
-                      </Link>
-                    </SheetClose>
-                  </li>
-                )}
-              </ul>
-            </SheetContent>
-          </Sheet>
-
-          {/* Logo */}
-
+      <AnimatePresence>
+        {openDrawer && (
           <motion.div
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.97 }}
-            transition={{
-              type: "spring",
-              stiffness: 400,
-              damping: 17,
-            }}
-            className="shrink-0"
+            key={openDrawer}
+            initial={{ opacity: 0, y: 16, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: 0.98 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            onMouseEnter={cancelScheduledClose}
+            onMouseLeave={scheduleClose}
+            className="
+              absolute
+              bottom-[76px]
+              w-[min(92vw,720px)]
+              overflow-hidden
+              rounded-[26px]
+              border
+              border-slate-100
+              bg-white
+              p-5
+              shadow-[0_30px_80px_rgba(15,12,27,0.22)]
+              sm:p-6
+            "
           >
-            <Link
-              href="/"
-              className="flex items-center gap-2"
-            >
-              <svg
-                width="28"
-                height="28"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke={PRIMARY}
-                strokeWidth="1.5"
-                className="shrink-0"
-              >
-                <circle
-                  cx="12"
-                  cy="12"
-                  r="8"
-                />
+            {openDrawer === "features" && (
+              <FeaturesDrawer
+                isAuthenticated={isAuthenticated}
+                onNavigate={() => setOpenDrawer(null)}
+              />
+            )}
 
-                <path d="M12 4v16" />
+            {openDrawer === "security" && (
+              <SecurityDrawer
+                isAuthenticated={isAuthenticated}
+                onNavigate={() => setOpenDrawer(null)}
+              />
+            )}
 
-                <path d="M12 4c4.418 0 8 3.582 8 8s-3.582 8-8 8" />
-
-                <path d="M10 4h4" />
-              </svg>
-
-              <span className="text-xl font-serif font-semibold tracking-wide text-[#1A202C]">
-                Coffer
-              </span>
-            </Link>
+            {openDrawer === "faq" && <FaqDrawer />}
           </motion.div>
-        </div>
+        )}
+      </AnimatePresence>
 
-        {/* =====================================================
-            CENTER: DESKTOP NAV
-        ====================================================== */}
-
-        <ul className="hidden items-center justify-center gap-6 text-[15px] font-medium text-gray-700 lg:flex lg:flex-1">
-          {navLinks.map((link, index) => (
-            <motion.li
-              key={link.href}
-              custom={index}
-              initial="hidden"
-              animate="visible"
-              variants={linkVariants}
+      <div className="max-w-full overflow-x-auto rounded-full [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex min-w-max items-center gap-1 rounded-full border border-white/10 bg-[#0a0714]/90 p-1.5 shadow-[0_10px_40px_rgba(0,0,0,0.5)] backdrop-blur-xl">
+          {HOVER_MENU_ITEMS.slice(0, 2).map((item) => (
+            <Link
+              key={item.label}
+              href={item.href}
+              onMouseEnter={() => openDrawerNow(item.drawer)}
+              className={`
+                rounded-full px-5 py-2.5 text-sm font-medium transition-colors
+                ${
+                  openDrawer === item.drawer
+                    ? "text-white"
+                    : "text-white/80 hover:text-white"
+                }
+              `}
             >
-              <Link
-                href={link.href}
-                className="group relative px-2 py-1 transition-colors duration-200 hover:text-[#1F5EA8]"
-              >
-                {link.name}
-
-                <span className="absolute bottom-0 left-0 h-[2px] w-0 bg-[#1F5EA8] transition-all duration-300 group-hover:w-full" />
-              </Link>
-            </motion.li>
+              {item.label}
+            </Link>
           ))}
-        </ul>
 
-        {/* =====================================================
-            RIGHT: AUTH
-        ====================================================== */}
-
-        <div className="relative z-50 flex shrink-0 items-center justify-end overflow-visible lg:flex-1">
           {loadingUser ? (
-            <div className="flex h-10 min-w-[110px] items-center justify-center">
-              <Loader2 className="h-4 w-4 animate-spin text-[#1F5EA8]" />
+            <div className="flex min-w-[140px] items-center justify-center rounded-full border border-violet-400/50 bg-violet-500/10 px-5 py-2.5">
+              <Loader2 className="h-4 w-4 animate-spin text-violet-200" />
+              <span className="sr-only">
+                Checking authentication
+              </span>
             </div>
           ) : user ? (
-            /* =================================================
-               LOGGED IN
-            ================================================== */
+            <Link
+              href="/dashboard"
+              className="flex items-center gap-1.5 rounded-full border border-violet-400/50 bg-violet-500/10 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-violet-500/20"
+            >
+              <LayoutDashboard className="h-3.5 w-3.5" />
+              {dashboardLabel}
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          ) : (
+            <Link
+              href="/register"
+              className="flex items-center gap-1.5 rounded-full border border-violet-400/50 bg-violet-500/10 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-violet-500/20"
+            >
+              Open Wallet
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          )}
 
-            <motion.button
+          {HOVER_MENU_ITEMS.slice(2).map((item) => (
+            <Link
+              key={item.label}
+              href={item.href}
+              onMouseEnter={() => openDrawerNow(item.drawer)}
+              className={`
+                rounded-full px-5 py-2.5 text-sm font-medium transition-colors
+                ${
+                  openDrawer === item.drawer
+                    ? "text-white"
+                    : "text-white/80 hover:text-white"
+                }
+              `}
+            >
+              {item.label}
+            </Link>
+          ))}
+
+          {!loadingUser && user ? (
+            <button
               type="button"
-              onClick={handleLogout}
+              onClick={() => void handleLogout()}
               disabled={loggingOut}
-              whileHover={{
-                y: -1,
-                scale: 1.01,
-              }}
-              whileTap={{
-                scale: 0.98,
-              }}
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-red-200 bg-white px-4 text-sm font-semibold text-red-600 shadow-sm transition-all hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-medium text-white/80 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loggingOut ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Logging out...
-                </>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
-                <>
-                  <LogOut className="h-4 w-4" />
-                  Logout
-                </>
+                <LogOut className="h-3.5 w-3.5" />
               )}
-            </motion.button>
-          ) : (
-            /* =================================================
-               LOGGED OUT
-            ================================================== */
 
-            <AnimatedFeatureButton />
-          )}
+              {loggingOut ? "Signing Out..." : "Logout"}
+            </button>
+          ) : !loadingUser && !isAuthRoute ? (
+            <Link
+              href="/login"
+              className="rounded-full px-5 py-2.5 text-sm font-medium text-white/80 transition-colors hover:text-white"
+            >
+              Sign In
+            </Link>
+          ) : null}
         </div>
-      </nav>
-    </motion.header>
+      </div>
+    </nav>
   );
+}
+
+function clearStoredAuthentication() {
+  if (typeof window === "undefined") return;
+
+  localStorage.removeItem("auth_user");
+  localStorage.removeItem("is_authenticated");
+  localStorage.removeItem("token");
+  localStorage.removeItem("digital_wallet_token");
 }
