@@ -2,48 +2,119 @@
    DASHBOARD ROLES
 ========================================================= */
 
+export const DASHBOARD_ROLES = [
+  "user",
+  "merchant",
+  "support",
+  "analyst",
+  "admin",
+  "super_admin",
+] as const;
+
 export type DashboardRole =
-  | "admin"
-  | "super_admin"
-  | "user"
-  | "merchant"
-  | "support"
-  | "analyst";
+  (typeof DASHBOARD_ROLES)[number];
 
 /* =========================================================
-   VALID ROLES
+   ROLE SET
 ========================================================= */
 
-const DASHBOARD_ROLES =
-  new Set<DashboardRole>([
-    "admin",
-    "super_admin",
-    "user",
-    "merchant",
-    "support",
-    "analyst",
-  ]);
+const DASHBOARD_ROLE_SET =
+  new Set<string>(
+    DASHBOARD_ROLES
+  );
 
 /* =========================================================
-   ROLE VALIDATION
+   ROLE NORMALIZER
+
+   Backend remains the source of truth.
+
+   This only normalizes harmless formatting differences
+   such as:
+   - Analyst
+   - analyst
+   - ANALYST
+   - " analyst "
+   - super-admin
+   - super admin
+
+   Legacy typo "analist" is also mapped to "analyst"
+   so an older development account does not break the UI.
+
+   Backend authorization still performs the real security
+   checks and should store canonical role values.
+========================================================= */
+
+export function normalizeDashboardRole(
+  value: unknown
+): DashboardRole | null {
+  if (
+    typeof value !== "string"
+  ) {
+    return null;
+  }
+
+  const normalized =
+    value
+      .trim()
+      .toLowerCase()
+      .replace(
+        /[\s-]+/g,
+        "_"
+      );
+
+  if (
+    DASHBOARD_ROLE_SET.has(
+      normalized
+    )
+  ) {
+    return normalized as DashboardRole;
+  }
+
+  /*
+   * Small compatibility aliases.
+   *
+   * They are intentionally limited.
+   */
+  switch (normalized) {
+    case "administrator":
+      return "admin";
+
+    case "superadmin":
+    case "super_administrator":
+      return "super_admin";
+
+    case "analist":
+      return "analyst";
+
+    case "support_agent":
+      return "support";
+
+    default:
+      return null;
+  }
+}
+
+/* =========================================================
+   EXACT ROLE CHECK
 ========================================================= */
 
 export function isDashboardRole(
   value: unknown
 ): value is DashboardRole {
   return (
-    typeof value === "string" &&
-    DASHBOARD_ROLES.has(
-      value as DashboardRole
+    typeof value ===
+      "string" &&
+    DASHBOARD_ROLE_SET.has(
+      value
     )
   );
 }
 
 /* =========================================================
-   ROLE HOME ROUTES
+   ROLE HOME
 ========================================================= */
 
-export const DASHBOARD_HOME_BY_ROLE:
+const DASHBOARD_HOME_BY_ROLE:
   Record<
     DashboardRole,
     string
@@ -68,32 +139,29 @@ export const DASHBOARD_HOME_BY_ROLE:
 };
 
 /* =========================================================
-   GET ROLE HOME
+   GET DASHBOARD HOME
 ========================================================= */
 
 export function getDashboardHome(
   role: DashboardRole
 ): string {
-  return DASHBOARD_HOME_BY_ROLE[
-    role
-  ];
+  return (
+    DASHBOARD_HOME_BY_ROLE[
+      role
+    ]
+  );
 }
 
 /* =========================================================
    WORKSPACE RULES
-
-   These are role-specific workspaces.
-
-   A merchant cannot enter analyst workspace.
-   An analyst cannot enter merchant workspace.
-   A normal user cannot enter admin workspace.
 ========================================================= */
 
 interface WorkspaceRule {
-  prefix: string;
+  prefix:
+    string;
 
-  roles:
-    DashboardRole[];
+  allowedRoles:
+    readonly DashboardRole[];
 }
 
 const WORKSPACE_RULES:
@@ -102,7 +170,7 @@ const WORKSPACE_RULES:
       prefix:
         "/dashboard/merchant",
 
-      roles: [
+      allowedRoles: [
         "merchant",
       ],
     },
@@ -111,7 +179,7 @@ const WORKSPACE_RULES:
       prefix:
         "/dashboard/analyst",
 
-      roles: [
+      allowedRoles: [
         "analyst",
       ],
     },
@@ -120,7 +188,7 @@ const WORKSPACE_RULES:
       prefix:
         "/dashboard/support-dashboard",
 
-      roles: [
+      allowedRoles: [
         "support",
       ],
     },
@@ -129,7 +197,7 @@ const WORKSPACE_RULES:
       prefix:
         "/dashboard/admin",
 
-      roles: [
+      allowedRoles: [
         "admin",
         "super_admin",
       ],
@@ -140,12 +208,13 @@ const WORKSPACE_RULES:
    PATH MATCH
 ========================================================= */
 
-function matchesPath(
+function matchesWorkspace(
   pathname: string,
   prefix: string
 ): boolean {
   return (
-    pathname === prefix ||
+    pathname ===
+      prefix ||
     pathname.startsWith(
       `${prefix}/`
     )
@@ -155,9 +224,11 @@ function matchesPath(
 /* =========================================================
    ROLE REDIRECT
 
-   Returns:
-   - null = current path is okay
-   - string = redirect required
+   null:
+   current route is allowed.
+
+   string:
+   user must be redirected.
 ========================================================= */
 
 export function getRoleRedirectPath(
@@ -170,9 +241,9 @@ export function getRoleRedirectPath(
     );
 
   /* =======================================================
-     SPECIAL WORKSPACE ROLES
+     ROLE-SPECIFIC ROOT REDIRECT
 
-     /dashboard should NOT show personal wallet dashboard.
+     These roles have their own dashboard root.
   ======================================================= */
 
   if (
@@ -191,7 +262,7 @@ export function getRoleRedirectPath(
   }
 
   /* =======================================================
-     BLOCK OTHER ROLE WORKSPACES
+     PREVENT CROSS-WORKSPACE ACCESS
   ======================================================= */
 
   for (
@@ -199,7 +270,7 @@ export function getRoleRedirectPath(
     WORKSPACE_RULES
   ) {
     if (
-      !matchesPath(
+      !matchesWorkspace(
         pathname,
         rule.prefix
       )
@@ -208,7 +279,7 @@ export function getRoleRedirectPath(
     }
 
     if (
-      !rule.roles.includes(
+      !rule.allowedRoles.includes(
         role
       )
     ) {
@@ -222,6 +293,35 @@ export function getRoleRedirectPath(
 }
 
 /* =========================================================
+   DASHBOARD LABEL
+========================================================= */
+
+export function getDashboardLabel(
+  role: DashboardRole
+): string {
+  switch (role) {
+    case "merchant":
+      return "Merchant Portal";
+
+    case "analyst":
+      return "Analyst Dashboard";
+
+    case "support":
+      return "Support Console";
+
+    case "admin":
+      return "Admin Dashboard";
+
+    case "super_admin":
+      return "Admin Dashboard";
+
+    case "user":
+    default:
+      return "My Wallet";
+  }
+}
+
+/* =========================================================
    ROLE LABEL
 ========================================================= */
 
@@ -229,12 +329,6 @@ export function getDashboardRoleLabel(
   role: DashboardRole
 ): string {
   switch (role) {
-    case "admin":
-      return "Administrator";
-
-    case "super_admin":
-      return "Super Administrator";
-
     case "merchant":
       return "Merchant";
 
@@ -243,6 +337,12 @@ export function getDashboardRoleLabel(
 
     case "support":
       return "Support Agent";
+
+    case "admin":
+      return "Administrator";
+
+    case "super_admin":
+      return "Super Administrator";
 
     case "user":
     default:

@@ -28,9 +28,8 @@ import {
 } from "@/lib/api/client";
 
 import {
-  getDashboardHome,
   getRoleRedirectPath,
-  isDashboardRole,
+  normalizeDashboardRole,
   type DashboardRole,
 } from "@/lib/auth/dashboardRoles";
 
@@ -39,19 +38,26 @@ import {
 ========================================================= */
 
 interface RawProfileUser {
-  _id?: unknown;
+  _id?:
+    unknown;
 
-  name?: unknown;
+  name?:
+    unknown;
 
-  email?: unknown;
+  email?:
+    unknown;
 
-  phone?: unknown;
+  phone?:
+    unknown;
 
-  role?: unknown;
+  role?:
+    unknown;
 
-  kycStatus?: unknown;
+  kycStatus?:
+    unknown;
 
-  avatarUrl?: unknown;
+  avatarUrl?:
+    unknown;
 }
 
 interface ProfileResponse {
@@ -89,10 +95,7 @@ function isKYCStatus(
 /* =========================================================
    NORMALIZE PROFILE
 
-   IMPORTANT:
-   Backend profile is the source of truth.
-
-   localStorage role is NOT trusted.
+   Backend profile remains the source of truth.
 ========================================================= */
 
 function normalizeProfileUser(
@@ -107,11 +110,19 @@ function normalizeProfileUser(
     );
   }
 
-  if (
-    !isDashboardRole(
+  const role =
+    normalizeDashboardRole(
       raw.role
-    )
+    );
+
+  if (
+    !role
   ) {
+    console.error(
+      "Unsupported role received from profile:",
+      raw.role
+    );
+
     throw new Error(
       "This account has an unsupported dashboard role."
     );
@@ -138,12 +149,12 @@ function normalizeProfileUser(
 
     phone:
       typeof raw.phone ===
-        "string"
+        "string" &&
+      raw.phone.trim()
         ? raw.phone
         : undefined,
 
-    role:
-      raw.role,
+    role,
 
     kycStatus:
       isKYCStatus(
@@ -164,12 +175,12 @@ function normalizeProfileUser(
 /* =========================================================
    LOCAL AUTH CACHE
 
-   This is UI cache only.
-
-   It is NOT used for authorization.
+   UI cache only.
+   Authorization never trusts localStorage.
 ========================================================= */
 
-function clearLocalAuth(): void {
+function clearLocalAuth():
+  void {
   if (
     typeof window ===
     "undefined"
@@ -287,14 +298,15 @@ function withTimeout<T>(
 }
 
 /* =========================================================
-   LOADING SCREEN
+   LOADING
 ========================================================= */
 
 function LoadingScreen({
   message =
     "Checking your account and permissions...",
 }: {
-  message?: string;
+  message?:
+    string;
 }) {
   return (
     <div className="flex min-h-dvh w-full items-center justify-center bg-background text-foreground">
@@ -344,11 +356,9 @@ function RoleSidebar({
   onClose:
     () => void;
 }) {
-  switch (role) {
-    /* =====================================================
-       ADMIN
-    ====================================================== */
-
+  switch (
+    role
+  ) {
     case "admin":
     case "super_admin":
       return (
@@ -358,10 +368,6 @@ function RoleSidebar({
           }
         />
       );
-
-    /* =====================================================
-       MERCHANT
-    ====================================================== */
 
     case "merchant":
       return (
@@ -375,10 +381,6 @@ function RoleSidebar({
         />
       );
 
-    /* =====================================================
-       ANALYST
-    ====================================================== */
-
     case "analyst":
       return (
         <AnalystSidebar
@@ -391,10 +393,6 @@ function RoleSidebar({
         />
       );
 
-    /* =====================================================
-       SUPPORT
-    ====================================================== */
-
     case "support":
       return (
         <SupportSidebar
@@ -406,10 +404,6 @@ function RoleSidebar({
           }
         />
       );
-
-    /* =====================================================
-       NORMAL USER
-    ====================================================== */
 
     case "user":
     default:
@@ -492,8 +486,6 @@ export default function DashboardLayout({
 
   /* =======================================================
      LOAD AUTHENTICATED USER
-
-     Role always comes from backend profile.
   ======================================================= */
 
   useEffect(
@@ -547,15 +539,12 @@ export default function DashboardLayout({
               response.user
             );
 
-          /*
-           * SERVER ROLE is source of truth.
-           */
           setUser(
             authenticatedUser
           );
 
           /*
-           * localStorage is only UI cache.
+           * Only UI cache.
            */
           localStorage.setItem(
             "auth_user",
@@ -638,7 +627,7 @@ export default function DashboardLayout({
   );
 
   /* =======================================================
-     ROLE ROUTE PROTECTION / REDIRECT
+     ROLE ROUTE PROTECTION
   ======================================================= */
 
   const roleRedirectPath =
@@ -658,7 +647,9 @@ export default function DashboardLayout({
         return;
       }
 
-      closeMobileMenu();
+      setMobileMenuOpen(
+        false
+      );
 
       router.replace(
         roleRedirectPath
@@ -726,7 +717,7 @@ export default function DashboardLayout({
   }
 
   /* =======================================================
-     INITIAL LOADING
+     LOADING
   ======================================================= */
 
   if (
@@ -738,7 +729,7 @@ export default function DashboardLayout({
   }
 
   /* =======================================================
-     AUTH REDIRECT
+     LOGIN REDIRECT
   ======================================================= */
 
   if (
@@ -797,10 +788,6 @@ export default function DashboardLayout({
     );
   }
 
-  /* =======================================================
-     NO USER
-  ======================================================= */
-
   if (
     !user
   ) {
@@ -808,7 +795,7 @@ export default function DashboardLayout({
   }
 
   /* =======================================================
-     WAIT WHILE ROLE REDIRECTS
+     WAIT DURING ROLE REDIRECT
   ======================================================= */
 
   if (
@@ -816,15 +803,13 @@ export default function DashboardLayout({
   ) {
     return (
       <LoadingScreen
-        message={`Opening ${
-          user.role
-        } workspace...`}
+        message={`Opening ${user.role} workspace...`}
       />
     );
   }
 
   /* =======================================================
-     DASHBOARD UI
+     DASHBOARD
   ======================================================= */
 
   return (
@@ -834,10 +819,6 @@ export default function DashboardLayout({
       }
     >
       <div className="flex min-h-dvh w-full bg-background text-foreground transition-colors duration-300">
-        {/* =================================================
-            MOBILE OVERLAY
-        ================================================= */}
-
         {mobileMenuOpen && (
           <button
             type="button"
@@ -848,10 +829,6 @@ export default function DashboardLayout({
             className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[4px] lg:hidden"
           />
         )}
-
-        {/* =================================================
-            ROLE SIDEBAR
-        ================================================= */}
 
         <aside
           className={`fixed inset-y-0 left-0 z-50 h-dvh w-[280px] shrink-0 overflow-hidden transform transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] lg:sticky lg:top-0 lg:z-40 lg:translate-x-0 ${
@@ -872,10 +849,6 @@ export default function DashboardLayout({
             }
           />
         </aside>
-
-        {/* =================================================
-            CONTENT
-        ================================================= */}
 
         <div className="flex min-h-dvh min-w-0 flex-1 flex-col bg-background">
           <TopNavbar
