@@ -1,10 +1,14 @@
+/* =========================================================
+   MERCHANT PAYOUT API
+========================================================= */
 
+import {
+  apiClient,
+} from "./client";
 
 /* =========================================================
    TYPES
 ========================================================= */
-
-import { apiClient } from "./client";
 
 export type MerchantPayoutStatus =
   | "pending"
@@ -19,114 +23,235 @@ export type MerchantPayoutMethod =
   | "wallet"
   | "other";
 
+/* =========================================================
+   PAYOUT
+========================================================= */
+
 export interface MerchantPayout {
   id: string;
+
   payoutId: string;
-  merchantId: string | null;
+
+  merchantId:
+    | string
+    | null;
 
   amount: number;
+
   currency: string;
+
   feeAmount: number;
+
   netAmount: number;
 
-  payoutMethod: MerchantPayoutMethod;
+  payoutMethod:
+    MerchantPayoutMethod;
 
-  destination: string | null;
-  destinationReference: string | null;
+  destination:
+    | string
+    | null;
 
-  status: MerchantPayoutStatus;
+  destinationReference:
+    | string
+    | null;
 
-  merchantReference: string | null;
-  externalReference: string | null;
-  failureReason: string | null;
+  status:
+    MerchantPayoutStatus;
 
-  ledgerEntryGroupId: string | null;
+  merchantReference:
+    | string
+    | null;
+
+  externalReference:
+    | string
+    | null;
+
+  failureReason:
+    | string
+    | null;
+
+  ledgerEntryGroupId:
+    | string
+    | null;
 
   requestedAt: string;
-  processingAt: string | null;
-  completedAt: string | null;
-  failedAt: string | null;
-  cancelledAt: string | null;
+
+  processingAt:
+    | string
+    | null;
+
+  completedAt:
+    | string
+    | null;
+
+  failedAt:
+    | string
+    | null;
+
+  cancelledAt:
+    | string
+    | null;
 
   createdAt: string;
+
   updatedAt: string;
 }
 
+/* =========================================================
+   SUMMARY
+========================================================= */
+
 export interface MerchantPayoutSummary {
   total: number;
+
   pending: number;
+
   processing: number;
+
   completed: number;
+
   failed: number;
+
   cancelled: number;
 
   totalAmount: number;
+
   pendingAmount: number;
+
   completedAmount: number;
 }
 
+/* =========================================================
+   BALANCE
+========================================================= */
+
 export interface MerchantPayoutBalance {
   currency: string;
+
   ledgerBalance: number;
+
   reservedAmount: number;
+
   availableBalance: number;
 }
 
+/* =========================================================
+   MERCHANT
+========================================================= */
+
 export interface MerchantPayoutMerchant {
   id: string;
+
   businessName: string;
-  businessDisplayName: string | null;
+
+  businessDisplayName:
+    | string
+    | null;
+
   defaultCurrency: string;
 }
+
+/* =========================================================
+   PAGINATION
+========================================================= */
+
+export interface MerchantPayoutPagination {
+  page: number;
+
+  limit: number;
+
+  total: number;
+
+  totalPages: number;
+
+  hasNextPage: boolean;
+
+  hasPreviousPage: boolean;
+}
+
+/* =========================================================
+   FILTERS
+========================================================= */
+
+export interface MerchantPayoutFilters {
+  search: string;
+
+  status:
+    | MerchantPayoutStatus
+    | null;
+
+  payoutMethod:
+    | MerchantPayoutMethod
+    | null;
+
+  from:
+    | string
+    | null;
+
+  to:
+    | string
+    | null;
+}
+
+/* =========================================================
+   LIST RESPONSE
+========================================================= */
 
 export interface MerchantPayoutListResponse {
   success: boolean;
 
   data: {
-    merchant: MerchantPayoutMerchant;
+    merchant:
+      MerchantPayoutMerchant;
 
-    payouts: MerchantPayout[];
+    payouts:
+      MerchantPayout[];
 
-    summary: MerchantPayoutSummary;
+    summary:
+      MerchantPayoutSummary;
 
-    balance: MerchantPayoutBalance;
+    balance:
+      MerchantPayoutBalance;
 
-    pagination: {
-      page: number;
-      limit: number;
-      total: number;
-      totalPages: number;
-      hasNextPage: boolean;
-      hasPreviousPage: boolean;
-    };
+    pagination:
+      MerchantPayoutPagination;
 
-    filters: {
-      search: string;
-      status: MerchantPayoutStatus | null;
-      payoutMethod: MerchantPayoutMethod | null;
-      from: string | null;
-      to: string | null;
-    };
+    filters:
+      MerchantPayoutFilters;
   };
 
   message?: string;
 }
+
+/* =========================================================
+   DETAIL RESPONSE
+========================================================= */
 
 export interface MerchantPayoutDetailResponse {
   success: boolean;
 
   data: {
-    merchant: MerchantPayoutMerchant;
-    payout: MerchantPayout;
+    merchant:
+      MerchantPayoutMerchant;
+
+    payout:
+      MerchantPayout;
   };
 
   message?: string;
 }
 
+/* =========================================================
+   CREATE PAYLOAD
+========================================================= */
+
 export interface CreateMerchantPayoutPayload {
   amount: number;
+
   currency?: string;
-  payoutMethod: MerchantPayoutMethod;
+
+  payoutMethod:
+    MerchantPayoutMethod;
 
   destination?: string;
 
@@ -138,154 +263,431 @@ export interface CreateMerchantPayoutPayload {
 }
 
 /* =========================================================
+   CREATE RESPONSE
+========================================================= */
+
+export interface CreateMerchantPayoutResponse {
+  success: boolean;
+
+  data: {
+    duplicate: boolean;
+
+    payout:
+      MerchantPayout;
+
+    balance?: {
+      currency: string;
+
+      currentBalance: number;
+
+      reservedAmount: number;
+
+      availableAfterRequest: number;
+    };
+  };
+
+  message?: string;
+}
+
+/* =========================================================
+   LIST PARAMS
+========================================================= */
+
+export interface MerchantPayoutListParams {
+  page?: number;
+
+  limit?: number;
+
+  search?: string;
+
+  status?:
+    | MerchantPayoutStatus
+    | "";
+
+  payoutMethod?:
+    | MerchantPayoutMethod
+    | "";
+
+  from?: string;
+
+  to?: string;
+}
+
+/* =========================================================
+   HELPERS
+========================================================= */
+
+function setOptionalParam(
+  params:
+    URLSearchParams,
+
+  key:
+    string,
+
+  value:
+    | string
+    | number
+    | undefined
+    | null
+): void {
+  if (
+    value ===
+      undefined ||
+    value ===
+      null ||
+    value ===
+      ""
+  ) {
+    return;
+  }
+
+  params.set(
+    key,
+    String(
+      value
+    )
+  );
+}
+
+function ensureSuccess(
+  response: {
+    success: boolean;
+    message?: string;
+  },
+
+  fallbackMessage:
+    string
+): void {
+  if (
+    response.success ===
+    false
+  ) {
+    throw new Error(
+      response.message ||
+        fallbackMessage
+    );
+  }
+}
+
+/* =========================================================
    LIST PAYOUTS
+
+   FINAL BACKEND URL:
+   /api/merchants/payouts
+
+   IMPORTANT:
+   apiClient base URL already contains /api
+
+   Therefore here we use:
+   /merchants/payouts
 ========================================================= */
 
 export async function getMerchantPayouts(
-  params: {
-    page?: number;
-    limit?: number;
-    search?: string;
-    status?: MerchantPayoutStatus | "";
-    payoutMethod?: MerchantPayoutMethod | "";
-    from?: string;
-    to?: string;
-  } = {}
+  params:
+    MerchantPayoutListParams = {}
 ): Promise<MerchantPayoutListResponse> {
   const query =
     new URLSearchParams();
 
-  if (
-    params.page !==
-    undefined
-  ) {
-    query.set(
-      "page",
-      String(params.page)
-    );
-  }
+  setOptionalParam(
+    query,
+    "page",
+    params.page
+  );
 
-  if (
-    params.limit !==
-    undefined
-  ) {
-    query.set(
-      "limit",
-      String(params.limit)
-    );
-  }
+  setOptionalParam(
+    query,
+    "limit",
+    params.limit
+  );
 
-  if (params.search) {
-    query.set(
-      "search",
-      params.search
-    );
-  }
+  setOptionalParam(
+    query,
+    "search",
+    params.search?.trim()
+  );
 
-  if (params.status) {
-    query.set(
-      "status",
-      params.status
-    );
-  }
+  setOptionalParam(
+    query,
+    "status",
+    params.status
+  );
 
-  if (params.payoutMethod) {
-    query.set(
-      "payoutMethod",
-      params.payoutMethod
-    );
-  }
+  setOptionalParam(
+    query,
+    "payoutMethod",
+    params.payoutMethod
+  );
 
-  if (params.from) {
-    query.set(
-      "from",
-      params.from
-    );
-  }
+  setOptionalParam(
+    query,
+    "from",
+    params.from
+  );
 
-  if (params.to) {
-    query.set(
-      "to",
-      params.to
-    );
-  }
+  setOptionalParam(
+    query,
+    "to",
+    params.to
+  );
 
   const queryString =
     query.toString();
 
-  const url =
-    `/api/merchants/payouts${
+  /*
+   * DO NOT use:
+   *
+   * /api/merchants/payouts
+   *
+   * Because apiClient already points to:
+   *
+   * http://localhost:5000/api
+   *
+   * Otherwise it becomes:
+   *
+   * /api/api/merchants/payouts
+   */
+  const endpoint =
+    `/merchants/payouts${
       queryString
         ? `?${queryString}`
         : ""
     }`;
 
-  return apiClient<MerchantPayoutListResponse>(
-    url,
-    {
-      method: "GET",
-    }
+  const response =
+    await apiClient<MerchantPayoutListResponse>(
+      endpoint,
+      {
+        method:
+          "GET",
+      }
+    );
+
+  if (
+    !response ||
+    typeof response !==
+      "object"
+  ) {
+    throw new Error(
+      "Invalid merchant payout response."
+    );
+  }
+
+  ensureSuccess(
+    response,
+    "Unable to load merchant payouts."
   );
+
+  if (
+    !response.data
+  ) {
+    throw new Error(
+      response.message ||
+        "Merchant payout data was not returned."
+    );
+  }
+
+  if (
+    !Array.isArray(
+      response.data.payouts
+    )
+  ) {
+    throw new Error(
+      "Invalid merchant payout list."
+    );
+  }
+
+  return response;
 }
 
 /* =========================================================
    GET PAYOUT DETAIL
+
+   FINAL BACKEND URL:
+   /api/merchants/payouts/:payoutId
 ========================================================= */
 
 export async function getMerchantPayoutDetail(
-  payoutId: string
+  payoutId:
+    string
 ): Promise<MerchantPayoutDetailResponse> {
-  return apiClient<MerchantPayoutDetailResponse>(
-    `/api/merchants/payouts/${encodeURIComponent(
-      payoutId
-    )}`,
-    {
-      method: "GET",
-    }
+  const normalizedPayoutId =
+    payoutId.trim();
+
+  if (
+    !normalizedPayoutId
+  ) {
+    throw new Error(
+      "Payout ID is required."
+    );
+  }
+
+  const response =
+    await apiClient<MerchantPayoutDetailResponse>(
+      `/merchants/payouts/${encodeURIComponent(
+        normalizedPayoutId
+      )}`,
+      {
+        method:
+          "GET",
+      }
+    );
+
+  if (
+    !response ||
+    typeof response !==
+      "object"
+  ) {
+    throw new Error(
+      "Invalid merchant payout detail response."
+    );
+  }
+
+  ensureSuccess(
+    response,
+    "Unable to load payout."
   );
+
+  if (
+    !response.data?.payout
+  ) {
+    throw new Error(
+      response.message ||
+        "Payout data was not returned."
+    );
+  }
+
+  return response;
 }
 
 /* =========================================================
    CREATE PAYOUT
+
+   FINAL BACKEND URL:
+   POST /api/merchants/payouts
 ========================================================= */
 
 export async function createMerchantPayout(
-  payload: CreateMerchantPayoutPayload
-): Promise<{
-  success: boolean;
-  data: {
-    duplicate: boolean;
-    payout: MerchantPayout;
+  payload:
+    CreateMerchantPayoutPayload
+): Promise<CreateMerchantPayoutResponse> {
+  if (
+    !Number.isFinite(
+      payload.amount
+    ) ||
+    payload.amount <=
+      0
+  ) {
+    throw new Error(
+      "Payout amount must be greater than zero."
+    );
+  }
 
-    balance?: {
-      currency: string;
-      currentBalance: number;
-      reservedAmount: number;
-      availableAfterRequest: number;
+  if (
+    !payload.payoutMethod
+  ) {
+    throw new Error(
+      "Payout method is required."
+    );
+  }
+
+  const normalizedPayload:
+    CreateMerchantPayoutPayload = {
+      amount:
+        payload.amount,
+
+      payoutMethod:
+        payload.payoutMethod,
+
+      ...(payload.currency?.trim()
+        ? {
+            currency:
+              payload.currency
+                .trim()
+                .toUpperCase(),
+          }
+        : {}),
+
+      ...(payload.destination?.trim()
+        ? {
+            destination:
+              payload.destination.trim(),
+          }
+        : {}),
+
+      ...(payload.destinationReference?.trim()
+        ? {
+            destinationReference:
+              payload.destinationReference.trim(),
+          }
+        : {}),
+
+      ...(payload.merchantReference?.trim()
+        ? {
+            merchantReference:
+              payload.merchantReference.trim(),
+          }
+        : {}),
+
+      ...(payload.idempotencyKey?.trim()
+        ? {
+            idempotencyKey:
+              payload.idempotencyKey.trim(),
+          }
+        : {}),
     };
-  };
-  message?: string;
-}> {
-  return apiClient(
-    "/api/merchants/payouts",
-    {
-      method: "POST",
 
-      headers: {
-        "Content-Type":
-          "application/json",
+  const response =
+    await apiClient<CreateMerchantPayoutResponse>(
+      "/merchants/payouts",
+      {
+        method:
+          "POST",
 
-        ...(payload.idempotencyKey
-          ? {
-              "Idempotency-Key":
-                payload.idempotencyKey,
-            }
-          : {}),
-      },
+        headers: {
+          "Content-Type":
+            "application/json",
 
-      body: JSON.stringify(
-        payload
-      ),
-    }
+          ...(normalizedPayload
+            .idempotencyKey
+            ? {
+                "Idempotency-Key":
+                  normalizedPayload
+                    .idempotencyKey,
+              }
+            : {}),
+        },
+
+        body:
+          JSON.stringify(
+            normalizedPayload
+          ),
+      }
+    );
+
+  if (
+    !response ||
+    typeof response !==
+      "object"
+  ) {
+    throw new Error(
+      "Invalid create payout response."
+    );
+  }
+
+  ensureSuccess(
+    response,
+    "Unable to create payout request."
   );
+
+  if (
+    !response.data?.payout
+  ) {
+    throw new Error(
+      response.message ||
+        "Created payout data was not returned."
+    );
+  }
+
+  return response;
 }
