@@ -3,6 +3,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
   type ReactNode,
@@ -18,7 +19,6 @@ import {
   ArrowUpRight,
   Banknote,
   CheckCircle2,
-  Clock3,
   DatabaseZap,
   Landmark,
   RefreshCcw,
@@ -699,6 +699,9 @@ export default function AnalystSettlementPage() {
   ] =
     useState(0);
 
+  const hasLoadedRef =
+    useRef(false);
+
   useEffect(
     () => {
       const controller =
@@ -709,7 +712,7 @@ export default function AnalystSettlementPage() {
 
       async function load() {
         try {
-          if (data) {
+          if (hasLoadedRef.current) {
             setRefreshing(true);
           } else {
             setLoading(true);
@@ -728,6 +731,7 @@ export default function AnalystSettlementPage() {
             );
 
           if (active) {
+            hasLoadedRef.current = true;
             setData(response);
           }
         } catch (loadError) {

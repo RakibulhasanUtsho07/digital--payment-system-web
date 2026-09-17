@@ -3,6 +3,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
   type ReactNode,
@@ -22,7 +23,6 @@ import {
   CircleDotDashed,
   DatabaseZap,
   Filter,
-  Gauge,
   RefreshCcw,
   Sparkles,
   TrendingDown,
@@ -594,6 +594,9 @@ export default function AnalystConversionPage() {
       0
     );
 
+  const hasLoadedRef =
+    useRef(false);
+
   /* =======================================================
      LOAD
   ====================================================== */
@@ -609,7 +612,7 @@ export default function AnalystConversionPage() {
       async function load() {
         try {
           if (
-            data
+            hasLoadedRef.current
           ) {
             setRefreshing(
               true
@@ -637,6 +640,9 @@ export default function AnalystConversionPage() {
           if (
             active
           ) {
+            hasLoadedRef.current =
+              true;
+
             setData(
               result
             );

@@ -3,6 +3,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
   type ReactNode,
@@ -764,6 +765,9 @@ export default function AnalystRiskPage() {
       0
     );
 
+  const hasLoadedRef =
+    useRef(false);
+
   /* =======================================================
      LOAD
   ====================================================== */
@@ -779,7 +783,7 @@ export default function AnalystRiskPage() {
       async function load() {
         try {
           if (
-            data
+            hasLoadedRef.current
           ) {
             setRefreshing(
               true
@@ -807,6 +811,9 @@ export default function AnalystRiskPage() {
           if (
             active
           ) {
+            hasLoadedRef.current =
+              true;
+
             setData(
               response
             );

@@ -3,6 +3,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
   type ReactNode,
@@ -22,7 +23,6 @@ import {
   GitCompareArrows,
   RefreshCcw,
   ShieldAlert,
-  TimerReset,
   TriangleAlert,
   XCircle,
   type LucideIcon,
@@ -674,6 +674,9 @@ export default function AnalystTransactionsPage() {
       0
     );
 
+  const hasLoadedRef =
+    useRef(false);
+
   useEffect(
     () => {
       const controller =
@@ -685,7 +688,7 @@ export default function AnalystTransactionsPage() {
       async function load() {
         try {
           if (
-            data
+            hasLoadedRef.current
           ) {
             setRefreshing(
               true
@@ -715,6 +718,9 @@ export default function AnalystTransactionsPage() {
           if (
             active
           ) {
+            hasLoadedRef.current =
+              true;
+
             setData(
               result
             );

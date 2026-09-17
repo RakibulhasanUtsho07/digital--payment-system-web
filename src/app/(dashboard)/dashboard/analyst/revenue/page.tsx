@@ -3,6 +3,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
   type ReactNode,
@@ -765,6 +766,9 @@ export default function AnalystRevenuePage() {
       0
     );
 
+  const hasLoadedRef =
+    useRef(false);
+
   /* =======================================================
      LOAD
   ====================================================== */
@@ -780,7 +784,7 @@ export default function AnalystRevenuePage() {
       async function load() {
         try {
           if (
-            data
+            hasLoadedRef.current
           ) {
             setRefreshing(
               true
@@ -809,6 +813,9 @@ export default function AnalystRevenuePage() {
           if (
             active
           ) {
+            hasLoadedRef.current =
+              true;
+
             setData(
               result
             );

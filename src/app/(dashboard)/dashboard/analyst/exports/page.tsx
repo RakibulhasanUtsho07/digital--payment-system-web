@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Download, FileDown, RefreshCcw } from "lucide-react";
 import { downloadAnalystReportCsv, getAnalystReports, type AnalystReportSummary } from "@/lib/api/analystApi";
 
 export default function AnalystExportsPage() {
   const [reports, setReports] = useState<AnalystReportSummary[]>([]);
   const [error, setError] = useState("");
-  async function load() { try { setError(""); setReports(await getAnalystReports()); } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to load export history."); } }
-  useEffect(() => { void load(); }, []);
+  const load = useCallback(async () => { try { setError(""); setReports(await getAnalystReports()); } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to load export history."); } }, []);
+  useEffect(() => {
+    const timerId = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(timerId);
+  }, [load]);
   return <main className="space-y-6">
     <section className="rounded-[28px] border border-border bg-card p-6 shadow-sm"><div className="flex items-center justify-between gap-4"><div className="flex items-center gap-3"><FileDown className="h-6 w-6 text-primary" /><div><h1 className="text-2xl font-black">Export History</h1><p className="mt-1 text-sm text-muted-foreground">Download analyst-owned report CSV files until expiry.</p></div></div><button type="button" onClick={() => void load()} className="rounded-xl border border-border p-3"><RefreshCcw className="h-4 w-4" /></button></div></section>
     {error && <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-4 text-xs text-red-600">{error}</div>}

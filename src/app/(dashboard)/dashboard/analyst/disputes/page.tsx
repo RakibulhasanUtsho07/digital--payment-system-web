@@ -3,6 +3,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
   type ReactNode,
@@ -667,6 +668,9 @@ export default function AnalystDisputesPage() {
       0
     );
 
+  const hasLoadedRef =
+    useRef(false);
+
   useEffect(
     () => {
       const controller =
@@ -678,7 +682,7 @@ export default function AnalystDisputesPage() {
       async function load() {
         try {
           if (
-            data
+            hasLoadedRef.current
           ) {
             setRefreshing(
               true
@@ -705,6 +709,9 @@ export default function AnalystDisputesPage() {
           if (
             active
           ) {
+            hasLoadedRef.current =
+              true;
+
             setData(
               response
             );

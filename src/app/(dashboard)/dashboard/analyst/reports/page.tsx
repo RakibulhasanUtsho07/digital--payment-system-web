@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Download, FileBarChart, RefreshCcw } from "lucide-react";
 import {
   createAnalystReport,
@@ -21,11 +21,14 @@ export default function AnalystReportsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  async function load() {
+  const load = useCallback(async () => {
     try { setError(""); setReports(await getAnalystReports()); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to load reports."); }
-  }
-  useEffect(() => { void load(); }, []);
+  }, []);
+  useEffect(() => {
+    const timerId = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(timerId);
+  }, [load]);
 
   async function generate() {
     try {

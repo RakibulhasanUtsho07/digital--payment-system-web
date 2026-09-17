@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Bookmark, Star, Trash2 } from "lucide-react";
 import { createAnalystSavedView, deleteAnalystSavedView, getAnalystSavedViews, updateAnalystSavedView, type AnalystSavedView } from "@/lib/api/analystApi";
 
@@ -26,8 +26,11 @@ export default function AnalystSavedViewsPage() {
   const [filtersText, setFiltersText] = useState('{\n  "range": "30d",\n  "currency": "BDT"\n}');
   const [error, setError] = useState("");
 
-  async function load() { try { setViews(await getAnalystSavedViews()); } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to load saved views."); } }
-  useEffect(() => { void load(); }, []);
+  const load = useCallback(async () => { try { setViews(await getAnalystSavedViews()); } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to load saved views."); } }, []);
+  useEffect(() => {
+    const timerId = window.setTimeout(() => { void load(); }, 0);
+    return () => window.clearTimeout(timerId);
+  }, [load]);
 
   async function save() {
     try {

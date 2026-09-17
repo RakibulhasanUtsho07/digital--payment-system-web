@@ -3,6 +3,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
   type ReactNode,
@@ -18,7 +19,6 @@ import {
   BadgeCheck,
   BrainCircuit,
   CheckCircle2,
-  CircleDollarSign,
   DatabaseZap,
   Filter,
   Gauge,
@@ -810,6 +810,9 @@ export default function AnalystIntelligencePage() {
       0
     );
 
+  const hasLoadedRef =
+    useRef(false);
+
   /* =======================================================
      LOAD INTELLIGENCE
   ====================================================== */
@@ -822,7 +825,7 @@ export default function AnalystIntelligencePage() {
       async function load() {
         try {
           if (
-            data
+            hasLoadedRef.current
           ) {
             setRefreshing(
               true
@@ -855,6 +858,9 @@ export default function AnalystIntelligencePage() {
           ) {
             return;
           }
+
+          hasLoadedRef.current =
+            true;
 
           setData(
             response
