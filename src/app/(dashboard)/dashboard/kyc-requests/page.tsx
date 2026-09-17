@@ -1,822 +1,1902 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
-import { CheckCircle2 } from "lucide-react";
+import {
+  AnimatePresence,
+  motion,
+} from "framer-motion";
+
+import {
+  AlertCircle,
+  CheckCircle2,
+  Download,
+  X,
+} from "lucide-react";
+
+import { apiClient } from "@/lib/api/client";
 
 import KYCHeader from "./components/KYCHeader";
-import KYCStats, { KYCStatsData } from "./components/KYCStats";
-import KYCFilters, {
-  DEFAULT_KYC_FILTERS,
-  KYCFiltersState,
-} from "./components/KYCFilters";
-import KYCQueue from "./components/KYCQueue";
-import KYCReviewDrawer from "./components/KYCReviewDrawer";
-import KYCDecisionModal from "./components/KYCRequestInfoModal";
+import KYCStats from "./components/KYCStats";
 import KYCAnalytics from "./components/KYCAnalytics";
 
-import type { KYCNote, KYCRequest } from "./components/KYCManagementTypes";
+import KYCFilters, {
+  DEFAULT_KYC_FILTERS,
+  type KYCFiltersState,
+} from "./components/KYCFilters";
 
-const DEMO_REQUESTS: KYCRequest[] = [
-  {
-    id: "kyc_req_001",
-    caseId: "KYC-00042",
-    applicantId: "usr_7f82a1b9",
-    applicantName: "Rakibul Hasan",
-    email: "rakibul.h@example.com",
-    phone: "+8801711223344",
-    documentType: "NID",
-    documentNumber: "*** *** 7842",
-    status: "Under Review",
-    verificationResult: "Needs Review",
-    riskLevel: "High",
-    riskScore: 72,
-    submittedAt: "2026-08-23T14:20:00Z",
-    createdAt: "2026-08-23T13:40:00Z",
-    lastReviewedAt: "2026-08-23T14:38:00Z",
-    reviewer: "Rakibul Admin",
-    slaMinutes: 12,
-    reason:
-      "Government ID passed initial checks, but the identity comparison requires manual review.",
-    provider: "manual",
-    city: "Dhaka",
-    country: "Bangladesh",
-    walletId: "wal_8001",
-    transactionCount: 145,
-    accountAgeDays: 953,
-    twoFactorEnabled: true,
-    failedLoginCount: 0,
-    verificationChecks: [
-      {
-        label: "Valid document",
-        status: "Pass",
-      },
-      {
-        label: "Authenticity",
-        status: "Pass",
-      },
-      {
-        label: "Expiration",
-        status: "Pass",
-      },
-      {
-        label: "Image quality",
-        status: "Review",
-        reason: "Document image quality is below the ideal threshold.",
-      },
-      {
-        label: "Data extraction",
-        status: "Pass",
-      },
-    ],
-    notes: [],
-  },
+import KYCQueue from "./components/KYCQueue";
+import KYCReviewDrawer from "./components/KYCReviewDrawer";
 
-  {
-    id: "kyc_req_002",
-    caseId: "KYC-00043",
-    applicantId: "usr_4k99p3n2",
-    applicantName: "Farhana Akter",
-    email: "farhana.a@example.com",
-    phone: "+8801644556677",
-    documentType: "NID",
-    documentNumber: "*** *** 4421",
-    status: "Pending",
-    verificationResult: "Needs Review",
-    riskLevel: "Medium",
-    riskScore: 45,
-    submittedAt: "2026-08-23T12:25:00Z",
-    createdAt: "2026-08-23T12:00:00Z",
-    reviewer: "Unassigned",
-    slaMinutes: 27,
-    reason: "Identity information is complete and waiting for manual review.",
-    provider: "manual",
-    city: "Rajshahi",
-    country: "Bangladesh",
-    walletId: "wal_8004",
-    transactionCount: 34,
-    accountAgeDays: 461,
-    twoFactorEnabled: false,
-    failedLoginCount: 1,
-    verificationChecks: [
-      {
-        label: "Valid document",
-        status: "Pass",
-      },
-      {
-        label: "Authenticity",
-        status: "Review",
-      },
-      {
-        label: "Expiration",
-        status: "Pass",
-      },
-    ],
-    notes: [],
-  },
+import type {
+  DocumentType,
+  KYCAIReview,
+  KYCOverviewData,
+  KYCPrivateDocuments,
+  KYCRequest,
+  KYCStatus,
+  RiskLevel,
+} from "./components/KYCManagementTypes";
 
-  {
-    id: "kyc_req_003",
-    caseId: "KYC-00044",
-    applicantId: "usr_2b55y8m4",
-    applicantName: "Tanvir Ahmed",
-    email: "tanvir.a@example.com",
-    phone: "+8801933445566",
-    documentType: "NID",
-    documentNumber: "*** *** 9920",
-    status: "Rejected",
-    verificationResult: "Failed",
-    riskLevel: "Critical",
-    riskScore: 85,
-    submittedAt: "2026-08-22T09:15:00Z",
-    createdAt: "2026-08-22T08:40:00Z",
-    lastReviewedAt: "2026-08-22T11:20:00Z",
-    reviewer: "Compliance Officer",
-    slaMinutes: 0,
-    reason: "Identity information did not match the submitted document.",
-    provider: "manual",
-    city: "Sylhet",
-    country: "Bangladesh",
-    walletId: "wal_8003",
-    transactionCount: 12,
-    accountAgeDays: 22,
-    twoFactorEnabled: false,
-    failedLoginCount: 4,
-    rejectionReason: "Identity mismatch",
-    verificationChecks: [
-      {
-        label: "Valid document",
-        status: "Pass",
-      },
-      {
-        label: "Authenticity",
-        status: "Fail",
-        reason: "Document authenticity could not be confidently established.",
-      },
-      {
-        label: "Face match",
-        status: "Fail",
-        reason: "Selfie similarity below the configured threshold.",
-      },
-    ],
-    notes: [
-      {
-        id: "note_1",
-        author: "Compliance Officer",
-        text: "Identity information requires additional evidence.",
-        createdAt: "2026-08-22T11:18:00Z",
-      },
-    ],
-  },
+import type {
+  DecisionAction,
+} from "./components/KYCRequestInfoModal";
 
-  {
-    id: "kyc_req_004",
-    caseId: "KYC-00045",
-    applicantId: "usr_9c34x2z1",
-    applicantName: "Nusrat Jahan",
-    email: "nusrat.j@example.com",
-    phone: "+8801822334455",
-    documentType: "Passport",
-    documentNumber: "*** *** 3109",
-    status: "Verified",
-    verificationResult: "Passed",
-    riskLevel: "Low",
-    riskScore: 8,
-    submittedAt: "2026-08-21T10:10:00Z",
-    createdAt: "2026-08-21T09:30:00Z",
-    lastReviewedAt: "2026-08-21T12:10:00Z",
-    reviewer: "Rakibul Admin",
-    slaMinutes: 0,
-    reason: "All identity and verification checks passed.",
-    provider: "manual",
-    city: "Chattogram",
-    country: "Bangladesh",
-    walletId: "wal_8002",
-    transactionCount: 320,
-    accountAgeDays: 1017,
-    twoFactorEnabled: true,
-    failedLoginCount: 0,
-    verificationChecks: [
-      {
-        label: "Valid document",
-        status: "Pass",
-      },
-      {
-        label: "Authenticity",
-        status: "Pass",
-      },
-      {
-        label: "Expiration",
-        status: "Pass",
-      },
-      {
-        label: "Image quality",
-        status: "Pass",
-      },
-      {
-        label: "Face match",
-        status: "Pass",
-      },
-    ],
-    notes: [],
-  },
-];
+/* =========================================================
+   BACKEND TYPES
+========================================================= */
 
-export default function KYCRequestsPage() {
-  const [mounted, setMounted] = useState(false);
-  const [requests, setRequests] = useState<KYCRequest[]>(DEMO_REQUESTS);
-  const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState<KYCFiltersState>(DEFAULT_KYC_FILTERS);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [selectedRequest, setSelectedRequest] = useState<KYCRequest | null>(
-    null,
-  );
+type ApiKYCStatus =
+  | "not_started"
+  | "pending"
+  | "under_review"
+  | "verified"
+  | "rejected";
 
-  const [decisionAction, setDecisionAction] = useState<
-    "approve" | "reject" | "information" | "escalate" | null
-  >(null);
+type ApiDocumentType =
+  | "nid"
+  | "passport"
+  | "driving_license";
 
-  const [refreshing, setRefreshing] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(25);
+interface AdminKYCUser {
+  _id?: string;
+  name?: string;
+  email?: string;
+  phone?: string;
+  role?: string;
+  kycStatus?: string;
+}
 
-  const [sortField, setSortField] = useState<
-    "submittedAt" | "riskScore" | "applicantName"
-  >("submittedAt");
+interface AdminKYCRecord {
+  _id: string;
 
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  userId:
+    | string
+    | AdminKYCUser;
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  documentType?: ApiDocumentType;
 
-  useEffect(() => {
-    if (!toast) return;
+  documentNumber?: string;
 
-    const timer = window.setTimeout(() => {
-      setToast(null);
-    }, 2500);
+  provider?:
+    | "manual"
+    | "stripe"
+    | "other";
 
-    return () => window.clearTimeout(timer);
-  }, [toast]);
+  status: ApiKYCStatus;
 
-  const filteredRequests = useMemo(() => {
-    const query = search.trim().toLowerCase();
+  rejectionReason?: string;
 
-    const filtered = requests.filter((request) => {
-      const matchesSearch =
-        !query ||
-        request.applicantName.toLowerCase().includes(query) ||
-        request.email.toLowerCase().includes(query) ||
-        request.phone.toLowerCase().includes(query) ||
-        request.caseId.toLowerCase().includes(query) ||
-        request.documentNumber.toLowerCase().includes(query);
+  submittedAt?: string;
 
-      const matchesStatus =
-        filters.status === "All" || request.status === filters.status;
+  verifiedAt?: string;
 
-      const matchesDocument =
-        filters.documentType === "All" ||
-        request.documentType === filters.documentType;
+  createdAt?: string;
 
-      const matchesRisk =
-        filters.risk === "All" || request.riskLevel === filters.risk;
+  updatedAt?: string;
 
-      const matchesVerification =
-        filters.verification === "All" ||
-        request.verificationResult === filters.verification;
+  hasFrontImage?: boolean;
 
-      const matchesReviewer =
-        filters.reviewer === "All" ||
-        (filters.reviewer === "Me"
-          ? request.reviewer === "Rakibul Admin"
-          : filters.reviewer === "Unassigned"
-            ? request.reviewer === "Unassigned"
-            : true);
+  hasBackImage?: boolean;
 
-      const matchesSla =
-        filters.sla === "All" ||
-        (filters.sla === "Normal"
-          ? request.slaMinutes > 15
-          : filters.sla === "Due Soon"
-            ? request.slaMinutes > 0 && request.slaMinutes <= 15
-            : request.slaMinutes <= 0);
+  hasSelfieImage?: boolean;
 
-      return (
-        matchesSearch &&
-        matchesStatus &&
-        matchesDocument &&
-        matchesRisk &&
-        matchesVerification &&
-        matchesReviewer &&
-        matchesSla
-      );
-    });
+  riskLevel?: string;
 
-    filtered.sort((a, b) => {
-      const direction = sortDirection === "asc" ? 1 : -1;
+  riskScore?: number;
 
-      if (sortField === "applicantName") {
-        return a.applicantName.localeCompare(b.applicantName) * direction;
-      }
+  slaMinutes?: number;
+}
 
-      if (sortField === "riskScore") {
-        return (a.riskScore - b.riskScore) * direction;
-      }
+interface PendingKYCResponse {
+  success: boolean;
+  count?: number;
+  kycs?: AdminKYCRecord[];
+  message?: string;
+}
 
-      return (
-        (Date.parse(a.submittedAt) - Date.parse(b.submittedAt)) * direction
-      );
-    });
+interface ReviewKYCResponse {
+  success: boolean;
+  message?: string;
+}
 
-    return filtered;
-  }, [requests, search, filters, sortField, sortDirection]);
+interface DocumentsResponse {
+  success: boolean;
+  message?: string;
+  documents?: KYCPrivateDocuments;
+}
 
-  const totalPages = Math.max(1, Math.ceil(filteredRequests.length / pageSize));
-  const safePage = Math.min(page, totalPages);
-  const paginatedRequests = filteredRequests.slice(
-    (safePage - 1) * pageSize,
-    safePage * pageSize,
-  );
+interface OverviewResponse {
+  success: boolean;
+  overview?: KYCOverviewData;
+  message?: string;
+}
 
-  const stats: KYCStatsData = useMemo(
-    () => ({
-      pending: requests.filter((req) => req.status === "Pending").length,
-      underReview: requests.filter((req) => req.status === "Under Review")
-        .length,
-      approvedToday: requests.filter((req) => req.status === "Verified").length,
-      rejectedToday: requests.filter((req) => req.status === "Rejected").length,
-      highRisk: requests.filter(
-        (req) => req.riskLevel === "High" || req.riskLevel === "Critical",
-      ).length,
-      averageReviewMinutes: 6.7,
-    }),
-    [requests],
-  );
+interface AIReviewResponse {
+  success: boolean;
+  review?: KYCAIReview;
+  message?: string;
+}
 
-  const healthCounts = useMemo(
-    () => ({
-      verified: requests.filter((item) => item.status === "Verified").length,
-      pending: requests.filter((item) => item.status === "Pending").length,
-      underReview: requests.filter((item) => item.status === "Under Review")
-        .length,
-      rejected: requests.filter((item) => item.status === "Rejected").length,
-    }),
-    [requests],
-  );
+/* =========================================================
+   MAPPERS
+========================================================= */
 
-  const toggleSelection = (id: string) => {
-    setSelectedIds((current) => {
-      const next = new Set(current);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
+function mapDocumentType(
+  value?: ApiDocumentType
+): DocumentType {
+  switch (value) {
+    case "passport":
+      return "Passport";
 
-  const toggleAll = (checked: boolean) => {
-    if (!checked) {
-      setSelectedIds(new Set());
-      return;
-    }
-    setSelectedIds(new Set(paginatedRequests.map((req) => req.id)));
-  };
+    case "driving_license":
+      return "Driving License";
 
-  const updateStatus = (
-    id: string,
-    status: KYCRequest["status"],
-    reason?: string,
-  ) => {
-    setRequests((current) =>
-      current.map((req) =>
-        req.id === id
-          ? {
-              ...req,
-              status,
-              verificationResult:
-                status === "Verified"
-                  ? "Passed"
-                  : status === "Rejected"
-                    ? "Failed"
-                    : req.verificationResult,
-              rejectionReason: reason,
-            }
-          : req,
-      ),
-    );
+    case "nid":
+    default:
+      return "NID";
+  }
+}
 
-    setToast(`KYC status updated locally to "${status}".`);
-  };
+function mapKYCStatus(
+  value: ApiKYCStatus
+): KYCStatus {
+  switch (value) {
+    case "verified":
+      return "Verified";
 
-  const bulkReview = (status: "Under Review" | "Needs Information") => {
-    if (selectedIds.size === 0) return;
+    case "rejected":
+      return "Rejected";
 
-    setRequests((current) =>
-      current.map((req) =>
-        selectedIds.has(req.id)
-          ? {
-              ...req,
-              status,
-            }
-          : req,
-      ),
-    );
+    case "under_review":
+      return "Under Review";
 
-    setSelectedIds(new Set());
-    setToast(`${selectedIds.size} KYC cases updated locally.`);
-  };
+    case "pending":
+      return "Pending";
 
-  const refreshQueue = async () => {
-    setRefreshing(true);
-    await new Promise((resolve) => window.setTimeout(resolve, 650));
-    setRefreshing(false);
-    setToast("KYC queue refreshed.");
-  };
+    case "not_started":
+    default:
+      return "Not Started";
+  }
+}
 
-  const sortBy = (field: "submittedAt" | "riskScore" | "applicantName") => {
-    setSortDirection((current) =>
-      sortField === field && current === "asc" ? "desc" : "asc",
-    );
-    setSortField(field);
-    setPage(1);
-  };
+function mapRiskLevel(
+  value?: string
+): RiskLevel {
+  const normalized = String(
+    value || ""
+  )
+    .trim()
+    .toLowerCase();
 
-  const handleDecision = (
-    action: "approve" | "reject" | "information" | "escalate",
-  ) => {
-    if (selectedRequest) {
-      setDecisionAction(action);
-    }
-  };
-
-  const confirmDecision = (reason: string) => {
-    if (!selectedRequest || !decisionAction) return;
-
-    const statusMap = {
-      approve: "Verified",
-      reject: "Rejected",
-      information: "Needs Information",
-      escalate: "Escalated",
-    } as const;
-
-    updateStatus(
-      selectedRequest.id,
-      statusMap[decisionAction],
-      decisionAction === "reject" ? reason : undefined,
-    );
-
-    setSelectedRequest((current) =>
-      current
-        ? {
-            ...current,
-            status: statusMap[decisionAction],
-            rejectionReason: decisionAction === "reject" ? reason : undefined,
-          }
-        : null,
-    );
-
-    setDecisionAction(null);
-  };
-
-  // Added: KYCReviewDrawer composes a notes panel and requires this handler.
-  const addNote = (requestId: string, note: KYCNote) => {
-    setRequests((current) =>
-      current.map((req) =>
-        req.id === requestId ? { ...req, notes: [...req.notes, note] } : req,
-      ),
-    );
-
-    setSelectedRequest((current) =>
-      current && current.id === requestId
-        ? { ...current, notes: [...current.notes, note] }
-        : current,
-    );
-  };
-
-  if (!mounted) {
-    return <main className="min-h-screen bg-[#F6F8FB]" />;
+  if (normalized === "critical") {
+    return "Critical";
   }
 
+  if (normalized === "high") {
+    return "High";
+  }
+
+  if (normalized === "medium") {
+    return "Medium";
+  }
+
+  if (normalized === "low") {
+    return "Low";
+  }
+
+  return "Unknown";
+}
+
+function getUser(
+  value: AdminKYCRecord["userId"]
+): AdminKYCUser {
+  if (
+    value &&
+    typeof value === "object"
+  ) {
+    return value;
+  }
+
+  return {
+    _id:
+      typeof value === "string"
+        ? value
+        : undefined,
+  };
+}
+
+function normalizeRiskScore(
+  value?: number
+): number {
+  if (
+    typeof value !== "number" ||
+    !Number.isFinite(value)
+  ) {
+    return 0;
+  }
+
+  return Math.min(
+    100,
+    Math.max(
+      0,
+      Math.round(value)
+    )
+  );
+}
+
+function getSlaMinutes(
+  kyc: AdminKYCRecord
+): number {
+  if (
+    typeof kyc.slaMinutes === "number" &&
+    Number.isFinite(
+      kyc.slaMinutes
+    )
+  ) {
+    return Math.round(
+      kyc.slaMinutes
+    );
+  }
+
+  const source =
+    kyc.submittedAt ||
+    kyc.createdAt;
+
+  if (!source) {
+    return 24 * 60;
+  }
+
+  const submitted =
+    Date.parse(source);
+
+  if (
+    !Number.isFinite(
+      submitted
+    )
+  ) {
+    return 24 * 60;
+  }
+
+  const elapsed =
+    Math.floor(
+      (
+        Date.now() -
+        submitted
+      ) /
+        (60 * 1000)
+    );
+
   return (
-    <main className="min-h-screen bg-[#F6F8FB] pb-20">
-      <div className="mx-auto w-full max-w-[1680px] space-y-5 px-4 py-4 sm:px-6 lg:px-8">
-        <KYCHeader
-          refreshing={refreshing}
-          onRefresh={refreshQueue}
-          onExport={() =>
-            setToast("Demo export is ready for backend integration.")
-          }
-        />
+    24 * 60 -
+    elapsed
+  );
+}
 
-        <KYCStats stats={stats} />
+function toKYCRequest(
+  kyc: AdminKYCRecord
+): KYCRequest {
+  const user =
+    getUser(kyc.userId);
 
-        <KYCAnalytics
-          counts={healthCounts}
-          onFilterStatus={(status) =>
-            setFilters((current) => ({
-              ...current,
-              status,
-            }))
-          }
-        />
+  const id =
+    String(kyc._id);
 
-        <PriorityReviews
-          requests={requests
-            .filter(
-              (req) =>
-                req.riskLevel === "High" ||
-                req.riskLevel === "Critical" ||
-                req.verificationResult === "Failed",
-            )
-            .slice(0, 3)}
-          onOpen={setSelectedRequest}
-        />
+  const status =
+    mapKYCStatus(
+      kyc.status
+    );
 
-        <KYCFilters
-          search={search}
-          setSearch={(value) => {
-            setSearch(value);
-            setPage(1);
-          }}
-          filters={filters}
-          setFilters={(value) => {
-            setFilters(value);
-            setPage(1);
-          }}
-          total={filteredRequests.length}
-        />
+  const submittedAt =
+    kyc.submittedAt ||
+    kyc.createdAt ||
+    new Date().toISOString();
 
-        <KYCQueue
-          requests={paginatedRequests}
-          selectedIds={selectedIds}
-          page={safePage}
-          pageSize={pageSize}
-          total={filteredRequests.length}
-          totalPages={totalPages}
-          onToggle={toggleSelection}
-          onToggleAll={toggleAll}
-          onOpen={setSelectedRequest}
-          sortField={sortField}
-          sortDirection={sortDirection}
-          onSort={sortBy}
-          onPageChange={setPage}
-          onPageSizeChange={(size) => {
-            setPageSize(size);
-            setPage(1);
-          }}
-        />
-      </div>
+  const riskLevel =
+    mapRiskLevel(
+      kyc.riskLevel
+    );
 
-      {selectedIds.size > 0 && (
-        <BulkActionBar
-          count={selectedIds.size}
-          onClear={() => setSelectedIds(new Set())}
-          onReview={() => bulkReview("Under Review")}
-          onInfo={() => bulkReview("Needs Information")}
-          onExport={() => setToast("Selected KYC cases prepared for export.")}
-        />
-      )}
+  const riskScore =
+    normalizeRiskScore(
+      kyc.riskScore
+    );
 
-      <KYCReviewDrawer
-        open={selectedRequest !== null}
-        applicant={
-          selectedRequest
-            ? {
-                id: selectedRequest.id,
-                applicantName: selectedRequest.applicantName,
-                email: selectedRequest.email,
-                phone: selectedRequest.phone,
-                dob: "",
-                nidNumber: selectedRequest.documentNumber,
-                address: `${selectedRequest.city}, ${selectedRequest.country}`,
-                submissionDate: selectedRequest.submittedAt,
-                status:
-                  selectedRequest.status === "Verified"
-                    ? "approved"
-                    : selectedRequest.status === "Rejected"
-                      ? "rejected"
-                      : selectedRequest.status === "Needs Information"
-                        ? "info_requested"
-                        : selectedRequest.status === "Escalated"
-                          ? "escalated"
-                          : "pending",
-                riskScore:
-                  selectedRequest.riskLevel === "Critical" ||
-                  selectedRequest.riskLevel === "High"
-                    ? "High"
-                    : selectedRequest.riskLevel === "Medium"
-                      ? "Medium"
-                      : "Low",
-                matchScore: selectedRequest.riskScore,
-                documents: {},
-                checks: {
-                  idDocumentValid: true,
-                  faceMatchScore: selectedRequest.riskScore,
-                  livenessPassed: true,
-                  databaseMatch: true,
-                  amlCheckPassed: true,
-                },
-              }
-            : null
-        }
-        onClose={() => setSelectedRequest(null)}
-        onDecisionSubmit={(action, reason, applicantId) => {
-          handleDecision(action);
+  const verificationChecks:
+    KYCRequest["verificationChecks"] =
+      [
+        {
+          label:
+            "Document front uploaded",
 
-          console.log(
-            "Decision:",
-            action,
-            "Reason:",
-            reason,
-            "Applicant:",
-            applicantId,
-          );
-        }}
-      />
+          status:
+            kyc.hasFrontImage
+              ? "Pass"
+              : "Review",
 
-      <KYCDecisionModal
-        open={decisionAction !== null}
-        action={decisionAction}
-        applicantName={selectedRequest?.applicantName ?? "Applicant"}
-        onClose={() => setDecisionAction(null)}
-        onConfirm={confirmDecision}
-      />
+          reason:
+            kyc.hasFrontImage
+              ? undefined
+              : "Front image is not available in the queue record.",
+        },
 
-      {toast && (
-        <div className="fixed right-4 top-4 z-[150] w-[calc(100%-2rem)] max-w-sm rounded-2xl border border-slate-200 bg-white p-4 shadow-2xl">
-          <div className="flex items-start gap-3">
-            <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-500" />
-            <div>
-              <p className="text-xs font-bold text-slate-900">Updated</p>
-              <p className="mt-1 text-xs leading-5 text-slate-500">{toast}</p>
-            </div>
+        {
+          label:
+            "Document back uploaded",
+
+          status:
+            kyc.hasBackImage
+              ? "Pass"
+              : "Review",
+
+          reason:
+            kyc.hasBackImage
+              ? undefined
+              : "Back image may be optional depending on the document type.",
+        },
+
+        {
+          label:
+            "Selfie uploaded",
+
+          status:
+            kyc.hasSelfieImage
+              ? "Pass"
+              : "Review",
+
+          reason:
+            kyc.hasSelfieImage
+              ? undefined
+              : "A selfie verification signal is not available.",
+        },
+      ];
+
+  return {
+    id,
+
+    caseId:
+      `KYC-${id
+        .slice(-8)
+        .toUpperCase()}`,
+
+    applicantId:
+      user._id || "",
+
+    applicantName:
+      user.name ||
+      "Unknown User",
+
+    email:
+      user.email || "",
+
+    phone:
+      user.phone || "",
+
+    documentType:
+      mapDocumentType(
+        kyc.documentType
+      ),
+
+    documentNumber:
+      kyc.documentNumber ||
+      "Masked / unavailable",
+
+    status,
+
+    verificationResult:
+      status === "Verified"
+        ? "Passed"
+        : status === "Rejected"
+          ? "Failed"
+          : "Needs Review",
+
+    riskLevel,
+
+    riskScore,
+
+    submittedAt,
+
+    createdAt:
+      kyc.createdAt ||
+      submittedAt,
+
+    lastReviewedAt:
+      kyc.updatedAt,
+
+    reviewer:
+      "Unassigned",
+
+    slaMinutes:
+      getSlaMinutes(
+        kyc
+      ),
+
+    reason:
+      kyc.rejectionReason ||
+      "The application is waiting for a final administrative KYC review.",
+
+    provider:
+      kyc.provider ===
+      "other"
+        ? "other"
+        : "manual",
+
+    city: "",
+    country: "",
+    walletId: "",
+
+    transactionCount: 0,
+    accountAgeDays: 0,
+    twoFactorEnabled: false,
+    failedLoginCount: 0,
+
+    rejectionReason:
+      kyc.rejectionReason,
+
+    verificationChecks,
+
+    notes: [],
+  };
+}
+
+/* =========================================================
+   LOADING SKELETON
+========================================================= */
+
+function KYCLoadingSkeleton() {
+  return (
+    <main className="min-h-screen bg-background pb-12 text-foreground">
+      <div className="mx-auto max-w-[1600px] space-y-5 px-4 py-5 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between rounded-[20px] border border-border bg-card p-5">
+          <div className="space-y-2">
+            <div className="h-3 w-40 animate-pulse rounded-full bg-muted" />
+
+            <div className="h-5 w-64 animate-pulse rounded-full bg-muted" />
+          </div>
+
+          <div className="flex items-center gap-2 text-indigo-500">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-500/20 border-t-indigo-500" />
+
+            <span className="text-[10px] font-black uppercase tracking-wider">
+              Syncing queue
+            </span>
           </div>
         </div>
-      )}
+
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+          {Array.from({
+            length: 6,
+          }).map((_, index) => (
+            <div
+              key={index}
+              className="h-24 animate-pulse rounded-[18px] border border-border bg-card"
+              style={{
+                animationDelay:
+                  `${index * 70}ms`,
+              }}
+            />
+          ))}
+        </div>
+
+        <div className="space-y-2 rounded-[20px] border border-border bg-card p-4">
+          {Array.from({
+            length: 8,
+          }).map((_, index) => (
+            <div
+              key={index}
+              className="h-14 w-full animate-pulse rounded-xl bg-gradient-to-r from-muted via-muted/50 to-muted"
+              style={{
+                animationDelay:
+                  `${index * 60}ms`,
+              }}
+            />
+          ))}
+        </div>
+      </div>
     </main>
   );
 }
 
 /* =========================================================
-   PRIORITY REVIEWS
+   PAGE
 ========================================================= */
 
-function PriorityReviews({
-  requests,
-  onOpen,
-}: {
-  requests: KYCRequest[];
-  onOpen: (request: KYCRequest) => void;
-}) {
-  return (
-    <section className="rounded-[26px] border border-amber-100 bg-gradient-to-br from-white to-amber-50/50 p-5 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-amber-600">
-            Priority Reviews
-          </p>
-          <h2 className="mt-1 text-lg font-black text-[#0F2745]">
-            Cases needing attention
-          </h2>
-        </div>
-        <span className="rounded-full bg-amber-100 px-3 py-1.5 text-[9px] font-bold text-amber-700">
-          Review first
-        </span>
-      </div>
-
-      <div className="mt-5 grid gap-3 lg:grid-cols-3">
-        {requests.length === 0 ? (
-          <div className="rounded-2xl bg-emerald-50 p-5 text-center lg:col-span-3">
-            <p className="text-sm font-bold text-emerald-800">
-              No high-priority cases
-            </p>
-            <p className="mt-1 text-[10px] text-emerald-700/70">
-              The current queue looks healthy.
-            </p>
-          </div>
-        ) : (
-          requests.map((request) => (
-            <button
-              key={request.id}
-              type="button"
-              onClick={() => onOpen(request)}
-              className="rounded-2xl border border-amber-100 bg-white p-4 text-left transition hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-md"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-[9px] font-black text-rose-600">
-                    {getInitials(request.applicantName)}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-xs font-black text-slate-900">
-                      {request.applicantName}
-                    </p>
-                    <p className="text-[9px] text-slate-400">
-                      {request.caseId}
-                    </p>
-                  </div>
-                </div>
-                <span className="rounded-full bg-rose-50 px-2 py-1 text-[9px] font-bold text-rose-700">
-                  {request.riskLevel}
-                </span>
-              </div>
-
-              <p className="mt-4 line-clamp-2 text-[10px] leading-5 text-slate-500">
-                {request.reason}
-              </p>
-
-              <div className="mt-4 flex items-center justify-between">
-                <span className="text-[9px] font-bold text-slate-400">SLA</span>
-                <span className="text-[10px] font-black text-amber-700">
-                  {formatSLA(request.slaMinutes)}
-                </span>
-              </div>
-            </button>
-          ))
-        )}
-      </div>
-    </section>
+export default function KYCRequestsPage() {
+  const [
+    requests,
+    setRequests,
+  ] = useState<KYCRequest[]>(
+    []
   );
-}
 
-function BulkActionBar({
-  count,
-  onClear,
-  onReview,
-  onInfo,
-  onExport,
-}: {
-  count: number;
-  onClear: () => void;
-  onReview: () => void;
-  onInfo: () => void;
-  onExport: () => void;
-}) {
-  return (
-    <div className="fixed bottom-4 left-1/2 z-[70] flex w-[calc(100%-2rem)] max-w-4xl -translate-x-1/2 flex-col gap-3 rounded-3xl border border-slate-700 bg-[#0F2745] p-4 text-white shadow-2xl sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <p className="text-xs font-black">
-          {count} case{count > 1 ? "s" : ""} selected
-        </p>
-        <p className="mt-0.5 text-[10px] text-slate-300">
-          Bulk actions use local demo state until the admin KYC APIs exist.
-        </p>
-      </div>
+  const [
+    overview,
+    setOverview,
+  ] = useState<KYCOverviewData>({
+    pending: 0,
+    underReview: 0,
+    approvedToday: 0,
+    rejectedToday: 0,
+    highRisk: 0,
+    averageReviewMinutes:
+      null,
+    totalSubmitted: 0,
+    verified: 0,
+    rejected: 0,
+    aiReviewed: 0,
+    needsManualReview: 0,
+  });
 
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={onReview}
-          className="rounded-xl bg-blue-500 px-3 py-2 text-[10px] font-bold"
-        >
-          Mark Review
-        </button>
-        <button
-          type="button"
-          onClick={onInfo}
-          className="rounded-xl bg-amber-500 px-3 py-2 text-[10px] font-bold"
-        >
-          Request Info
-        </button>
-        <button
-          type="button"
-          onClick={onExport}
-          className="rounded-xl bg-white/10 px-3 py-2 text-[10px] font-bold"
-        >
-          Export
-        </button>
-        <button
-          type="button"
-          onClick={onClear}
-          className="rounded-xl px-3 py-2 text-[10px] font-bold text-slate-300"
-        >
-          Clear
-        </button>
-      </div>
-    </div>
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
+
+  const [
+    refreshing,
+    setRefreshing,
+  ] = useState(false);
+
+  const [
+    search,
+    setSearch,
+  ] = useState("");
+
+  const [
+    filters,
+    setFilters,
+  ] =
+    useState<KYCFiltersState>(
+      DEFAULT_KYC_FILTERS
+    );
+
+  const [
+    selectedIds,
+    setSelectedIds,
+  ] = useState<Set<string>>(
+    new Set()
   );
-}
 
-function getInitials(value: string) {
-  return value
-    .split(" ")
-    .slice(0, 2)
-    .map((part) => part.charAt(0))
-    .join("")
-    .toUpperCase();
-}
+  const [
+    selectedRequest,
+    setSelectedRequest,
+  ] =
+    useState<KYCRequest | null>(
+      null
+    );
 
-function formatSLA(minutes: number) {
-  if (minutes <= 0) {
-    return "Overdue";
+  const [
+    privateDocuments,
+    setPrivateDocuments,
+  ] =
+    useState<KYCPrivateDocuments>(
+      {}
+    );
+
+  const [
+    documentsLoading,
+    setDocumentsLoading,
+  ] = useState(false);
+
+  const [
+    documentsError,
+    setDocumentsError,
+  ] = useState("");
+
+  const [
+    aiReview,
+    setAIReview,
+  ] =
+    useState<KYCAIReview | null>(
+      null
+    );
+
+  const [
+    aiLoading,
+    setAILoading,
+  ] = useState(false);
+
+  const [
+    aiRunning,
+    setAIRunning,
+  ] = useState(false);
+
+  const [
+    aiError,
+    setAIError,
+  ] = useState("");
+
+  const [
+    submittingDecision,
+    setSubmittingDecision,
+  ] = useState(false);
+
+  const [
+    page,
+    setPage,
+  ] = useState(1);
+
+  const [
+    pageSize,
+    setPageSize,
+  ] = useState(25);
+
+  const [
+    sortField,
+    setSortField,
+  ] = useState<
+    | "submittedAt"
+    | "riskScore"
+    | "applicantName"
+  >(
+    "submittedAt"
+  );
+
+  const [
+    sortDirection,
+    setSortDirection,
+  ] =
+    useState<
+      "asc" | "desc"
+    >("desc");
+
+  const [
+    errorMessage,
+    setErrorMessage,
+  ] = useState("");
+
+  const [
+    toast,
+    setToast,
+  ] =
+    useState<string | null>(
+      null
+    );
+
+  const [
+    lastUpdated,
+    setLastUpdated,
+  ] = useState("");
+
+  /* =========================================================
+     LOAD OVERVIEW
+  ========================================================= */
+
+  const loadOverview =
+    useCallback(
+      async () => {
+        try {
+          const response =
+            await apiClient<OverviewResponse>(
+              "/admin/kyc/overview"
+            );
+
+          if (
+            response?.success &&
+            response.overview
+          ) {
+            setOverview(
+              response.overview
+            );
+
+            return;
+          }
+        } catch (error) {
+          console.warn(
+            "KYC overview endpoint unavailable:",
+            error
+          );
+        }
+
+        setOverview(
+          (current) => ({
+            ...current,
+            approvedToday: 0,
+            rejectedToday: 0,
+            averageReviewMinutes:
+              null,
+            verified: 0,
+            rejected: 0,
+            aiReviewed: 0,
+            needsManualReview: 0,
+          })
+        );
+      },
+      []
+    );
+
+  /* =========================================================
+     LOAD REQUESTS
+  ========================================================= */
+
+  const loadRequests =
+    useCallback(
+      async (
+        fullLoader = true
+      ) => {
+        try {
+          if (fullLoader) {
+            setLoading(true);
+          } else {
+            setRefreshing(
+              true
+            );
+          }
+
+          setErrorMessage("");
+
+          const response =
+            await apiClient<PendingKYCResponse>(
+              "/admin/kyc/pending"
+            );
+
+          if (
+            !response ||
+            response.success !==
+              true
+          ) {
+            throw new Error(
+              response?.message ||
+                "Failed to load KYC requests."
+            );
+          }
+
+          const normalized =
+            Array.isArray(
+              response.kycs
+            )
+              ? response.kycs.map(
+                  toKYCRequest
+                )
+              : [];
+
+          setRequests(
+            normalized
+          );
+
+          setOverview(
+            (current) => ({
+              ...current,
+
+              pending:
+                normalized.filter(
+                  (item) =>
+                    item.status ===
+                    "Pending"
+                ).length,
+
+              underReview:
+                normalized.filter(
+                  (item) =>
+                    item.status ===
+                    "Under Review"
+                ).length,
+
+              totalSubmitted:
+                Math.max(
+                  current.totalSubmitted,
+                  normalized.length
+                ),
+
+              highRisk:
+                normalized.filter(
+                  (item) =>
+                    item.riskLevel ===
+                      "High" ||
+                    item.riskLevel ===
+                      "Critical"
+                ).length,
+            })
+          );
+
+          setSelectedIds(
+            new Set()
+          );
+
+          setLastUpdated(
+            new Date().toLocaleTimeString(
+              [],
+              {
+                hour: "2-digit",
+                minute: "2-digit",
+              }
+            )
+          );
+
+          await loadOverview();
+        } catch (error) {
+          console.error(
+            "Admin KYC loading error:",
+            error
+          );
+
+          setErrorMessage(
+            error instanceof
+              Error
+              ? error.message
+              : "Failed to load KYC requests."
+          );
+        } finally {
+          setLoading(false);
+          setRefreshing(false);
+        }
+      },
+      [loadOverview]
+    );
+
+  /* =========================================================
+     INITIAL LOAD
+  ========================================================= */
+
+  useEffect(() => {
+    void loadRequests(
+      true
+    );
+  }, [loadRequests]);
+
+  /* =========================================================
+     TOAST
+  ========================================================= */
+
+  useEffect(() => {
+    if (!toast) {
+      return;
+    }
+
+    const timer =
+      window.setTimeout(
+        () => {
+          setToast(null);
+        },
+        3000
+      );
+
+    return () =>
+      window.clearTimeout(
+        timer
+      );
+  }, [toast]);
+
+  /* =========================================================
+     LOAD SELECTED DRAWER DATA
+  ========================================================= */
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadSelectedData =
+      async () => {
+        if (!selectedRequest) {
+          setPrivateDocuments(
+            {}
+          );
+
+          setDocumentsError(
+            ""
+          );
+
+          setDocumentsLoading(
+            false
+          );
+
+          setAIReview(null);
+
+          setAIError("");
+
+          setAILoading(false);
+
+          return;
+        }
+
+        setDocumentsLoading(
+          true
+        );
+
+        setDocumentsError(
+          ""
+        );
+
+        setPrivateDocuments(
+          {}
+        );
+
+        setAILoading(true);
+
+        setAIError("");
+
+        setAIReview(null);
+
+        const [
+          documentsResult,
+          aiResult,
+        ] =
+          await Promise.allSettled(
+            [
+              apiClient<DocumentsResponse>(
+                `/admin/kyc/${selectedRequest.id}/documents`
+              ),
+
+              apiClient<AIReviewResponse>(
+                `/admin/kyc/${selectedRequest.id}/ai-review`
+              ),
+            ]
+          );
+
+        if (cancelled) {
+          return;
+        }
+
+        if (
+          documentsResult.status ===
+            "fulfilled" &&
+          documentsResult.value
+            ?.success
+        ) {
+          setPrivateDocuments(
+            documentsResult.value
+              .documents || {}
+          );
+        } else {
+          setDocumentsError(
+            documentsResult.status ===
+              "rejected" &&
+            documentsResult.reason instanceof
+              Error
+              ? documentsResult
+                  .reason
+                  .message
+              : "KYC documents could not be loaded."
+          );
+        }
+
+        if (
+          aiResult.status ===
+            "fulfilled" &&
+          aiResult.value?.success &&
+          aiResult.value.review
+        ) {
+          setAIReview(
+            aiResult.value.review
+          );
+        } else if (
+          aiResult.status ===
+          "rejected"
+        ) {
+          setAIError(
+            aiResult.reason instanceof
+              Error
+              ? aiResult.reason.message
+              : ""
+          );
+        }
+
+        setDocumentsLoading(
+          false
+        );
+
+        setAILoading(false);
+      };
+
+    void loadSelectedData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedRequest?.id]);
+
+  /* =========================================================
+     FILTER + SORT
+  ========================================================= */
+
+  const filteredRequests =
+    useMemo(() => {
+      const query =
+        search
+          .trim()
+          .toLowerCase();
+
+      const filtered =
+        requests.filter(
+          (request) => {
+            const matchesSearch =
+              !query ||
+              request.applicantName
+                .toLowerCase()
+                .includes(query) ||
+              request.email
+                .toLowerCase()
+                .includes(query) ||
+              request.phone
+                .toLowerCase()
+                .includes(query) ||
+              request.caseId
+                .toLowerCase()
+                .includes(query) ||
+              request.documentNumber
+                .toLowerCase()
+                .includes(query);
+
+            const matchesStatus =
+              filters.status ===
+                "All" ||
+              request.status ===
+                filters.status;
+
+            const matchesDocument =
+              filters.documentType ===
+                "All" ||
+              request.documentType ===
+                filters.documentType;
+
+            const matchesRisk =
+              filters.risk ===
+                "All" ||
+              request.riskLevel ===
+                filters.risk;
+
+            const matchesVerification =
+              filters.verification ===
+                "All" ||
+              request.verificationResult ===
+                filters.verification;
+
+            const matchesReviewer =
+              filters.reviewer ===
+                "All" ||
+              (
+                filters.reviewer ===
+                "Unassigned"
+                  ? request.reviewer ===
+                    "Unassigned"
+                  : request.reviewer !==
+                    "Unassigned"
+              );
+
+            const matchesSla =
+              filters.sla ===
+                "All" ||
+              (
+                filters.sla ===
+                  "Normal"
+                  ? request.slaMinutes >
+                    15
+                  : filters.sla ===
+                      "Due Soon"
+                    ? request.slaMinutes >
+                        0 &&
+                      request.slaMinutes <=
+                        15
+                    : request.slaMinutes <=
+                      0
+              );
+
+            return (
+              matchesSearch &&
+              matchesStatus &&
+              matchesDocument &&
+              matchesRisk &&
+              matchesVerification &&
+              matchesReviewer &&
+              matchesSla
+            );
+          }
+        );
+
+      return [...filtered].sort(
+        (a, b) => {
+          let left:
+            | string
+            | number;
+
+          let right:
+            | string
+            | number;
+
+          if (
+            sortField ===
+            "riskScore"
+          ) {
+            left =
+              a.riskScore;
+
+            right =
+              b.riskScore;
+          } else if (
+            sortField ===
+            "applicantName"
+          ) {
+            left =
+              a.applicantName
+                .toLowerCase();
+
+            right =
+              b.applicantName
+                .toLowerCase();
+          } else {
+            left =
+              Date.parse(
+                a.submittedAt
+              );
+
+            right =
+              Date.parse(
+                b.submittedAt
+              );
+          }
+
+          if (left < right) {
+            return sortDirection ===
+              "asc"
+              ? -1
+              : 1;
+          }
+
+          if (left > right) {
+            return sortDirection ===
+              "asc"
+              ? 1
+              : -1;
+          }
+
+          return 0;
+        }
+      );
+    }, [
+      requests,
+      search,
+      filters,
+      sortField,
+      sortDirection,
+    ]);
+
+  /* =========================================================
+     RESET PAGE
+  ========================================================= */
+
+  useEffect(() => {
+    setPage(1);
+  }, [
+    search,
+    filters,
+    pageSize,
+  ]);
+
+  /* =========================================================
+     PAGINATION
+  ========================================================= */
+
+  const totalPages =
+    Math.max(
+      1,
+      Math.ceil(
+        filteredRequests.length /
+          pageSize
+      )
+    );
+
+  const safePage =
+    Math.min(
+      page,
+      totalPages
+    );
+
+  const paginatedRequests =
+    filteredRequests.slice(
+      (safePage - 1) *
+        pageSize,
+      safePage *
+        pageSize
+    );
+
+  /* =========================================================
+     SELECTION
+  ========================================================= */
+
+  const toggleSelection =
+    (id: string) => {
+      setSelectedIds(
+        (current) => {
+          const next =
+            new Set(
+              current
+            );
+
+          if (
+            next.has(id)
+          ) {
+            next.delete(id);
+          } else {
+            next.add(id);
+          }
+
+          return next;
+        }
+      );
+    };
+
+  const toggleAll =
+    (checked: boolean) => {
+      if (!checked) {
+        setSelectedIds(
+          new Set()
+        );
+
+        return;
+      }
+
+      setSelectedIds(
+        new Set(
+          paginatedRequests.map(
+            (request) =>
+              request.id
+          )
+        )
+      );
+    };
+
+  /* =========================================================
+     SORT
+  ========================================================= */
+
+  const sortBy =
+    (
+      field:
+        | "submittedAt"
+        | "riskScore"
+        | "applicantName"
+    ) => {
+      if (
+        sortField === field
+      ) {
+        setSortDirection(
+          (current) =>
+            current === "asc"
+              ? "desc"
+              : "asc"
+        );
+
+        return;
+      }
+
+      setSortField(field);
+      setSortDirection("desc");
+    };
+
+  /* =========================================================
+     AI REVIEW
+  ========================================================= */
+
+  const runAIReview =
+    async () => {
+      if (!selectedRequest) {
+        return;
+      }
+
+      try {
+        setAIRunning(true);
+        setAIError("");
+
+        const response =
+          await apiClient<AIReviewResponse>(
+            `/admin/kyc/${selectedRequest.id}/ai-review`,
+            {
+              method: "POST",
+            }
+          );
+
+        if (
+          !response?.success ||
+          !response.review
+        ) {
+          throw new Error(
+            response?.message ||
+              "Automated KYC screening failed."
+          );
+        }
+
+        setAIReview(
+          response.review
+        );
+
+        setToast(
+          "Automated KYC screening completed."
+        );
+
+        await loadOverview();
+      } catch (error) {
+        setAIError(
+          error instanceof
+            Error
+            ? error.message
+            : "Automated KYC screening failed."
+        );
+      } finally {
+        setAIRunning(false);
+      }
+    };
+
+  /* =========================================================
+     DECISION
+  ========================================================= */
+
+  const submitDecision =
+    async (
+      action: DecisionAction,
+      reason: string
+    ) => {
+      if (!selectedRequest) {
+        return;
+      }
+
+      try {
+        setSubmittingDecision(
+          true
+        );
+
+        setErrorMessage(
+          ""
+        );
+
+        const status =
+          action === "approve"
+            ? "verified"
+            : "rejected";
+
+        const body: {
+          status:
+            | "verified"
+            | "rejected";
+
+          rejectionReason?: string;
+        } = {
+          status,
+        };
+
+        if (
+          status ===
+          "rejected"
+        ) {
+          body.rejectionReason =
+            reason.trim();
+        }
+
+        const response =
+          await apiClient<ReviewKYCResponse>(
+            `/admin/kyc/${selectedRequest.id}/review`,
+            {
+              method: "PATCH",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body:
+                JSON.stringify(
+                  body
+                ),
+            }
+          );
+
+        if (
+          !response?.success
+        ) {
+          throw new Error(
+            response?.message ||
+              "Failed to save the KYC decision."
+          );
+        }
+
+        setSelectedRequest(
+          null
+        );
+
+        setToast(
+          action ===
+            "approve"
+            ? "KYC approved successfully."
+            : "KYC rejected successfully."
+        );
+
+        await loadRequests(
+          false
+        );
+      } catch (error) {
+        setErrorMessage(
+          error instanceof
+            Error
+            ? error.message
+            : "Failed to save the KYC decision."
+        );
+      } finally {
+        setSubmittingDecision(
+          false
+        );
+      }
+    };
+
+  /* =========================================================
+     EXPORT
+  ========================================================= */
+
+  const exportRows =
+    () => {
+      const source =
+        selectedIds.size > 0
+          ? filteredRequests.filter(
+              (item) =>
+                selectedIds.has(
+                  item.id
+                )
+            )
+          : filteredRequests;
+
+      const rows = [
+        [
+          "Case ID",
+          "Applicant",
+          "Email",
+          "Phone",
+          "Document Type",
+          "Status",
+          "Verification",
+          "Risk",
+          "Risk Score",
+          "Submitted At",
+        ],
+
+        ...source.map(
+          (item) => [
+            item.caseId,
+            item.applicantName,
+            item.email,
+            item.phone,
+            item.documentType,
+            item.status,
+            item.verificationResult,
+            item.riskLevel,
+            String(
+              item.riskScore
+            ),
+            item.submittedAt,
+          ]
+        ),
+      ];
+
+      const csv =
+        rows
+          .map(
+            (row) =>
+              row
+                .map(
+                  (value) =>
+                    `"${String(
+                      value ?? ""
+                    ).replace(
+                      /"/g,
+                      '""'
+                    )}"`
+                )
+                .join(",")
+          )
+          .join("\n");
+
+      const blob =
+        new Blob(
+          [csv],
+          {
+            type:
+              "text/csv;charset=utf-8",
+          }
+        );
+
+      const url =
+        URL.createObjectURL(
+          blob
+        );
+
+      const anchor =
+        document.createElement(
+          "a"
+        );
+
+      anchor.href = url;
+
+      anchor.download =
+        `kyc-review-${new Date()
+          .toISOString()
+          .slice(
+            0,
+            10
+          )}.csv`;
+
+      document.body.appendChild(
+        anchor
+      );
+
+      anchor.click();
+
+      anchor.remove();
+
+      URL.revokeObjectURL(
+        url
+      );
+    };
+
+  /* =========================================================
+     ANALYTICS FILTER
+  ========================================================= */
+
+  const applyAnalyticsFilter =
+    (
+      status: KYCStatus
+    ) => {
+      if (
+        status === "Pending" ||
+        status ===
+          "Under Review"
+      ) {
+        setFilters(
+          (current) => ({
+            ...current,
+            status,
+          })
+        );
+      }
+    };
+
+  /* =========================================================
+     LOADING
+  ========================================================= */
+
+  if (loading) {
+    return (
+      <KYCLoadingSkeleton />
+    );
   }
 
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
+  /* =========================================================
+     UI
+  ========================================================= */
 
-  return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+  return (
+    <main className="min-h-screen bg-background pb-12 text-foreground">
+      <div className="mx-auto max-w-[1600px] space-y-5 px-4 py-5 sm:px-6 lg:px-8">
+
+        {/* HEADER */}
+        <KYCHeader
+          refreshing={
+            refreshing
+          }
+          onRefresh={() =>
+            void loadRequests(
+              false
+            )
+          }
+          onExport={
+            exportRows
+          }
+          lastUpdated={
+            lastUpdated
+          }
+        />
+
+        {/* ERROR */}
+        <AnimatePresence>
+          {errorMessage && (
+            <motion.div
+              initial={{
+                opacity: 0,
+                y: -8,
+              }}
+              animate={{
+                opacity: 1,
+                y: 0,
+              }}
+              exit={{
+                opacity: 0,
+                y: -8,
+              }}
+              className="flex flex-col gap-3 rounded-[20px] border border-rose-500/20 bg-rose-500/10 p-4 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="flex items-start gap-3">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-500" />
+
+                <p className="text-[9px] leading-5 text-rose-500">
+                  {errorMessage}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setErrorMessage(
+                    ""
+                  )
+                }
+                className="flex h-8 w-8 items-center justify-center self-end rounded-xl text-rose-500 transition hover:bg-rose-500/10 sm:self-auto"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* STATS */}
+        <KYCStats
+          stats={overview}
+        />
+
+        {/* ANALYTICS */}
+        <KYCAnalytics
+          overview={overview}
+          onFilterStatus={
+            applyAnalyticsFilter
+          }
+        />
+
+        {/* FILTERS */}
+        <KYCFilters
+          search={search}
+          setSearch={setSearch}
+          filters={filters}
+          setFilters={setFilters}
+          total={
+            filteredRequests.length
+          }
+        />
+
+        {/* SELECTED ACTION BAR */}
+        <AnimatePresence>
+          {selectedIds.size >
+            0 && (
+            <motion.div
+              initial={{
+                opacity: 0,
+                y: 8,
+              }}
+              animate={{
+                opacity: 1,
+                y: 0,
+              }}
+              exit={{
+                opacity: 0,
+                y: 8,
+              }}
+              className="flex flex-col gap-3 rounded-[20px] border border-indigo-500/20 bg-indigo-500/5 p-4 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <p className="text-[9px] font-black text-foreground">
+                {selectedIds.size} review request
+                {selectedIds.size ===
+                1
+                  ? ""
+                  : "s"}{" "}
+                selected
+              </p>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={
+                    exportRows
+                  }
+                  className="inline-flex h-9 items-center gap-2 rounded-xl bg-indigo-600 px-3 text-[9px] font-black text-white transition hover:bg-violet-600"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  Export Selected
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelectedIds(
+                      new Set()
+                    )
+                  }
+                  className="h-9 rounded-xl border border-border bg-background px-3 text-[9px] font-black text-muted-foreground transition hover:border-indigo-500/25 hover:bg-indigo-500/5 hover:text-indigo-500"
+                >
+                  Clear
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* KYC QUEUE */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={[
+              safePage,
+              pageSize,
+              filteredRequests
+                .map(
+                  (item) =>
+                    item.id
+                )
+                .join("-"),
+            ].join("|")}
+            initial={{
+              opacity: 0,
+              y: 12,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+            }}
+            exit={{
+              opacity: 0,
+              y: -8,
+            }}
+            transition={{
+              duration: 0.25,
+              ease: "easeOut",
+            }}
+          >
+            <KYCQueue
+              requests={
+                paginatedRequests
+              }
+              selectedIds={
+                selectedIds
+              }
+              page={
+                safePage
+              }
+              pageSize={
+                pageSize
+              }
+              total={
+                filteredRequests.length
+              }
+              totalPages={
+                totalPages
+              }
+              onToggle={
+                toggleSelection
+              }
+              onToggleAll={
+                toggleAll
+              }
+              onOpen={
+                setSelectedRequest
+              }
+              sortField={
+                sortField
+              }
+              sortDirection={
+                sortDirection
+              }
+              onSort={
+                sortBy
+              }
+              onPageChange={
+                setPage
+              }
+              onPageSizeChange={(
+                size
+              ) => {
+                setPageSize(
+                  size
+                );
+
+                setPage(1);
+              }}
+            />
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* =====================================================
+          REVIEW DRAWER
+      ====================================================== */}
+
+      <KYCReviewDrawer
+        request={
+          selectedRequest
+        }
+        documents={
+          privateDocuments
+        }
+        documentsLoading={
+          documentsLoading
+        }
+        documentsError={
+          documentsError
+        }
+        aiReview={
+          aiReview
+        }
+        aiLoading={
+          aiLoading
+        }
+        aiRunning={
+          aiRunning
+        }
+        aiError={
+          aiError
+        }
+        submittingDecision={
+          submittingDecision
+        }
+        onClose={() =>
+          setSelectedRequest(
+            null
+          )
+        }
+        onRunAIReview={() =>
+          void runAIReview()
+        }
+        onDecision={(
+          action: DecisionAction,
+          reason: string
+        ) => {
+          void submitDecision(
+            action,
+            reason
+          );
+        }}
+      />
+
+      {/* =====================================================
+          TOAST
+      ====================================================== */}
+
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{
+              opacity: 0,
+              x: 18,
+            }}
+            animate={{
+              opacity: 1,
+              x: 0,
+            }}
+            exit={{
+              opacity: 0,
+              x: 18,
+            }}
+            className="fixed right-4 top-4 z-[210] flex w-[calc(100%-2rem)] max-w-sm items-start gap-3 rounded-[18px] border border-emerald-500/20 bg-card p-4 text-card-foreground shadow-[0_22px_60px_rgba(0,0,0,0.16)]"
+          >
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+
+            <div>
+              <p className="text-[9px] font-black text-foreground">
+                Updated
+              </p>
+
+              <p className="mt-1 text-[9px] leading-5 text-muted-foreground">
+                {toast}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </main>
+  );
 }

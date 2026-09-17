@@ -1,38 +1,45 @@
 "use client";
 
-import { useState, type FormEvent, type ElementType } from "react";
+import {
+  useState,
+  type FormEvent,
+} from "react";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import {
+  useRouter,
+} from "next/navigation";
 
 import {
+  AnimatePresence,
+  motion,
+} from "framer-motion";
+
+import {
+  AlertCircle,
   ArrowRight,
   Eye,
   EyeOff,
   Fingerprint,
   KeyRound,
+  Loader2,
   Mail,
   ShieldCheck,
-  Sparkles,
-  TrendingUp,
-  WalletCards,
-  Zap,
-  Loader2,
-  AlertCircle,
 } from "lucide-react";
-
-/* =========================================================
-   TYPES
-========================================================= */
 
 interface AuthUser {
   _id: string;
   name: string;
   email: string;
   phone?: string;
-  role: "user" | "admin";
-  kycStatus: "not_started" | "pending" | "verified" | "rejected";
+  role:
+    | "user"
+    | "admin";
+  kycStatus:
+    | "not_started"
+    | "pending"
+    | "verified"
+    | "rejected";
 }
 
 interface LoginResponse {
@@ -41,98 +48,185 @@ interface LoginResponse {
   user?: AuthUser;
 }
 
-/* =========================================================
-   API URL
-========================================================= */
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
-
-/* =========================================================
-   LOGIN PAGE
-========================================================= */
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:5000/api";
 
 export default function LoginPage() {
-  const router = useRouter();
+  const router =
+    useRouter();
 
-  const [email, setEmail] = useState("");
+  const [email, setEmail] =
+    useState("");
 
-  const [password, setPassword] = useState("");
+  const [password, setPassword] =
+    useState("");
 
-  const [showPassword, setShowPassword] = useState(false);
+  const [showPassword, setShowPassword] =
+    useState(false);
 
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] =
+    useState(false);
 
-  const [errorMessage, setErrorMessage] = useState("");
+  const [errorMessage, setErrorMessage] =
+    useState("");
 
-  /* =========================================================
-     LOGIN SUBMIT
-  ========================================================== */
-  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleSubmit = async (
+    event: FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault();
+
+    if (isLoading) {
+      return;
+    }
 
     setErrorMessage("");
 
-    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedEmail =
+      email
+        .trim()
+        .toLowerCase();
 
     if (!normalizedEmail) {
-      setErrorMessage("Please enter your email address.");
+      setErrorMessage(
+        "Please enter your email address.",
+      );
       return;
     }
 
     if (!password) {
-      setErrorMessage("Please enter your password.");
+      setErrorMessage(
+        "Please enter your password.",
+      );
       return;
     }
 
     setIsLoading(true);
 
     try {
+      const loginUrl =
+        `${API_URL}/auth/login`;
+
       console.log(
         "LOGIN API:",
-        "https://digital-wallet-backend-five.vercel.app/api/auth/login",
+        loginUrl,
       );
 
-      const response = await fetch(
-        "https://digital-wallet-backend-five.vercel.app/api/auth/login",
+      console.log(
+        "LOGIN REQUEST:",
         {
-          method: "POST",
-
-          headers: {
-            "Content-Type": "application/json",
-          },
-
-          credentials: "include",
-
-          body: JSON.stringify({
-            email: normalizedEmail,
-            password,
-          }),
+          email:
+            normalizedEmail,
+          passwordLength:
+            password.length,
         },
       );
 
-      const data = await response.json();
+      const response =
+        await fetch(
+          loginUrl,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+              Accept:
+                "application/json",
+            },
+            credentials:
+              "include",
+            body:
+              JSON.stringify({
+                email:
+                  normalizedEmail,
+                password,
+              }),
+          },
+        );
 
-      console.log("LOGIN STATUS:", response.status);
+      const data =
+        (await response
+          .json()
+          .catch(
+            () => null,
+          )) as
+          | LoginResponse
+          | null;
 
-      console.log("LOGIN RESPONSE:", data);
+      if (!data) {
+        throw new Error(
+          "Invalid response from server.",
+        );
+      }
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.message || "Login failed.");
+      console.log(
+        "LOGIN STATUS:",
+        response.status,
+      );
+
+      console.log(
+        "LOGIN RESPONSE:",
+        data,
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            `Login failed with status ${response.status}.`,
+        );
+      }
+
+      if (!data.success) {
+        throw new Error(
+          data.message ||
+            "Login failed.",
+        );
       }
 
       if (!data.user) {
-        throw new Error("User information was not returned by the server.");
+        throw new Error(
+          "User information was not returned by the server.",
+        );
       }
 
-      // UI-এর জন্য user information
-      localStorage.setItem("auth_user", JSON.stringify(data.user));
+      localStorage.setItem(
+        "auth_user",
+        JSON.stringify(
+          data.user,
+        ),
+      );
 
-      localStorage.setItem("is_authenticated", "true");
+      localStorage.setItem(
+        "is_authenticated",
+        "true",
+      );
 
-      // Login successful
-      router.replace("/dashboard");
+      window.dispatchEvent(
+        new Event(
+          "coffer-auth-state-changed",
+        ),
+      );
+
+      router.replace(
+        "/dashboard",
+      );
+
+      router.refresh();
     } catch (error) {
-      console.error("LOGIN ERROR:", error);
+      console.error(
+        "LOGIN ERROR:",
+        error,
+      );
+
+      if (
+        error instanceof
+        TypeError
+      ) {
+        setErrorMessage(
+          "Unable to connect to the server. Please make sure the backend is running.",
+        );
+        return;
+      }
 
       setErrorMessage(
         error instanceof Error
@@ -144,376 +238,325 @@ export default function LoginPage() {
     }
   };
 
-  /* =========================================================
-     UI
-  ========================================================== */
-
   return (
-    <div className="grid min-h-[760px] w-full grid-cols-1 lg:grid-cols-2">
-      {/* =====================================================
-          LEFT PANEL
-      ====================================================== */}
-
-      <section className="relative hidden overflow-hidden rounded-l-[2rem] bg-[#020617] lg:flex">
-        {/* Background */}
-
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(37,99,235,.18),transparent_40%),radial-gradient(circle_at_80%_80%,rgba(6,182,212,.12),transparent_35%)]" />
-
-        {/* Blue glow */}
-
+    <div className="relative z-10 w-full">
+      <motion.header
+        initial={{
+          opacity: 0,
+          y: 14,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        transition={{
+          duration: 0.48,
+          ease: [
+            0.22,
+            1,
+            0.36,
+            1,
+          ],
+        }}
+      >
         <motion.div
-          animate={{
-            scale: [1, 1.15, 1],
-            opacity: [0.18, 0.3, 0.18],
+          whileHover={{
+            scale: 1.055,
+            rotate: -4,
           }}
           transition={{
-            duration: 8,
-            repeat: Infinity,
-            ease: "easeInOut",
+            type: "spring",
+            stiffness: 300,
+            damping: 19,
           }}
-          className="pointer-events-none absolute -left-24 -top-24 h-[420px] w-[420px] rounded-full bg-blue-600/20 blur-[120px]"
-        />
+          className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl border border-violet-200/80 bg-gradient-to-br from-violet-50 to-indigo-100 text-indigo-700 shadow-[0_12px_30px_rgba(79,70,229,0.13)]"
+        >
+          <Fingerprint className="h-5 w-5" />
+        </motion.div>
 
-        {/* Cyan glow */}
+        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-violet-700">
+          Secure account access
+        </p>
 
-        <motion.div
-          animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.1, 0.2, 0.1],
-          }}
-          transition={{
-            duration: 10,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-          className="pointer-events-none absolute -bottom-24 -right-20 h-[400px] w-[400px] rounded-full bg-cyan-500/20 blur-[120px]"
-        />
+        <h1 className="mt-2 text-[32px] font-black leading-none tracking-[-0.05em] text-slate-950 sm:text-[36px]">
+          Welcome back
+        </h1>
 
-        {/* Content */}
+        <p className="mt-4 max-w-[430px] text-[12px] font-medium leading-6 text-slate-500 sm:text-[13px]">
+          Enter your account credentials to continue to your secure Coffer wallet.
+        </p>
+      </motion.header>
 
-        <div className="relative z-10 flex w-full flex-col justify-between p-10 xl:p-14">
-          {/* Logo */}
-
-          <Link href="/" className="flex w-fit items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-cyan-300 shadow-lg">
-              <WalletCards className="h-6 w-6" />
-            </div>
-
-            <div>
-              <p className="text-xl font-black tracking-tight text-white">
-                Nova
-                <span className="text-cyan-400">Wallet</span>
-              </p>
-
-              <p className="text-[9px] font-bold uppercase tracking-[0.2em] text-cyan-300/70">
-                Digital Wallet System
-              </p>
-            </div>
-          </Link>
-
-          {/* Main text */}
-
-          <div className="my-auto py-12">
-            <motion.div
-              initial={{
-                opacity: 0,
-                y: 25,
-              }}
-              animate={{
-                opacity: 1,
-                y: 0,
-              }}
-              transition={{
-                duration: 0.7,
-              }}
-            >
-              <div className="inline-flex items-center gap-2 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-4 py-2">
-                <Sparkles className="h-4 w-4 text-cyan-400" />
-
-                <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-300">
-                  Secure Access
-                </span>
-              </div>
-
-              <h1 className="mt-7 text-4xl font-extrabold leading-[1.1] text-white xl:text-5xl">
-                Welcome back.
-                <span className="mt-1 block bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
-                  Your wallet is ready.
-                </span>
-              </h1>
-
-              <p className="mt-6 max-w-lg text-sm leading-7 text-slate-300">
-                Access secure payments, fast transfers, KYC verification,
-                transaction visibility, and intelligent financial insights from
-                one secure wallet.
-              </p>
-            </motion.div>
-
-            {/* Features */}
-
-            <div className="mt-10 space-y-4">
-              <FeatureRow
-                icon={ShieldCheck}
-                title="Secure Payments"
-                description="Protected payment flows"
-              />
-
-              <FeatureRow
-                icon={Zap}
-                title="Fast Transfers"
-                description="Simple peer-to-peer payments"
-              />
-
-              <FeatureRow
-                icon={TrendingUp}
-                title="Smart Insights"
-                description="Understand your spending"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 text-[10px] text-slate-400">
-            <ShieldCheck className="h-4 w-4 text-emerald-400" />
-
-            <span>Private and secure account access</span>
-          </div>
-        </div>
-      </section>
-
-      {/* =====================================================
-          LOGIN FORM
-      ====================================================== */}
-
-      <section className="flex items-center justify-center bg-white px-6 py-12 sm:px-10 lg:px-14 xl:px-20">
-        <div className="w-full max-w-[420px]">
-          {/* Heading */}
-
+      <AnimatePresence
+        initial={false}
+      >
+        {errorMessage && (
           <motion.div
+            role="alert"
+            aria-live="polite"
             initial={{
               opacity: 0,
-              y: 18,
+              height: 0,
+              y: -7,
             }}
             animate={{
               opacity: 1,
+              height: "auto",
               y: 0,
             }}
-            transition={{
-              duration: 0.5,
+            exit={{
+              opacity: 0,
+              height: 0,
+              y: -5,
             }}
+            transition={{
+              duration: 0.24,
+            }}
+            className="overflow-hidden"
           >
-            <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl border border-blue-100 bg-blue-50 text-blue-600">
-              <Fingerprint className="h-6 w-6" />
-            </div>
-
-            <h2 className="text-3xl font-extrabold tracking-tight text-slate-900">
-              Sign in to Nova
-            </h2>
-
-            <p className="mt-2 text-sm leading-6 text-slate-500">
-              Enter your credentials to access your wallet, transfers, and
-              financial tools.
-            </p>
-          </motion.div>
-
-          {/* Error */}
-
-          {errorMessage && (
-            <motion.div
-              initial={{
-                opacity: 0,
-                y: -5,
-              }}
-              animate={{
-                opacity: 1,
-                y: 0,
-              }}
-              className="mt-5 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-600"
-            >
+            <div className="mt-5 flex items-start gap-2.5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-[11px] font-semibold leading-5 text-rose-700">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-
-              <span>{errorMessage}</span>
-            </motion.div>
-          )}
-
-          {/* Form */}
-
-          <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-            {/* EMAIL */}
-
-            <div>
-              <label
-                htmlFor="login-email"
-                className="mb-2 block text-xs font-bold text-slate-700"
-              >
-                Email Address
-              </label>
-
-              <div className="relative">
-                <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-
-                <input
-                  id="login-email"
-                  name="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="hello@example.com"
-                  autoComplete="email"
-                  disabled={isLoading}
-                  required
-                  className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:opacity-60"
-                />
-              </div>
+              <span>
+                {errorMessage}
+              </span>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-            {/* PASSWORD */}
+      <motion.form
+        onSubmit={
+          handleSubmit
+        }
+        initial={{
+          opacity: 0,
+          y: 14,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        transition={{
+          delay: 0.07,
+          duration: 0.45,
+          ease: [
+            0.22,
+            1,
+            0.36,
+            1,
+          ],
+        }}
+        className="mt-7 space-y-5"
+      >
+        <div>
+          <label
+            htmlFor="login-email"
+            className="mb-2 block cursor-pointer text-[10px] font-extrabold text-slate-700"
+          >
+            Email address
+          </label>
 
-            <div>
-              <div className="mb-2 flex items-center justify-between">
-                <label
-                  htmlFor="login-password"
-                  className="text-xs font-bold text-slate-700"
-                >
-                  Password
-                </label>
+          <div className="group relative">
+            <Mail className="pointer-events-none absolute left-4 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-violet-600" />
 
-                <Link
-                  href="/forgot-password"
-                  className="text-[10px] font-bold text-blue-600 hover:underline"
-                >
-                  Forgot password?
-                </Link>
-              </div>
+            <input
+              id="login-email"
+              name="email"
+              type="email"
+              value={email}
+              onChange={(
+                event,
+              ) => {
+                setEmail(
+                  event.target.value,
+                );
+              }}
+              placeholder="name@example.com"
+              autoComplete="email"
+              disabled={
+                isLoading
+              }
+              required
+              className="h-[54px] w-full rounded-2xl border border-slate-200 bg-white/80 pl-11 pr-4 text-[13px] font-semibold text-slate-900 outline-none transition-all duration-200 placeholder:font-medium placeholder:text-slate-400 hover:border-violet-200 focus:border-violet-500 focus:bg-white focus:ring-4 focus:ring-violet-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+            />
+          </div>
+        </div>
 
-              <div className="relative">
-                <KeyRound className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <div>
+          <div className="mb-2 flex items-center justify-between gap-4">
+            <label
+              htmlFor="login-password"
+              className="cursor-pointer text-[10px] font-extrabold text-slate-700"
+            >
+              Password
+            </label>
 
-                <input
-                  id="login-password"
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  autoComplete="current-password"
-                  disabled={isLoading}
-                  required
-                  className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-11 text-sm font-medium text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-500/10 disabled:cursor-not-allowed disabled:opacity-60"
-                />
+            <Link
+              href="/forgot-password"
+              className="rounded-md text-[9px] font-extrabold text-violet-700 transition hover:text-violet-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
+            >
+              Forgot password?
+            </Link>
+          </div>
 
-                <button
-                  type="button"
-                  disabled={isLoading}
-                  onClick={() => setShowPassword((value) => !value)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-600"
+          <div className="group relative">
+            <KeyRound className="pointer-events-none absolute left-4 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-violet-600" />
+
+            <input
+              id="login-password"
+              name="password"
+              type={
+                showPassword
+                  ? "text"
+                  : "password"
+              }
+              value={password}
+              onChange={(
+                event,
+              ) => {
+                setPassword(
+                  event.target.value,
+                );
+              }}
+              placeholder="Enter your password"
+              autoComplete="current-password"
+              required
+              disabled={
+                isLoading
+              }
+              className="h-[54px] w-full rounded-2xl border border-slate-200 bg-white/80 pl-11 pr-12 text-[13px] font-semibold text-slate-900 outline-none transition-all duration-200 placeholder:font-medium placeholder:text-slate-400 hover:border-violet-200 focus:border-violet-500 focus:bg-white focus:ring-4 focus:ring-violet-500/10 disabled:cursor-not-allowed disabled:opacity-60"
+            />
+
+            <motion.button
+              type="button"
+              disabled={
+                isLoading
+              }
+              whileTap={{
+                scale: 0.86,
+              }}
+              onClick={() => {
+                setShowPassword(
+                  (current) =>
+                    !current,
+                );
+              }}
+              aria-label={
+                showPassword
+                  ? "Hide password"
+                  : "Show password"
+              }
+              className="absolute right-3 top-1/2 z-20 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-violet-50 hover:text-violet-700 disabled:pointer-events-none"
+            >
+              <AnimatePresence
+                mode="wait"
+                initial={false}
+              >
+                <motion.span
+                  key={
+                    showPassword
+                      ? "hide"
+                      : "show"
+                  }
+                  initial={{
+                    opacity: 0,
+                    scale: 0.75,
+                  }}
+                  animate={{
+                    opacity: 1,
+                    scale: 1,
+                  }}
+                  exit={{
+                    opacity: 0,
+                    scale: 0.75,
+                  }}
+                  transition={{
+                    duration: 0.14,
+                  }}
                 >
                   {showPassword ? (
                     <EyeOff className="h-4 w-4" />
                   ) : (
                     <Eye className="h-4 w-4" />
                   )}
-                </button>
-              </div>
-            </div>
-
-            {/* SUBMIT */}
-
-            <motion.button
-              type="submit"
-              disabled={isLoading}
-              whileHover={
-                isLoading
-                  ? undefined
-                  : {
-                      y: -2,
-                    }
-              }
-              whileTap={
-                isLoading
-                  ? undefined
-                  : {
-                      scale: 0.98,
-                    }
-              }
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#0F172A] text-sm font-bold text-white shadow-lg transition-all hover:bg-[#1E293B] disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Signing in...
-                </>
-              ) : (
-                <>
-                  Sign In
-                  <ArrowRight className="h-4 w-4" />
-                </>
-              )}
+                </motion.span>
+              </AnimatePresence>
             </motion.button>
-          </form>
-
-          {/* Register */}
-
-          <p className="mt-8 text-center text-sm text-slate-500">
-            Don&apos;t have an account?{" "}
-            <Link
-              href="/register"
-              className="font-bold text-blue-600 hover:underline"
-            >
-              Create an account
-            </Link>
-          </p>
-
-          {/* Security */}
-
-          <div className="mt-8 flex items-center justify-center gap-2 text-[10px] text-slate-400">
-            <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-
-            <span>Your wallet data stays private</span>
           </div>
         </div>
-      </section>
+
+        <motion.button
+          type="submit"
+          disabled={
+            isLoading
+          }
+          whileHover={
+            isLoading
+              ? undefined
+              : {
+                  y: -2,
+                }
+          }
+          whileTap={
+            isLoading
+              ? undefined
+              : {
+                  scale: 0.985,
+                }
+          }
+          className="group relative flex h-[54px] w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 text-[13px] font-extrabold text-white shadow-[0_17px_38px_rgba(109,40,217,0.28)] transition-all hover:shadow-[0_20px_44px_rgba(109,40,217,0.36)] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {!isLoading && (
+            <span className="pointer-events-none absolute -left-20 top-0 h-full w-20 -skew-x-12 bg-white/15 transition-transform duration-700 group-hover:translate-x-[620px]" />
+          )}
+
+          {isLoading ? (
+            <>
+              <Loader2 className="relative h-4 w-4 animate-spin" />
+              <span className="relative">
+                Signing in...
+              </span>
+            </>
+          ) : (
+            <>
+              <span className="relative">
+                Sign in securely
+              </span>
+              <ArrowRight className="relative h-4 w-4 transition-transform group-hover:translate-x-1" />
+            </>
+          )}
+        </motion.button>
+      </motion.form>
+
+      <motion.div
+        initial={{
+          opacity: 0,
+          y: 7,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        transition={{
+          delay: 0.18,
+          duration: 0.4,
+        }}
+      >
+        <p className="mt-7 text-center text-[11px] font-medium text-slate-500">
+          Don&apos;t have an account?{" "}
+          <Link
+            href="/register"
+            className="font-extrabold text-violet-700 transition hover:text-violet-900"
+          >
+            Create account
+          </Link>
+        </p>
+
+        <div className="mt-5 flex items-center justify-center gap-2 text-[9px] font-semibold text-slate-400">
+          <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+          Your account data stays private
+        </div>
+      </motion.div>
     </div>
-  );
-}
-
-/* =========================================================
-   FEATURE ROW
-========================================================= */
-
-function FeatureRow({
-  icon: Icon,
-  title,
-  description,
-}: {
-  icon: ElementType;
-  title: string;
-  description: string;
-}) {
-  return (
-    <motion.div
-      initial={{
-        opacity: 0,
-        x: -12,
-      }}
-      animate={{
-        opacity: 1,
-        x: 0,
-      }}
-      transition={{
-        duration: 0.5,
-      }}
-      className="flex items-center gap-3"
-    >
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 text-cyan-400">
-        <Icon className="h-5 w-5" />
-      </div>
-
-      <div>
-        <p className="text-sm font-semibold text-white">{title}</p>
-
-        <p className="text-[10px] text-slate-400">{description}</p>
-      </div>
-    </motion.div>
   );
 }

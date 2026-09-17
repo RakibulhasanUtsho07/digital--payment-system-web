@@ -1,20 +1,32 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
+
 import Link from "next/link";
-import { AnimatePresence, motion } from "framer-motion";
-import { QRCodeCanvas } from "qrcode.react";
+
+import {
+  AnimatePresence,
+  motion,
+} from "framer-motion";
+
+import {
+  QRCodeCanvas,
+} from "qrcode.react";
+
 import {
   ArrowDownLeft,
   ArrowUpRight,
   Banknote,
+  Check,
   CheckCircle2,
   ChevronRight,
+  Clock3,
   Copy,
   CreditCard,
   Download,
@@ -24,520 +36,1894 @@ import {
   QrCode,
   RefreshCw,
   Share2,
+  ShieldAlert,
   ShieldCheck,
   Wallet,
   WalletCards,
+  Sparkles,
 } from "lucide-react";
 
-import { apiClient } from "@/lib/api/client";
+import {
+  apiClient,
+} from "@/lib/api/client";
 
 /* =========================================================
    TYPES
 ========================================================= */
 
+type WalletStatus =
+  | "ACTIVE"
+  | "FROZEN"
+  | "BLOCKED";
+
+type TransactionStatus =
+  | "PENDING"
+  | "COMPLETED"
+  | "FAILED";
+
+type TransactionType =
+  | "TRANSFER"
+  | "DEPOSIT"
+  | "WITHDRAW";
+
+type TransactionDirection =
+  | "IN"
+  | "OUT";
+
 interface WalletData {
   _id: string;
+
   userId: string;
+
   balance: number;
-  [key: string]: unknown;
+
+  pendingBalance: number;
+
+  currency: string;
+
+  status: WalletStatus;
+
+  createdAt?: string;
+
+  updatedAt?: string;
 }
 
 interface WalletResponse {
   success: boolean;
+
   wallet: WalletData;
+
+  message?: string;
+}
+
+interface SafeTransactionUser {
+  _id: string;
+
+  name: string;
+
+  email: string;
+
+  phone: string;
 }
 
 interface Transaction {
   _id: string;
+
+  senderId:
+    | SafeTransactionUser
+    | string;
+
+  receiverId:
+    | SafeTransactionUser
+    | string;
+
+  counterparty?:
+    | SafeTransactionUser
+    | string
+    | null;
+
+  direction:
+    TransactionDirection;
+
   amount: number;
+
   currency: string;
-  type: "TRANSFER" | "DEPOSIT" | "WITHDRAW";
-  status: "PENDING" | "COMPLETED" | "FAILED";
+
+  type: TransactionType;
+
+  status: TransactionStatus;
+
   reference?: string;
+
   createdAt?: string;
+
+  updatedAt?: string;
 }
 
 interface TransactionsResponse {
   success: boolean;
+
   count: number;
+
   transactions: Transaction[];
+
+  message?: string;
 }
 
-type Mode = "qr" | "request";
-type CopiedKey = "id" | "request" | null;
+type Mode =
+  | "qr"
+  | "request";
+
+type CopiedKey =
+  | "id"
+  | "link"
+  | null;
+
+/* =========================================================
+   CONSTANTS
+========================================================= */
+
+const AUTO_REFRESH_MS =
+  60_000;
+
+const MAX_NOTE_LENGTH =
+  120;
 
 /* =========================================================
    PAGE
 ========================================================= */
 
 export default function ReceiveMoneyPage() {
-  const [wallet, setWallet] = useState<WalletData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [showBalance, setShowBalance] = useState(true);
+  const [wallet, setWallet] =
+    useState<WalletData | null>(
+      null
+    );
 
-  const [mode, setMode] = useState<Mode>("qr");
-  const [requestAmount, setRequestAmount] = useState("");
-  const [requestNote, setRequestNote] = useState("");
+  const [
+    receivedTransactions,
+    setReceivedTransactions,
+  ] = useState<Transaction[]>(
+    []
+  );
 
-  const [copied, setCopied] = useState<CopiedKey>(null);
+  const [loading, setLoading] =
+    useState(true);
 
-  const [deposits, setDeposits] = useState<Transaction[]>([]);
-  const [depositsLoading, setDepositsLoading] = useState(true);
+  const [refreshing, setRefreshing] =
+    useState(false);
 
-  const qrRef = useRef<HTMLCanvasElement>(null);
+  const [errorMessage, setErrorMessage] =
+    useState("");
+
+  const [
+    activityError,
+    setActivityError,
+  ] = useState("");
+
+  const [lastUpdated, setLastUpdated] =
+    useState<Date | null>(null);
+
+  const [showBalance, setShowBalance] =
+    useState(true);
+
+  const [mode, setMode] =
+    useState<Mode>("qr");
+
+  const [requestAmount, setRequestAmount] =
+    useState("");
+
+  const [
+    requestAmountTouched,
+    setRequestAmountTouched,
+  ] = useState(false);
+
+  const [requestNote, setRequestNote] =
+    useState("");
+
+  const [copied, setCopied] =
+    useState<CopiedKey>(null);
+
+  const [actionMessage, setActionMessage] =
+    useState("");
+
+  const [appOrigin, setAppOrigin] =
+    useState(
+      process.env.NEXT_PUBLIC_APP_URL?.replace(
+        /\/$/,
+        ""
+      ) ?? ""
+    );
+
+  const qrRef =
+    useRef<HTMLCanvasElement>(null);
+
+  const requestInFlightRef =
+    useRef(false);
+
+  const copiedTimerRef =
+    useRef<number | null>(null);
 
   /* =========================================================
-     LOAD WALLET
+     APPLICATION ORIGIN
   ========================================================== */
 
-  const loadWallet = async () => {
-    try {
-      setLoading(true);
-      setErrorMessage("");
-
-      const data = await apiClient<WalletResponse>("/wallet");
-
-      if (!data || data.success !== true || !data.wallet) {
-        throw new Error("Unable to load wallet information.");
-      }
-
-      setWallet(data.wallet);
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Failed to load wallet."
+  useEffect(() => {
+    if (!appOrigin) {
+      setAppOrigin(
+        window.location.origin
       );
-    } finally {
-      setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    void loadWallet();
-  }, []);
+  }, [appOrigin]);
 
   /* =========================================================
-     LOAD RECENT DEPOSITS
-     Only DEPOSIT-type transactions are shown here — those are
-     always a credit to this wallet regardless of who initiated
-     them, so they're safe to display without knowing "which side
-     is me". TRANSFER-type history isn't shown on this page for
-     the same reason it's flagged on the transactions page: I
-     don't yet have a way to tell sender from receiver client-side.
+     LOAD WALLET + TRANSACTIONS
   ========================================================== */
 
+  const loadReceiveData =
+    useCallback(
+      async (
+        silent = false
+      ) => {
+        if (
+          requestInFlightRef.current
+        ) {
+          return;
+        }
+
+        requestInFlightRef.current =
+          true;
+
+        if (silent) {
+          setRefreshing(true);
+        } else {
+          setLoading(true);
+          setErrorMessage("");
+        }
+
+        setActivityError("");
+
+        try {
+          const [
+            walletResult,
+            transactionsResult,
+          ] =
+            await Promise.allSettled([
+              apiClient<WalletResponse>(
+                "/wallet"
+              ),
+
+              apiClient<TransactionsResponse>(
+                "/transactions"
+              ),
+            ]);
+
+          let receivedFreshData =
+            false;
+
+          /* -------------------------------------------------
+             WALLET
+          ------------------------------------------------- */
+
+          if (
+            walletResult.status ===
+            "fulfilled"
+          ) {
+            const data =
+              walletResult.value;
+
+            if (
+              data?.success &&
+              data.wallet
+            ) {
+              setWallet(
+                data.wallet
+              );
+
+              setErrorMessage(
+                ""
+              );
+
+              receivedFreshData =
+                true;
+            } else {
+              setErrorMessage(
+                data?.message ??
+                  "Unable to load wallet information."
+              );
+            }
+          } else if (!silent) {
+            setErrorMessage(
+              getErrorMessage(
+                walletResult.reason,
+                "Failed to load wallet."
+              )
+            );
+          } else {
+            setActionMessage(
+              "Wallet refresh failed. Your previous data is still shown."
+            );
+          }
+
+          /* -------------------------------------------------
+             TRANSACTIONS
+          ------------------------------------------------- */
+
+          if (
+            transactionsResult.status ===
+            "fulfilled"
+          ) {
+            const data =
+              transactionsResult.value;
+
+            if (
+              data?.success &&
+              Array.isArray(
+                data.transactions
+              )
+            ) {
+              const incoming =
+                data.transactions
+                  .filter(
+                    (
+                      transaction
+                    ) =>
+                      transaction.direction ===
+                        "IN" &&
+                      (
+                        transaction.type ===
+                          "TRANSFER" ||
+                        transaction.type ===
+                          "DEPOSIT"
+                      )
+                  )
+                  .slice(
+                    0,
+                    5
+                  );
+
+              setReceivedTransactions(
+                incoming
+              );
+
+              setActivityError(
+                ""
+              );
+
+              receivedFreshData =
+                true;
+            } else {
+              setActivityError(
+                data?.message ??
+                  "Unable to load received transactions."
+              );
+            }
+          } else {
+            setActivityError(
+              getErrorMessage(
+                transactionsResult.reason,
+                "Failed to load received transactions."
+              )
+            );
+          }
+
+          if (
+            receivedFreshData
+          ) {
+            setLastUpdated(
+              new Date()
+            );
+          }
+        } catch (error) {
+          const message =
+            getErrorMessage(
+              error,
+              "Failed to refresh receive data."
+            );
+
+          if (silent) {
+            setActionMessage(
+              message
+            );
+          } else {
+            setErrorMessage(
+              message
+            );
+          }
+        } finally {
+          setLoading(false);
+          setRefreshing(false);
+          requestInFlightRef.current =
+            false;
+        }
+      },
+      []
+    );
+
   useEffect(() => {
-    const loadDeposits = async () => {
-      try {
-        setDepositsLoading(true);
+    void loadReceiveData(
+      false
+    );
 
-        const data = await apiClient<TransactionsResponse>("/transactions");
+    const intervalId =
+      window.setInterval(
+        () => {
+          if (
+            document.visibilityState ===
+            "visible"
+          ) {
+            void loadReceiveData(
+              true
+            );
+          }
+        },
+        AUTO_REFRESH_MS
+      );
 
-        if (data?.success && Array.isArray(data.transactions)) {
-          setDeposits(
-            data.transactions
-              .filter((t) => t.type === "DEPOSIT")
-              .slice(0, 5)
+    const handleVisibilityChange =
+      () => {
+        if (
+          document.visibilityState ===
+          "visible"
+        ) {
+          void loadReceiveData(
+            true
           );
         }
+      };
+
+    document.addEventListener(
+      "visibilitychange",
+      handleVisibilityChange
+    );
+
+    return () => {
+      window.clearInterval(
+        intervalId
+      );
+
+      document.removeEventListener(
+        "visibilitychange",
+        handleVisibilityChange
+      );
+
+      if (
+        copiedTimerRef.current
+      ) {
+        window.clearTimeout(
+          copiedTimerRef.current
+        );
+      }
+    };
+  }, [
+    loadReceiveData,
+  ]);
+
+  /* =========================================================
+     REQUEST VALIDATION
+  ========================================================== */
+
+  const amountValidation =
+    useMemo(() => {
+      const value =
+        requestAmount.trim();
+
+      if (
+        mode !== "request"
+      ) {
+        return {
+          valid: true,
+          message: "",
+          amount:
+            null as
+              | number
+              | null,
+        };
+      }
+
+      if (!value) {
+        return {
+          valid: false,
+          message:
+            "Enter an amount to create a payment request.",
+          amount:
+            null as
+              | number
+              | null,
+        };
+      }
+
+      if (
+        !/^\d+(?:\.\d{1,2})?$/.test(
+          value
+        )
+      ) {
+        return {
+          valid: false,
+          message:
+            "Use a positive amount with no more than 2 decimal places.",
+          amount:
+            null as
+              | number
+              | null,
+        };
+      }
+
+      const amount =
+        Number(value);
+
+      if (
+        !Number.isFinite(
+          amount
+        ) ||
+        amount <= 0
+      ) {
+        return {
+          valid: false,
+          message:
+            "Amount must be greater than zero.",
+          amount:
+            null as
+              | number
+              | null,
+        };
+      }
+
+      return {
+        valid: true,
+        message: "",
+        amount,
+      };
+    }, [
+      mode,
+      requestAmount,
+    ]);
+
+  const walletCanReceive =
+    Boolean(
+      wallet &&
+        wallet.status !==
+          "BLOCKED"
+    );
+
+  const actionsEnabled =
+    Boolean(
+      wallet &&
+        walletCanReceive &&
+        amountValidation.valid
+    );
+
+  /* =========================================================
+     RECEIVE LINK
+  ========================================================== */
+
+  const receiveLink =
+    useMemo(() => {
+      if (!wallet) {
+        return "";
+      }
+
+      const params =
+        new URLSearchParams({
+          walletId:
+            wallet._id,
+
+          receiverId:
+            wallet.userId,
+
+          currency:
+            wallet.currency ||
+            "BDT",
+        });
+
+      if (
+        mode ===
+          "request" &&
+        amountValidation.amount !=
+          null
+      ) {
+        params.set(
+          "amount",
+          amountValidation.amount.toFixed(
+            2
+          )
+        );
+      }
+
+      const note =
+        requestNote.trim();
+
+      if (note) {
+        params.set(
+          "note",
+          note
+        );
+      }
+
+      const path =
+        `/dashboard/send?${params.toString()}`;
+
+      return appOrigin
+        ? `${appOrigin}${path}`
+        : path;
+    }, [
+      wallet,
+      mode,
+      amountValidation.amount,
+      requestNote,
+      appOrigin,
+    ]);
+
+  const requestText =
+    useMemo(() => {
+      if (!wallet) {
+        return "";
+      }
+
+      const amountText =
+        mode ===
+          "request" &&
+        amountValidation.amount !=
+          null
+          ? ` ${formatCurrency(
+              amountValidation.amount,
+              wallet.currency
+            )}`
+          : " money";
+
+      const note =
+        requestNote.trim();
+
+      return `Send me${amountText} with Coffer${
+        note
+          ? ` for ${note}`
+          : ""
+      }.`;
+    }, [
+      wallet,
+      mode,
+      amountValidation.amount,
+      requestNote,
+    ]);
+
+  /* =========================================================
+     TEMP MESSAGE
+  ========================================================== */
+
+  const showTemporaryAction =
+    useCallback(
+      (
+        message: string
+      ) => {
+        setActionMessage(
+          message
+        );
+
+        window.setTimeout(
+          () => {
+            setActionMessage(
+              ""
+            );
+          },
+          2400
+        );
+      },
+      []
+    );
+
+  /* =========================================================
+     COPY
+  ========================================================== */
+
+  const handleCopy =
+    async (
+      key: CopiedKey,
+      text: string
+    ) => {
+      if (!text) {
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(
+          text
+        );
+
+        setCopied(key);
+
+        if (
+          copiedTimerRef.current
+        ) {
+          window.clearTimeout(
+            copiedTimerRef.current
+          );
+        }
+
+        copiedTimerRef.current =
+          window.setTimeout(
+            () => {
+              setCopied(
+                null
+              );
+            },
+            1800
+          );
       } catch (error) {
-        console.error("Failed to load recent deposits:", error);
-      } finally {
-        setDepositsLoading(false);
+        console.error(
+          "Copy failed:",
+          error
+        );
+
+        showTemporaryAction(
+          "Copy failed. Please try again."
+        );
       }
     };
 
-    void loadDeposits();
-  }, []);
-
   /* =========================================================
-     QR VALUE
+     SHARE
   ========================================================== */
 
-  const qrValue = useMemo(() => {
-    if (!wallet) return "";
+  const handleShare =
+    async () => {
+      if (
+        !actionsEnabled ||
+        !receiveLink
+      ) {
+        setRequestAmountTouched(
+          true
+        );
 
-    if (mode === "request" && requestAmount) {
-      const params = new URLSearchParams({
-        walletId: wallet._id,
-        amount: requestAmount,
-      });
-
-      if (requestNote.trim()) {
-        params.set("note", requestNote.trim());
-      }
-
-      return `novawallet-request:${params.toString()}`;
-    }
-
-    return wallet._id;
-  }, [wallet, mode, requestAmount, requestNote]);
-
-  const requestText = useMemo(() => {
-    if (!wallet) return "";
-
-    if (mode === "request" && requestAmount) {
-      return `Send me ${formatCurrency(Number(requestAmount))} on NovaWallet${
-        requestNote.trim() ? ` — ${requestNote.trim()}` : ""
-      }. Wallet ID: ${wallet._id}`;
-    }
-
-    return `Send me money on NovaWallet. Wallet ID: ${wallet._id}`;
-  }, [wallet, mode, requestAmount, requestNote]);
-
-  /* =========================================================
-     ACTIONS
-  ========================================================== */
-
-  const handleCopy = async (key: CopiedKey, text: string) => {
-    if (!text) return;
-
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(key);
-      window.setTimeout(() => setCopied(null), 1800);
-    } catch (error) {
-      console.error("Copy failed:", error);
-    }
-  };
-
-  const handleShare = async () => {
-    if (typeof navigator !== "undefined" && "share" in navigator) {
-      try {
-        await navigator.share({ title: "NovaWallet", text: requestText });
         return;
-      } catch (error) {
-        // User cancelled the share sheet, or it's unsupported for
-        // this content — fall through to copy instead.
       }
-    }
 
-    void handleCopy("request", requestText);
-  };
+      if (
+        typeof navigator !==
+          "undefined" &&
+        "share" in
+          navigator
+      ) {
+        try {
+          await navigator.share(
+            {
+              title:
+                "Receive money with Coffer",
 
-  const handleDownloadQr = () => {
-    const canvas = qrRef.current;
-    if (!canvas || !wallet) return;
+              text:
+                requestText,
 
-    const url = canvas.toDataURL("image/png");
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `novawallet-qr-${wallet._id}.png`;
-    link.click();
-  };
+              url:
+                receiveLink,
+            }
+          );
+
+          return;
+        } catch (error) {
+          if (
+            error instanceof
+              DOMException &&
+            error.name ===
+              "AbortError"
+          ) {
+            return;
+          }
+        }
+      }
+
+      await handleCopy(
+        "link",
+        `${requestText} ${receiveLink}`
+      );
+    };
 
   /* =========================================================
-     LOADING / ERROR
+     DOWNLOAD QR
+  ========================================================== */
+
+  const handleDownloadQr =
+    () => {
+      if (
+        !actionsEnabled
+      ) {
+        setRequestAmountTouched(
+          true
+        );
+
+        return;
+      }
+
+      const canvas =
+        qrRef.current;
+
+      if (
+        !canvas ||
+        !wallet
+      ) {
+        return;
+      }
+
+      const url =
+        canvas.toDataURL(
+          "image/png"
+        );
+
+      const link =
+        document.createElement(
+          "a"
+        );
+
+      link.href = url;
+
+      link.download =
+        `coffer-receive-${wallet._id}.png`;
+
+      link.click();
+    };
+
+  /* =========================================================
+     LOADING
   ========================================================== */
 
   if (loading) {
     return (
       <div className="flex min-h-[70vh] items-center justify-center px-4">
         <div className="flex flex-col items-center gap-4 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#1F5EA8] text-white shadow-lg shadow-blue-500/20">
-            <Loader2 className="h-6 w-6 animate-spin" />
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/20">
+            <Loader2
+              className="h-6 w-6 animate-spin"
+              aria-hidden="true"
+            />
           </div>
 
           <div>
-            <p className="text-sm font-bold text-slate-800">Loading your QR code</p>
-            <p className="mt-1 text-xs text-slate-400">Fetching your wallet information...</p>
+            <p className="text-sm font-bold text-foreground">
+              Loading receive details
+            </p>
+
+            <p className="mt-1 text-xs text-muted-foreground">
+              Fetching your wallet and incoming activity...
+            </p>
           </div>
         </div>
       </div>
     );
   }
 
-  if (errorMessage || !wallet) {
+  /* =========================================================
+     WALLET ERROR
+  ========================================================== */
+
+  if (!wallet) {
     return (
       <div className="flex min-h-[70vh] items-center justify-center px-4">
-        <div className="w-full max-w-md rounded-3xl border border-red-200 bg-white p-7 text-center shadow-sm">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-600">
-            <QrCode className="h-6 w-6" />
+        <div className="w-full max-w-md rounded-[28px] border border-border bg-card p-7 text-center shadow-sm">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-500/10 text-red-600 dark:text-red-300">
+            <QrCode
+              className="h-6 w-6"
+              aria-hidden="true"
+            />
           </div>
 
-          <h2 className="mt-4 text-xl font-extrabold text-slate-900">
-            Couldn&apos;t load your receive info
+          <h2 className="mt-4 text-xl font-extrabold text-foreground">
+            Couldn&apos;t load your wallet
           </h2>
 
-          <p className="mt-2 text-sm leading-6 text-slate-500">
-            {errorMessage || "Unable to retrieve wallet information."}
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
+            {errorMessage ||
+              "Unable to retrieve wallet information."}
           </p>
 
           <button
             type="button"
-            onClick={() => void loadWallet()}
-            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-[#1F5EA8] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#17466F]"
+            onClick={() =>
+              void loadReceiveData(
+                false
+              )
+            }
+            className="
+              mt-6
+              inline-flex
+              items-center
+              gap-2
+              rounded-xl
+              bg-violet-600
+              px-5
+              py-3
+              text-sm
+              font-bold
+              text-white
+              transition
+              hover:bg-violet-500
+              focus-visible:outline-none
+              focus-visible:ring-4
+              focus-visible:ring-violet-500/20
+            "
           >
             <RefreshCw className="h-4 w-4" />
-            Try Again
+            Try again
           </button>
         </div>
       </div>
     );
   }
 
-  const balance = Number(wallet.balance) || 0;
-  const formattedBalance = formatCurrency(balance);
+  /* =========================================================
+     FORMATTED VALUES
+  ========================================================== */
+
+  const formattedBalance =
+    formatCurrency(
+      wallet.balance,
+      wallet.currency
+    );
+
+  const formattedPendingBalance =
+    formatCurrency(
+      wallet.pendingBalance,
+      wallet.currency
+    );
+
+  /* =========================================================
+     MAIN
+  ========================================================== */
 
   return (
-    <main className="mx-auto max-w-4xl space-y-6 pb-10">
+    <main className="mx-auto w-full max-w-5xl space-y-6 pb-12">
       {/* =====================================================
           HEADER
       ====================================================== */}
 
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
+      <motion.header
+        initial={{
+          opacity: 0,
+          y: -12,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        transition={{
+          duration: 0.4,
+        }}
+        className="
+          relative
+          overflow-hidden
+          rounded-[30px]
+          border
+          border-border
+          bg-card
+          p-5
+          shadow-sm
+          sm:p-6
+          md:p-7
+        "
       >
-        <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#1F5EA8]">
-          <QrCode className="h-3.5 w-3.5" />
-          Receive Money
+        {/* Decorative background */}
+        <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-violet-500/10 blur-3xl" />
+
+        <div className="pointer-events-none absolute -bottom-24 left-1/3 h-52 w-52 rounded-full bg-cyan-400/10 blur-3xl" />
+
+        <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            {/* Badge */}
+
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <span
+                className="
+                  inline-flex
+                  items-center
+                  gap-2
+                  rounded-full
+                  border
+                  border-violet-200
+                  bg-violet-50
+                  px-3
+                  py-1.5
+                  text-[10px]
+                  font-black
+                  uppercase
+                  tracking-[0.16em]
+                  text-violet-700
+                  dark:border-violet-800
+                  dark:bg-violet-950/30
+                  dark:text-violet-300
+                "
+              >
+                <QrCode className="h-3.5 w-3.5" />
+
+                Receive money
+              </span>
+
+              <span
+                className="
+                  inline-flex
+                  items-center
+                  gap-2
+                  rounded-full
+                  border
+                  border-emerald-200
+                  bg-emerald-50
+                  px-3
+                  py-1.5
+                  text-[10px]
+                  font-bold
+                  text-emerald-700
+                  dark:border-emerald-800
+                  dark:bg-emerald-950/30
+                  dark:text-emerald-300
+                "
+              >
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+
+                Wallet ready
+              </span>
+            </div>
+
+            {/* Heading */}
+
+            <div className="flex items-start gap-3">
+              <div className="mt-1 hidden h-1.5 rounded-full bg-gradient-to-b from-violet-500 to-cyan-400 sm:block sm:w-1.5" />
+
+              <div>
+                <h1
+                  className="
+                    max-w-3xl
+                    text-3xl
+                    font-black
+                    tracking-[-0.045em]
+                    text-foreground
+                    sm:text-4xl
+                  "
+                >
+                  Share your Coffer receive link
+                </h1>
+
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground md:text-[15px]">
+                  Share your QR code or Wallet ID.
+                  The sender still confirms the
+                  transfer securely from their own
+                  account.
+                </p>
+              </div>
+            </div>
+
+            {/* Small info row */}
+
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-[9px] font-bold text-muted-foreground">
+                <ShieldCheck className="h-3.5 w-3.5 text-violet-500" />
+                Secure receiving
+              </span>
+
+              <span className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1.5 text-[9px] font-bold text-muted-foreground">
+                <Wallet className="h-3.5 w-3.5 text-cyan-500" />
+                {wallet.currency || "BDT"} wallet
+              </span>
+            </div>
+          </div>
+
+          {/* Refresh card */}
+
+          <div
+            className="
+              shrink-0
+              rounded-2xl
+              border
+              border-border
+              bg-background
+              p-3
+              shadow-sm
+            "
+          >
+            <div className="flex items-center gap-4">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                  Wallet status
+                </p>
+
+                <p className="mt-1 text-xs font-black text-foreground">
+                  {wallet.status}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() =>
+                  void loadReceiveData(
+                    true
+                  )
+                }
+                disabled={refreshing}
+                className="
+                  inline-flex
+                  h-10
+                  items-center
+                  gap-2
+                  rounded-xl
+                  border
+                  border-border
+                  bg-card
+                  px-4
+                  text-xs
+                  font-bold
+                  text-foreground
+                  transition
+                  hover:border-violet-300
+                  hover:text-violet-600
+                  disabled:cursor-not-allowed
+                  disabled:opacity-60
+                  dark:hover:border-violet-700
+                  dark:hover:text-violet-300
+                "
+              >
+                <RefreshCw
+                  className={`h-3.5 w-3.5 ${
+                    refreshing
+                      ? "animate-spin"
+                      : ""
+                  }`}
+                />
+
+                {refreshing
+                  ? "Refreshing"
+                  : "Refresh"}
+              </button>
+            </div>
+          </div>
         </div>
 
-        <h1 className="text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
-          Get paid instantly
-        </h1>
+        {/* updated */}
 
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">
-          Share your QR code or Wallet ID — anyone on NovaWallet can send you money in seconds.
-        </p>
-      </motion.div>
+        <div className="relative z-10 mt-5 flex items-center justify-between gap-4 border-t border-border pt-4 text-[9px] text-muted-foreground">
+          <span className="truncate">
+            Share only your public receive details.
+          </span>
+
+          {lastUpdated && (
+            <span className="shrink-0">
+              Updated{" "}
+              {formatTime(
+                lastUpdated
+              )}
+            </span>
+          )}
+        </div>
+      </motion.header>
 
       {/* =====================================================
-          HERO CARD
+          ACTION MESSAGE
+      ====================================================== */}
+
+      <div className="min-h-4 px-1">
+        <p
+          className="
+            text-right
+            text-[10px]
+            font-medium
+            text-violet-600
+            dark:text-violet-300
+          "
+          aria-live="polite"
+        >
+          {actionMessage}
+        </p>
+      </div>
+
+      {/* =====================================================
+          BLOCKED WARNING
+      ====================================================== */}
+
+      {wallet.status ===
+        "BLOCKED" && (
+        <motion.div
+          initial={{
+            opacity: 0,
+            y: 8,
+          }}
+          animate={{
+            opacity: 1,
+            y: 0,
+          }}
+          className="
+            flex
+            items-start
+            gap-3
+            rounded-[22px]
+            border
+            border-red-200
+            bg-red-50
+            p-4
+            text-red-800
+            dark:border-red-900/60
+            dark:bg-red-950/20
+            dark:text-red-200
+          "
+        >
+          <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0" />
+
+          <div>
+            <p className="text-sm font-bold">
+              Receiving is unavailable
+            </p>
+
+            <p className="mt-1 text-xs leading-5 opacity-80">
+              This wallet is blocked. Contact
+              support before sharing a payment
+              request.
+            </p>
+          </div>
+        </motion.div>
+      )}
+
+      {/* =====================================================
+          MAIN RECEIVE CARD
       ====================================================== */}
 
       <motion.section
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.1 }}
-        className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-[#0F2745] via-[#173F6D] to-[#1F5EA8] p-6 text-white shadow-[0_20px_55px_rgba(23,63,109,0.2)] sm:p-8"
+        initial={{
+          opacity: 0,
+          y: 16,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        transition={{
+          duration: 0.45,
+          delay: 0.06,
+        }}
+        className="
+          relative
+          overflow-hidden
+          rounded-[34px]
+          border
+          border-violet-400/15
+          bg-gradient-to-br
+          from-[#17133B]
+          via-[#281A63]
+          to-[#5226A6]
+          p-5
+          text-white
+          shadow-[0_24px_65px_rgba(55,38,125,.18)]
+          sm:p-7
+          md:p-8
+        "
       >
-        <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-cyan-300/10 blur-3xl" />
-        <div className="pointer-events-none absolute -bottom-24 left-1/3 h-72 w-72 rounded-full bg-blue-300/10 blur-3xl" />
+        {/* background decoration */}
 
-        <div className="relative z-10 flex flex-col items-center text-center">
-          {/* MODE TOGGLE */}
-          <div className="relative inline-flex rounded-full border border-white/15 bg-white/10 p-1 backdrop-blur-md">
+        <div className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-violet-300/10 blur-3xl" />
+
+        <div className="pointer-events-none absolute -bottom-28 -left-20 h-80 w-80 rounded-full bg-cyan-300/10 blur-3xl" />
+
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,.08),transparent_34%)]" />
+
+        <div className="relative z-10 flex flex-col items-center">
+          {/* -------------------------------------------------
+              MODE SWITCH
+          -------------------------------------------------- */}
+
+          <div className="relative inline-flex rounded-full border border-white/15 bg-white/[0.08] p-1 backdrop-blur-md">
             <motion.div
               layout
-              transition={{ type: "spring", stiffness: 400, damping: 30 }}
-              className="absolute bottom-1 top-1 w-[calc(50%-4px)] rounded-full bg-white shadow-sm"
-              style={{ left: mode === "qr" ? "4px" : "calc(50%)" }}
+              transition={{
+                type: "spring",
+                stiffness: 400,
+                damping: 30,
+              }}
+              className="
+                absolute
+                bottom-1
+                top-1
+                rounded-full
+                bg-white
+                shadow-lg
+              "
+              style={{
+                width:
+                  "calc(50% - 4px)",
+
+                left:
+                  mode === "qr"
+                    ? "4px"
+                    : "50%",
+              }}
             />
 
             <button
               type="button"
-              onClick={() => setMode("qr")}
-              className={`relative z-10 rounded-full px-5 py-2 text-xs font-bold transition-colors ${
-                mode === "qr" ? "text-[#123B66]" : "text-blue-100 hover:text-white"
+              onClick={() => {
+                setMode(
+                  "qr"
+                );
+
+                setRequestAmountTouched(
+                  false
+                );
+              }}
+              className={`relative z-10 rounded-full px-5 py-2.5 text-xs font-black transition-colors ${
+                mode === "qr"
+                  ? "text-[#281A63]"
+                  : "text-violet-100/70 hover:text-white"
               }`}
             >
-              My QR Code
+              My QR code
             </button>
 
             <button
               type="button"
-              onClick={() => setMode("request")}
-              className={`relative z-10 rounded-full px-5 py-2 text-xs font-bold transition-colors ${
-                mode === "request" ? "text-[#123B66]" : "text-blue-100 hover:text-white"
+              onClick={() =>
+                setMode(
+                  "request"
+                )
+              }
+              className={`relative z-10 rounded-full px-5 py-2.5 text-xs font-black transition-colors ${
+                mode ===
+                "request"
+                  ? "text-[#281A63]"
+                  : "text-violet-100/70 hover:text-white"
               }`}
             >
-              Request Amount
+              Request amount
             </button>
           </div>
 
-          {/* REQUEST FIELDS */}
-          <AnimatePresence initial={false}>
-            {mode === "request" && (
+          {/* -------------------------------------------------
+              MINI TITLE
+          -------------------------------------------------- */}
+
+          <div className="mt-6 flex items-center gap-2 text-center">
+            <Sparkles className="h-4 w-4 text-cyan-300" />
+
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-violet-100/50">
+              Your secure receiving point
+            </p>
+          </div>
+
+          {/* -------------------------------------------------
+              REQUEST FORM
+          -------------------------------------------------- */}
+
+          <AnimatePresence
+            initial={false}
+          >
+            {mode ===
+              "request" && (
               <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                className="w-full max-w-xs overflow-hidden"
+                initial={{
+                  height: 0,
+                  opacity: 0,
+                }}
+                animate={{
+                  height:
+                    "auto",
+                  opacity: 1,
+                }}
+                exit={{
+                  height: 0,
+                  opacity: 0,
+                }}
+                transition={{
+                  duration:
+                    0.3,
+                  ease: [
+                    0.16,
+                    1,
+                    0.3,
+                    1,
+                  ],
+                }}
+                className="w-full max-w-sm overflow-hidden"
               >
-                <div className="mt-6 space-y-3 text-left">
-                  <div className="relative">
-                    <Banknote className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-blue-200" />
-                    <input
-                      type="number"
-                      min="1"
-                      step="0.01"
-                      inputMode="decimal"
-                      placeholder="Amount (৳)"
-                      value={requestAmount}
-                      onChange={(e) => setRequestAmount(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (["-", "e", "E", "+"].includes(e.key)) e.preventDefault();
-                      }}
-                      className="w-full rounded-xl border border-white/15 bg-white/10 py-3 pl-11 pr-4 text-sm font-semibold text-white placeholder:text-blue-200/60 outline-none transition focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
-                    />
+                <div className="mt-5 space-y-3 text-left">
+                  {/* amount */}
+
+                  <div>
+                    <label
+                      htmlFor="request-amount"
+                      className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.14em] text-violet-100/55"
+                    >
+                      Amount (
+                      {
+                        wallet.currency
+                      }
+                      )
+                    </label>
+
+                    <div className="relative">
+                      <Banknote className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-cyan-200" />
+
+                      <input
+                        id="request-amount"
+                        type="text"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        placeholder="0.00"
+                        value={
+                          requestAmount
+                        }
+                        onBlur={() =>
+                          setRequestAmountTouched(
+                            true
+                          )
+                        }
+                        onChange={(
+                          event
+                        ) => {
+                          const nextValue =
+                            event
+                              .target
+                              .value;
+
+                          if (
+                            nextValue ===
+                              "" ||
+                            /^\d*\.?\d{0,2}$/.test(
+                              nextValue
+                            )
+                          ) {
+                            setRequestAmount(
+                              nextValue
+                            );
+                          }
+                        }}
+                        aria-invalid={
+                          requestAmountTouched &&
+                          !amountValidation.valid
+                        }
+                        aria-describedby="request-amount-error"
+                        className={`
+                          w-full
+                          rounded-2xl
+                          border
+                          bg-white/[0.08]
+                          py-3.5
+                          pl-11
+                          pr-4
+                          text-sm
+                          font-semibold
+                          text-white
+                          placeholder:text-violet-100/25
+                          outline-none
+                          transition
+                          focus:ring-4
+                          ${
+                            requestAmountTouched &&
+                            !amountValidation.valid
+                              ? "border-red-300 focus:border-red-300 focus:ring-red-300/10"
+                              : "border-white/10 focus:border-cyan-300 focus:ring-cyan-300/10"
+                          }
+                        `}
+                      />
+                    </div>
+
+                    <p
+                      id="request-amount-error"
+                      className="mt-1.5 min-h-4 text-[10px] text-red-200"
+                    >
+                      {requestAmountTouched &&
+                      !amountValidation.valid
+                        ? amountValidation.message
+                        : ""}
+                    </p>
                   </div>
 
-                  <input
-                    type="text"
-                    placeholder="What's this for? (optional)"
-                    value={requestNote}
-                    onChange={(e) => setRequestNote(e.target.value)}
-                    className="w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-blue-200/60 outline-none transition focus:border-cyan-300 focus:ring-4 focus:ring-cyan-300/10"
-                  />
+                  {/* note */}
+
+                  <div>
+                    <label
+                      htmlFor="request-note"
+                      className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.14em] text-violet-100/55"
+                    >
+                      Note
+                      <span className="ml-1 opacity-50">
+                        optional
+                      </span>
+                    </label>
+
+                    <input
+                      id="request-note"
+                      type="text"
+                      maxLength={
+                        MAX_NOTE_LENGTH
+                      }
+                      placeholder="What is this payment for?"
+                      value={
+                        requestNote
+                      }
+                      onChange={(
+                        event
+                      ) =>
+                        setRequestNote(
+                          event
+                            .target
+                            .value
+                        )
+                      }
+                      className="
+                        w-full
+                        rounded-2xl
+                        border
+                        border-white/10
+                        bg-white/[0.08]
+                        px-4
+                        py-3.5
+                        text-sm
+                        text-white
+                        placeholder:text-violet-100/25
+                        outline-none
+                        transition
+                        focus:border-cyan-300
+                        focus:ring-4
+                        focus:ring-cyan-300/10
+                      "
+                    />
+
+                    <p className="mt-1 text-right text-[9px] text-violet-100/35">
+                      {
+                        requestNote.length
+                      }
+                      /
+                      {
+                        MAX_NOTE_LENGTH
+                      }
+                    </p>
+                  </div>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* QR CODE */}
-          <motion.div layout className="relative mt-7 rounded-3xl bg-white p-5 shadow-2xl">
-            <motion.div
-              animate={{ opacity: [0.5, 0.9, 0.5] }}
-              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              className="pointer-events-none absolute -inset-2 -z-10 rounded-[28px] bg-cyan-300/20 blur-xl"
-            />
+          {/* -------------------------------------------------
+              QR CARD
+          -------------------------------------------------- */}
 
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={qrValue}
-                initial={{ opacity: 0, scale: 0.92 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.92 }}
-                transition={{ duration: 0.25 }}
+          <motion.div
+            layout
+            className="
+              relative
+              mt-7
+              rounded-[30px]
+              border
+              border-white/10
+              bg-white
+              p-4
+              shadow-[0_18px_45px_rgba(0,0,0,.25)]
+              sm:p-5
+            "
+          >
+            <div className="rounded-[22px] border border-slate-100 bg-white p-2">
+              <AnimatePresence
+                mode="wait"
               >
-                <QRCodeCanvas
-                  ref={qrRef}
-                  value={qrValue || wallet._id}
-                  size={200}
-                  level="M"
-                  includeMargin
-                  bgColor="#ffffff"
-                  fgColor="#0F2745"
-                />
-              </motion.div>
-            </AnimatePresence>
+                <motion.div
+                  key={
+                    receiveLink
+                  }
+                  initial={{
+                    opacity: 0,
+                    scale: 0.94,
+                  }}
+                  animate={{
+                    opacity: 1,
+                    scale: 1,
+                  }}
+                  exit={{
+                    opacity: 0,
+                    scale: 0.94,
+                  }}
+                  transition={{
+                    duration:
+                      0.22,
+                  }}
+                >
+                  <QRCodeCanvas
+                    ref={qrRef}
+                    value={
+                      receiveLink ||
+                      wallet._id
+                    }
+                    size={210}
+                    level="M"
+                    includeMargin
+                    bgColor="#ffffff"
+                    fgColor="#17133B"
+                  />
+                </motion.div>
+              </AnimatePresence>
+            </div>
           </motion.div>
 
-          <AnimatePresence>
-            {mode === "request" && requestAmount && Number(requestAmount) > 0 && (
-              <motion.p
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -4 }}
-                className="mt-3 text-sm font-semibold text-cyan-200"
+          {/* request amount label */}
+
+          {mode ===
+            "request" &&
+            amountValidation.amount !=
+              null && (
+              <motion.div
+                initial={{
+                  opacity: 0,
+                  y: 6,
+                }}
+                animate={{
+                  opacity: 1,
+                  y: 0,
+                }}
+                className="mt-4 rounded-full border border-cyan-300/15 bg-cyan-300/10 px-4 py-2"
               >
-                Requesting {formatCurrency(Number(requestAmount))}
-              </motion.p>
+                <p className="text-xs font-black text-cyan-200">
+                  Requesting{" "}
+                  {formatCurrency(
+                    amountValidation.amount,
+                    wallet.currency
+                  )}
+                </p>
+              </motion.div>
             )}
-          </AnimatePresence>
 
-          {/* WALLET ID */}
-          <div className="mt-7 w-full max-w-xs rounded-2xl border border-white/10 bg-white/10 p-4 backdrop-blur-md">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.15em] text-blue-100/60">
-              Wallet ID
-            </p>
+          {/* -------------------------------------------------
+              WALLET ID
+          -------------------------------------------------- */}
 
-            <div className="mt-1 flex items-center justify-between gap-3">
-              <p className="truncate text-sm font-bold text-white">{wallet._id}</p>
+          <div className="mt-7 w-full max-w-sm">
+            <div
+              className="
+                rounded-[22px]
+                border
+                border-white/10
+                bg-white/[0.07]
+                p-4
+                backdrop-blur-md
+              "
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.16em] text-violet-100/45">
+                    Wallet ID
+                  </p>
 
-              <button
-                type="button"
-                onClick={() => void handleCopy("id", wallet._id)}
-                aria-label="Copy wallet ID"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/10 text-white transition hover:bg-white/20"
-              >
-                <AnimatePresence mode="wait" initial={false}>
-                  <motion.span
-                    key={copied === "id" ? "check" : "copy"}
-                    initial={{ scale: 0.5, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0.5, opacity: 0 }}
-                    transition={{ duration: 0.15 }}
-                    className="flex"
-                  >
-                    {copied === "id" ? (
-                      <CheckCircle2 className="h-4 w-4 text-emerald-300" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )}
-                  </motion.span>
-                </AnimatePresence>
-              </button>
+                  <p className="mt-1 truncate text-sm font-black text-white">
+                    {wallet._id}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    void handleCopy(
+                      "id",
+                      wallet._id
+                    )
+                  }
+                  aria-label="Copy wallet ID"
+                  className="
+                    flex
+                    h-9
+                    w-9
+                    shrink-0
+                    items-center
+                    justify-center
+                    rounded-xl
+                    border
+                    border-white/10
+                    bg-white/[0.06]
+                    text-white
+                    transition
+                    hover:bg-white/[0.14]
+                  "
+                >
+                  {copied ===
+                  "id" ? (
+                    <Check className="h-4 w-4 text-emerald-300" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+
+              {/* account status */}
+
+              <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3">
+                <span className="text-[9px] text-violet-100/40">
+                  Account status
+                </span>
+
+                <span
+                  className={`rounded-full px-2.5 py-1 text-[8px] font-black ${
+                    wallet.status ===
+                    "ACTIVE"
+                      ? "bg-emerald-300/10 text-emerald-200"
+                      : wallet.status ===
+                        "FROZEN"
+                      ? "bg-amber-300/10 text-amber-200"
+                      : "bg-red-300/10 text-red-200"
+                  }`}
+                >
+                  {
+                    wallet.status
+                  }
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* BALANCE */}
-          <div className="mt-3 flex items-center gap-2 text-xs text-blue-100/70">
-            <Wallet className="h-3.5 w-3.5" />
-            <span>Balance:</span>
+          {/* -------------------------------------------------
+              BALANCE
+          -------------------------------------------------- */}
 
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.span
-                key={showBalance ? "visible" : "masked"}
-                initial={{ opacity: 0, filter: "blur(3px)" }}
-                animate={{ opacity: 1, filter: "blur(0px)" }}
-                exit={{ opacity: 0, filter: "blur(3px)" }}
-                transition={{ duration: 0.2 }}
-                className="font-bold text-white"
-              >
-                {showBalance ? formattedBalance : maskCurrency(formattedBalance)}
-              </motion.span>
-            </AnimatePresence>
+          <div className="mt-3 flex flex-wrap items-center justify-center gap-2 text-xs text-violet-100/55">
+            <Wallet className="h-3.5 w-3.5" />
+
+            <span>
+              Available:
+            </span>
+
+            <span className="font-black text-white">
+              {showBalance
+                ? formattedBalance
+                : maskCurrency(
+                    formattedBalance
+                  )}
+            </span>
 
             <button
               type="button"
-              onClick={() => setShowBalance((v) => !v)}
-              aria-label={showBalance ? "Hide balance" : "Show balance"}
-              className="text-blue-200 transition-colors hover:text-white"
+              onClick={() =>
+                setShowBalance(
+                  (current) =>
+                    !current
+                )
+              }
+              aria-label={
+                showBalance
+                  ? "Hide balance"
+                  : "Show balance"
+              }
+              className="rounded p-1 text-violet-100/50 transition hover:text-white"
             >
-              {showBalance ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+              {showBalance ? (
+                <Eye className="h-3.5 w-3.5" />
+              ) : (
+                <EyeOff className="h-3.5 w-3.5" />
+              )}
             </button>
+
+            {wallet.pendingBalance >
+              0 && (
+              <span className="ml-1 rounded-full border border-amber-300/10 bg-amber-300/10 px-2.5 py-1 text-[9px] font-bold text-amber-200">
+                Pending{" "}
+                {
+                  formattedPendingBalance
+                }
+              </span>
+            )}
           </div>
 
-          {/* ACTIONS */}
-          <div className="mt-7 grid w-full max-w-xs grid-cols-2 gap-3">
+          {/* -------------------------------------------------
+              ACTIONS
+          -------------------------------------------------- */}
+
+          <div className="mt-7 grid w-full max-w-sm grid-cols-2 gap-3">
             <button
               type="button"
-              onClick={() => void handleShare()}
-              className="flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-xs font-bold text-[#123B66] transition hover:bg-blue-50 active:scale-95"
+              onClick={() =>
+                void handleShare()
+              }
+              disabled={
+                !actionsEnabled
+              }
+              className="
+                flex
+                items-center
+                justify-center
+                gap-2
+                rounded-2xl
+                bg-white
+                px-4
+                py-3.5
+                text-xs
+                font-black
+                text-[#281A63]
+                transition
+                hover:bg-violet-50
+                active:scale-[.98]
+                disabled:cursor-not-allowed
+                disabled:opacity-45
+              "
             >
-              {copied === "request" ? (
+              {copied ===
+              "link" ? (
                 <>
-                  <CheckCircle2 className="h-4 w-4" /> Copied
+                  <CheckCircle2 className="h-4 w-4" />
+
+                  Copied
                 </>
               ) : (
                 <>
-                  <Share2 className="h-4 w-4" /> Share
+                  <Share2 className="h-4 w-4" />
+
+                  Share
                 </>
               )}
             </button>
 
             <button
               type="button"
-              onClick={handleDownloadQr}
-              className="flex items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-xs font-bold text-white transition hover:bg-white/20 active:scale-95"
+              onClick={
+                handleDownloadQr
+              }
+              disabled={
+                !actionsEnabled
+              }
+              className="
+                flex
+                items-center
+                justify-center
+                gap-2
+                rounded-2xl
+                border
+                border-white/15
+                bg-white/[0.08]
+                px-4
+                py-3.5
+                text-xs
+                font-black
+                text-white
+                backdrop-blur
+                transition
+                hover:bg-white/[0.14]
+                active:scale-[.98]
+                disabled:cursor-not-allowed
+                disabled:opacity-45
+              "
             >
-              <Download className="h-4 w-4" /> Save QR
+              <Download className="h-4 w-4" />
+
+              Save QR
             </button>
+          </div>
+
+          {/* tiny footer */}
+
+          <div className="mt-6 flex items-center gap-2 text-center text-[9px] text-violet-100/35">
+            <ShieldCheck className="h-3.5 w-3.5" />
+
+            Never share your password, PIN,
+            token, or OTP.
           </div>
         </div>
       </motion.section>
 
       {/* =====================================================
-          QUICK ACTIONS
+          QUICK LINKS
       ====================================================== */}
 
       <motion.section
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.15 }}
+        initial={{
+          opacity: 0,
+          y: 14,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        transition={{
+          duration: 0.4,
+          delay: 0.12,
+        }}
         className="grid gap-4 sm:grid-cols-3"
       >
         <QuickLink
           href="/dashboard/send"
           icon={ArrowUpRight}
-          title="Send Money"
+          title="Send money"
           description="Transfer funds to someone"
-          iconClass="bg-blue-50 text-blue-600"
+          iconClass="
+            border-blue-200
+            bg-blue-50
+            text-blue-600
+            dark:border-blue-800
+            dark:bg-blue-950/30
+            dark:text-blue-300
+          "
         />
 
         <QuickLink
@@ -545,76 +1931,249 @@ export default function ReceiveMoneyPage() {
           icon={CreditCard}
           title="Transactions"
           description="View wallet activity"
-          iconClass="bg-violet-50 text-violet-600"
+          iconClass="
+            border-violet-200
+            bg-violet-50
+            text-violet-600
+            dark:border-violet-800
+            dark:bg-violet-950/30
+            dark:text-violet-300
+          "
         />
 
         <QuickLink
           href="/dashboard/wallet"
           icon={WalletCards}
-          title="My Wallet"
-          description="Balance and account info"
-          iconClass="bg-emerald-50 text-emerald-600"
+          title="My wallet"
+          description="Balance and account information"
+          iconClass="
+            border-emerald-200
+            bg-emerald-50
+            text-emerald-600
+            dark:border-emerald-800
+            dark:bg-emerald-950/30
+            dark:text-emerald-300
+          "
         />
       </motion.section>
 
       {/* =====================================================
-          RECENT DEPOSITS
+          RECENTLY RECEIVED
       ====================================================== */}
 
       <motion.section
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.2 }}
-        className="overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-[0_10px_35px_rgba(15,23,42,0.04)]"
+        initial={{
+          opacity: 0,
+          y: 14,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        transition={{
+          duration: 0.4,
+          delay: 0.18,
+        }}
+        className="
+          overflow-hidden
+          rounded-[28px]
+          border
+          border-border
+          bg-card
+          shadow-sm
+        "
       >
-        <div className="border-b border-slate-100 px-5 py-5 sm:px-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Activity</p>
-          <h2 className="mt-1 text-lg font-extrabold text-slate-900">Recently Received</h2>
+        <div className="flex items-center justify-between gap-4 border-b border-border px-5 py-5 sm:px-6">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-600 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
+              <ArrowDownLeft className="h-4 w-4" />
+            </div>
+
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                Incoming activity
+              </p>
+
+              <h2 className="mt-1 text-lg font-black text-foreground">
+                Recently received
+              </h2>
+            </div>
+          </div>
+
+          <Link
+            href="/dashboard/transactions"
+            className="
+              inline-flex
+              items-center
+              gap-1
+              rounded-lg
+              px-2
+              py-1.5
+              text-[10px]
+              font-black
+              text-violet-600
+              transition
+              hover:bg-violet-50
+              dark:text-violet-300
+              dark:hover:bg-violet-950/30
+            "
+          >
+            View all
+
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Link>
         </div>
 
-        {depositsLoading ? (
-          <div className="flex items-center justify-center gap-3 p-10 text-sm text-slate-400">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Loading recent activity...
+        {activityError ? (
+          <div className="p-8 text-center">
+            <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-300">
+              <RefreshCw className="h-5 w-5" />
+            </div>
+
+            <p className="mt-3 text-sm font-bold text-foreground">
+              Couldn&apos;t load incoming activity
+            </p>
+
+            <p className="mt-1 text-xs text-muted-foreground">
+              {activityError}
+            </p>
+
+            <button
+              type="button"
+              onClick={() =>
+                void loadReceiveData(
+                  true
+                )
+              }
+              className="
+                mt-4
+                inline-flex
+                items-center
+                gap-2
+                rounded-xl
+                border
+                border-border
+                bg-background
+                px-4
+                py-2
+                text-xs
+                font-bold
+                text-foreground
+                transition
+                hover:border-violet-300
+                hover:text-violet-600
+                dark:hover:border-violet-700
+                dark:hover:text-violet-300
+              "
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+
+              Retry
+            </button>
           </div>
-        ) : deposits.length === 0 ? (
+        ) : receivedTransactions.length ===
+          0 ? (
           <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-border bg-muted text-muted-foreground">
               <ArrowDownLeft className="h-5 w-5" />
             </div>
-            <p className="mt-3 text-sm font-bold text-slate-700">Nothing received yet</p>
-            <p className="mt-1 max-w-xs text-xs text-slate-400">
-              Money you receive into your wallet will show up here.
+
+            <p className="mt-3 text-sm font-bold text-foreground">
+              Nothing received yet
+            </p>
+
+            <p className="mt-1 max-w-xs text-xs leading-5 text-muted-foreground">
+              Incoming transfers and deposits
+              will appear here.
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-100">
-            {deposits.map((deposit, i) => (
-              <motion.div
-                key={deposit._id}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.05 }}
-                className="flex items-center justify-between gap-4 p-4 transition hover:bg-slate-50 sm:p-5"
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-                    <ArrowDownLeft className="h-5 w-5" />
+          <div className="divide-y divide-border">
+            {receivedTransactions.map(
+              (
+                transaction,
+                index
+              ) => (
+                <motion.div
+                  key={
+                    transaction._id
+                  }
+                  initial={{
+                    opacity: 0,
+                    x: -10,
+                  }}
+                  animate={{
+                    opacity: 1,
+                    x: 0,
+                  }}
+                  transition={{
+                    delay:
+                      index *
+                      0.05,
+                  }}
+                  className="
+                    flex
+                    items-center
+                    justify-between
+                    gap-4
+                    p-4
+                    transition
+                    hover:bg-muted/40
+                    sm:p-5
+                  "
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-600 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
+                      <ArrowDownLeft className="h-5 w-5" />
+                    </div>
+
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold text-foreground">
+                        {getTransactionTitle(
+                          transaction
+                        )}
+                      </p>
+
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
+                        <span>
+                          {formatDate(
+                            transaction.createdAt
+                          )}
+                        </span>
+
+                        <StatusBadge
+                          status={
+                            transaction.status
+                          }
+                        />
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-slate-900">
-                      {deposit.reference ? `Reference: ${deposit.reference}` : "Wallet Deposit"}
-                    </p>
-                    <p className="mt-0.5 text-[11px] text-slate-400">{formatDate(deposit.createdAt)}</p>
-                  </div>
-                </div>
+                  <p
+                    className={`shrink-0 text-sm font-black ${
+                      transaction.status ===
+                      "COMPLETED"
+                        ? "text-emerald-600 dark:text-emerald-300"
+                        : transaction.status ===
+                          "PENDING"
+                        ? "text-amber-600 dark:text-amber-300"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    {transaction.status ===
+                    "COMPLETED"
+                      ? "+ "
+                      : ""}
 
-                <p className="shrink-0 text-sm font-black text-emerald-600">
-                  + {formatCurrency(deposit.amount)}
-                </p>
-              </motion.div>
-            ))}
+                    {formatCurrency(
+                      transaction.amount,
+                      transaction.currency
+                    )}
+                  </p>
+                </motion.div>
+              )
+            )}
           </div>
         )}
       </motion.section>
@@ -624,28 +2183,77 @@ export default function ReceiveMoneyPage() {
       ====================================================== */}
 
       <motion.section
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, delay: 0.25 }}
-        className="rounded-[26px] border border-emerald-100 bg-gradient-to-br from-emerald-50 to-blue-50 p-5 shadow-[0_10px_35px_rgba(15,23,42,0.04)] sm:p-6"
+        initial={{
+          opacity: 0,
+          y: 14,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        transition={{
+          duration: 0.4,
+          delay: 0.22,
+        }}
+        className="
+          relative
+          overflow-hidden
+          rounded-[28px]
+          border
+          border-violet-200
+          bg-gradient-to-br
+          from-violet-50
+          via-background
+          to-cyan-50
+          p-5
+          shadow-sm
+          dark:border-violet-900/60
+          dark:from-violet-950/20
+          dark:via-card
+          dark:to-cyan-950/10
+          sm:p-6
+        "
       >
-        <div className="flex items-start gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white text-emerald-600 shadow-sm">
+        <div className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-violet-500/10 blur-3xl" />
+
+        <div className="relative z-10 flex items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50 text-emerald-600 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
             <ShieldCheck className="h-5 w-5" />
           </div>
 
-          <div>
-            <p className="text-sm font-bold text-slate-900">Your Wallet ID is safe to share</p>
-            <p className="mt-1 text-xs leading-5 text-slate-600">
-              Anyone with your Wallet ID or QR code can only send you money — they can never withdraw
-              or take funds from your wallet with it. Never share your password or PIN, though.
+          <div className="min-w-0">
+            <p className="text-sm font-black text-foreground">
+              Share receive details, never account secrets
+            </p>
+
+            <p className="mt-1 max-w-3xl text-xs leading-6 text-muted-foreground">
+              Your Wallet ID and receive link identify
+              where a sender intends to pay. They do
+              not replace authentication. Never share
+              your password, PIN, token, or one-time
+              code.
             </p>
 
             <Link
               href="/dashboard/kyc"
-              className="mt-3 inline-flex items-center gap-1 text-xs font-bold text-[#1F5EA8] hover:underline"
+              className="
+                mt-3
+                inline-flex
+                items-center
+                gap-1
+                rounded-lg
+                px-2
+                py-1.5
+                text-[10px]
+                font-black
+                text-violet-600
+                transition
+                hover:bg-violet-500/10
+                dark:text-violet-300
+              "
             >
-              Complete KYC for higher limits
+              Review verification status
+
               <ChevronRight className="h-3.5 w-3.5" />
             </Link>
           </div>
@@ -667,56 +2275,265 @@ function QuickLink({
   iconClass,
 }: {
   href: string;
+
   icon: React.ElementType;
+
   title: string;
+
   description: string;
+
   iconClass: string;
 }) {
   return (
     <Link
       href={href}
-      className="group rounded-[24px] border border-slate-200 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.04)] transition duration-300 hover:-translate-y-1 hover:border-blue-100 hover:shadow-[0_16px_40px_rgba(15,23,42,0.07)]"
+      className="
+        group
+        rounded-[24px]
+        border
+        border-border
+        bg-card
+        p-5
+        shadow-sm
+        transition
+        duration-300
+        hover:-translate-y-1
+        hover:border-violet-300
+        hover:shadow-[0_18px_40px_rgba(109,40,217,.08)]
+        dark:hover:border-violet-700
+      "
     >
       <div className="flex items-start justify-between gap-3">
-        <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${iconClass}`}>
-          <Icon className="h-5 w-5" />
+        <div
+          className={`flex h-11 w-11 items-center justify-center rounded-2xl border ${iconClass}`}
+        >
+          <Icon
+            className="h-5 w-5"
+            aria-hidden="true"
+          />
         </div>
 
-        <ChevronRight className="h-4 w-4 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[#1F5EA8]" />
+        <div className="flex h-8 w-8 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition group-hover:border-violet-200 group-hover:text-violet-600 dark:group-hover:border-violet-800 dark:group-hover:text-violet-300">
+          <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+        </div>
       </div>
 
-      <h3 className="mt-5 text-sm font-extrabold text-slate-900">{title}</h3>
-      <p className="mt-1 text-[11px] leading-5 text-slate-400">{description}</p>
+      <h3 className="mt-5 text-sm font-black text-foreground">
+        {title}
+      </h3>
+
+      <p className="mt-1 text-[10px] leading-5 text-muted-foreground">
+        {description}
+      </p>
     </Link>
   );
 }
 
 /* =========================================================
-   CURRENCY / DATE
+   STATUS BADGE
 ========================================================= */
 
-function formatCurrency(amount: number): string {
-  return `৳ ${Number(amount || 0).toLocaleString("en-BD", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })}`;
+function StatusBadge({
+  status,
+}: {
+  status: TransactionStatus;
+}) {
+  const styles: Record<
+    TransactionStatus,
+    string
+  > = {
+    COMPLETED:
+      "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300",
+
+    PENDING:
+      "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300",
+
+    FAILED:
+      "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300",
+  };
+
+  return (
+    <span
+      className={`
+        inline-flex
+        items-center
+        gap-1
+        rounded-full
+        border
+        px-2
+        py-0.5
+        text-[8px]
+        font-black
+        ${styles[status]}
+      `}
+    >
+      {status ===
+        "PENDING" && (
+        <Clock3 className="h-2.5 w-2.5" />
+      )}
+
+      {status.toLowerCase()}
+    </span>
+  );
 }
 
-function maskCurrency(formatted: string): string {
-  return formatted.replace(/[0-9]/g, "•");
+/* =========================================================
+   TRANSACTION TITLE
+========================================================= */
+
+function getTransactionTitle(
+  transaction: Transaction
+): string {
+  if (
+    transaction.reference?.trim()
+  ) {
+    return transaction.reference.trim();
+  }
+
+  if (
+    transaction.counterparty &&
+    typeof transaction.counterparty ===
+      "object" &&
+    transaction.counterparty.name
+  ) {
+    return `From ${transaction.counterparty.name}`;
+  }
+
+  return transaction.type ===
+    "DEPOSIT"
+    ? "Wallet deposit"
+    : "Incoming transfer";
 }
 
-function formatDate(value?: string): string {
-  if (!value) return "N/A";
+/* =========================================================
+   FORMAT CURRENCY
+========================================================= */
 
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "N/A";
+function formatCurrency(
+  amount: number,
+  currency = "BDT"
+): string {
+  const safeAmount =
+    Number(amount) || 0;
 
-  return date.toLocaleString("en-BD", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  if (
+    currency.toUpperCase() ===
+    "BDT"
+  ) {
+    return `৳ ${safeAmount.toLocaleString(
+      "en-BD",
+      {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2,
+      }
+    )}`;
+  }
+
+  try {
+    return new Intl.NumberFormat(
+      "en",
+      {
+        style:
+          "currency",
+
+        currency:
+          currency.toUpperCase(),
+
+        minimumFractionDigits: 0,
+
+        maximumFractionDigits: 2,
+      }
+    ).format(
+      safeAmount
+    );
+  } catch {
+    return `${currency.toUpperCase()} ${safeAmount.toLocaleString(
+      "en",
+      {
+        maximumFractionDigits: 2,
+      }
+    )}`;
+  }
+}
+
+/* =========================================================
+   MASK
+========================================================= */
+
+function maskCurrency(
+  formatted: string
+): string {
+  return formatted.replace(
+    /[0-9]/g,
+    "•"
+  );
+}
+
+/* =========================================================
+   DATE
+========================================================= */
+
+function formatDate(
+  value?: string
+): string {
+  if (!value) {
+    return "N/A";
+  }
+
+  const date =
+    new Date(value);
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return "N/A";
+  }
+
+  return date.toLocaleString(
+    "en-BD",
+    {
+      day: "2-digit",
+
+      month: "short",
+
+      year: "numeric",
+
+      hour: "2-digit",
+
+      minute: "2-digit",
+    }
+  );
+}
+
+/* =========================================================
+   TIME
+========================================================= */
+
+function formatTime(
+  value: Date
+): string {
+  return value.toLocaleTimeString(
+    "en-BD",
+    {
+      hour: "2-digit",
+
+      minute: "2-digit",
+    }
+  );
+}
+
+/* =========================================================
+   ERROR
+========================================================= */
+
+function getErrorMessage(
+  error: unknown,
+  fallback: string
+): string {
+  return error instanceof Error &&
+    error.message
+    ? error.message
+    : fallback;
 }

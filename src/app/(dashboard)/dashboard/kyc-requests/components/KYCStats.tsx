@@ -1,150 +1,246 @@
 "use client";
 
 import { motion } from "framer-motion";
+
 import {
   AlertTriangle,
   CheckCircle2,
   Clock3,
   FileCheck2,
   ShieldAlert,
-  Users,
+  TimerReset,
 } from "lucide-react";
 
-export interface KYCStatsData {
-  pending: number;
-  underReview: number;
-  approvedToday: number;
-  rejectedToday: number;
-  highRisk: number;
-  averageReviewMinutes: number;
-}
+import type { KYCOverviewData } from "./KYCManagementTypes";
 
-const cards = [
-  {
-    key: "pending",
-    title: "Pending Review",
-    icon: FileCheck2,
-    color: "blue",
+const tone = {
+  blue: {
+    icon:
+      "border-indigo-500/20 bg-indigo-500/10 text-indigo-500",
+    bar:
+      "bg-indigo-500",
   },
-  {
-    key: "underReview",
-    title: "Under Review",
-    icon: Clock3,
-    color: "amber",
+  amber: {
+    icon:
+      "border-amber-500/20 bg-amber-500/10 text-amber-500",
+    bar:
+      "bg-amber-500",
   },
-  {
-    key: "approvedToday",
-    title: "Approved Today",
-    icon: CheckCircle2,
-    color: "emerald",
+  emerald: {
+    icon:
+      "border-emerald-500/20 bg-emerald-500/10 text-emerald-500",
+    bar:
+      "bg-emerald-500",
   },
-  {
-    key: "rejectedToday",
-    title: "Rejected Today",
-    icon: ShieldAlert,
-    color: "rose",
+  rose: {
+    icon:
+      "border-rose-500/20 bg-rose-500/10 text-rose-500",
+    bar:
+      "bg-rose-500",
   },
-  {
-    key: "highRisk",
-    title: "High Risk",
-    icon: AlertTriangle,
-    color: "orange",
+  orange: {
+    icon:
+      "border-orange-500/20 bg-orange-500/10 text-orange-500",
+    bar:
+      "bg-orange-500",
   },
-] as const;
+  cyan: {
+    icon:
+      "border-cyan-500/20 bg-cyan-500/10 text-cyan-500",
+    bar:
+      "bg-cyan-500",
+  },
+} as const;
+
+function formatReviewTime(minutes: number | null) {
+  if (
+    minutes === null ||
+    !Number.isFinite(minutes)
+  ) {
+    return "—";
+  }
+
+  const safe = Math.max(0, minutes);
+  const mins = Math.floor(safe);
+  const seconds = Math.round(
+    (safe - mins) * 60
+  );
+
+  return `${mins}m ${seconds
+    .toString()
+    .padStart(2, "0")}s`;
+}
 
 export default function KYCStats({
   stats,
 }: {
-  stats: KYCStatsData;
+  stats: KYCOverviewData;
 }) {
+  const maxCount = Math.max(
+    1,
+    stats.pending,
+    stats.underReview,
+    stats.approvedToday,
+    stats.rejectedToday,
+    stats.highRisk
+  );
+
+  const cards = [
+    {
+      key: "pending",
+      title: "Pending Review",
+      value: stats.pending,
+      helper: "Waiting to be opened",
+      icon: FileCheck2,
+      color: "blue" as const,
+    },
+    {
+      key: "underReview",
+      title: "Under Review",
+      value: stats.underReview,
+      helper: "Active compliance reviews",
+      icon: Clock3,
+      color: "amber" as const,
+    },
+    {
+      key: "approvedToday",
+      title: "Approved Today",
+      value: stats.approvedToday,
+      helper: "Finalized as verified",
+      icon: CheckCircle2,
+      color: "emerald" as const,
+    },
+    {
+      key: "rejectedToday",
+      title: "Rejected Today",
+      value: stats.rejectedToday,
+      helper: "Finalized as rejected",
+      icon: ShieldAlert,
+      color: "rose" as const,
+    },
+    {
+      key: "highRisk",
+      title: "High Risk",
+      value: stats.highRisk,
+      helper: "High / critical screening",
+      icon: AlertTriangle,
+      color: "orange" as const,
+    },
+  ];
+
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
       {cards.map((card, index) => {
         const Icon = card.icon;
-        const value = stats[card.key];
-
-        const iconClass = {
-          blue: "bg-blue-50 text-blue-600",
-          amber: "bg-amber-50 text-amber-600",
-          emerald: "bg-emerald-50 text-emerald-600",
-          rose: "bg-rose-50 text-rose-600",
-          orange: "bg-orange-50 text-orange-600",
-        }[card.color];
+        const style = tone[card.color];
+        const progress =
+          (card.value / maxCount) * 100;
 
         return (
-          <motion.div
+          <motion.article
             key={card.key}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.05 }}
-            whileHover={{ y: -3 }}
-            className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+            initial={{
+              opacity: 0,
+              y: 10,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+            }}
+            transition={{
+              duration: 0.4,
+              delay: index * 0.04,
+              ease: [0.22, 1, 0.36, 1],
+            }}
+            whileHover={{ y: -2 }}
+            className="rounded-[22px] border border-border bg-card p-4 text-card-foreground shadow-[0_8px_26px_rgba(0,0,0,0.035)] transition hover:border-indigo-500/20 hover:shadow-[0_14px_34px_rgba(0,0,0,0.07)]"
           >
-            <div
-              className={`flex h-10 w-10 items-center justify-center rounded-xl ${iconClass}`}
-            >
-              <Icon className="h-4 w-4" />
+            <div className="flex items-start justify-between gap-3">
+              <div
+                className={`flex h-9 w-9 items-center justify-center rounded-xl border ${style.icon}`}
+              >
+                <Icon className="h-4 w-4" />
+              </div>
+
+              <span className="rounded-full border border-border bg-muted px-2 py-1 text-[7px] font-black uppercase tracking-[0.09em] text-muted-foreground">
+                Live
+              </span>
             </div>
 
-            <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
+            <p className="mt-4 text-[8px] font-black uppercase tracking-[0.13em] text-muted-foreground">
               {card.title}
             </p>
 
-            <p className="mt-1 text-2xl font-black text-[#0F2745]">
-              {value.toLocaleString()}
+            <p className="mt-1 text-2xl font-black text-foreground">
+              {card.value.toLocaleString()}
             </p>
 
-            <div className="mt-4 flex items-end gap-1">
-              {[11, 18, 15, 25, 21, 30, 27].map(
-                (height, barIndex) => (
-                  <motion.span
-                    key={barIndex}
-                    initial={{ height: 0 }}
-                    animate={{ height }}
-                    transition={{
-                      duration: 0.4,
-                      delay:
-                        index * 0.04 +
-                        barIndex * 0.03,
-                    }}
-                    className="w-full rounded-full bg-slate-200"
-                  />
-                )
-              )}
+            <p className="mt-1 truncate text-[8px] text-muted-foreground">
+              {card.helper}
+            </p>
+
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{
+                  width: `${Math.max(
+                    0,
+                    Math.min(
+                      100,
+                      progress
+                    )
+                  )}%`,
+                }}
+                transition={{
+                  duration: 0.65,
+                  delay: 0.1 + index * 0.04,
+                }}
+                className={`h-full rounded-full ${style.bar}`}
+              />
             </div>
-          </motion.div>
+          </motion.article>
         );
       })}
 
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.25 }}
-        className="rounded-2xl border border-slate-200 bg-[#0F2745] p-4 text-white shadow-sm"
+      <motion.article
+        initial={{
+          opacity: 0,
+          y: 10,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        transition={{
+          duration: 0.4,
+          delay: 0.22,
+        }}
+        className="relative overflow-hidden rounded-[22px] border border-indigo-500/20 bg-indigo-500/5 p-4 text-card-foreground shadow-[0_14px_35px_rgba(79,70,229,0.06)]"
       >
-        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10">
-          <Users className="h-4 w-4 text-cyan-200" />
+        <div className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-violet-500/10 blur-2xl" />
+
+        <div className="relative z-10">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-indigo-500/15 bg-indigo-500/10">
+            <TimerReset className="h-4 w-4 text-indigo-500" />
+          </div>
+
+          <p className="mt-4 text-[8px] font-black uppercase tracking-[0.13em] text-muted-foreground">
+            Average Review Time
+          </p>
+
+          <p className="mt-1 text-2xl font-black text-foreground">
+            {formatReviewTime(
+              stats.averageReviewMinutes
+            )}
+          </p>
+
+          <p className="mt-1 text-[8px] leading-4 text-muted-foreground">
+            {stats.averageReviewMinutes === null
+              ? "No completed review timing yet"
+              : "Based on completed reviews"}
+          </p>
         </div>
-
-        <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.12em] text-blue-100/50">
-          Average Review Time
-        </p>
-
-        <p className="mt-1 text-2xl font-black">
-          {Math.floor(stats.averageReviewMinutes)}m{" "}
-          {Math.round(
-            (stats.averageReviewMinutes %
-              1) *
-              60
-          )
-            .toString()
-            .padStart(2, "0")}
-        </p>
-
-        <p className="mt-2 text-[10px] text-blue-100/50">
-          Current demo queue baseline
-        </p>
-      </motion.div>
-    </div>
+      </motion.article>
+    </section>
   );
 }
