@@ -22,7 +22,6 @@ import {
   GitCompareArrows,
   Landmark,
   LogOut,
-  Radar,
   ReceiptText,
   RefreshCcw,
   ShieldAlert,
@@ -59,6 +58,15 @@ interface NavItem {
   icon:
     ElementType;
 
+  /*
+   * IMPORTANT:
+   *
+   * true
+   * = user explicitly confirmed module is complete
+   *
+   * false
+   * = module still needs work/testing
+   */
   available:
     boolean;
 }
@@ -73,10 +81,86 @@ interface NavSectionData {
 
 /* =========================================================
    ANALYST NAVIGATION
+
+   COFFER ANALYST ARCHITECTURE
+
+   Coffer is primarily:
+
+   1. Payment Gateway
+   2. Digital Wallet / Payment Platform
+
+   Analyst workspace is READ-ONLY.
+
+   ---------------------------------------------------------
+   COMMAND CENTER
+   ---------------------------------------------------------
+
+   Executive Overview
+   Live Platform Pulse
+   AI Intelligence
+
+   ---------------------------------------------------------
+   PERFORMANCE
+   ---------------------------------------------------------
+
+   Payments
+   Transactions
+   Conversion
+   Revenue
+
+   ---------------------------------------------------------
+   BUSINESS & PLATFORM
+   ---------------------------------------------------------
+
+   Merchants
+   = businesses using Coffer gateway
+
+   Users
+   = personal Coffer wallet/platform users
+
+   Wallets
+   = Coffer wallet network analytics:
+     - wallet adoption
+     - engagement
+     - active/dormant wallets
+     - P2P usage
+     - merchant-payment usage
+     - repeat activity
+     - wallet status
+     - aggregate wallet balance
+
+   ---------------------------------------------------------
+   IMPORTANT
+
+   Payment Methods removed.
+
+   Coffer merchant checkout is wallet-first, therefore
+   generic Card/PayPal/etc payment-method analytics is not
+   a core Analyst module.
+
+   Providers also removed from the current navigation.
+
+   External funding/provider infrastructure can later be
+   introduced as a dedicated Funding Rails / External Rails
+   module if the platform architecture requires it.
+
+   ---------------------------------------------------------
+   NOT E-COMMERCE ANALYTICS
+
+   No:
+   - products
+   - inventory
+   - product sales
+   - product performance
+   - generic shopping customers
 ========================================================= */
 
 const sections:
   NavSectionData[] = [
+    /* =====================================================
+       COMMAND CENTER
+    ====================================================== */
+
     {
       title:
         "Command Center",
@@ -126,6 +210,10 @@ const sections:
       ],
     },
 
+    /* =====================================================
+       PERFORMANCE
+    ====================================================== */
+
     {
       title:
         "Performance",
@@ -141,9 +229,6 @@ const sections:
           icon:
             CircleDollarSign,
 
-          /*
-           * Payment Analytics is implemented.
-           */
           available:
             true,
         },
@@ -192,9 +277,26 @@ const sections:
       ],
     },
 
+    /* =====================================================
+       BUSINESS & PLATFORM
+
+       Merchants
+       = Coffer gateway merchants.
+
+       Users
+       = Coffer personal wallet/platform users.
+
+       Wallets
+       = Coffer wallet ecosystem and engagement analytics.
+
+       Removed:
+       - Providers
+       - Payment Methods
+    ====================================================== */
+
     {
       title:
-        "Business",
+        "Business & Platform",
 
       items: [
         {
@@ -213,33 +315,45 @@ const sections:
 
         {
           label:
-            "Customers",
+            "Users",
 
           href:
-            "/dashboard/analyst/customers",
+            "/dashboard/analyst/users",
 
           icon:
             Users,
 
+          /*
+           * Keep false until you confirm
+           * Users Analytics is complete.
+           */
           available:
-            false,
+            true,
         },
 
         {
           label:
-            "Cohorts",
+            "Wallets",
 
           href:
-            "/dashboard/analyst/cohorts",
+            "/dashboard/analyst/wallets",
 
           icon:
-            Radar,
+            WalletCards,
 
+          /*
+           * Wallet Analytics is currently
+           * under development/testing.
+           */
           available:
-            false,
+            true,
         },
       ],
     },
+
+    /* =====================================================
+       RISK & OPERATIONS
+    ====================================================== */
 
     {
       title:
@@ -332,6 +446,10 @@ const sections:
       ],
     },
 
+    /* =====================================================
+       REPORTING
+    ====================================================== */
+
     {
       title:
         "Reporting",
@@ -392,12 +510,20 @@ function isActive(
   href:
     string
 ): boolean {
+  /*
+   * Analyst root must match exactly.
+   *
+   * Otherwise every analyst child route would
+   * make Executive Overview active.
+   */
+
   if (
     href ===
     "/dashboard/analyst"
   ) {
     return (
-      pathname === href
+      pathname ===
+      href
     );
   }
 
@@ -422,27 +548,90 @@ export default function AnalystSidebar({
     usePathname();
 
   return (
-    <div className="flex h-full min-h-dvh w-full flex-col border-r border-border bg-card">
+    <div
+      className="
+        flex
+        h-full
+        min-h-dvh
+        w-full
+        flex-col
+        border-r
+        border-border
+        bg-card
+      "
+    >
       {/* ===================================================
           BRAND
       ==================================================== */}
 
-      <div className="flex h-[76px] shrink-0 items-center justify-between border-b border-border px-5">
+      <div
+        className="
+          flex
+          h-[76px]
+          shrink-0
+          items-center
+          justify-between
+          border-b
+          border-border
+          px-5
+        "
+      >
         <Link
           href="/dashboard/analyst"
-          onClick={onClose}
-          className="flex min-w-0 items-center gap-3"
+          onClick={
+            onClose
+          }
+          className="
+            flex
+            min-w-0
+            items-center
+            gap-3
+          "
         >
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 via-blue-600 to-violet-600 text-white shadow-lg shadow-blue-500/20">
+          <div
+            className="
+              flex
+              h-10
+              w-10
+              shrink-0
+              items-center
+              justify-center
+              rounded-2xl
+
+              bg-gradient-to-br
+              from-cyan-500
+              via-blue-600
+              to-violet-600
+
+              text-white
+
+              shadow-lg
+              shadow-blue-500/20
+            "
+          >
             <BrainCircuit className="h-5 w-5" />
           </div>
 
           <div className="min-w-0">
-            <p className="truncate text-sm font-extrabold text-card-foreground">
-              DAMO Intelligence
+            <p
+              className="
+                truncate
+                text-sm
+                font-extrabold
+                text-card-foreground
+              "
+            >
+              Coffer Intelligence
             </p>
 
-            <p className="truncate text-[11px] font-medium text-muted-foreground">
+            <p
+              className="
+                truncate
+                text-[11px]
+                font-medium
+                text-muted-foreground
+              "
+            >
               Analyst Workspace
             </p>
           </div>
@@ -455,7 +644,19 @@ export default function AnalystSidebar({
               onClose
             }
             aria-label="Close analyst sidebar"
-            className="rounded-lg p-2 text-muted-foreground transition hover:bg-muted hover:text-foreground lg:hidden"
+            className="
+              rounded-lg
+              p-2
+
+              text-muted-foreground
+
+              transition
+
+              hover:bg-muted
+              hover:text-foreground
+
+              lg:hidden
+            "
           >
             <X className="h-5 w-5" />
           </button>
@@ -463,23 +664,67 @@ export default function AnalystSidebar({
       </div>
 
       {/* ===================================================
-          READ ONLY BADGE
+          READ-ONLY ANALYST BADGE
       ==================================================== */}
 
       <div className="px-4 pt-4">
-        <div className="rounded-2xl border border-cyan-500/20 bg-gradient-to-br from-cyan-500/10 via-blue-500/5 to-violet-500/10 p-3">
+        <div
+          className="
+            rounded-2xl
+
+            border
+            border-cyan-500/20
+
+            bg-gradient-to-br
+            from-cyan-500/10
+            via-blue-500/5
+            to-violet-500/10
+
+            p-3
+          "
+        >
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-600 dark:text-cyan-400">
+            <div
+              className="
+                flex
+                h-9
+                w-9
+                items-center
+                justify-center
+
+                rounded-xl
+
+                bg-cyan-500/15
+
+                text-cyan-600
+                dark:text-cyan-400
+              "
+            >
               <ShieldCheck className="h-4 w-4" />
             </div>
 
             <div className="min-w-0">
-              <p className="truncate text-xs font-bold text-foreground">
+              <p
+                className="
+                  truncate
+                  text-xs
+                  font-bold
+                  text-foreground
+                "
+              >
                 Read-only intelligence
               </p>
 
-              <p className="mt-1 truncate text-[10px] font-medium text-muted-foreground">
-                Aggregated and privacy-safe
+              <p
+                className="
+                  mt-1
+                  truncate
+                  text-[10px]
+                  font-medium
+                  text-muted-foreground
+                "
+              >
+                Gateway & wallet analytics
               </p>
             </div>
           </div>
@@ -492,7 +737,13 @@ export default function AnalystSidebar({
 
       <nav
         aria-label="Analyst navigation"
-        className="custom-scrollbar flex-1 overflow-y-auto px-4 py-5"
+        className="
+          custom-scrollbar
+          flex-1
+          overflow-y-auto
+          px-4
+          py-5
+        "
       >
         {sections.map(
           (
@@ -504,7 +755,19 @@ export default function AnalystSidebar({
               }
               className="mb-6"
             >
-              <p className="mb-2 px-3 text-[10px] font-bold uppercase tracking-[0.16em] text-muted-foreground/70">
+              <p
+                className="
+                  mb-2
+                  px-3
+
+                  text-[10px]
+                  font-bold
+                  uppercase
+                  tracking-[0.16em]
+
+                  text-muted-foreground/70
+                "
+              >
                 {
                   section.title
                 }
@@ -526,7 +789,11 @@ export default function AnalystSidebar({
                       );
 
                     /* =======================================
-                       FUTURE ROUTE
+                       INCOMPLETE / FUTURE MODULE
+
+                       available === false
+                       means user has not confirmed
+                       this module as complete yet.
                     ======================================== */
 
                     if (
@@ -538,17 +805,59 @@ export default function AnalystSidebar({
                             item.href
                           }
                           aria-disabled="true"
-                          className="flex cursor-not-allowed items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-muted-foreground/55"
-                        >
-                          <Icon className="h-[18px] w-[18px] shrink-0" />
+                          title={`${item.label} is not completed yet`}
+                          className="
+                            flex
+                            cursor-not-allowed
+                            items-center
+                            gap-3
 
-                          <span className="min-w-0 flex-1 truncate">
+                            rounded-xl
+
+                            px-3
+                            py-2.5
+
+                            text-sm
+                            font-semibold
+
+                            text-muted-foreground/55
+                          "
+                        >
+                          <Icon
+                            className="
+                              h-[18px]
+                              w-[18px]
+                              shrink-0
+                            "
+                          />
+
+                          <span
+                            className="
+                              min-w-0
+                              flex-1
+                              truncate
+                            "
+                          >
                             {
                               item.label
                             }
                           </span>
 
-                          <span className="rounded-md bg-muted px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide">
+                          <span
+                            className="
+                              rounded-md
+
+                              bg-muted
+
+                              px-1.5
+                              py-0.5
+
+                              text-[9px]
+                              font-bold
+                              uppercase
+                              tracking-wide
+                            "
+                          >
                             Next
                           </span>
                         </div>
@@ -556,7 +865,7 @@ export default function AnalystSidebar({
                     }
 
                     /* =======================================
-                       ACTIVE ROUTE
+                       COMPLETED / AVAILABLE ROUTE
                     ======================================== */
 
                     return (
@@ -570,22 +879,71 @@ export default function AnalystSidebar({
                         onClick={
                           onClose
                         }
-                        className={`group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all duration-200 ${
-                          active
-                            ? "bg-primary text-primary-foreground shadow-sm"
-                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                        }`}
-                      >
-                        <Icon className="h-[18px] w-[18px] shrink-0 transition-transform duration-200 group-hover:scale-105" />
+                        className={`
+                          group
+                          relative
 
-                        <span className="min-w-0 flex-1 truncate">
+                          flex
+                          items-center
+                          gap-3
+
+                          rounded-xl
+
+                          px-3
+                          py-2.5
+
+                          text-sm
+                          font-semibold
+
+                          transition-all
+                          duration-200
+
+                          ${
+                            active
+                              ? "bg-primary text-primary-foreground shadow-sm"
+                              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                          }
+                        `}
+                      >
+                        <Icon
+                          className="
+                            h-[18px]
+                            w-[18px]
+                            shrink-0
+
+                            transition-transform
+                            duration-200
+
+                            group-hover:scale-105
+                          "
+                        />
+
+                        <span
+                          className="
+                            min-w-0
+                            flex-1
+                            truncate
+                          "
+                        >
                           {
                             item.label
                           }
                         </span>
 
                         {active && (
-                          <span className="ml-auto h-1.5 w-1.5 shrink-0 rounded-full bg-primary-foreground" />
+                          <span
+                            className="
+                              ml-auto
+
+                              h-1.5
+                              w-1.5
+                              shrink-0
+
+                              rounded-full
+
+                              bg-primary-foreground
+                            "
+                          />
                         )}
                       </Link>
                     );
@@ -601,9 +959,44 @@ export default function AnalystSidebar({
           FOOTER
       ==================================================== */}
 
-      <div className="border-t border-border p-4">
-        <div className="mb-3 flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2.5 text-[10px] font-semibold text-muted-foreground">
-          <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-500" />
+      <div
+        className="
+          border-t
+          border-border
+          p-4
+        "
+      >
+        <div
+          className="
+            mb-3
+
+            flex
+            items-center
+            gap-2
+
+            rounded-xl
+
+            border
+            border-border
+
+            bg-background
+
+            px-3
+            py-2.5
+
+            text-[10px]
+            font-semibold
+            text-muted-foreground
+          "
+        >
+          <ShieldCheck
+            className="
+              h-4
+              w-4
+              shrink-0
+              text-emerald-500
+            "
+          />
 
           <span>
             No financial mutation access
@@ -615,7 +1008,28 @@ export default function AnalystSidebar({
           onClick={
             onLogout
           }
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-muted-foreground transition hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/20"
+          className="
+            flex
+            w-full
+            items-center
+            gap-3
+
+            rounded-xl
+
+            px-3
+            py-2.5
+
+            text-sm
+            font-semibold
+            text-muted-foreground
+
+            transition
+
+            hover:bg-red-50
+            hover:text-red-600
+
+            dark:hover:bg-red-950/20
+          "
         >
           <LogOut className="h-[18px] w-[18px]" />
 

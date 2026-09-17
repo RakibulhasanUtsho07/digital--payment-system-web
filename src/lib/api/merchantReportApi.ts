@@ -2,7 +2,9 @@
    MERCHANT REPORT API
 ========================================================= */
 
-import { apiClient } from "./client";
+import {
+  apiClient,
+} from "./client";
 
 /* =========================================================
    REPORT TYPES
@@ -14,20 +16,34 @@ export type MerchantReportType =
   | "payouts"
   | "settlements";
 
+export type MerchantReportMode =
+  | "test"
+  | "live";
+
 /* =========================================================
    PARAMS
 ========================================================= */
 
 export interface MerchantReportParams {
-  reportType?: MerchantReportType;
+  reportType?:
+    MerchantReportType;
+
   from?: string;
+
   to?: string;
+
   status?: string;
+
   provider?: string;
+
   sourceType?: string;
+
   payoutMethod?: string;
+
   currency?: string;
-  mode?: "test" | "live";
+
+  mode?:
+    MerchantReportMode;
 }
 
 /* =========================================================
@@ -36,28 +52,61 @@ export interface MerchantReportParams {
 
 export interface MerchantPaymentReportRow {
   paymentId: string;
-  orderId: string | null;
-  customerId: string | null;
+
+  orderId:
+    | string
+    | null;
+
+  customerId:
+    | string
+    | null;
+
   amount: number;
+
   currency: string;
+
   feeAmount: number;
-  netAmount: number | null;
+
+  netAmount:
+    | number
+    | null;
+
   sourceType: string;
+
   provider: string;
+
   mode: string;
+
   status: string;
-  merchantReference: string | null;
-  providerPaymentId: string | null;
+
+  merchantReference:
+    | string
+    | null;
+
+  providerPaymentId:
+    | string
+    | null;
+
   createdAt: string;
-  completedAt: string | null;
-  failedAt: string | null;
+
+  completedAt:
+    | string
+    | null;
+
+  failedAt:
+    | string
+    | null;
 }
 
 export interface MerchantPaymentReportSummary {
   count: number;
+
   grossAmount: number;
+
   feeAmount: number;
+
   completedCount: number;
+
   completedAmount: number;
 }
 
@@ -67,24 +116,47 @@ export interface MerchantPaymentReportSummary {
 
 export interface MerchantPayoutReportRow {
   payoutId: string;
+
   amount: number;
+
   currency: string;
+
   feeAmount: number;
+
   netAmount: number;
+
   payoutMethod: string;
-  destination: string | null;
+
+  destination:
+    | string
+    | null;
+
   status: string;
-  merchantReference: string | null;
-  externalReference: string | null;
+
+  merchantReference:
+    | string
+    | null;
+
+  externalReference:
+    | string
+    | null;
+
   requestedAt: string;
-  completedAt: string | null;
+
+  completedAt:
+    | string
+    | null;
 }
 
 export interface MerchantPayoutReportSummary {
   count: number;
+
   amount: number;
+
   feeAmount: number;
+
   netAmount: number;
+
   completedAmount: number;
 }
 
@@ -94,99 +166,148 @@ export interface MerchantPayoutReportSummary {
 
 export interface MerchantSettlementReportRow {
   settlementId: string;
+
   periodStart: string;
+
   periodEnd: string;
+
   currency: string;
+
   paymentCount: number;
+
   grossAmount: number;
+
   feeAmount: number;
+
   refundAmount: number;
+
   adjustmentAmount: number;
+
   netAmount: number;
+
   status: string;
-  payoutId: string | null;
-  settledAt: string | null;
+
+  payoutId:
+    | string
+    | null;
+
+  settledAt:
+    | string
+    | null;
 }
 
 export interface MerchantSettlementReportSummary {
   count: number;
+
   grossAmount: number;
+
   feeAmount: number;
+
   refundAmount: number;
+
   adjustmentAmount: number;
+
   netAmount: number;
 }
 
 /* =========================================================
-   COMMON MERCHANT DATA
+   COMMON
 ========================================================= */
 
-interface MerchantReportMerchant {
+export interface MerchantReportMerchant {
   id: string;
+
   businessName: string;
-  businessDisplayName: string | null;
+
+  businessDisplayName:
+    | string
+    | null;
+
   defaultCurrency: string;
 }
 
-interface MerchantReportRange {
-  from: string | null;
-  to: string | null;
+export interface MerchantReportRange {
+  from:
+    | string
+    | null;
+
+  to:
+    | string
+    | null;
 }
 
 interface MerchantReportBase {
-  merchant: MerchantReportMerchant;
-  range: MerchantReportRange;
+  merchant:
+    MerchantReportMerchant;
+
+  range:
+    MerchantReportRange;
+
   generatedAt: string;
 }
 
 /* =========================================================
-   DISCRIMINATED REPORT TYPES
+   REPORT RESPONSES
 ========================================================= */
 
 export interface MerchantSummaryReport
   extends MerchantReportBase {
-  reportType: "summary";
+  reportType:
+    "summary";
 
   report: {
-    paymentSummary: MerchantPaymentReportSummary;
-    payoutSummary: MerchantPayoutReportSummary;
-    settlementSummary: MerchantSettlementReportSummary;
+    paymentSummary:
+      MerchantPaymentReportSummary;
+
+    payoutSummary:
+      MerchantPayoutReportSummary;
+
+    settlementSummary:
+      MerchantSettlementReportSummary;
   };
 }
 
 export interface MerchantPaymentsReport
   extends MerchantReportBase {
-  reportType: "payments";
+  reportType:
+    "payments";
 
   report: {
-    summary: MerchantPaymentReportSummary;
-    rows: MerchantPaymentReportRow[];
+    summary:
+      MerchantPaymentReportSummary;
+
+    rows:
+      MerchantPaymentReportRow[];
   };
 }
 
 export interface MerchantPayoutsReport
   extends MerchantReportBase {
-  reportType: "payouts";
+  reportType:
+    "payouts";
 
   report: {
-    summary: MerchantPayoutReportSummary;
-    rows: MerchantPayoutReportRow[];
+    summary:
+      MerchantPayoutReportSummary;
+
+    rows:
+      MerchantPayoutReportRow[];
   };
 }
 
 export interface MerchantSettlementsReport
   extends MerchantReportBase {
-  reportType: "settlements";
+  reportType:
+    "settlements";
 
   report: {
-    summary: MerchantSettlementReportSummary;
-    rows: MerchantSettlementReportRow[];
+    summary:
+      MerchantSettlementReportSummary;
+
+    rows:
+      MerchantSettlementReportRow[];
   };
 }
-
-/* =========================================================
-   MAIN RESPONSE
-========================================================= */
 
 export type MerchantReportResponse =
   | MerchantSummaryReport
@@ -195,161 +316,180 @@ export type MerchantReportResponse =
   | MerchantSettlementsReport;
 
 /* =========================================================
-   API RESPONSE WRAPPER
+   API RESPONSE
 ========================================================= */
 
 interface MerchantReportApiResponse {
   success: boolean;
-  data: MerchantReportResponse;
+
+  data:
+    MerchantReportResponse;
+
   message?: string;
 }
 
 /* =========================================================
-   GET MERCHANT REPORT
+   HELPERS
+========================================================= */
+
+function setOptionalParam(
+  params:
+    URLSearchParams,
+
+  key:
+    string,
+
+  value:
+    | string
+    | undefined
+    | null
+): void {
+  if (
+    value === undefined ||
+    value === null ||
+    value === ""
+  ) {
+    return;
+  }
+
+  params.set(
+    key,
+    value
+  );
+}
+
+/* =========================================================
+   GET REPORT
+
+   IMPORTANT:
+
+   apiClient base:
+   http://localhost:5000/api
+
+   Therefore use:
+
+   /merchants/reports
+
+   NOT:
+
+   /api/merchants/reports
 ========================================================= */
 
 export async function getMerchantReport(
-  params: MerchantReportParams = {}
+  params:
+    MerchantReportParams = {}
 ): Promise<MerchantReportResponse> {
+  if (
+    params.from &&
+    params.to &&
+    params.from >
+      params.to
+  ) {
+    throw new Error(
+      "From date cannot be later than To date."
+    );
+  }
+
   const searchParams =
     new URLSearchParams();
 
-  /* -------------------------------------------------------
-     REPORT TYPE
-  ------------------------------------------------------- */
+  setOptionalParam(
+    searchParams,
+    "reportType",
+    params.reportType
+  );
 
-  if (params.reportType) {
-    searchParams.set(
-      "reportType",
-      params.reportType
-    );
-  }
+  setOptionalParam(
+    searchParams,
+    "from",
+    params.from
+  );
 
-  /* -------------------------------------------------------
-     DATE RANGE
-  ------------------------------------------------------- */
+  setOptionalParam(
+    searchParams,
+    "to",
+    params.to
+  );
 
-  if (params.from) {
-    searchParams.set(
-      "from",
-      params.from
-    );
-  }
+  setOptionalParam(
+    searchParams,
+    "status",
+    params.status?.trim()
+  );
 
-  if (params.to) {
-    searchParams.set(
-      "to",
-      params.to
-    );
-  }
+  setOptionalParam(
+    searchParams,
+    "provider",
+    params.provider
+      ?.trim()
+      .toLowerCase()
+  );
 
-  /* -------------------------------------------------------
-     STATUS
-  ------------------------------------------------------- */
+  setOptionalParam(
+    searchParams,
+    "sourceType",
+    params.sourceType
+      ?.trim()
+      .toLowerCase()
+  );
 
-  if (params.status) {
-    searchParams.set(
-      "status",
-      params.status
-    );
-  }
+  setOptionalParam(
+    searchParams,
+    "payoutMethod",
+    params.payoutMethod
+      ?.trim()
+      .toLowerCase()
+  );
 
-  /* -------------------------------------------------------
-     PROVIDER
-  ------------------------------------------------------- */
+  setOptionalParam(
+    searchParams,
+    "currency",
+    params.currency
+      ?.trim()
+      .toUpperCase()
+  );
 
-  if (params.provider) {
-    searchParams.set(
-      "provider",
-      params.provider
-    );
-  }
-
-  /* -------------------------------------------------------
-     SOURCE TYPE
-  ------------------------------------------------------- */
-
-  if (params.sourceType) {
-    searchParams.set(
-      "sourceType",
-      params.sourceType
-    );
-  }
-
-  /* -------------------------------------------------------
-     PAYOUT METHOD
-  ------------------------------------------------------- */
-
-  if (params.payoutMethod) {
-    searchParams.set(
-      "payoutMethod",
-      params.payoutMethod
-    );
-  }
-
-  /* -------------------------------------------------------
-     CURRENCY
-  ------------------------------------------------------- */
-
-  if (params.currency) {
-    searchParams.set(
-      "currency",
-      params.currency
-    );
-  }
-
-  /* -------------------------------------------------------
-     MODE
-  ------------------------------------------------------- */
-
-  if (params.mode) {
-    searchParams.set(
-      "mode",
-      params.mode
-    );
-  }
-
-  /* -------------------------------------------------------
-     QUERY STRING
-  ------------------------------------------------------- */
+  setOptionalParam(
+    searchParams,
+    "mode",
+    params.mode
+  );
 
   const query =
     searchParams.toString();
 
+  /*
+   * DO NOT put /api here.
+   */
   const endpoint =
-    `/api/merchants/reports${
+    `/merchants/reports${
       query
         ? `?${query}`
         : ""
     }`;
 
-  /* -------------------------------------------------------
-     REQUEST
-  ------------------------------------------------------- */
-
   const response =
-    (await apiClient(
+    await apiClient<MerchantReportApiResponse>(
       endpoint,
       {
-        method: "GET",
+        method:
+          "GET",
       }
-    )) as MerchantReportApiResponse;
-
-  /* -------------------------------------------------------
-     RESPONSE VALIDATION
-  ------------------------------------------------------- */
+    );
 
   if (
     !response ||
-    typeof response !== "object"
+    typeof response !==
+      "object"
   ) {
     throw new Error(
-      "Invalid report response."
+      "Invalid merchant report response."
     );
   }
 
   if (
-    response.success === false
+    response.success ===
+    false
   ) {
     throw new Error(
       response.message ||
@@ -357,7 +497,9 @@ export async function getMerchantReport(
     );
   }
 
-  if (!response.data) {
+  if (
+    !response.data
+  ) {
     throw new Error(
       response.message ||
         "Merchant report data was not returned."
