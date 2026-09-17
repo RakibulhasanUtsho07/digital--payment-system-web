@@ -2,23 +2,69 @@
    MERCHANT TRANSACTION API
 ========================================================= */
 
-import { apiClient } from "./client";
+import {
+  apiClient,
+} from "./client";
 
 /* =========================================================
    TYPES
 ========================================================= */
 
 export type MerchantTransactionStatus =
-  | "PENDING"
-  | "COMPLETED"
-  | "FAILED"
-  | "CANCELLED"
-  | "EXPIRED";
+  | "POSTED"
+  | "REVERSED";
 
 export type MerchantTransactionType =
   | "PAYMENT"
   | "REFUND"
-  | "PAYOUT";
+  | "PAYOUT"
+  | "FEE"
+  | "ADJUSTMENT"
+  | "REVERSAL";
+
+export type MerchantTransactionDirection =
+  | "CREDIT"
+  | "DEBIT";
+
+export type MerchantLedgerReferenceType =
+  | "payment"
+  | "payment_attempt"
+  | "order"
+  | "refund"
+  | "payout"
+  | "transfer"
+  | "settlement"
+  | "invoice"
+  | "subscription"
+  | "dispute"
+  | "wallet"
+  | "adjustment"
+  | "provider"
+  | "fee";
+
+/* =========================================================
+   MERCHANT
+========================================================= */
+
+export interface MerchantTransactionMerchant {
+  id: string;
+
+  businessName: string;
+
+  businessDisplayName:
+    | string
+    | null;
+
+  defaultCurrency: string;
+
+  status:
+    | string
+    | null;
+
+  verificationStatus:
+    | string
+    | null;
+}
 
 /* =========================================================
    PARAMS
@@ -26,19 +72,24 @@ export type MerchantTransactionType =
 
 export interface MerchantTransactionParams {
   page?: number;
+
   limit?: number;
 
   search?: string;
 
-  status?: string;
+  status?:
+    | MerchantTransactionStatus
+    | "";
 
-  type?: string;
+  type?:
+    | MerchantTransactionType
+    | "";
+
+  direction?:
+    | MerchantTransactionDirection
+    | "";
 
   currency?: string;
-
-  provider?: string;
-
-  mode?: "test" | "live";
 
   from?: string;
 
@@ -50,41 +101,130 @@ export interface MerchantTransactionParams {
 ========================================================= */
 
 export interface MerchantTransaction {
+  /*
+   * Ledger entry ID.
+   *
+   * Example:
+   * led_xxxxx
+   */
   transactionId: string;
 
-  type: MerchantTransactionType;
+  /*
+   * Balanced ledger operation group.
+   *
+   * Example:
+   * ledgrp_xxxxx
+   */
+  entryGroupId: string;
 
-  paymentId: string;
+  type:
+    MerchantTransactionType;
 
-  orderId: string | null;
+  direction:
+    MerchantTransactionDirection;
 
-  customerId: string | null;
-
+  /*
+   * Absolute ledger amount.
+   */
   amount: number;
 
-  feeAmount: number;
-
-  netAmount: number | null;
+  /*
+   * Signed merchant balance effect.
+   *
+   * CREDIT => positive
+   * DEBIT  => negative
+   */
+  balanceImpact: number;
 
   currency: string;
 
-  provider: string;
+  status:
+    MerchantTransactionStatus;
 
-  sourceType: string;
+  /*
+   * Source financial object.
+   *
+   * Example:
+   * payment
+   * refund
+   * payout
+   */
+  referenceType:
+    MerchantLedgerReferenceType;
 
-  mode: string;
+  /*
+   * Public source ID.
+   *
+   * Example:
+   * pay_xxx
+   * re_xxx
+   * payout_xxx
+   */
+  referenceId: string;
 
-  status: MerchantTransactionStatus;
+  /* =======================================================
+     RELATED DOMAIN REFERENCES
+  ======================================================== */
 
-  merchantReference: string | null;
+  paymentId:
+    | string
+    | null;
 
-  providerReference: string | null;
+  refundId:
+    | string
+    | null;
+
+  payoutId:
+    | string
+    | null;
+
+  merchantReference:
+    | string
+    | null;
+
+  /* =======================================================
+     SOURCE CONTEXT
+
+     Available when the ledger entry is connected
+     to a source record such as Payment.
+  ======================================================== */
+
+  provider:
+    | string
+    | null;
+
+  sourceType:
+    | string
+    | null;
+
+  mode:
+    | string
+    | null;
+
+  sourceStatus:
+    | string
+    | null;
+
+  /* =======================================================
+     LEDGER INFORMATION
+  ======================================================== */
+
+  description:
+    | string
+    | null;
+
+  metadata:
+    | Record<
+        string,
+        unknown
+      >
+    | null;
+
+  isReversal: boolean;
+
+  effectiveAt: string;
 
   createdAt: string;
-
-  completedAt: string | null;
-
-  failedAt: string | null;
 }
 
 /* =========================================================
@@ -92,17 +232,66 @@ export interface MerchantTransaction {
 ========================================================= */
 
 export interface MerchantTransactionSummary {
-  totalCount: number;
+  currency: string;
 
-  totalAmount: number;
+  /*
+   * Ledger entry counts.
+   */
+  transactionCount: number;
 
-  completedCount: number;
+  postedCount: number;
 
-  completedAmount: number;
+  reversedCount: number;
 
-  pendingCount: number;
+  reversalCount: number;
 
-  failedCount: number;
+  /*
+   * Gross direction totals.
+   */
+  totalCredits: number;
+
+  totalDebits: number;
+
+  /*
+   * Current merchant payable position.
+   */
+  ledgerBalance: number;
+
+  /*
+   * Pending/processing payout reservations.
+   */
+  reservedPayoutAmount: number;
+
+  /*
+   * ledgerBalance - reservedPayoutAmount
+   */
+  availableBalance: number;
+
+  pendingPayoutCount: number;
+
+  /*
+   * Financial breakdown.
+   */
+  paymentCredits: number;
+
+  refundDebits: number;
+
+  payoutDebits: number;
+
+  feeDebits: number;
+
+  /*
+   * Net effects including reversals.
+   */
+  paymentNetImpact: number;
+
+  refundNetImpact: number;
+
+  payoutNetImpact: number;
+
+  feeNetImpact: number;
+
+  adjustmentNetImpact: number;
 }
 
 /* =========================================================
@@ -117,6 +306,42 @@ export interface MerchantTransactionPagination {
   total: number;
 
   totalPages: number;
+
+  hasNextPage: boolean;
+
+  hasPreviousPage: boolean;
+}
+
+/* =========================================================
+   RESPONSE FILTERS
+========================================================= */
+
+export interface MerchantTransactionAppliedFilters {
+  search:
+    | string
+    | null;
+
+  type:
+    | MerchantTransactionType
+    | null;
+
+  direction:
+    | MerchantTransactionDirection
+    | null;
+
+  status:
+    | MerchantTransactionStatus
+    | null;
+
+  currency: string;
+
+  from:
+    | string
+    | null;
+
+  to:
+    | string
+    | null;
 }
 
 /* =========================================================
@@ -124,58 +349,53 @@ export interface MerchantTransactionPagination {
 ========================================================= */
 
 export interface MerchantTransactionListData {
-  merchant: {
-    id: string;
-
-    businessName: string;
-
-    businessDisplayName:
-      | string
-      | null;
-
-    defaultCurrency: string;
-  };
-
-  pagination:
-    MerchantTransactionPagination;
+  merchant:
+    MerchantTransactionMerchant;
 
   summary:
     MerchantTransactionSummary;
 
   transactions:
     MerchantTransaction[];
+
+  pagination:
+    MerchantTransactionPagination;
+
+  filters:
+    MerchantTransactionAppliedFilters;
 }
 
 /* =========================================================
-   DETAIL TIMELINE
+   LEDGER GROUP ENTRY
 ========================================================= */
 
-export interface MerchantTransactionTimeline {
+export interface MerchantLedgerGroupEntry {
+  transactionId: string;
+
+  direction:
+    MerchantTransactionDirection;
+
+  amount: number;
+
+  balanceImpact: number;
+
+  currency: string;
+
+  referenceType:
+    MerchantLedgerReferenceType;
+
+  referenceId: string;
+
+  description:
+    | string
+    | null;
+
+  status:
+    MerchantTransactionStatus;
+
+  effectiveAt: string;
+
   createdAt: string;
-
-  authorizedAt:
-    | string
-    | null;
-
-  capturedAt:
-    | string
-    | null;
-
-  completedAt:
-    | string
-    | null;
-
-  failedAt:
-    | string
-    | null;
-
-  cancelledAt:
-    | string
-    | null;
-
-  expiredAt:
-    | string
-    | null;
 }
 
 /* =========================================================
@@ -183,73 +403,24 @@ export interface MerchantTransactionTimeline {
 ========================================================= */
 
 export interface MerchantTransactionDetail {
-  merchant: {
-    id: string;
+  merchant:
+    MerchantTransactionMerchant;
 
-    businessName: string;
+  transaction:
+    MerchantTransaction;
 
-    businessDisplayName:
-      | string
-      | null;
+  /*
+   * Only merchant-side lines from the same
+   * balanced ledger operation are returned.
+   *
+   * Customer/platform counterparty ledger lines
+   * are not exposed through merchant dashboard.
+   */
+  ledgerGroup: {
+    entryGroupId: string;
 
-    defaultCurrency: string;
-  };
-
-  transaction: {
-    transactionId: string;
-
-    type: "PAYMENT";
-
-    paymentId: string;
-
-    orderId: string | null;
-
-    customerId: string | null;
-
-    amount: number;
-
-    feeAmount: number;
-
-    netAmount:
-      | number
-      | null;
-
-    currency: string;
-
-    provider: string;
-
-    sourceType: string;
-
-    mode: string;
-
-    status: string;
-
-    merchantReference:
-      | string
-      | null;
-
-    providerReference:
-      | string
-      | null;
-
-    failureCode:
-      | string
-      | null;
-
-    failureMessage:
-      | string
-      | null;
-
-    idempotencyKey:
-      | string
-      | null;
-
-    checkoutUrl:
-      | string
-      | null;
-
-    timeline:
-      MerchantTransactionTimeline;
+    entries:
+      MerchantLedgerGroupEntry[];
   };
 }
 
@@ -260,17 +431,23 @@ export interface MerchantTransactionDetail {
 interface MerchantTransactionListApiResponse {
   success: boolean;
 
-  data: MerchantTransactionListData;
+  data:
+    MerchantTransactionListData;
 
   message?: string;
+
+  code?: string;
 }
 
 interface MerchantTransactionDetailApiResponse {
   success: boolean;
 
-  data: MerchantTransactionDetail;
+  data:
+    MerchantTransactionDetail;
 
   message?: string;
+
+  code?: string;
 }
 
 /* =========================================================
@@ -278,36 +455,68 @@ interface MerchantTransactionDetailApiResponse {
 ========================================================= */
 
 function setOptionalParam(
-  params: URLSearchParams,
-  key: string,
+  params:
+    URLSearchParams,
+
+  key:
+    string,
+
   value:
     | string
     | number
     | undefined
+    | null
 ): void {
   if (
-    value === undefined ||
-    value === null ||
-    value === ""
+    value ===
+      undefined ||
+    value ===
+      null ||
+    value ===
+      ""
   ) {
     return;
   }
 
   params.set(
     key,
-    String(value)
+    String(
+      value
+    )
   );
 }
 
 /* =========================================================
    GET MERCHANT TRANSACTIONS
+
+   Backend:
+   GET /api/merchants/transactions
+
+   IMPORTANT:
+   apiClient already prefixes NEXT_PUBLIC_API_URL.
+
+   Example:
+   NEXT_PUBLIC_API_URL=http://localhost:5000/api
+
+   Therefore endpoint here must be:
+   /merchants/transactions
+
+   NOT:
+   /api/merchants/transactions
 ========================================================= */
 
 export async function getMerchantTransactions(
-  params: MerchantTransactionParams = {}
-): Promise<MerchantTransactionListData> {
+  params:
+    MerchantTransactionParams = {}
+): Promise<
+  MerchantTransactionListData
+> {
   const searchParams =
     new URLSearchParams();
+
+  /* -------------------------------------------------------
+     PAGINATION
+  ------------------------------------------------------- */
 
   setOptionalParam(
     searchParams,
@@ -321,11 +530,19 @@ export async function getMerchantTransactions(
     params.limit
   );
 
+  /* -------------------------------------------------------
+     SEARCH
+  ------------------------------------------------------- */
+
   setOptionalParam(
     searchParams,
     "search",
-    params.search
+    params.search?.trim()
   );
+
+  /* -------------------------------------------------------
+     LEDGER FILTERS
+  ------------------------------------------------------- */
 
   setOptionalParam(
     searchParams,
@@ -341,21 +558,21 @@ export async function getMerchantTransactions(
 
   setOptionalParam(
     searchParams,
+    "direction",
+    params.direction
+  );
+
+  setOptionalParam(
+    searchParams,
     "currency",
     params.currency
+      ?.trim()
+      .toUpperCase()
   );
 
-  setOptionalParam(
-    searchParams,
-    "provider",
-    params.provider
-  );
-
-  setOptionalParam(
-    searchParams,
-    "mode",
-    params.mode
-  );
+  /* -------------------------------------------------------
+     DATE RANGE
+  ------------------------------------------------------- */
 
   setOptionalParam(
     searchParams,
@@ -369,27 +586,43 @@ export async function getMerchantTransactions(
     params.to
   );
 
+  /* -------------------------------------------------------
+     ENDPOINT
+  ------------------------------------------------------- */
+
   const query =
     searchParams.toString();
 
   const endpoint =
-    `/api/merchants/transactions${
+    `/merchants/transactions${
       query
         ? `?${query}`
         : ""
     }`;
 
+  /* -------------------------------------------------------
+     REQUEST
+  ------------------------------------------------------- */
+
   const response =
-    (await apiClient(
+    await apiClient<
+      MerchantTransactionListApiResponse
+    >(
       endpoint,
       {
-        method: "GET",
+        method:
+          "GET",
       }
-    )) as MerchantTransactionListApiResponse;
+    );
+
+  /* -------------------------------------------------------
+     VALIDATE RESPONSE
+  ------------------------------------------------------- */
 
   if (
     !response ||
-    typeof response !== "object"
+    typeof response !==
+      "object"
   ) {
     throw new Error(
       "Invalid merchant transaction response."
@@ -397,7 +630,8 @@ export async function getMerchantTransactions(
   }
 
   if (
-    response.success === false
+    response.success ===
+    false
   ) {
     throw new Error(
       response.message ||
@@ -405,7 +639,9 @@ export async function getMerchantTransactions(
     );
   }
 
-  if (!response.data) {
+  if (
+    !response.data
+  ) {
     throw new Error(
       response.message ||
         "Merchant transaction data was not returned."
@@ -417,33 +653,49 @@ export async function getMerchantTransactions(
 
 /* =========================================================
    GET SINGLE MERCHANT TRANSACTION
+
+   Backend:
+   GET /api/merchants/transactions/:transactionId
 ========================================================= */
 
 export async function getMerchantTransactionDetail(
-  transactionId: string
-): Promise<MerchantTransactionDetail> {
+  transactionId:
+    string
+): Promise<
+  MerchantTransactionDetail
+> {
   const normalizedId =
     transactionId.trim();
 
-  if (!normalizedId) {
+  if (
+    !normalizedId
+  ) {
     throw new Error(
       "Transaction ID is required."
     );
   }
 
   const response =
-    (await apiClient(
-      `/api/merchants/transactions/${encodeURIComponent(
+    await apiClient<
+      MerchantTransactionDetailApiResponse
+    >(
+      `/merchants/transactions/${encodeURIComponent(
         normalizedId
       )}`,
       {
-        method: "GET",
+        method:
+          "GET",
       }
-    )) as MerchantTransactionDetailApiResponse;
+    );
+
+  /* -------------------------------------------------------
+     VALIDATE RESPONSE
+  ------------------------------------------------------- */
 
   if (
     !response ||
-    typeof response !== "object"
+    typeof response !==
+      "object"
   ) {
     throw new Error(
       "Invalid merchant transaction detail response."
@@ -451,7 +703,8 @@ export async function getMerchantTransactionDetail(
   }
 
   if (
-    response.success === false
+    response.success ===
+    false
   ) {
     throw new Error(
       response.message ||
@@ -459,7 +712,9 @@ export async function getMerchantTransactionDetail(
     );
   }
 
-  if (!response.data) {
+  if (
+    !response.data
+  ) {
     throw new Error(
       response.message ||
         "Merchant transaction data was not returned."
