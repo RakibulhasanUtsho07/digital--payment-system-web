@@ -1474,15 +1474,15 @@ export default function RegisterPage() {
                   overflow-hidden
                   rounded-[14px]
                   bg-gradient-to-r
-                  from-[#174F82]
-                  via-[#1F5EA8]
-                  to-[#287EC5]
+                  from-indigo-600
+                  via-violet-600
+                  to-purple-600
                   text-xs
                   font-extrabold
                   text-white
-                  shadow-[0_12px_27px_rgba(31,94,168,0.22)]
+                  shadow-[0_12px_27px_rgba(109,40,217,0.24)]
                   transition-all
-                  hover:shadow-[0_17px_34px_rgba(31,94,168,0.28)]
+                  hover:shadow-[0_17px_34px_rgba(109,40,217,0.32)]
                   disabled:cursor-not-allowed
                   disabled:opacity-60
                 "
@@ -1882,13 +1882,13 @@ export default function RegisterPage() {
                     gap-2
                     rounded-[14px]
                     bg-gradient-to-r
-                    from-[#174F82]
-                    via-[#1F5EA8]
-                    to-[#287EC5]
+                    from-indigo-600
+                    via-violet-600
+                    to-purple-600
                     text-xs
                     font-extrabold
                     text-white
-                    shadow-[0_12px_27px_rgba(31,94,168,0.20)]
+                    shadow-[0_12px_27px_rgba(109,40,217,0.24)]
                     transition-all
                     disabled:cursor-not-allowed
                     disabled:opacity-50

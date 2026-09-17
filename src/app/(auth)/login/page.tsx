@@ -6,7 +6,9 @@ import {
 } from "react";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import {
+  useRouter,
+} from "next/navigation";
 
 import {
   AnimatePresence,
@@ -25,20 +27,14 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
-/* =========================================================
-   TYPES
-========================================================= */
-
 interface AuthUser {
   _id: string;
   name: string;
   email: string;
   phone?: string;
-
   role:
     | "user"
     | "admin";
-
   kycStatus:
     | "not_started"
     | "pending"
@@ -52,370 +48,209 @@ interface LoginResponse {
   user?: AuthUser;
 }
 
-/* =========================================================
-   LOGIN PAGE
-========================================================= */
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:5000/api";
 
 export default function LoginPage() {
   const router =
     useRouter();
 
-  const [
-    email,
-    setEmail,
-  ] = useState("");
+  const [email, setEmail] =
+    useState("");
 
-  const [
-    password,
-    setPassword,
-  ] = useState("");
+  const [password, setPassword] =
+    useState("");
 
-  const [
-    showPassword,
-    setShowPassword,
-  ] = useState(false);
+  const [showPassword, setShowPassword] =
+    useState(false);
 
-  const [
-    isLoading,
-    setIsLoading,
-  ] = useState(false);
+  const [isLoading, setIsLoading] =
+    useState(false);
 
-  const [
-    errorMessage,
-    setErrorMessage,
-  ] = useState("");
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:5000/api";
-  /* =========================================================
-     LOGIN LOGIC
-     SAME LOGIC AS YOUR FIRST WORKING CODE
-  ========================================================== */
+  const [errorMessage, setErrorMessage] =
+    useState("");
 
-  // const handleSubmit = async (
-  //   e: FormEvent<HTMLFormElement>
-  // ) => {
-  //   e.preventDefault();
+  const handleSubmit = async (
+    event: FormEvent<HTMLFormElement>,
+  ) => {
+    event.preventDefault();
 
-  //   setErrorMessage("");
-
-  //   const normalizedEmail =
-  //     email
-  //       .trim()
-  //       .toLowerCase();
-
-  //   if (!normalizedEmail) {
-  //     setErrorMessage(
-  //       "Please enter your email address."
-  //     );
-
-  //     return;
-  //   }
-
-  //   if (!password) {
-  //     setErrorMessage(
-  //       "Please enter your password."
-  //     );
-
-  //     return;
-  //   }
-
-  //   setIsLoading(true);
-
-  //   try {
-  //     console.log(
-  //       "LOGIN API:",
-  //       "https://digital-wallet-backend-five.vercel.app/api/auth/login"
-  //     );
-
-  //     const response =
-  //       await fetch(
-  //         "https://digital-wallet-backend-five.vercel.app/api/auth/login",
-  //         {
-  //           method:
-  //             "POST",
-
-  //           headers: {
-  //             "Content-Type":
-  //               "application/json",
-  //           },
-
-  //           credentials:
-  //             "include",
-
-  //           body:
-  //             JSON.stringify({
-  //               email:
-  //                 normalizedEmail,
-
-  //               password,
-  //             }),
-  //         }
-  //       );
-
-  //     const data:
-  //       LoginResponse =
-  //         await response.json();
-
-  //     console.log(
-  //       "LOGIN STATUS:",
-  //       response.status
-  //     );
-
-  //     console.log(
-  //       "LOGIN RESPONSE:",
-  //       data
-  //     );
-
-  //     if (
-  //       !response.ok ||
-  //       !data.success
-  //     ) {
-  //       throw new Error(
-  //         data.message ||
-  //           "Login failed."
-  //       );
-  //     }
-
-  //     if (!data.user) {
-  //       throw new Error(
-  //         "User information was not returned by the server."
-  //       );
-  //     }
-
-  //     localStorage.setItem(
-  //       "auth_user",
-  //       JSON.stringify(
-  //         data.user
-  //       )
-  //     );
-
-  //     localStorage.setItem(
-  //       "is_authenticated",
-  //       "true"
-  //     );
-
-  //     router.replace(
-  //       "/dashboard"
-  //     );
-  //   } catch (error) {
-  //     console.error(
-  //       "LOGIN ERROR:",
-  //       error
-  //     );
-
-  //     setErrorMessage(
-  //       error instanceof Error
-  //         ? error.message
-  //         : "Unable to login. Please try again."
-  //     );
-  //   } finally {
-  //     setIsLoading(
-  //       false
-  //     );
-  //   }
-  // };
-const handleSubmit = async (
-  e: FormEvent<HTMLFormElement>
-) => {
-  e.preventDefault();
-
-  if (isLoading) {
-    return;
-  }
-
-  setErrorMessage("");
-
-  const normalizedEmail =
-    email
-      .trim()
-      .toLowerCase();
-
-  if (!normalizedEmail) {
-    setErrorMessage(
-      "Please enter your email address."
-    );
-
-    return;
-  }
-
-  if (!password) {
-    setErrorMessage(
-      "Please enter your password."
-    );
-
-    return;
-  }
-
-  setIsLoading(true);
-
-  try {
-    const loginUrl =
-      `${API_URL}/auth/login`;
-
-    console.log(
-      "LOGIN API:",
-      loginUrl
-    );
-
-    console.log(
-      "LOGIN REQUEST:",
-      {
-        email: normalizedEmail,
-        passwordLength:
-          password.length,
-      }
-    );
-
-    const response =
-      await fetch(
-        loginUrl,
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type":
-              "application/json",
-
-            Accept:
-              "application/json",
-          },
-
-          credentials:
-            "include",
-
-          body:
-            JSON.stringify({
-              email:
-                normalizedEmail,
-
-              password,
-            }),
-        }
-      );
-
-    let data:
-      LoginResponse | null =
-        null;
-
-    try {
-      data =
-        (await response.json()) as LoginResponse;
-    } catch {
-      throw new Error(
-        "Invalid response from server."
-      );
-    }
-
-    console.log(
-      "LOGIN STATUS:",
-      response.status
-    );
-
-    console.log(
-      "LOGIN RESPONSE:",
-      data
-    );
-
-    if (!response.ok) {
-      throw new Error(
-        data?.message ||
-          `Login failed with status ${response.status}.`
-      );
-    }
-
-    if (
-      !data.success
-    ) {
-      throw new Error(
-        data.message ||
-          "Login failed."
-      );
-    }
-
-    if (!data.user) {
-      throw new Error(
-        "User information was not returned by the server."
-      );
-    }
-
-    localStorage.setItem(
-      "auth_user",
-      JSON.stringify(
-        data.user
-      )
-    );
-
-    localStorage.setItem(
-      "is_authenticated",
-      "true"
-    );
-    window.dispatchEvent(
-  new Event(
-    "coffer-auth-state-changed"
-  )
-);
-
-    router.replace(
-      "/dashboard"
-    );
-
-    router.refresh();
-  } catch (error) {
-    console.error(
-      "LOGIN ERROR:",
-      error
-    );
-
-    if (
-      error instanceof TypeError
-    ) {
-      setErrorMessage(
-        "Unable to connect to the server. Please make sure the backend is running."
-      );
-
+    if (isLoading) {
       return;
     }
 
-    setErrorMessage(
-      error instanceof Error
-        ? error.message
-        : "Unable to login. Please try again."
-    );
-  } finally {
-    setIsLoading(
-      false
-    );
-  }
-};
-  /* =========================================================
-     UI
-  ========================================================== */
+    setErrorMessage("");
+
+    const normalizedEmail =
+      email
+        .trim()
+        .toLowerCase();
+
+    if (!normalizedEmail) {
+      setErrorMessage(
+        "Please enter your email address.",
+      );
+      return;
+    }
+
+    if (!password) {
+      setErrorMessage(
+        "Please enter your password.",
+      );
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const loginUrl =
+        `${API_URL}/auth/login`;
+
+      console.log(
+        "LOGIN API:",
+        loginUrl,
+      );
+
+      console.log(
+        "LOGIN REQUEST:",
+        {
+          email:
+            normalizedEmail,
+          passwordLength:
+            password.length,
+        },
+      );
+
+      const response =
+        await fetch(
+          loginUrl,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+              Accept:
+                "application/json",
+            },
+            credentials:
+              "include",
+            body:
+              JSON.stringify({
+                email:
+                  normalizedEmail,
+                password,
+              }),
+          },
+        );
+
+      const data =
+        (await response
+          .json()
+          .catch(
+            () => null,
+          )) as
+          | LoginResponse
+          | null;
+
+      if (!data) {
+        throw new Error(
+          "Invalid response from server.",
+        );
+      }
+
+      console.log(
+        "LOGIN STATUS:",
+        response.status,
+      );
+
+      console.log(
+        "LOGIN RESPONSE:",
+        data,
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          data.message ||
+            `Login failed with status ${response.status}.`,
+        );
+      }
+
+      if (!data.success) {
+        throw new Error(
+          data.message ||
+            "Login failed.",
+        );
+      }
+
+      if (!data.user) {
+        throw new Error(
+          "User information was not returned by the server.",
+        );
+      }
+
+      localStorage.setItem(
+        "auth_user",
+        JSON.stringify(
+          data.user,
+        ),
+      );
+
+      localStorage.setItem(
+        "is_authenticated",
+        "true",
+      );
+
+      window.dispatchEvent(
+        new Event(
+          "coffer-auth-state-changed",
+        ),
+      );
+
+      router.replace(
+        "/dashboard",
+      );
+
+      router.refresh();
+    } catch (error) {
+      console.error(
+        "LOGIN ERROR:",
+        error,
+      );
+
+      if (
+        error instanceof
+        TypeError
+      ) {
+        setErrorMessage(
+          "Unable to connect to the server. Please make sure the backend is running.",
+        );
+        return;
+      }
+
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Unable to login. Please try again.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
-    <div
-      className="
-        relative
-        z-20
-        w-full
-        pointer-events-auto
-      "
-    >
-      {/* =====================================================
-          HEADER
-      ====================================================== */}
-
-      <motion.div
+    <div className="relative z-10 w-full">
+      <motion.header
         initial={{
           opacity: 0,
-          y: 16,
+          y: 14,
         }}
         animate={{
           opacity: 1,
           y: 0,
         }}
         transition={{
-          duration: 0.5,
+          duration: 0.48,
           ease: [
             0.22,
             1,
@@ -424,113 +259,41 @@ const handleSubmit = async (
           ],
         }}
       >
-        {/* ICON */}
-
         <motion.div
           whileHover={{
-            scale: 1.06,
+            scale: 1.055,
             rotate: -4,
           }}
           transition={{
             type: "spring",
-            stiffness: 280,
-            damping: 18,
+            stiffness: 300,
+            damping: 19,
           }}
-          className="
-            mb-4
-
-            flex
-            h-[44px]
-            w-[44px]
-            items-center
-            justify-center
-
-            rounded-[14px]
-
-            border
-            border-[#D9E8F6]
-
-            bg-gradient-to-br
-            from-[#F3F9FF]
-            to-[#EAF4FF]
-
-            text-[#1F5EA8]
-
-            shadow-[0_10px_24px_rgba(31,94,168,0.08)]
-          "
+          className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl border border-violet-200/80 bg-gradient-to-br from-violet-50 to-indigo-100 text-indigo-700 shadow-[0_12px_30px_rgba(79,70,229,0.13)]"
         >
-          <Fingerprint
-            className="
-              h-[20px]
-              w-[20px]
-            "
-          />
+          <Fingerprint className="h-5 w-5" />
         </motion.div>
 
-        {/* EYEBROW */}
-
-        <p
-          className="
-            text-[9px]
-            font-black
-            uppercase
-            tracking-[0.19em]
-
-            text-[#1762AC]
-          "
-        >
+        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-violet-700">
           Secure account access
         </p>
 
-        {/* TITLE */}
-
-        <h1
-          className="
-            mt-2
-
-            text-[32px]
-            font-black
-            leading-none
-            tracking-[-0.045em]
-
-            text-[#102A43]
-
-            sm:text-[34px]
-          "
-        >
-          Sign in
+        <h1 className="mt-2 text-[32px] font-black leading-none tracking-[-0.05em] text-slate-950 sm:text-[36px]">
+          Welcome back
         </h1>
 
-        {/* DESCRIPTION */}
-
-        <p
-          className="
-            mt-4
-
-            max-w-[390px]
-
-            text-[12px]
-            font-medium
-            leading-[1.9]
-
-            text-[#718296]
-
-            sm:text-[13px]
-          "
-        >
-          Enter your account credentials
-          to continue to your secure
-          wallet.
+        <p className="mt-4 max-w-[430px] text-[12px] font-medium leading-6 text-slate-500 sm:text-[13px]">
+          Enter your account credentials to continue to your secure Coffer wallet.
         </p>
-      </motion.div>
+      </motion.header>
 
-      {/* =====================================================
-          ERROR
-      ====================================================== */}
-
-      <AnimatePresence>
+      <AnimatePresence
+        initial={false}
+      >
         {errorMessage && (
           <motion.div
+            role="alert"
+            aria-live="polite"
             initial={{
               opacity: 0,
               height: 0,
@@ -547,45 +310,12 @@ const handleSubmit = async (
               y: -5,
             }}
             transition={{
-              duration: 0.25,
+              duration: 0.24,
             }}
-            className="
-              overflow-hidden
-            "
+            className="overflow-hidden"
           >
-            <div
-              className="
-                mt-5
-
-                flex
-                items-start
-                gap-2.5
-
-                rounded-[14px]
-
-                border
-                border-rose-200
-
-                bg-rose-50
-
-                px-3.5
-                py-3
-
-                text-[11px]
-                font-semibold
-
-                text-rose-600
-              "
-            >
-              <AlertCircle
-                className="
-                  mt-0.5
-                  h-4
-                  w-4
-                  shrink-0
-                "
-              />
-
+            <div className="mt-5 flex items-start gap-2.5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-[11px] font-semibold leading-5 text-rose-700">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               <span>
                 {errorMessage}
               </span>
@@ -593,10 +323,6 @@ const handleSubmit = async (
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* =====================================================
-          FORM
-      ====================================================== */}
 
       <motion.form
         onSubmit={
@@ -620,355 +346,111 @@ const handleSubmit = async (
             1,
           ],
         }}
-        className="
-          relative
-          z-30
-
-          mt-7
-          space-y-5
-
-          pointer-events-auto
-        "
+        className="mt-7 space-y-5"
       >
-        {/* ===================================================
-            EMAIL
-        ==================================================== */}
-
-        <div
-          className="
-            relative
-            z-20
-          "
-        >
+        <div>
           <label
             htmlFor="login-email"
-            className="
-              mb-2
-              block
-
-              cursor-pointer
-
-              text-[10px]
-              font-extrabold
-
-              text-[#344A60]
-            "
+            className="mb-2 block cursor-pointer text-[10px] font-extrabold text-slate-700"
           >
-            Email Address
+            Email address
           </label>
 
-          <div
-            className="
-              group
-              relative
-            "
-          >
-            <Mail
-              className="
-                pointer-events-none
-
-                absolute
-                left-4
-                top-1/2
-                z-10
-
-                h-4
-                w-4
-
-                -translate-y-1/2
-
-                text-[#93A5B8]
-
-                transition-colors
-
-                group-focus-within:text-[#1F5EA8]
-              "
-            />
+          <div className="group relative">
+            <Mail className="pointer-events-none absolute left-4 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-violet-600" />
 
             <input
               id="login-email"
               name="email"
               type="email"
-
               value={email}
-
               onChange={(
-                event
-              ) =>
+                event,
+              ) => {
                 setEmail(
-                  event.target
-                    .value
-                )
-              }
-
+                  event.target.value,
+                );
+              }}
               placeholder="name@example.com"
-
               autoComplete="email"
-
               disabled={
                 isLoading
               }
-
               required
-
-              className="
-                relative
-                z-20
-
-                h-[53px]
-                w-full
-
-                rounded-[14px]
-
-                border
-                border-[#D6E1EB]
-
-                bg-[#F7F9FC]
-
-                pl-11
-                pr-4
-
-                text-[13px]
-                font-semibold
-
-                text-[#18334B]
-
-                outline-none
-
-                transition-all
-                duration-200
-
-                placeholder:font-semibold
-                placeholder:text-[#A0AFC0]
-
-                hover:border-[#C4D4E3]
-
-                focus:border-[#3E8FD9]
-                focus:bg-white
-
-                focus:ring-4
-                focus:ring-blue-500/[0.07]
-
-                disabled:cursor-not-allowed
-                disabled:opacity-60
-              "
+              className="h-[54px] w-full rounded-2xl border border-slate-200 bg-white/80 pl-11 pr-4 text-[13px] font-semibold text-slate-900 outline-none transition-all duration-200 placeholder:font-medium placeholder:text-slate-400 hover:border-violet-200 focus:border-violet-500 focus:bg-white focus:ring-4 focus:ring-violet-500/10 disabled:cursor-not-allowed disabled:opacity-60"
             />
           </div>
         </div>
 
-        {/* ===================================================
-            PASSWORD
-        ==================================================== */}
-
-        <div
-          className="
-            relative
-            z-20
-          "
-        >
-          <div
-            className="
-              mb-2
-
-              flex
-              items-center
-              justify-between
-              gap-4
-            "
-          >
+        <div>
+          <div className="mb-2 flex items-center justify-between gap-4">
             <label
               htmlFor="login-password"
-              className="
-                cursor-pointer
-
-                text-[10px]
-                font-extrabold
-
-                text-[#344A60]
-              "
+              className="cursor-pointer text-[10px] font-extrabold text-slate-700"
             >
               Password
             </label>
 
             <Link
               href="/forgot-password"
-              className="
-                text-[9px]
-                font-extrabold
-
-                text-[#1762AC]
-
-                transition-colors
-
-                hover:text-[#104C85]
-              "
+              className="rounded-md text-[9px] font-extrabold text-violet-700 transition hover:text-violet-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
             >
               Forgot password?
             </Link>
           </div>
 
-          <div
-            className="
-              group
-              relative
-            "
-          >
-            <KeyRound
-              className="
-                pointer-events-none
-
-                absolute
-                left-4
-                top-1/2
-                z-10
-
-                h-4
-                w-4
-
-                -translate-y-1/2
-
-                text-[#93A5B8]
-
-                transition-colors
-
-                group-focus-within:text-[#1F5EA8]
-              "
-            />
+          <div className="group relative">
+            <KeyRound className="pointer-events-none absolute left-4 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-violet-600" />
 
             <input
               id="login-password"
               name="password"
-
               type={
                 showPassword
                   ? "text"
                   : "password"
               }
-
-              value={
-                password
-              }
-
+              value={password}
               onChange={(
-                event
-              ) =>
+                event,
+              ) => {
                 setPassword(
-                  event.target
-                    .value
-                )
-              }
-
+                  event.target.value,
+                );
+              }}
               placeholder="Enter your password"
-
               autoComplete="current-password"
-
               required
-
               disabled={
                 isLoading
               }
-
-              className="
-                relative
-                z-20
-
-                h-[53px]
-                w-full
-
-                rounded-[14px]
-
-                border
-                border-[#D6E1EB]
-
-                bg-[#F7F9FC]
-
-                pl-11
-                pr-12
-
-                text-[13px]
-                font-semibold
-
-                text-[#18334B]
-
-                outline-none
-
-                transition-all
-                duration-200
-
-                placeholder:font-semibold
-                placeholder:text-[#A0AFC0]
-
-                hover:border-[#C4D4E3]
-
-                focus:border-[#3E8FD9]
-                focus:bg-white
-
-                focus:ring-4
-                focus:ring-blue-500/[0.07]
-
-                disabled:cursor-not-allowed
-                disabled:opacity-60
-              "
+              className="h-[54px] w-full rounded-2xl border border-slate-200 bg-white/80 pl-11 pr-12 text-[13px] font-semibold text-slate-900 outline-none transition-all duration-200 placeholder:font-medium placeholder:text-slate-400 hover:border-violet-200 focus:border-violet-500 focus:bg-white focus:ring-4 focus:ring-violet-500/10 disabled:cursor-not-allowed disabled:opacity-60"
             />
-
-            {/* SHOW / HIDE */}
 
             <motion.button
               type="button"
-
               disabled={
                 isLoading
               }
-
               whileTap={{
                 scale: 0.86,
               }}
-
-              onClick={() =>
+              onClick={() => {
                 setShowPassword(
                   (current) =>
-                    !current
-                )
-              }
-
+                    !current,
+                );
+              }}
               aria-label={
                 showPassword
                   ? "Hide password"
                   : "Show password"
               }
-
-              className="
-                absolute
-                right-3
-                top-1/2
-                z-30
-
-                flex
-                h-8
-                w-8
-
-                -translate-y-1/2
-
-                items-center
-                justify-center
-
-                rounded-lg
-
-                text-[#92A4B8]
-
-                transition-all
-
-                hover:bg-[#EEF6FF]
-                hover:text-[#1F5EA8]
-
-                disabled:pointer-events-none
-              "
+              className="absolute right-3 top-1/2 z-20 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 transition hover:bg-violet-50 hover:text-violet-700 disabled:pointer-events-none"
             >
               <AnimatePresence
                 mode="wait"
-                initial={
-                  false
-                }
+                initial={false}
               >
                 <motion.span
                   key={
@@ -993,19 +475,9 @@ const handleSubmit = async (
                   }}
                 >
                   {showPassword ? (
-                    <EyeOff
-                      className="
-                        h-4
-                        w-4
-                      "
-                    />
+                    <EyeOff className="h-4 w-4" />
                   ) : (
-                    <Eye
-                      className="
-                        h-4
-                        w-4
-                      "
-                    />
+                    <Eye className="h-4 w-4" />
                   )}
                 </motion.span>
               </AnimatePresence>
@@ -1013,17 +485,11 @@ const handleSubmit = async (
           </div>
         </div>
 
-        {/* ===================================================
-            SUBMIT
-        ==================================================== */}
-
         <motion.button
           type="submit"
-
           disabled={
             isLoading
           }
-
           whileHover={
             isLoading
               ? undefined
@@ -1031,122 +497,22 @@ const handleSubmit = async (
                   y: -2,
                 }
           }
-
           whileTap={
             isLoading
               ? undefined
               : {
-                  scale:
-                    0.985,
+                  scale: 0.985,
                 }
           }
-
-          className="
-            group
-
-            relative
-            z-30
-
-            flex
-            h-[52px]
-            w-full
-
-            items-center
-            justify-center
-            gap-2
-
-            overflow-hidden
-
-            rounded-[14px]
-
-            bg-gradient-to-r
-            from-[#1D5A91]
-            via-[#2268A9]
-            to-[#2D86CB]
-
-            text-[13px]
-            font-extrabold
-
-            text-white
-
-            shadow-[0_17px_35px_rgba(31,94,168,0.24)]
-
-            transition-all
-
-            hover:shadow-[0_20px_42px_rgba(31,94,168,0.30)]
-
-            disabled:cursor-not-allowed
-            disabled:opacity-60
-          "
+          className="group relative flex h-[54px] w-full items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 text-[13px] font-extrabold text-white shadow-[0_17px_38px_rgba(109,40,217,0.28)] transition-all hover:shadow-[0_20px_44px_rgba(109,40,217,0.36)] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {/* LEFT GLASS SHAPE */}
-
           {!isLoading && (
-            <motion.span
-              aria-hidden="true"
-
-              initial={{
-                x: 0,
-              }}
-
-              whileHover={{
-                x: 6,
-              }}
-
-              className="
-                pointer-events-none
-
-                absolute
-                bottom-0
-                left-0
-                top-0
-
-                w-[22px]
-
-                skew-x-[-12deg]
-
-                bg-white/[0.08]
-              "
-            />
-          )}
-
-          {/* LIGHT SWEEP */}
-
-          {!isLoading && (
-            <span
-              className="
-                pointer-events-none
-
-                absolute
-                -left-16
-                top-0
-
-                h-full
-                w-20
-
-                -skew-x-12
-
-                bg-white/[0.10]
-
-                transition-transform
-                duration-700
-
-                group-hover:translate-x-[560px]
-              "
-            />
+            <span className="pointer-events-none absolute -left-20 top-0 h-full w-20 -skew-x-12 bg-white/15 transition-transform duration-700 group-hover:translate-x-[620px]" />
           )}
 
           {isLoading ? (
             <>
-              <Loader2
-                className="
-                  relative
-                  h-4
-                  w-4
-                  animate-spin
-                "
-              />
-
+              <Loader2 className="relative h-4 w-4 animate-spin" />
               <span className="relative">
                 Signing in...
               </span>
@@ -1154,29 +520,13 @@ const handleSubmit = async (
           ) : (
             <>
               <span className="relative">
-                Sign In
+                Sign in securely
               </span>
-
-              <ArrowRight
-                className="
-                  relative
-
-                  h-4
-                  w-4
-
-                  transition-transform
-
-                  group-hover:translate-x-1
-                "
-              />
+              <ArrowRight className="relative h-4 w-4 transition-transform group-hover:translate-x-1" />
             </>
           )}
         </motion.button>
       </motion.form>
-
-      {/* =====================================================
-          CREATE ACCOUNT
-      ====================================================== */}
 
       <motion.div
         initial={{
@@ -1192,61 +542,18 @@ const handleSubmit = async (
           duration: 0.4,
         }}
       >
-        <p
-          className="
-            mt-7
-
-            text-center
-
-            text-[11px]
-            font-medium
-
-            text-[#78899B]
-          "
-        >
+        <p className="mt-7 text-center text-[11px] font-medium text-slate-500">
           Don&apos;t have an account?{" "}
-
           <Link
             href="/register"
-            className="
-              font-extrabold
-              text-[#1762AC]
-
-              transition-colors
-
-              hover:text-[#104B82]
-            "
+            className="font-extrabold text-violet-700 transition hover:text-violet-900"
           >
             Create account
           </Link>
         </p>
 
-        {/* SECURITY */}
-
-        <div
-          className="
-            mt-5
-
-            flex
-            items-center
-            justify-center
-            gap-2
-
-            text-[9px]
-            font-semibold
-
-            text-[#9AA8B8]
-          "
-        >
-          <ShieldCheck
-            className="
-              h-3.5
-              w-3.5
-
-              text-emerald-600
-            "
-          />
-
+        <div className="mt-5 flex items-center justify-center gap-2 text-[9px] font-semibold text-slate-400">
+          <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
           Your account data stays private
         </div>
       </motion.div>
