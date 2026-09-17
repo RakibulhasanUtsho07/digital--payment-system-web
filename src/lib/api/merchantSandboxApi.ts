@@ -35,61 +35,112 @@ export interface SandboxOrder {
   id: string;
   orderId: string;
   merchantId: string;
+
   mode: "test";
+
   status: SandboxOrderStatus;
+
   amount: number;
   currency: string;
+
   merchantReference?: string | null;
   description?: string | null;
+
   customer?: SandboxOrderCustomer | null;
+
   items: SandboxOrderItem[];
-  metadata: Record<string, string>;
+
+  metadata: Record<
+    string,
+    string
+  >;
+
   returnUrl?: string | null;
   cancelUrl?: string | null;
+
   checkoutUrl: string;
+
   paidAt?: string | null;
   cancelledAt?: string | null;
   expiredAt?: string | null;
+
   expiresAt: string;
+
   createdAt: string;
   updatedAt: string;
 }
 
 export interface SandboxPayment {
   paymentId?: string;
+
   status?: string;
+
   amount?: number;
+
   currency?: string;
+
   provider?: string;
+
   sourceType?: string;
+
   mode?: "test";
+
   checkoutUrl?: string | null;
+
   createdAt?: string;
+
   completedAt?: string | null;
 }
 
 export interface SandboxPagination {
   page: number;
+
   limit: number;
+
   total: number;
+
   totalPages: number;
+
   hasNextPage: boolean;
+
   hasPreviousPage: boolean;
 }
 
 export interface CreateSandboxOrderInput {
   amount: number;
+
   currency: string;
+
   merchantReference?: string;
+
   description?: string;
+
   customer?: {
     name?: string;
+
     email?: string;
+
+    phone?: string;
+
     externalCustomerId?: string;
   };
+
+  items?: Array<{
+    name: string;
+
+    sku?: string;
+
+    quantity: number;
+
+    unitAmount: number;
+  }>;
+
   returnUrl?: string;
+
   cancelUrl?: string;
+
   expiresInMinutes?: number;
+
   metadata?: Record<
     string,
     string | number | boolean
@@ -98,29 +149,43 @@ export interface CreateSandboxOrderInput {
 
 export interface CreateSandboxOrderResult {
   duplicate: boolean;
+
   message: string;
+
   order: SandboxOrder;
 }
 
 export interface SandboxOrderDetail {
   order: SandboxOrder;
+
   payment: SandboxPayment | null;
 }
 
 export interface SandboxOrderList {
   merchant: {
     id: string;
+
     businessName: string;
+
     defaultCurrency: string;
   };
+
   orders: SandboxOrder[];
+
   pagination: SandboxPagination;
 }
 
+/* =========================================================
+   INTERNAL RESPONSE TYPES
+========================================================= */
+
 interface CreateResponse {
   success: boolean;
+
   duplicate: boolean;
+
   message: string;
+
   order: SandboxOrder;
 }
 
@@ -131,17 +196,33 @@ interface DetailResponse
 
 interface ListResponse {
   success: boolean;
+
   data: SandboxOrderList;
 }
 
 /* =========================================================
-   CREATE
+   CREATE SANDBOX ORDER
+
+   IMPORTANT:
+   apiClient already owns the /api base prefix.
+
+   Browser:
+   POST /api/merchants/sandbox/orders
 ========================================================= */
 
 export async function createSandboxOrder(
   input: CreateSandboxOrderInput,
   idempotencyKey: string,
 ): Promise<CreateSandboxOrderResult> {
+  const normalizedKey =
+    idempotencyKey.trim();
+
+  if (!normalizedKey) {
+    throw new Error(
+      "Idempotency key is required.",
+    );
+  }
+
   const response =
     await apiClient<CreateResponse>(
       "/merchants/sandbox/orders",
@@ -150,7 +231,7 @@ export async function createSandboxOrder(
 
         headers: {
           "Idempotency-Key":
-            idempotencyKey,
+            normalizedKey,
         },
 
         body:
@@ -159,6 +240,15 @@ export async function createSandboxOrder(
           ),
       },
     );
+
+  if (
+    !response.success
+  ) {
+    throw new Error(
+      response.message ||
+        "Unable to create sandbox order.",
+    );
+  }
 
   return {
     duplicate:
@@ -173,16 +263,22 @@ export async function createSandboxOrder(
 }
 
 /* =========================================================
-   LIST
+   LIST SANDBOX ORDERS
+
+   Browser:
+   GET /api/merchants/sandbox/orders
 ========================================================= */
 
 export async function listSandboxOrders(
   input: {
     page?: number;
+
     limit?: number;
+
     status?:
       | SandboxOrderStatus
       | "all";
+
     search?: string;
   } = {},
 ): Promise<SandboxOrderList> {
@@ -213,12 +309,15 @@ export async function listSandboxOrders(
     );
   }
 
+  const normalizedSearch =
+    input.search?.trim();
+
   if (
-    input.search?.trim()
+    normalizedSearch
   ) {
     query.set(
       "search",
-      input.search.trim(),
+      normalizedSearch,
     );
   }
 
@@ -230,25 +329,55 @@ export async function listSandboxOrders(
       },
     );
 
+  if (
+    !response.success
+  ) {
+    throw new Error(
+      "Unable to load sandbox orders.",
+    );
+  }
+
   return response.data;
 }
 
 /* =========================================================
-   DETAIL / STATUS
+   GET SANDBOX ORDER
+
+   Browser:
+   GET /api/merchants/sandbox/orders/:orderId
 ========================================================= */
 
 export async function getSandboxOrder(
   orderId: string,
 ): Promise<SandboxOrderDetail> {
+  const normalizedOrderId =
+    orderId.trim();
+
+  if (
+    !normalizedOrderId
+  ) {
+    throw new Error(
+      "Order ID is required.",
+    );
+  }
+
   const response =
     await apiClient<DetailResponse>(
       `/merchants/sandbox/orders/${encodeURIComponent(
-        orderId,
+        normalizedOrderId,
       )}`,
       {
         method: "GET",
       },
     );
+
+  if (
+    !response.success
+  ) {
+    throw new Error(
+      "Unable to load sandbox order.",
+    );
+  }
 
   return {
     order:
