@@ -13,6 +13,41 @@ interface ApiErrorResponse {
 }
 
 /* =========================================================
+   ABORT ERROR HELPER
+========================================================= */
+
+export function isApiAbortError(
+  error: unknown
+): boolean {
+  /*
+   * Browser fetch normally throws DOMException:
+   *
+   * name = "AbortError"
+   *
+   * Error check is also included because different
+   * runtimes may expose the aborted request differently.
+   */
+
+  if (
+    typeof DOMException !==
+      "undefined" &&
+    error instanceof DOMException &&
+    error.name === "AbortError"
+  ) {
+    return true;
+  }
+
+  if (
+    error instanceof Error &&
+    error.name === "AbortError"
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/* =========================================================
    API CLIENT
 ========================================================= */
 
@@ -38,7 +73,8 @@ export async function apiClient<T>(
   ======================================================== */
 
   const isFormData =
-    typeof FormData !== "undefined" &&
+    typeof FormData !==
+      "undefined" &&
     body instanceof FormData;
 
   /* =======================================================
@@ -114,6 +150,32 @@ export async function apiClient<T>(
         }
       );
   } catch (error) {
+    /* =====================================================
+       EXPECTED REQUEST CANCELLATION
+
+       These are normal situations:
+       - component unmount
+       - route change
+       - filter change
+       - new request replacing old request
+       - React development Strict Mode lifecycle
+
+       Abort is NOT a real network error.
+       So do NOT console.error it.
+    ===================================================== */
+
+    if (
+      isApiAbortError(
+        error
+      )
+    ) {
+      throw error;
+    }
+
+    /* =====================================================
+       REAL NETWORK ERROR
+    ===================================================== */
+
     console.error(
       "API NETWORK ERROR:",
       error
@@ -128,13 +190,33 @@ export async function apiClient<T>(
      READ RESPONSE AS TEXT FIRST
   ======================================================== */
 
-  let rawText = "";
+  let rawText =
+    "";
 
   try {
     rawText =
       await response.text();
-  } catch {
-    rawText = "";
+  } catch (error) {
+    /*
+     * response.text() can also be interrupted
+     * when the request is aborted.
+     */
+
+    if (
+      isApiAbortError(
+        error
+      )
+    ) {
+      throw error;
+    }
+
+    console.error(
+      "API RESPONSE READ ERROR:",
+      error
+    );
+
+    rawText =
+      "";
   }
 
   /* =======================================================
@@ -144,7 +226,9 @@ export async function apiClient<T>(
   let data: unknown =
     null;
 
-  if (rawText) {
+  if (
+    rawText
+  ) {
     try {
       data =
         JSON.parse(
@@ -153,7 +237,8 @@ export async function apiClient<T>(
     } catch {
       /*
        * Server may return HTML/text error.
-       * Don't crash with JSON.parse error.
+       *
+       * Do not crash with JSON.parse error.
        */
 
       data = {
@@ -164,10 +249,12 @@ export async function apiClient<T>(
   }
 
   /* =======================================================
-     HANDLE ERROR
+     HANDLE HTTP ERROR
   ======================================================== */
 
-  if (!response.ok) {
+  if (
+    !response.ok
+  ) {
     let message =
       `Request failed with status ${response.status}.`;
 
@@ -197,7 +284,8 @@ export async function apiClient<T>(
     }
 
     /*
-     * Don't dump huge HTML/body into UI.
+     * Prevent huge HTML/server body
+     * from being displayed in the UI.
      */
 
     if (
@@ -217,9 +305,15 @@ export async function apiClient<T>(
      EMPTY SUCCESS RESPONSE
   ======================================================== */
 
-  if (!rawText) {
+  if (
+    !rawText
+  ) {
     return {} as T;
   }
+
+  /* =======================================================
+     SUCCESS
+  ======================================================== */
 
   return data as T;
 }

@@ -26,6 +26,7 @@ import {
   RefreshCw,
   Search,
   ShieldCheck,
+  Sparkles,
   X,
   XCircle,
 } from "lucide-react";
@@ -1984,6 +1985,29 @@ function TransactionModal({
     };
 
   /* =======================================================
+     ASK COFFER AI
+  ======================================================== */
+
+  const handleAskCoffer =
+    () => {
+      window.dispatchEvent(
+        new CustomEvent(
+          "coffer-ai:open",
+          {
+            detail: {
+              resourceId:
+                transaction._id,
+              message:
+                `Explain why transaction ${transaction._id} is ${transaction.status.toLowerCase()} and what I should do next.`,
+            },
+          }
+        )
+      );
+
+      onClose();
+    };
+
+  /* =======================================================
      PRINT
   ======================================================== */
 
@@ -2267,6 +2291,20 @@ function TransactionModal({
           {/* ACTIONS */}
 
           <div className="mt-6 grid gap-2.5 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={
+                handleAskCoffer
+              }
+              className="group relative inline-flex h-12 items-center justify-center gap-2 overflow-hidden rounded-[15px] bg-gradient-to-r from-[#21143b] via-[#3b2368] to-[#633b9f] px-4 text-xs font-extrabold text-white shadow-[0_12px_30px_rgba(73,40,126,.22)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(73,40,126,.3)] sm:col-span-2"
+            >
+              <span className="pointer-events-none absolute -left-12 top-0 h-full w-12 -skew-x-12 bg-white/10 transition-transform duration-700 group-hover:translate-x-[620px]" />
+              <Sparkles className="relative h-4 w-4" />
+              <span className="relative">
+                Ask Coffer AI about this transaction
+              </span>
+            </button>
+
             <button
               type="button"
               onClick={handlePrint}

@@ -46,6 +46,8 @@ import {
   X,
 } from "lucide-react";
 
+import CofferAiCopilot from "@/components/dashboard/ai/CofferAiCopilot";
+
 /* =========================================================
    TYPES
 ========================================================= */
@@ -2188,6 +2190,20 @@ export default function TopNavbar({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {(userRole === "user" ||
+        userRole === "merchant") && (
+        <CofferAiCopilot
+          userName={
+            userName
+          }
+          portal={
+            userRole === "merchant"
+              ? "merchant"
+              : "personal"
+          }
+        />
+      )}
     </>
   );
 }

@@ -29,28 +29,29 @@ import {
 ========================================================= */
 
 interface WalletData {
-  _id: string;
+  _id:
+    string;
 
-  userId: string;
+  userId:
+    string;
 
-  balance: number;
+  balance:
+    number;
 
   [key: string]:
     unknown;
 }
 
 interface WalletResponse {
-  success: boolean;
+  success:
+    boolean;
 
   wallet:
     WalletData;
 
-  message?: string;
+  message?:
+    string;
 }
-
-/* =========================================================
-   TRANSACTION TYPES
-========================================================= */
 
 type TransactionType =
   | "TRANSFER"
@@ -68,15 +69,19 @@ type RiskScore =
   | "HIGH";
 
 interface PopulatedUser {
-  _id: string;
+  _id:
+    string;
 
-  name?: string;
+  name?:
+    string;
 
-  email?: string;
+  email?:
+    string;
 }
 
 interface TransactionData {
-  _id: string;
+  _id:
+    string;
 
   senderId:
     | string
@@ -86,9 +91,11 @@ interface TransactionData {
     | string
     | PopulatedUser;
 
-  amount: number;
+  amount:
+    number;
 
-  currency: string;
+  currency:
+    string;
 
   type:
     TransactionType;
@@ -96,30 +103,32 @@ interface TransactionData {
   status:
     TransactionStatus;
 
-  reference?: string;
+  reference?:
+    string;
 
   riskScore:
     RiskScore;
 
-  createdAt?: string;
+  createdAt?:
+    string;
 
-  updatedAt?: string;
+  updatedAt?:
+    string;
 }
 
 interface TransactionsResponse {
-  success: boolean;
+  success:
+    boolean;
 
-  count: number;
+  count:
+    number;
 
   transactions:
     TransactionData[];
 
-  message?: string;
+  message?:
+    string;
 }
-
-/* =========================================================
-   CONSTANT
-========================================================= */
 
 const REQUEST_TIMEOUT_MS =
   12_000;
@@ -189,15 +198,13 @@ function getGreeting():
       .getHours();
 
   if (
-    hour <
-    12
+    hour < 12
   ) {
     return "Good morning";
   }
 
   if (
-    hour <
-    18
+    hour < 18
   ) {
     return "Good afternoon";
   }
@@ -213,7 +220,8 @@ function DashboardLoading({
   message =
     "Loading dashboard...",
 }: {
-  message?: string;
+  message?:
+    string;
 }) {
   return (
     <div className="flex min-h-[70vh] items-center justify-center">
@@ -250,12 +258,6 @@ export default function DashboardPage() {
   const router =
     useRouter();
 
-  /*
-   * User has already been loaded and validated
-   * by DashboardLayout.
-   *
-   * No second /users/profile request.
-   */
   const {
     user,
   } =
@@ -308,11 +310,11 @@ export default function DashboardPage() {
     );
 
   /* =======================================================
-     DEFENSIVE ROLE REDIRECT
+     ROLE DASHBOARD REDIRECT
 
-     Layout already redirects these roles.
-
-     This is an extra safety fallback.
+     merchant → merchant
+     analyst  → analyst
+     support  → support
   ======================================================= */
 
   useEffect(
@@ -339,19 +341,7 @@ export default function DashboardPage() {
   );
 
   /* =======================================================
-     NORMAL USER DATA ONLY
-
-     Merchant:
-       NO wallet dashboard request
-
-     Analyst:
-       NO personal transaction request
-
-     Support:
-       NO personal wallet request
-
-     Admin:
-       NO personal wallet request
+     USER WALLET DATA ONLY
   ======================================================= */
 
   useEffect(
@@ -385,9 +375,7 @@ export default function DashboardPage() {
                 apiClient<WalletResponse>(
                   "/wallet"
                 ),
-
                 REQUEST_TIMEOUT_MS,
-
                 "Wallet request timed out."
               ),
 
@@ -395,9 +383,7 @@ export default function DashboardPage() {
                 apiClient<TransactionsResponse>(
                   "/transactions"
                 ),
-
                 REQUEST_TIMEOUT_MS,
-
                 "Transaction request timed out."
               ),
             ]);
@@ -483,7 +469,7 @@ export default function DashboardPage() {
   );
 
   /* =======================================================
-     ADMIN
+     ADMIN DASHBOARD
   ======================================================= */
 
   if (
@@ -498,7 +484,7 @@ export default function DashboardPage() {
   }
 
   /* =======================================================
-     MERCHANT / ANALYST / SUPPORT REDIRECTING
+     DEDICATED DASHBOARDS
   ======================================================= */
 
   if (
@@ -511,15 +497,13 @@ export default function DashboardPage() {
   ) {
     return (
       <DashboardLoading
-        message={`Opening ${
-          user.role
-        } workspace...`}
+        message={`Opening ${user.role} workspace...`}
       />
     );
   }
 
   /* =======================================================
-     USER LOADING
+     NORMAL USER
   ======================================================= */
 
   if (
@@ -531,10 +515,6 @@ export default function DashboardPage() {
       />
     );
   }
-
-  /* =======================================================
-     USER ERROR
-  ======================================================= */
 
   if (
     errorMessage ||
@@ -579,10 +559,6 @@ export default function DashboardPage() {
       </div>
     );
   }
-
-  /* =======================================================
-     NORMAL USER
-  ======================================================= */
 
   return (
     <UserDashboardOverview
