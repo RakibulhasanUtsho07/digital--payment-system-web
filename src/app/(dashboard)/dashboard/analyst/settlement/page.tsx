@@ -9,16 +9,16 @@ import {
   type ReactNode,
 } from "react";
 
-import {
-  motion,
-} from "framer-motion";
+import { motion } from "framer-motion";
 
 import {
   AlertTriangle,
   ArrowDownRight,
   ArrowUpRight,
   Banknote,
+  Check,
   CheckCircle2,
+  ChevronDown,
   DatabaseZap,
   Landmark,
   RefreshCcw,
@@ -52,6 +52,32 @@ import {
   type AnalystSettlementInsight,
   type AnalystSettlementStatus,
 } from "@/lib/api/analystApi";
+
+/* =========================================================
+   THEME
+
+   Ocean-glow visual system shared with the Analyst Overview
+   and Transaction Analytics pages. Semantic red / amber /
+   emerald are reserved for operational state.
+========================================================= */
+
+const THEME = {
+  ink: "#17324D",
+  teal: "#0D9488",
+  tealBright: "#14B8A6",
+  emerald: "#10B981",
+  cyan: "#22C7D6",
+  sky: "#38BDF8",
+  violet: "#7C6CF2",
+  amber: "#F59E0B",
+  red: "#EF4444",
+  axis: "#94A3B8",
+} as const;
+
+const DARK_SURFACE =
+  "bg-[linear-gradient(135deg,#10243A_0%,#0B4F52_48%,#10273A_100%)] text-white";
+
+const easeOut = [0.22, 1, 0.36, 1] as const;
 
 /* =========================================================
    OPTIONS
@@ -300,6 +326,242 @@ function humanize(
 }
 
 /* =========================================================
+   CHART TOOLTIP
+========================================================= */
+
+function ChartTooltip({
+  active,
+  payload,
+  label,
+  currency,
+}: {
+  active?: boolean;
+  payload?: Array<{
+    name?: string;
+    dataKey?: string;
+    value?: number;
+    color?: string;
+  }>;
+  label?: string;
+  currency: string;
+}) {
+  if (!active || !payload?.length) {
+    return null;
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.96 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.15 }}
+      className="min-w-[190px] rounded-2xl border border-white/10 bg-slate-900/95 p-3 shadow-[0_18px_50px_rgba(2,6,23,0.55)] backdrop-blur-xl"
+    >
+      {label ? (
+        <p className="mb-2 text-[11px] font-black uppercase tracking-[0.1em] text-teal-300">
+          {label}
+        </p>
+      ) : null}
+
+      <div className="space-y-1.5">
+        {payload.map((entry) => {
+          const isMoney = entry.dataKey === "netMajor";
+          const displayValue = isMoney
+            ? moneyText(Number(entry.value ?? 0) * 100, currency, true)
+            : numberText(Number(entry.value ?? 0));
+
+          return (
+            <div
+              key={String(entry.dataKey)}
+              className="flex items-center justify-between gap-5 text-xs"
+            >
+              <span className="inline-flex min-w-0 items-center gap-2 text-slate-300">
+                <span
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{ backgroundColor: entry.color }}
+                />
+                <span className="truncate">{entry.name}</span>
+              </span>
+
+              <span className="shrink-0 font-black tabular-nums text-white">
+                {displayValue}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </motion.div>
+  );
+}
+
+/* =========================================================
+   CUSTOM FILTER SELECT
+========================================================= */
+
+type FilterOption<T extends string> = {
+  value: T;
+  label: string;
+};
+
+function FilterSelect<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: Array<FilterOption<T>>;
+  onChange: (value: T) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+
+  const selected =
+    options.find((option) => option.value === value) ?? options[0];
+
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node | null;
+
+      if (
+        target &&
+        rootRef.current &&
+        !rootRef.current.contains(target)
+      ) {
+        setOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
+  return (
+    <div ref={rootRef} className="relative">
+      <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+        {label}
+      </span>
+
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className={`group flex h-11 w-full items-center justify-between gap-3 rounded-xl border bg-background px-3 text-left text-xs font-bold outline-none transition-all duration-200 ${
+          open
+            ? "border-teal-500 ring-4 ring-teal-500/10 shadow-[0_8px_24px_rgba(13,148,136,0.10)]"
+            : "border-border hover:border-teal-500/50 hover:bg-teal-500/[0.025]"
+        }`}
+      >
+        <span className="truncate text-foreground">
+          {selected?.label ?? value}
+        </span>
+
+        <motion.span
+          animate={{ rotate: open ? 180 : 0 }}
+          transition={{ duration: 0.2 }}
+          className="shrink-0 text-muted-foreground"
+        >
+          <ChevronDown className="h-4 w-4" />
+        </motion.span>
+      </button>
+
+      {open ? (
+        <motion.div
+          initial={{ opacity: 0, y: -6, scale: 0.985 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.16, ease: easeOut }}
+          role="listbox"
+          className="absolute left-0 right-0 top-[calc(100%+8px)] z-[90] overflow-hidden rounded-2xl border border-teal-500/15 bg-card/95 p-1.5 shadow-[0_22px_60px_rgba(15,23,42,0.18)] backdrop-blur-xl"
+        >
+          {options.map((option) => {
+            const active = option.value === value;
+
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="option"
+                aria-selected={active}
+                onClick={() => {
+                  onChange(option.value);
+                  setOpen(false);
+                }}
+                className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-bold transition ${
+                  active
+                    ? "bg-teal-500/10 text-teal-700 dark:text-teal-300"
+                    : "text-foreground hover:bg-muted/70"
+                }`}
+              >
+                <span>{option.label}</span>
+                {active ? <Check className="h-4 w-4 shrink-0" /> : null}
+              </button>
+            );
+          })}
+        </motion.div>
+      ) : null}
+    </div>
+  );
+}
+
+/* =========================================================
+   HERO SETTLEMENT ORBIT
+========================================================= */
+
+function SettlementOrbit() {
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute right-10 top-1/2 hidden h-52 w-80 -translate-y-1/2 xl:block"
+    >
+      <motion.div
+        animate={{ rotate: 360 }}
+        transition={{ duration: 26, repeat: Infinity, ease: "linear" }}
+        className="absolute right-4 top-1/2 h-44 w-44 -translate-y-1/2 rounded-full border border-teal-200/15"
+      >
+        <span className="absolute left-1/2 top-[-5px] h-2.5 w-2.5 -translate-x-1/2 rounded-full bg-teal-300 shadow-[0_0_18px_rgba(94,234,212,0.95)]" />
+        <span className="absolute bottom-5 right-2 h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_16px_rgba(103,232,249,0.9)]" />
+      </motion.div>
+
+      <motion.div
+        animate={{ rotate: -360 }}
+        transition={{ duration: 18, repeat: Infinity, ease: "linear" }}
+        className="absolute right-12 top-1/2 h-28 w-28 -translate-y-1/2 rounded-full border border-cyan-200/15"
+      >
+        <span className="absolute left-[-4px] top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-cyan-300 shadow-[0_0_16px_rgba(34,199,214,0.85)]" />
+      </motion.div>
+
+      <div className="absolute left-0 top-[47%] h-px w-36 overflow-hidden bg-white/10">
+        <motion.span
+          animate={{ x: ["-100%", "280%"] }}
+          transition={{ duration: 3.8, repeat: Infinity, ease: "linear" }}
+          className="block h-px w-16 bg-gradient-to-r from-transparent via-teal-200 to-transparent"
+        />
+      </div>
+
+      <motion.div
+        animate={{ opacity: [0.45, 1, 0.45], scale: [0.96, 1.08, 0.96] }}
+        transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute right-[78px] top-[78px] flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] text-teal-200 shadow-[0_0_34px_rgba(20,184,166,0.12)] backdrop-blur"
+      >
+        <Landmark className="h-5 w-5" />
+      </motion.div>
+    </div>
+  );
+}
+
+/* =========================================================
    CHANGE
 ========================================================= */
 
@@ -384,74 +646,57 @@ function MetricCard({
   metric,
   icon: Icon,
   iconClass,
+  accentClass,
   inverse,
+  index = 0,
 }: {
-  label:
-    string;
-
-  value:
-    string;
-
-  helper:
-    string;
-
-  metric:
-    AnalystMetric;
-
-  icon:
-    LucideIcon;
-
-  iconClass:
-    string;
-
-  inverse?:
-    boolean;
+  label: string;
+  value: string;
+  helper: string;
+  metric: AnalystMetric;
+  icon: LucideIcon;
+  iconClass: string;
+  accentClass: string;
+  inverse?: boolean;
+  index?: number;
 }) {
   return (
     <motion.div
-      initial={{
-        opacity:
-          0,
-
-        y:
-          12,
-      }}
-      animate={{
-        opacity:
-          1,
-
-        y:
-          0,
-      }}
-      className="rounded-2xl border border-border bg-card p-5 shadow-sm"
+      initial={{ opacity: 0, y: 14 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.2 }}
+      whileHover={{ y: -4 }}
+      transition={{ duration: 0.35, delay: index * 0.055, ease: easeOut }}
+      className="group relative flex h-full min-h-[168px] flex-col overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm transition-shadow hover:shadow-[0_18px_50px_rgba(15,23,42,0.10)]"
     >
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+      <div className={`absolute inset-x-0 top-0 h-1 ${accentClass}`} />
+
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="line-clamp-2 text-[10px] font-black uppercase leading-4 tracking-[0.14em] text-muted-foreground">
             {label}
           </p>
 
-          <p className="mt-3 truncate text-2xl font-black">
+          <p className="mt-3 break-words text-2xl font-black tabular-nums tracking-tight text-foreground">
             {value}
           </p>
 
-          <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
+          <p className="mt-1 line-clamp-2 text-[11px] leading-5 text-muted-foreground">
             {helper}
           </p>
         </div>
 
-        <div
+        <motion.div
+          whileHover={{ rotate: 6, scale: 1.08 }}
+          transition={{ type: "spring", stiffness: 320, damping: 18 }}
           className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${iconClass}`}
         >
           <Icon className="h-5 w-5" />
-        </div>
+        </motion.div>
       </div>
 
-      <div className="mt-4 border-t border-border/70 pt-3">
-        <Change
-          metric={metric}
-          inverse={inverse}
-        />
+      <div className="mt-auto border-t border-border/70 pt-3">
+        <Change metric={metric} inverse={inverse} />
       </div>
     </motion.div>
   );
@@ -465,32 +710,68 @@ function Panel({
   title,
   description,
   children,
+  action,
+  tone = "light",
+  className = "",
 }: {
-  title:
-    string;
-
-  description:
-    string;
-
-  children:
-    ReactNode;
+  title: string;
+  description: string;
+  children: ReactNode;
+  action?: ReactNode;
+  tone?: "light" | "dark";
+  className?: string;
 }) {
+  const dark = tone === "dark";
+
   return (
-    <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-      <div className="border-b border-border px-5 py-4">
-        <h2 className="text-base font-extrabold">
-          {title}
-        </h2>
+    <motion.section
+      initial={{ opacity: 0, y: 14 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.12 }}
+      transition={{ duration: 0.42, ease: easeOut }}
+      className={`relative flex h-full flex-col overflow-hidden rounded-[24px] shadow-sm ${
+        dark
+          ? `${DARK_SURFACE} border border-white/10 shadow-[0_24px_70px_-40px_rgba(13,148,136,0.5)]`
+          : "border border-border bg-card"
+      } ${className}`}
+    >
+      {dark ? (
+        <>
+          <motion.div
+            aria-hidden
+            animate={{ opacity: [0.35, 0.7, 0.35], scale: [1, 1.15, 1] }}
+            transition={{ duration: 13, repeat: Infinity, ease: "easeInOut" }}
+            className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-teal-500/20 blur-3xl"
+          />
+          <motion.div
+            aria-hidden
+            animate={{ opacity: [0.2, 0.5, 0.2], y: [0, -20, 0] }}
+            transition={{ duration: 16, repeat: Infinity, ease: "easeInOut" }}
+            className="pointer-events-none absolute -bottom-24 left-[26%] h-56 w-56 rounded-full bg-emerald-500/15 blur-3xl"
+          />
+        </>
+      ) : null}
 
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          {description}
-        </p>
+      <div
+        className={`relative flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-center sm:justify-between ${
+          dark ? "border-white/10" : "border-border"
+        }`}
+      >
+        <div className="min-w-0">
+          <h2 className={`text-base font-extrabold ${dark ? "text-white" : "text-foreground"}`}>
+            {title}
+          </h2>
+
+          <p className={`mt-1 text-xs leading-5 ${dark ? "text-slate-300" : "text-muted-foreground"}`}>
+            {description}
+          </p>
+        </div>
+
+        {action ? <div className="shrink-0">{action}</div> : null}
       </div>
 
-      <div className="p-5">
-        {children}
-      </div>
-    </section>
+      <div className="relative flex-1 p-5">{children}</div>
+    </motion.section>
   );
 }
 
@@ -500,53 +781,59 @@ function Panel({
 
 function Breakdown({
   rows,
+  color = THEME.teal,
 }: {
-  rows:
-    Array<{
-      key: string;
-      count: number;
-      percentage: number;
-    }>;
+  rows: Array<{
+    key: string;
+    count: number;
+    percentage: number;
+  }>;
+  color?: string;
 }) {
+  if (rows.length === 0) {
+    return (
+      <div className="flex min-h-[210px] flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-muted/20 px-6 text-center">
+        <DatabaseZap className="h-8 w-8 text-muted-foreground/45" />
+        <p className="mt-3 text-sm font-extrabold text-foreground">No records</p>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+          No matching settlement records exist for this breakdown.
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-4">
-      {rows.map(
-        (row) => (
-          <div key={row.key}>
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <span className="text-xs font-bold">
-                {humanize(
-                  row.key
-                )}
-              </span>
+    <div className="space-y-5">
+      {rows.map((row, index) => (
+        <motion.div
+          key={row.key}
+          initial={{ opacity: 0, x: -8 }}
+          whileInView={{ opacity: 1, x: 0 }}
+          viewport={{ once: true }}
+          transition={{ delay: index * 0.05 }}
+        >
+          <div className="mb-2 flex items-center justify-between gap-4 text-xs">
+            <span className="min-w-0 truncate font-bold text-foreground">
+              {humanize(row.key)}
+            </span>
 
-              <span className="text-[11px] font-bold text-muted-foreground">
-                {numberText(
-                  row.count
-                )}{" "}
-                ·{" "}
-                {row.percentage.toFixed(
-                  1
-                )}
-                %
-              </span>
-            </div>
-
-            <div className="h-2 overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-primary"
-                style={{
-                  width:
-                    `${Math.min(
-                      100,
-                      row.percentage
-                    )}%`,
-                }}
-              />
-            </div>
+            <span className="shrink-0 font-bold tabular-nums text-muted-foreground">
+              {numberText(row.count)} · {row.percentage.toFixed(1)}%
+            </span>
           </div>
-        )
-      )}
+
+          <div className="h-2.5 overflow-hidden rounded-full bg-muted">
+            <motion.div
+              initial={{ width: 0 }}
+              whileInView={{ width: `${Math.min(100, row.percentage)}%` }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.85, delay: index * 0.05, ease: easeOut }}
+              className="h-full rounded-full shadow-[0_0_16px_rgba(20,184,166,0.16)]"
+              style={{ backgroundColor: color }}
+            />
+          </div>
+        </motion.div>
+      ))}
     </div>
   );
 }
@@ -557,76 +844,69 @@ function Breakdown({
 
 function InsightCard({
   insight,
+  index,
 }: {
-  insight:
-    AnalystSettlementInsight;
+  insight: AnalystSettlementInsight;
+  index: number;
 }) {
   const style =
-    insight.severity ===
-    "critical"
-      ? "border-red-500/25 bg-red-500/5 text-red-600"
-      : insight.severity ===
-          "high"
-        ? "border-orange-500/25 bg-orange-500/5 text-orange-600"
-        : insight.severity ===
-            "medium"
-          ? "border-amber-500/25 bg-amber-500/5 text-amber-600"
-          : insight.severity ===
-              "positive"
-            ? "border-emerald-500/25 bg-emerald-500/5 text-emerald-600"
-            : "border-blue-500/25 bg-blue-500/5 text-blue-600";
+    insight.severity === "critical"
+      ? "border-red-400/30 bg-red-500/10 text-red-300"
+      : insight.severity === "high"
+        ? "border-orange-400/30 bg-orange-500/10 text-orange-300"
+        : insight.severity === "medium"
+          ? "border-amber-400/30 bg-amber-500/10 text-amber-300"
+          : insight.severity === "positive"
+            ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-300"
+            : "border-teal-400/30 bg-teal-500/10 text-teal-300";
 
   const Icon =
-    insight.severity ===
-    "positive"
+    insight.severity === "positive"
       ? CheckCircle2
-      : insight.severity ===
-          "critical"
+      : insight.severity === "critical"
         ? XCircle
-        : insight.severity ===
-            "info"
+        : insight.severity === "info"
           ? Sparkles
           : TriangleAlert;
 
   return (
-    <article
-      className={`rounded-2xl border p-4 ${style}`}
+    <motion.article
+      initial={{ opacity: 0, y: 10 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.2 }}
+      transition={{ delay: index * 0.06, duration: 0.35, ease: easeOut }}
+      whileHover={{ y: -3 }}
+      className={`rounded-2xl border p-4 backdrop-blur ${style}`}
     >
       <div className="flex items-start gap-3">
         <Icon className="mt-0.5 h-5 w-5 shrink-0" />
 
-        <div>
+        <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-sm font-extrabold text-foreground">
-              {insight.title}
-            </h3>
-
-            <span className="rounded-full border border-current/20 px-2 py-0.5 text-[9px] font-black uppercase">
+            <h3 className="text-sm font-extrabold text-white">{insight.title}</h3>
+            <span className="rounded-full border border-current/30 px-2 py-0.5 text-[9px] font-black uppercase tracking-wide">
               {insight.severity}
             </span>
           </div>
 
-          <p className="mt-2 text-xs leading-5 text-muted-foreground">
+          <p className="mt-2 text-xs leading-5 text-slate-300">
             {insight.description}
           </p>
 
-          <p className="mt-3 text-[10px] font-black uppercase text-foreground">
-            Evidence
-          </p>
+          <div className="mt-3 rounded-xl border border-white/10 bg-white/[0.04] p-3">
+            <p className="text-[11px] font-bold text-white">Evidence</p>
+            <p className="mt-1 break-words text-[11px] leading-5 text-slate-300">
+              {insight.evidence}
+            </p>
+          </div>
 
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            {insight.evidence}
-          </p>
-
-          <p className="mt-3 text-[11px] text-muted-foreground">
-            <span className="font-extrabold text-foreground">
-              Recommended review:
-            </span>{" "}
+          <p className="mt-3 text-[11px] leading-5 text-slate-300">
+            <span className="font-extrabold text-white">Recommended review:</span>{" "}
             {insight.recommendedReview}
           </p>
         </div>
       </div>
-    </article>
+    </motion.article>
   );
 }
 
@@ -819,177 +1099,169 @@ export default function AnalystSettlementPage() {
     setCurrency(next);
   }
 
-  if (
-    loading &&
-    !data
-  ) {
+  if (loading && !data) {
     return (
       <div className="flex min-h-[65vh] items-center justify-center">
         <div className="text-center">
-          <Landmark className="mx-auto h-9 w-9 animate-pulse text-primary" />
-
-          <p className="mt-3 text-sm font-extrabold">
-            Loading settlement intelligence
-          </p>
+          <motion.div
+            animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.08, 1] }}
+            transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <Landmark className="mx-auto h-9 w-9 text-teal-600" />
+          </motion.div>
+          <p className="mt-3 text-sm font-extrabold">Loading settlement intelligence</p>
         </div>
       </div>
     );
   }
 
   return (
-    <main className="space-y-6">
-      {/* HEADER */}
+    <main className="space-y-6 pb-8">
+      {/* HERO */}
 
-      <section className="relative overflow-hidden rounded-[28px] border border-border bg-card p-6 shadow-sm md:p-7">
-        <div className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-emerald-500/10 blur-[100px]" />
+      <motion.section
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: easeOut }}
+        className={`relative overflow-hidden rounded-[30px] border border-white/10 p-6 shadow-[0_28px_80px_-38px_rgba(13,148,136,0.62)] sm:p-7 ${DARK_SURFACE}`}
+      >
+        <motion.div
+          aria-hidden
+          animate={{ x: ["-30%", "145%"] }}
+          transition={{ duration: 8.5, repeat: Infinity, ease: "linear" }}
+          className="pointer-events-none absolute left-0 top-0 h-px w-48 bg-gradient-to-r from-transparent via-cyan-200/80 to-transparent"
+        />
 
-        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-emerald-600">
+        <SettlementOrbit />
+
+        <motion.div
+          aria-hidden
+          animate={{ opacity: [0.35, 0.75, 0.35], scale: [1, 1.15, 1], x: [0, 26, 0] }}
+          transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
+          className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-teal-500/25 blur-3xl"
+        />
+
+        <motion.div
+          aria-hidden
+          animate={{ opacity: [0.25, 0.55, 0.25], y: [0, -22, 0] }}
+          transition={{ duration: 17, repeat: Infinity, ease: "easeInOut" }}
+          className="pointer-events-none absolute -bottom-28 left-[28%] h-64 w-64 rounded-full bg-emerald-500/20 blur-3xl"
+        />
+
+        <motion.div
+          aria-hidden
+          animate={{ opacity: [0.2, 0.45, 0.2], x: [0, -24, 0] }}
+          transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+          className="pointer-events-none absolute right-[28%] top-[28%] h-44 w-44 rounded-full bg-cyan-400/20 blur-3xl"
+        />
+
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between xl:pr-[310px]">
+          <div className="min-w-0">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-teal-200 backdrop-blur">
               <Landmark className="h-3.5 w-3.5" />
-
               Settlement Intelligence
             </div>
 
-            <h1 className="mt-4 text-2xl font-black tracking-tight md:text-3xl">
+            <h1 className="mt-4 text-2xl font-black tracking-tight text-white md:text-3xl">
               Settlement Analytics
             </h1>
 
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-              Monitor settlement value, fees, refunds, merchant concentration,
-              aging and payout reconciliation.
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+              Monitor settlement value, fees, refunds, merchant concentration, aging and payout reconciliation.
             </p>
 
-            {data && (
-              <>
-                <p className="mt-3 text-[11px] font-semibold text-muted-foreground">
-                  Updated{" "}
-                  {dateText(
-                    data.generatedAt
-                  )}
-                </p>
-
-                <p className="mt-1 text-[10px] text-muted-foreground">
+            {data ? (
+              <div className="mt-4 flex flex-wrap gap-2 text-[10px] font-bold text-slate-300">
+                <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 backdrop-blur">
+                  Updated {dateText(data.generatedAt)}
+                </span>
+                <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 backdrop-blur">
+                  {data.filters.currency}
+                </span>
+                <span className="max-w-[520px] truncate rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 backdrop-blur">
                   {data.scopeNote}
-                </p>
-              </>
-            )}
+                </span>
+              </div>
+            ) : null}
           </div>
 
-          <button
+          <motion.button
             type="button"
             disabled={refreshing}
-            onClick={() =>
-              setRefreshKey(
-                (current) =>
-                  current + 1
-              )
-            }
-            className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-3 text-xs font-extrabold"
+            whileHover={{ y: -1 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => setRefreshKey((current) => current + 1)}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-xs font-extrabold text-white backdrop-blur transition hover:bg-white/20 disabled:opacity-50"
           >
-            <RefreshCcw
-              className={`h-4 w-4 ${
-                refreshing
-                  ? "animate-spin"
-                  : ""
-              }`}
-            />
-
+            <RefreshCcw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
             Refresh
-          </button>
+          </motion.button>
         </div>
-      </section>
+      </motion.section>
 
-      {error && (
-        <div className="flex gap-3 rounded-2xl border border-red-500/20 bg-red-500/5 p-4 text-red-600">
-          <AlertTriangle className="h-5 w-5 shrink-0" />
-
-          <p className="text-xs">
-            {error}
-          </p>
-        </div>
-      )}
+      {error ? (
+        <motion.div
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex gap-3 rounded-2xl border border-red-500/20 bg-red-500/5 p-4"
+        >
+          <AlertTriangle className="h-5 w-5 shrink-0 text-red-600" />
+          <p className="min-w-0 break-words text-xs text-red-600">{error}</p>
+        </motion.div>
+      ) : null}
 
       {/* FILTERS */}
 
-      <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-        <div className="grid gap-3 sm:grid-cols-3">
-          <select
+      <motion.section
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.08, ease: easeOut }}
+        className="relative z-30 rounded-[22px] border border-border bg-card/95 p-4 shadow-[0_14px_38px_rgba(15,23,42,0.05)] backdrop-blur"
+      >
+        <div className="grid gap-3 md:grid-cols-3">
+          <FilterSelect
+            label="Period"
             value={range}
-            onChange={(event) =>
-              setRange(
-                event.target
-                  .value as
-                  AnalystRange
-              )
-            }
-            className="h-11 rounded-xl border border-border bg-background px-3 text-xs font-bold"
-          >
-            {RANGE_OPTIONS.map(
-              (option) => (
-                <option
-                  key={option.value}
-                  value={option.value}
-                >
-                  {option.label}
-                </option>
-              )
-            )}
-          </select>
+            options={RANGE_OPTIONS}
+            onChange={setRange}
+          />
 
-          <select
+          <FilterSelect
+            label="Settlement status"
             value={status}
-            onChange={(event) =>
-              setStatus(
-                event.target
-                  .value as
-                  AnalystSettlementStatus
-              )
-            }
-            className="h-11 rounded-xl border border-border bg-background px-3 text-xs font-bold"
-          >
-            {STATUS_OPTIONS.map(
-              (option) => (
-                <option
-                  key={option.value}
-                  value={option.value}
-                >
-                  {option.label}
-                </option>
-              )
-            )}
-          </select>
+            options={STATUS_OPTIONS}
+            onChange={setStatus}
+          />
 
-          <form
-            onSubmit={applyCurrency}
-            className="flex"
-          >
-            <input
-              value={currencyDraft}
-              maxLength={3}
-              onChange={(event) =>
-                setCurrencyDraft(
-                  event.target.value
-                    .replace(
-                      /[^a-z]/gi,
-                      ""
-                    )
-                    .slice(0, 3)
-                    .toUpperCase()
-                )
-              }
-              className="h-11 min-w-0 flex-1 rounded-l-xl border border-border bg-background px-3 text-center text-xs font-black"
-            />
+          <form onSubmit={applyCurrency}>
+            <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+              Currency
+            </span>
 
-            <button
-              type="submit"
-              className="rounded-r-xl bg-primary px-4 text-xs font-black text-primary-foreground"
-            >
-              Apply
-            </button>
+            <div className="flex h-11 overflow-hidden rounded-xl border border-border bg-background transition focus-within:border-teal-500 focus-within:ring-4 focus-within:ring-teal-500/10">
+              <input
+                value={currencyDraft}
+                maxLength={3}
+                aria-label="Currency code"
+                onChange={(event) =>
+                  setCurrencyDraft(
+                    event.target.value.replace(/[^a-z]/gi, "").slice(0, 3).toUpperCase()
+                  )
+                }
+                className="min-w-0 flex-1 bg-transparent px-3 text-center text-xs font-black uppercase outline-none"
+              />
+
+              <motion.button
+                whileTap={{ scale: 0.97 }}
+                type="submit"
+                className="border-l border-teal-500/15 bg-teal-600 px-4 text-[10px] font-black uppercase tracking-wide text-white transition hover:bg-teal-700"
+              >
+                Apply
+              </motion.button>
+            </div>
           </form>
         </div>
-      </section>
+      </motion.section>
 
       {data && (
         <>
@@ -1010,6 +1282,8 @@ export default function AnalystSettlementPage() {
               }
               icon={Landmark}
               iconClass="bg-blue-500/10 text-blue-600"
+              index={0}
+              accentClass="bg-teal-500"
             />
 
             <MetricCard
@@ -1028,6 +1302,8 @@ export default function AnalystSettlementPage() {
               }
               icon={Banknote}
               iconClass="bg-violet-500/10 text-violet-600"
+              index={1}
+              accentClass="bg-violet-500"
             />
 
             <MetricCard
@@ -1046,6 +1322,8 @@ export default function AnalystSettlementPage() {
               }
               icon={WalletCards}
               iconClass="bg-emerald-500/10 text-emerald-600"
+              index={2}
+              accentClass="bg-emerald-500"
             />
 
             <MetricCard
@@ -1064,6 +1342,8 @@ export default function AnalystSettlementPage() {
               }
               icon={CheckCircle2}
               iconClass="bg-cyan-500/10 text-cyan-600"
+              index={3}
+              accentClass="bg-cyan-500"
             />
 
             <MetricCard
@@ -1082,6 +1362,8 @@ export default function AnalystSettlementPage() {
               }
               icon={Scale}
               iconClass="bg-indigo-500/10 text-indigo-600"
+              index={4}
+              accentClass="bg-indigo-500"
             />
 
             <MetricCard
@@ -1101,6 +1383,8 @@ export default function AnalystSettlementPage() {
               icon={ArrowDownRight}
               iconClass="bg-orange-500/10 text-orange-600"
               inverse
+              index={5}
+              accentClass="bg-orange-500"
             />
 
             <MetricCard
@@ -1118,6 +1402,8 @@ export default function AnalystSettlementPage() {
               icon={TimerReset}
               iconClass="bg-amber-500/10 text-amber-600"
               inverse
+              index={6}
+              accentClass="bg-amber-500"
             />
 
             <MetricCard
@@ -1137,6 +1423,8 @@ export default function AnalystSettlementPage() {
               icon={XCircle}
               iconClass="bg-red-500/10 text-red-600"
               inverse
+              index={7}
+              accentClass="bg-red-500"
             />
           </section>
 
@@ -1219,94 +1507,143 @@ export default function AnalystSettlementPage() {
           {/* TREND */}
 
           <Panel
+            tone="dark"
             title="Settlement Trend"
-            description="Settlement lifecycle and net merchant payable value."
+            description="Settlement lifecycle and net merchant payable value across the selected period."
+            action={
+              <div className="flex flex-wrap gap-3">
+                {[
+                  ["Net payable", THEME.emerald],
+                  ["Settled", THEME.cyan],
+                  ["Pending", THEME.amber],
+                  ["Failed", THEME.red],
+                ].map(([label, color]) => (
+                  <span
+                    key={label}
+                    className="inline-flex items-center gap-1.5 whitespace-nowrap text-[10px] font-bold text-slate-300"
+                  >
+                    <span
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: color }}
+                    />
+                    {label}
+                  </span>
+                ))}
+              </div>
+            }
           >
-            <div className="h-[360px]">
-              <ResponsiveContainer
-                width="100%"
-                height="100%"
-              >
-                <ComposedChart
-                  data={chartData}
-                >
-                  <CartesianGrid
-                    vertical={false}
-                    strokeDasharray="4 4"
-                    opacity={0.15}
-                  />
+            {chartData.length > 0 ? (
+              <div className="h-[380px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart
+                    data={chartData}
+                    margin={{ top: 12, right: 12, left: -12, bottom: 0 }}
+                  >
+                    <defs>
+                      <linearGradient id="settlementNetGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={THEME.emerald} stopOpacity={0.48} />
+                        <stop offset="95%" stopColor={THEME.emerald} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
 
-                  <XAxis
-                    dataKey="label"
-                    tick={{
-                      fontSize: 10,
-                    }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
+                    <CartesianGrid
+                      vertical={false}
+                      strokeDasharray="4 4"
+                      stroke="rgba(255,255,255,0.09)"
+                    />
 
-                  <YAxis
-                    yAxisId="count"
-                    allowDecimals={false}
-                    tick={{
-                      fontSize: 10,
-                    }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fontSize: 10, fill: THEME.axis }}
+                      axisLine={false}
+                      tickLine={false}
+                      minTickGap={22}
+                    />
 
-                  <YAxis
-                    yAxisId="value"
-                    orientation="right"
-                    tick={{
-                      fontSize: 10,
-                    }}
-                    axisLine={false}
-                    tickLine={false}
-                  />
+                    <YAxis
+                      yAxisId="count"
+                      allowDecimals={false}
+                      tick={{ fontSize: 10, fill: THEME.axis }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
 
-                  <Tooltip />
+                    <YAxis
+                      yAxisId="value"
+                      orientation="right"
+                      tick={{ fontSize: 10, fill: THEME.axis }}
+                      axisLine={false}
+                      tickLine={false}
+                    />
 
-                  <Area
-                    yAxisId="value"
-                    type="monotone"
-                    dataKey="netMajor"
-                    name="Net settlement value"
-                    stroke="#10b981"
-                    fill="#10b981"
-                    fillOpacity={0.08}
-                  />
+                    <Tooltip
+                      content={<ChartTooltip currency={data.filters.currency} />}
+                      cursor={{ stroke: "rgba(20,184,166,0.35)", strokeWidth: 2 }}
+                    />
 
-                  <Bar
-                    yAxisId="count"
-                    dataKey="failedCount"
-                    name="Failed"
-                    fill="#ef4444"
-                    maxBarSize={15}
-                  />
+                    <Area
+                      yAxisId="value"
+                      type="monotone"
+                      dataKey="netMajor"
+                      name="Net payable"
+                      stroke={THEME.emerald}
+                      strokeWidth={2.5}
+                      fill="url(#settlementNetGradient)"
+                      isAnimationActive
+                      animationDuration={1250}
+                    />
 
-                  <Line
-                    yAxisId="count"
-                    type="monotone"
-                    dataKey="settledCount"
-                    name="Settled"
-                    stroke="#06b6d4"
-                    strokeWidth={3}
-                    dot={false}
-                  />
+                    <Bar
+                      yAxisId="count"
+                      dataKey="failedCount"
+                      name="Failed"
+                      fill={THEME.red}
+                      maxBarSize={14}
+                      radius={[6, 6, 0, 0]}
+                      isAnimationActive
+                      animationBegin={180}
+                      animationDuration={1050}
+                    />
 
-                  <Line
-                    yAxisId="count"
-                    type="monotone"
-                    dataKey="pendingCount"
-                    name="Pending"
-                    stroke="#f59e0b"
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </div>
+                    <Line
+                      yAxisId="count"
+                      type="monotone"
+                      dataKey="settledCount"
+                      name="Settled"
+                      stroke={THEME.cyan}
+                      strokeWidth={3}
+                      dot={false}
+                      activeDot={{ r: 5, strokeWidth: 2, stroke: THEME.cyan }}
+                      isAnimationActive
+                      animationBegin={260}
+                      animationDuration={1200}
+                    />
+
+                    <Line
+                      yAxisId="count"
+                      type="monotone"
+                      dataKey="pendingCount"
+                      name="Pending"
+                      stroke={THEME.amber}
+                      strokeWidth={2}
+                      dot={false}
+                      activeDot={{ r: 4, strokeWidth: 2, stroke: THEME.amber }}
+                      isAnimationActive
+                      animationBegin={360}
+                      animationDuration={1200}
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="flex min-h-[320px] flex-col items-center justify-center rounded-2xl border border-dashed border-white/15 bg-white/[0.03] px-6 text-center">
+                <DatabaseZap className="h-8 w-8 text-teal-300/60" />
+                <p className="mt-3 text-sm font-extrabold text-white">No settlement trend</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Settlement activity will appear when matching records exist.
+                </p>
+              </div>
+            )}
           </Panel>
 
           {/* BREAKDOWNS */}
@@ -1315,8 +1652,10 @@ export default function AnalystSettlementPage() {
             <Panel
               title="Status Distribution"
               description="Settlement lifecycle states."
+              className="min-h-[360px]"
             >
               <Breakdown
+                color={THEME.teal}
                 rows={
                   data.statuses.map(
                     (item) => ({
@@ -1337,8 +1676,10 @@ export default function AnalystSettlementPage() {
             <Panel
               title="Open Settlement Aging"
               description="Current pending and processing settlement age."
+              className="min-h-[360px]"
             >
               <Breakdown
+                color={THEME.amber}
                 rows={
                   data.aging.map(
                     (item) => ({
@@ -1359,8 +1700,10 @@ export default function AnalystSettlementPage() {
             <Panel
               title="Payout Methods"
               description="Methods used by linked merchant payouts."
+              className="min-h-[360px]"
             >
               <Breakdown
+                color={THEME.cyan}
                 rows={
                   data.payoutMethods.map(
                     (item) => ({
@@ -1529,9 +1872,8 @@ export default function AnalystSettlementPage() {
                     {data.merchants.map(
                       (merchant) => (
                         <tr
-                          key={
-                            merchant.merchantId
-                          }
+                          key={merchant.merchantId}
+                          className="transition-colors hover:bg-teal-500/[0.035]"
                         >
                           <td className="border-b border-border/60 px-3 py-3.5 font-extrabold">
                             {merchant.businessName}
@@ -1609,24 +1951,43 @@ export default function AnalystSettlementPage() {
           {/* INSIGHTS */}
 
           <Panel
+            tone="dark"
             title="Settlement Intelligence"
             description="Explainable settlement reliability, aging, concentration and payout reconciliation signals."
+            action={
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-wide text-teal-200">
+                <Sparkles className="h-3.5 w-3.5" />
+                {data.insights.length} signals
+              </span>
+            }
           >
-            <div className="grid gap-4 lg:grid-cols-2">
-              {data.insights.map(
-                (insight) => (
+            {data.insights.length > 0 ? (
+              <div className="grid gap-4 lg:grid-cols-2">
+                {data.insights.map((insight, index) => (
                   <InsightCard
                     key={insight.id}
                     insight={insight}
+                    index={index}
                   />
-                )
-              )}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex min-h-[220px] flex-col items-center justify-center rounded-2xl border border-dashed border-white/15 bg-white/[0.03] px-6 text-center">
+                <Sparkles className="h-8 w-8 text-teal-300/60" />
+                <p className="mt-3 text-sm font-extrabold text-white">No settlement signals</p>
+                <p className="mt-1 text-xs text-slate-400">No deterministic settlement signal was generated for this filter set.</p>
+              </div>
+            )}
           </Panel>
 
           {/* READ ONLY */}
 
-          <section className="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-4">
+          <motion.section
+            initial={{ opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="rounded-2xl border border-teal-500/20 bg-teal-500/5 p-4"
+          >
             <div className="flex items-start gap-3">
               <ShieldCheck className="mt-0.5 h-5 w-5 text-cyan-600" />
 
@@ -1642,7 +2003,7 @@ export default function AnalystSettlementPage() {
                 </p>
               </div>
             </div>
-          </section>
+          </motion.section>
         </>
       )}
     </main>
@@ -1663,21 +2024,25 @@ function OperationCard({
   helper?: string;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-background p-4">
+    <motion.div
+      whileHover={{ y: -3 }}
+      transition={{ type: "spring", stiffness: 300, damping: 22 }}
+      className="group relative overflow-hidden rounded-2xl border border-border bg-background p-4 shadow-sm transition-shadow hover:shadow-md"
+    >
+      <div className="absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r from-transparent via-teal-400/70 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+
       <p className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">
         {label}
       </p>
 
-      <p className="mt-2 text-xl font-black">
+      <p className="mt-2 text-xl font-black tabular-nums text-foreground">
         {numberText(value)}
       </p>
 
-      {helper && (
-        <p className="mt-1 text-[10px] text-muted-foreground">
-          {helper}
-        </p>
-      )}
-    </div>
+      {helper ? (
+        <p className="mt-1 text-[10px] text-muted-foreground">{helper}</p>
+      ) : null}
+    </motion.div>
   );
 }
 
@@ -1689,14 +2054,20 @@ function ReconciliationCard({
   value: string;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-background p-4">
-      <p className="text-[9px] font-black uppercase tracking-wider text-muted-foreground">
+    <motion.div
+      whileHover={{ y: -3 }}
+      transition={{ type: "spring", stiffness: 300, damping: 22 }}
+      className="group relative overflow-hidden rounded-2xl border border-border bg-background p-4 shadow-sm transition-shadow hover:shadow-md"
+    >
+      <div className="absolute -right-6 -top-6 h-16 w-16 rounded-full bg-teal-500/5 blur-2xl transition group-hover:bg-teal-500/10" />
+
+      <p className="relative text-[9px] font-black uppercase tracking-wider text-muted-foreground">
         {label}
       </p>
 
-      <p className="mt-2 text-xl font-black">
+      <p className="relative mt-2 text-xl font-black tabular-nums text-foreground">
         {value}
       </p>
-    </div>
+    </motion.div>
   );
 }
