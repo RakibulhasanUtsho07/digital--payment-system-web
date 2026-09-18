@@ -1,4 +1,8 @@
 import { apiClient } from "@/lib/api/client";
+import {
+  startRegistration,
+  type PublicKeyCredentialCreationOptionsJSON,
+} from "@simplewebauthn/browser";
 import type {
   ActiveLivenessChallengeSession,
   AdminEKYCVerification,
@@ -8,6 +12,9 @@ import type {
   EKYCOverview,
   EKYCStatus,
   EKYCVerification,
+  DeviceBiometricProof,
+  NIDDocumentValidation,
+  PhoneOtpChallenge,
 } from "@/types/ekyc";
 
 interface CurrentResponse {
@@ -29,6 +36,77 @@ export interface EKYCSubmissionInput {
   backImage: File;
   selfieImage: File;
   liveness: CompletedLivenessCapture;
+  phoneChallengeId: string;
+  documentValidationId: string;
+  biometricSessionId?: string;
+}
+
+export async function getKycPhone(): Promise<string> {
+  const response = await apiClient<{ success: boolean; phone: string }>("/ekyc/phone");
+  return response.phone;
+}
+
+export async function requestKycPhoneOtp(phone: string): Promise<PhoneOtpChallenge> {
+  const response = await apiClient<{ success: boolean; challenge: PhoneOtpChallenge }>(
+    "/ekyc/phone/otp/request",
+    { method: "POST", body: JSON.stringify({ phone }) }
+  );
+  return response.challenge;
+}
+
+export async function verifyKycPhoneOtp(input: {
+  challengeId: string;
+  otp: string;
+}): Promise<{ phone: string; verifiedAt: string }> {
+  const response = await apiClient<{
+    success: boolean;
+    verification: { phone: string; verifiedAt: string };
+  }>("/ekyc/phone/otp/verify", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  return response.verification;
+}
+
+export async function validateNidDocuments(input: {
+  phoneChallengeId: string;
+  frontImage: File;
+  backImage: File;
+}): Promise<NIDDocumentValidation> {
+  const body = new FormData();
+  body.append("phoneChallengeId", input.phoneChallengeId);
+  body.append("frontImage", input.frontImage);
+  body.append("backImage", input.backImage);
+  const response = await apiClient<{ success: boolean; validation: NIDDocumentValidation }>(
+    "/ekyc/documents/preflight",
+    { method: "POST", body }
+  );
+  return response.validation;
+}
+
+export async function verifyKycDeviceBiometric(): Promise<DeviceBiometricProof> {
+  if (
+    typeof window === "undefined" ||
+    !("PublicKeyCredential" in window) ||
+    !navigator.credentials
+  ) {
+    throw new Error("Device biometrics are not supported on this browser.");
+  }
+  const start = await apiClient<{
+    success: boolean;
+    sessionId: string;
+    options: PublicKeyCredentialCreationOptionsJSON;
+  }>("/ekyc/biometrics/options", { method: "POST" });
+  const credential = await startRegistration({ optionsJSON: start.options });
+  const verified = await apiClient<{
+    success: boolean;
+    sessionId: string;
+    evidence: Omit<DeviceBiometricProof, "sessionId">;
+  }>("/ekyc/biometrics/verify", {
+    method: "POST",
+    body: JSON.stringify({ sessionId: start.sessionId, response: credential }),
+  });
+  return { sessionId: verified.sessionId, ...verified.evidence };
 }
 
 export async function createLivenessChallenge(): Promise<ActiveLivenessChallengeSession> {
@@ -59,6 +137,11 @@ export async function submitEKYC(input: EKYCSubmissionInput): Promise<Submission
   body.append("livenessChallenges", JSON.stringify(input.liveness.session.challenges));
   body.append("livenessStartedAt", input.liveness.startedAt);
   body.append("livenessCompletedAt", input.liveness.completedAt);
+  body.append("phoneChallengeId", input.phoneChallengeId);
+  body.append("documentValidationId", input.documentValidationId);
+  if (input.biometricSessionId) {
+    body.append("biometricSessionId", input.biometricSessionId);
+  }
 
   return apiClient<SubmissionResponse>("/ekyc/verifications", {
     method: "POST",

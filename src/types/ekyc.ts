@@ -28,10 +28,40 @@ export interface AdminEKYCVerification extends EKYCVerification {
   faceQualityScore?: number | null;
   nameScore: number | null;
   livenessPassed: boolean | null;
+  phoneVerifiedAt?: string;
+  deviceBiometricVerified: boolean;
   possibleDuplicateVectorId?: string;
   possibleDuplicateScore: number | null;
   processingStartedAt?: string;
   hasReviewBiometricTemplate: boolean;
+  identity?: {
+    claimedName: string;
+    nid: string;
+    dateOfBirth: string;
+    verifiedPhone: string;
+  };
+}
+
+export interface PhoneOtpChallenge {
+  challengeId: string;
+  maskedPhone: string;
+  expiresAt: string;
+  resendAfterSeconds: number;
+}
+
+export interface NIDDocumentValidation {
+  validationId: string;
+  expiresAt: string;
+  frontSignals: number;
+  backSignals: number;
+}
+
+export interface DeviceBiometricProof {
+  sessionId: string;
+  credentialId: string;
+  deviceType: "singleDevice" | "multiDevice";
+  backedUp: boolean;
+  verifiedAt: string;
 }
 
 export interface EKYCOverview {
