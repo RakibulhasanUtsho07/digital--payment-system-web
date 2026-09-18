@@ -3,20 +3,27 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type FormEvent,
   type ReactNode,
 } from "react";
 
-import { motion } from "framer-motion";
+import {
+  animate,
+  motion,
+  useInView,
+} from "framer-motion";
 
 import {
   Activity,
   AlertTriangle,
   ArrowDownRight,
   ArrowUpRight,
+  AreaChart as AreaChartIcon,
   BadgeCheck,
   Banknote,
+  BarChart3,
   BrainCircuit,
   CreditCard,
   DatabaseZap,
@@ -40,7 +47,6 @@ import {
   CartesianGrid,
   Cell,
   ComposedChart,
-  Legend,
   Line,
   ResponsiveContainer,
   Tooltip,
@@ -64,49 +70,15 @@ import {
    OPTIONS
 ========================================================= */
 
-const RANGE_OPTIONS: Array<{
-  value:
-    AnalystRange;
-
-  label:
-    string;
-}> = [
-  {
-    value:
-      "24h",
-
-    label:
-      "Last 24 hours",
-  },
-
-  {
-    value:
-      "7d",
-
-    label:
-      "Last 7 days",
-  },
-
-  {
-    value:
-      "30d",
-
-    label:
-      "Last 30 days",
-  },
-
-  {
-    value:
-      "90d",
-
-    label:
-      "Last 90 days",
-  },
+const RANGE_OPTIONS: Array<{ value: AnalystRange; label: string }> = [
+  { value: "24h", label: "Last 24 hours" },
+  { value: "7d", label: "Last 7 days" },
+  { value: "30d", label: "Last 30 days" },
+  { value: "90d", label: "Last 90 days" },
 ];
 
 /* =========================================================
    OPAL GLOW THEME
-   A lighter, luminous palette that avoids deep navy.
 ========================================================= */
 
 const OPAL_GLOW = {
@@ -119,149 +91,185 @@ const OPAL_GLOW = {
   canvas: "#F8FAFF",
 } as const;
 
-const chartTooltipStyle = {
-  borderRadius: 16,
-  border: "1px solid rgba(109, 124, 255, 0.18)",
-  background: "rgba(255, 255, 255, 0.96)",
-  boxShadow: "0 18px 50px rgba(91, 108, 220, 0.16)",
-  fontSize: 12,
-};
+/* Trend series config — drives both the chart and the
+   clickable legend, so adding a series means editing one
+   place instead of three. */
+const TREND_SERIES = [
+  { key: "engaged", name: "Engaged wallets", color: OPAL_GLOW.primary },
+  { key: "merchant", name: "Merchant payments", color: OPAL_GLOW.rose },
+  { key: "p2p", name: "P2P transfers", color: OPAL_GLOW.mint },
+  { key: "newWallets", name: "New wallets", color: OPAL_GLOW.sky },
+] as const;
+
+type TrendSeriesKey = (typeof TREND_SERIES)[number]["key"];
+type TrendView = "flow" | "compare";
+
+const easeOut = [0.22, 1, 0.36, 1] as const;
 
 /* =========================================================
    FORMAT
 ========================================================= */
 
-function formatNumber(
-  value:
-    number
-) {
-  return new Intl.NumberFormat(
-    "en-BD"
-  ).format(
-    value
-  );
+function formatNumber(value: number) {
+  return new Intl.NumberFormat("en-BD").format(value);
 }
 
-function formatPercent(
-  value:
-    number
-) {
-  return `${value.toFixed(
-    1
-  )}%`;
+function formatPercent(value: number) {
+  return `${value.toFixed(1)}%`;
 }
 
-function formatMoney(
-  minor:
-    number,
-  currency:
-    string
-) {
+function formatMoney(minor: number, currency: string) {
   try {
-    return new Intl.NumberFormat(
-      "en-BD",
-      {
-        style:
-          "currency",
-
-        currency,
-
-        maximumFractionDigits:
-          2,
-      }
-    ).format(
-      minor /
-        100
-    );
+    return new Intl.NumberFormat("en-BD", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 2,
+    }).format(minor / 100);
   } catch {
-    return `${currency} ${(
-      minor /
-      100
-    ).toLocaleString(
-      "en-BD"
-    )}`;
+    return `${currency} ${(minor / 100).toLocaleString("en-BD")}`;
   }
 }
 
-function formatDate(
-  value:
-    string
-) {
-  const date =
-    new Date(
-      value
-    );
+function formatDate(value: string) {
+  const date = new Date(value);
 
-  if (
-    Number.isNaN(
-      date.getTime()
-    )
-  ) {
+  if (Number.isNaN(date.getTime())) {
     return "Unavailable";
   }
 
-  return new Intl.DateTimeFormat(
-    "en-BD",
-    {
-      dateStyle:
-        "medium",
-
-      timeStyle:
-        "short",
-    }
-  ).format(
-    date
-  );
+  return new Intl.DateTimeFormat("en-BD", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
 }
 
-function formatBucket(
-  value:
-    string,
-  range:
-    AnalystRange
-) {
-  const date =
-    new Date(
-      value
-    );
+function formatBucket(value: string, range: AnalystRange) {
+  const date = new Date(value);
 
-  if (
-    Number.isNaN(
-      date.getTime()
-    )
-  ) {
+  if (Number.isNaN(date.getTime())) {
     return value;
   }
 
-  if (
-    range ===
-    "24h"
-  ) {
-    return new Intl.DateTimeFormat(
-      "en-BD",
-      {
-        hour:
-          "numeric",
-
-        hour12:
-          true,
-      }
-    ).format(
-      date
-    );
+  if (range === "24h") {
+    return new Intl.DateTimeFormat("en-BD", {
+      hour: "numeric",
+      hour12: true,
+    }).format(date);
   }
 
-  return new Intl.DateTimeFormat(
-    "en-BD",
-    {
-      month:
-        "short",
+  return new Intl.DateTimeFormat("en-BD", {
+    month: "short",
+    day: "numeric",
+  }).format(date);
+}
 
-      day:
-        "numeric",
+/* =========================================================
+   ANIMATED NUMBER
+
+   Counts from 0 to the real value the first time it scrolls
+   into view, and re-counts from the previous value whenever
+   the data changes (range switch, refresh). Makes every stat
+   feel live instead of static text swapping in place.
+========================================================= */
+
+function AnimatedNumber({
+  value,
+  format = formatNumber,
+  className = "",
+  duration = 1.1,
+}: {
+  value: number;
+  format?: (value: number) => string;
+  className?: string;
+  duration?: number;
+}) {
+  const nodeRef = useRef<HTMLSpanElement | null>(null);
+  const inView = useInView(nodeRef, { once: true, amount: 0.4 });
+  const previous = useRef(0);
+
+  useEffect(() => {
+    const node = nodeRef.current;
+
+    if (!node || !inView) {
+      return;
     }
-  ).format(
-    date
+
+    const controls = animate(previous.current, value, {
+      duration,
+      ease: easeOut,
+      onUpdate: (latest) => {
+        node.textContent = format(latest);
+      },
+    });
+
+    previous.current = value;
+
+    return () => controls.stop();
+  }, [value, inView, duration, format]);
+
+  return (
+    <span ref={nodeRef} className={className}>
+      {format(0)}
+    </span>
+  );
+}
+
+/* =========================================================
+   CHART TOOLTIP
+========================================================= */
+
+function GlowTooltip({
+  active,
+  payload,
+  label,
+}: {
+  active?: boolean;
+  payload?: Array<{
+    name?: string;
+    dataKey?: string;
+    value?: number;
+    color?: string;
+  }>;
+  label?: string;
+}) {
+  if (!active || !payload?.length) {
+    return null;
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.96, y: 4 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      transition={{ duration: 0.16 }}
+      className="min-w-[180px] rounded-2xl border border-[#6D7CFF]/20 bg-white/95 p-3 shadow-[0_18px_50px_rgba(91,108,220,0.18)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95"
+    >
+      {label ? (
+        <p className="mb-2 text-[11px] font-black uppercase tracking-[0.1em] text-[#5B68E8] dark:text-[#AEB7FF]">
+          {label}
+        </p>
+      ) : null}
+
+      <div className="space-y-1.5">
+        {payload.map((entry) => (
+          <div
+            key={String(entry.dataKey)}
+            className="flex items-center justify-between gap-5 text-xs"
+          >
+            <span className="inline-flex min-w-0 items-center gap-2 text-slate-500 dark:text-slate-400">
+              <span
+                className="h-2 w-2 shrink-0 rounded-full"
+                style={{ backgroundColor: entry.color }}
+              />
+              <span className="truncate">{entry.name}</span>
+            </span>
+
+            <span className="shrink-0 font-black tabular-nums text-[#33415C] dark:text-slate-100">
+              {formatNumber(Number(entry.value ?? 0))}
+            </span>
+          </div>
+        ))}
+      </div>
+    </motion.div>
   );
 }
 
@@ -285,15 +293,22 @@ function Panel({
       initial={{ opacity: 0, y: 14 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.12 }}
-      transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+      transition={{ duration: 0.42, ease: easeOut }}
       whileHover={{ y: -2 }}
       className="group relative overflow-hidden rounded-[28px] border border-[#6D7CFF]/10 bg-white/[0.82] shadow-[0_20px_65px_-40px_rgba(85,102,242,0.55)] backdrop-blur-xl transition-shadow duration-300 hover:shadow-[0_24px_75px_-38px_rgba(85,102,242,0.7)] dark:border-white/10 dark:bg-slate-950/[0.72]"
     >
       <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[#6D7CFF]/70 to-transparent" />
-      <div className="pointer-events-none absolute -right-14 -top-16 h-40 w-40 rounded-full bg-[#FF8BCB]/10 blur-3xl transition-opacity duration-500 group-hover:opacity-90" />
+
+      {/* slow drifting bloom instead of a static blur blob */}
+      <motion.div
+        aria-hidden
+        animate={{ opacity: [0.5, 0.95, 0.5], scale: [1, 1.12, 1] }}
+        transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
+        className="pointer-events-none absolute -right-14 -top-16 h-40 w-40 rounded-full bg-[#FF8BCB]/10 blur-3xl"
+      />
 
       <div className="relative flex flex-col gap-3 border-b border-[#6D7CFF]/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+        <div className="min-w-0">
           <h2 className="text-base font-extrabold tracking-tight text-[#33415C] dark:text-slate-100">
             {title}
           </h2>
@@ -303,7 +318,7 @@ function Panel({
           </p>
         </div>
 
-        {action}
+        {action ? <div className="shrink-0">{action}</div> : null}
       </div>
 
       <div className="relative p-5">{children}</div>
@@ -315,16 +330,8 @@ function Panel({
    CHANGE
 ========================================================= */
 
-function ChangeBadge({
-  metric,
-}: {
-  metric:
-    AnalystMetric;
-}) {
-  if (
-    metric.changePercent ===
-    null
-  ) {
+function ChangeBadge({ metric }: { metric: AnalystMetric }) {
+  if (metric.changePercent === null) {
     return (
       <span className="text-[11px] font-semibold text-muted-foreground">
         New vs previous period
@@ -332,36 +339,31 @@ function ChangeBadge({
     );
   }
 
-  const positive =
-    metric.changePercent >=
-    0;
-
-  const Icon =
-    positive
-      ? ArrowUpRight
-      : ArrowDownRight;
+  const positive = metric.changePercent >= 0;
+  const Icon = positive ? ArrowUpRight : ArrowDownRight;
 
   return (
-    <span
+    <motion.span
+      initial={{ opacity: 0, x: -4 }}
+      whileInView={{ opacity: 1, x: 0 }}
+      viewport={{ once: true }}
+      transition={{ delay: 0.25 }}
       className={`inline-flex items-center gap-1 text-[11px] font-bold ${
         positive
           ? "text-emerald-600 dark:text-emerald-400"
           : "text-red-600 dark:text-red-400"
       }`}
     >
-      <Icon className="h-3.5 w-3.5" />
+      <motion.span
+        animate={{ y: positive ? [0, -2, 0] : [0, 2, 0] }}
+        transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <Icon className="h-3.5 w-3.5" />
+      </motion.span>
 
-      {Math.abs(
-        metric.changePercent
-      ).toFixed(
-        2
-      )}
-      %
-
-      <span className="font-medium text-muted-foreground">
-        vs previous
-      </span>
-    </span>
+      {Math.abs(metric.changePercent).toFixed(2)}%
+      <span className="font-medium text-muted-foreground">vs previous</span>
+    </motion.span>
   );
 }
 
@@ -377,7 +379,7 @@ function MetricCard({
   iconClass,
 }: {
   label: string;
-  value: string;
+  value: number;
   metric: AnalystMetric;
   icon: LucideIcon;
   iconClass: string;
@@ -389,20 +391,30 @@ function MetricCard({
       viewport={{ once: true, amount: 0.15 }}
       whileHover={{ y: -5, scale: 1.012 }}
       transition={{ type: "spring", stiffness: 240, damping: 24 }}
-      className="group relative overflow-hidden rounded-[24px] border border-[#6D7CFF]/10 bg-white/[0.86] p-5 shadow-[0_18px_55px_-38px_rgba(85,102,242,0.55)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/[0.75]"
+      className="group relative flex h-full flex-col overflow-hidden rounded-[24px] border border-[#6D7CFF]/10 bg-white/[0.86] p-5 shadow-[0_18px_55px_-38px_rgba(85,102,242,0.55)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/[0.75]"
     >
       <div className="pointer-events-none absolute -right-10 -top-12 h-28 w-28 rounded-full bg-[#6D7CFF]/10 blur-3xl transition-transform duration-500 group-hover:scale-125" />
       <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-[#55E6C1]/70 to-transparent" />
 
+      {/* sheen sweep on hover */}
+      <motion.div
+        aria-hidden
+        initial={{ x: "-130%" }}
+        whileHover={{ x: "130%" }}
+        transition={{ duration: 0.9, ease: "easeInOut" }}
+        className="pointer-events-none absolute inset-y-0 w-24 -skew-x-12 bg-gradient-to-r from-transparent via-white/45 to-transparent dark:via-white/10"
+      />
+
       <div className="relative flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-[11px] font-black uppercase tracking-[0.13em] text-slate-500 dark:text-slate-400">
+        <div className="min-w-0 flex-1">
+          <p className="line-clamp-2 text-[11px] font-black uppercase leading-4 tracking-[0.13em] text-slate-500 dark:text-slate-400">
             {label}
           </p>
 
-          <p className="mt-3 truncate text-2xl font-black tracking-tight text-[#33415C] dark:text-slate-50">
-            {value}
-          </p>
+          <AnimatedNumber
+            value={value}
+            className="mt-3 block truncate text-2xl font-black tabular-nums tracking-tight text-[#33415C] dark:text-slate-50"
+          />
         </div>
 
         <motion.div
@@ -414,7 +426,7 @@ function MetricCard({
         </motion.div>
       </div>
 
-      <div className="relative mt-4 border-t border-[#6D7CFF]/10 pt-3">
+      <div className="relative mt-auto border-t border-[#6D7CFF]/10 pt-3">
         <ChangeBadge metric={metric} />
       </div>
     </motion.div>
@@ -433,7 +445,7 @@ function SummaryCard({
   iconClass,
 }: {
   title: string;
-  value: string;
+  value: ReactNode;
   description: string;
   icon: LucideIcon;
   iconClass: string;
@@ -444,22 +456,22 @@ function SummaryCard({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.15 }}
       whileHover={{ y: -4 }}
-      transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
-      className="group relative overflow-hidden rounded-[24px] border border-[#6D7CFF]/10 bg-white/[0.86] p-5 shadow-[0_18px_50px_-38px_rgba(85,102,242,0.5)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/[0.75]"
+      transition={{ duration: 0.34, ease: easeOut }}
+      className="group relative flex h-full overflow-hidden rounded-[24px] border border-[#6D7CFF]/10 bg-white/[0.86] p-5 shadow-[0_18px_50px_-38px_rgba(85,102,242,0.5)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/[0.75]"
     >
       <div className="pointer-events-none absolute -bottom-10 -right-10 h-28 w-28 rounded-full bg-[#55E6C1]/10 blur-3xl transition-transform duration-500 group-hover:scale-125" />
 
-      <div className="relative flex justify-between gap-4">
-        <div>
-          <p className="text-[11px] font-black uppercase tracking-[0.13em] text-slate-500 dark:text-slate-400">
+      <div className="relative flex w-full justify-between gap-4">
+        <div className="min-w-0">
+          <p className="line-clamp-2 text-[11px] font-black uppercase leading-4 tracking-[0.13em] text-slate-500 dark:text-slate-400">
             {title}
           </p>
 
-          <p className="mt-3 text-2xl font-black tracking-tight text-[#33415C] dark:text-slate-50">
+          <p className="mt-3 break-words text-2xl font-black tabular-nums tracking-tight text-[#33415C] dark:text-slate-50">
             {value}
           </p>
 
-          <p className="mt-2 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
+          <p className="mt-2 line-clamp-2 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
             {description}
           </p>
         </div>
@@ -476,16 +488,106 @@ function SummaryCard({
 }
 
 /* =========================================================
+   RADIAL RATE
+
+   Replaces the flat percentage text in the engagement grid —
+   the ring draws itself in so a rate reads at a glance.
+========================================================= */
+
+function RadialRate({
+  label,
+  value,
+  color,
+  caption,
+}: {
+  label: string;
+  value: number;
+  color: string;
+  caption?: string;
+}) {
+  const safe = Math.max(0, Math.min(100, value));
+  const circumference = 2 * Math.PI * 34;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.3 }}
+      whileHover={{ y: -4 }}
+      className="flex h-full flex-col items-center justify-center gap-3 rounded-2xl border border-[#6D7CFF]/10 bg-gradient-to-br from-white/90 to-[#6D7CFF]/[0.035] p-4 text-center shadow-sm transition hover:border-[#6D7CFF]/25 dark:from-slate-950/80 dark:to-[#6D7CFF]/[0.04]"
+    >
+      <div className="relative flex h-[92px] w-[92px] items-center justify-center">
+        <svg viewBox="0 0 80 80" className="absolute inset-0 h-full w-full -rotate-90">
+          <circle
+            cx="40"
+            cy="40"
+            r="34"
+            fill="none"
+            strokeWidth="7"
+            className="stroke-[#6D7CFF]/10"
+          />
+
+          <motion.circle
+            cx="40"
+            cy="40"
+            r="34"
+            fill="none"
+            stroke={color}
+            strokeWidth="7"
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            initial={{ strokeDashoffset: circumference }}
+            whileInView={{
+              strokeDashoffset: circumference - (safe / 100) * circumference,
+            }}
+            viewport={{ once: true }}
+            transition={{ duration: 1.2, ease: easeOut }}
+          />
+        </svg>
+
+        <AnimatedNumber
+          value={safe}
+          format={(current) => `${current.toFixed(1)}%`}
+          className="relative text-sm font-black tabular-nums text-[#33415C] dark:text-slate-100"
+        />
+      </div>
+
+      <div className="min-w-0">
+        <p className="truncate text-[10px] font-black uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400">
+          {label}
+        </p>
+
+        {caption ? (
+          <p className="mt-1 line-clamp-2 text-[10px] leading-4 text-slate-400 dark:text-slate-500">
+            {caption}
+          </p>
+        ) : null}
+      </div>
+    </motion.div>
+  );
+}
+
+/* =========================================================
    EMPTY
 ========================================================= */
 
 function EmptyData({ text }: { text: string }) {
   return (
     <div className="relative flex min-h-[240px] flex-col items-center justify-center overflow-hidden rounded-[24px] border border-dashed border-[#6D7CFF]/20 bg-gradient-to-br from-[#6D7CFF]/[0.035] via-white/60 to-[#55E6C1]/[0.05] px-6 text-center dark:via-slate-950/50">
-      <div className="absolute h-24 w-24 rounded-full bg-[#FF8BCB]/10 blur-3xl" />
-      <div className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-[#6D7CFF]/10 text-[#5B68E8]">
+      <motion.div
+        aria-hidden
+        animate={{ opacity: [0.4, 0.9, 0.4], scale: [1, 1.2, 1] }}
+        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute h-24 w-24 rounded-full bg-[#FF8BCB]/10 blur-3xl"
+      />
+
+      <motion.div
+        animate={{ y: [0, -5, 0] }}
+        transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
+        className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-[#6D7CFF]/10 text-[#5B68E8]"
+      >
         <DatabaseZap className="h-6 w-6" />
-      </div>
+      </motion.div>
 
       <p className="relative mt-3 text-sm font-extrabold text-[#33415C] dark:text-slate-100">
         No wallet activity
@@ -502,16 +604,18 @@ function EmptyData({ text }: { text: string }) {
    INSIGHT
 ========================================================= */
 
-function InsightCard({ insight }: { insight: AnalystWalletInsight }) {
+function InsightCard({
+  insight,
+  index,
+}: {
+  insight: AnalystWalletInsight;
+  index: number;
+}) {
   const style = {
-    critical:
-      "border-red-500/25 bg-red-500/[0.055] text-red-600 dark:text-red-400",
-    high:
-      "border-orange-500/25 bg-orange-500/[0.055] text-orange-600 dark:text-orange-400",
-    medium:
-      "border-amber-500/25 bg-amber-500/[0.055] text-amber-600 dark:text-amber-400",
-    info:
-      "border-[#6D7CFF]/20 bg-[#6D7CFF]/[0.055] text-[#5B68E8] dark:text-[#AEB7FF]",
+    critical: "border-red-500/25 bg-red-500/[0.055] text-red-600 dark:text-red-400",
+    high: "border-orange-500/25 bg-orange-500/[0.055] text-orange-600 dark:text-orange-400",
+    medium: "border-amber-500/25 bg-amber-500/[0.055] text-amber-600 dark:text-amber-400",
+    info: "border-[#6D7CFF]/20 bg-[#6D7CFF]/[0.055] text-[#5B68E8] dark:text-[#AEB7FF]",
     positive:
       "border-emerald-500/25 bg-emerald-500/[0.055] text-emerald-600 dark:text-emerald-400",
   }[insight.severity];
@@ -528,23 +632,27 @@ function InsightCard({ insight }: { insight: AnalystWalletInsight }) {
       initial={{ opacity: 0, y: 10 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.2 }}
+      transition={{ delay: index * 0.06, duration: 0.35, ease: easeOut }}
       whileHover={{ y: -3 }}
-      className={`group relative overflow-hidden rounded-[22px] border p-4 transition-shadow hover:shadow-[0_18px_50px_-36px_rgba(85,102,242,0.7)] ${style}`}
+      className={`group relative flex overflow-hidden rounded-[22px] border p-4 transition-shadow hover:shadow-[0_18px_50px_-36px_rgba(85,102,242,0.7)] ${style}`}
     >
       <div className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-current/5 blur-3xl" />
 
-      <div className="relative flex items-start gap-3">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-current/10">
+      <div className="relative flex w-full items-start gap-3">
+        <motion.div
+          whileHover={{ rotate: 8, scale: 1.08 }}
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-current/10"
+        >
           <Icon className="h-4 w-4" />
-        </div>
+        </motion.div>
 
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-sm font-extrabold text-[#33415C] dark:text-slate-100">
               {insight.title}
             </p>
 
-            <span className="rounded-full border border-current/20 bg-white/50 px-2 py-0.5 text-[9px] font-black uppercase backdrop-blur dark:bg-slate-950/30">
+            <span className="shrink-0 rounded-full border border-current/20 bg-white/50 px-2 py-0.5 text-[9px] font-black uppercase backdrop-blur dark:bg-slate-950/30">
               {insight.severity}
             </span>
           </div>
@@ -554,11 +662,8 @@ function InsightCard({ insight }: { insight: AnalystWalletInsight }) {
           </p>
 
           <div className="mt-3 rounded-xl border border-white/60 bg-white/60 p-3 shadow-sm backdrop-blur dark:border-white/5 dark:bg-slate-950/[0.35]">
-            <p className="text-[11px] font-bold text-[#33415C] dark:text-slate-200">
-              Evidence
-            </p>
-
-            <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+            <p className="text-[11px] font-bold text-[#33415C] dark:text-slate-200">Evidence</p>
+            <p className="mt-1 break-words text-[11px] text-slate-500 dark:text-slate-400">
               {insight.evidence}
             </p>
           </div>
@@ -577,284 +682,139 @@ function InsightCard({ insight }: { insight: AnalystWalletInsight }) {
 ========================================================= */
 
 export default function AnalystWalletsPage() {
-  const [
-    range,
-    setRange,
-  ] =
-    useState<AnalystRange>(
-      "30d"
-    );
+  const [range, setRange] = useState<AnalystRange>("30d");
+  const [currency, setCurrency] = useState("BDT");
+  const [currencyDraft, setCurrencyDraft] = useState("BDT");
+  const [data, setData] = useState<AnalystWalletAnalyticsData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const [
-    currency,
-    setCurrency,
-  ] =
-    useState(
-      "BDT"
-    );
-
-  const [
-    currencyDraft,
-    setCurrencyDraft,
-  ] =
-    useState(
-      "BDT"
-    );
-
-  const [
-    data,
-    setData,
-  ] =
-    useState<
-      AnalystWalletAnalyticsData |
-      null
-    >(
-      null
-    );
-
-  const [
-    loading,
-    setLoading,
-  ] =
-    useState(
-      true
-    );
-
-  const [
-    refreshing,
-    setRefreshing,
-  ] =
-    useState(
-      false
-    );
-
-  const [
-    error,
-    setError,
-  ] =
-    useState(
-      ""
-    );
-
-  const [
-    refreshKey,
-    setRefreshKey,
-  ] =
-    useState(
-      0
-    );
+  /* Interactive chart state — legend toggles and view switch. */
+  const [hiddenSeries, setHiddenSeries] = useState<TrendSeriesKey[]>([]);
+  const [trendView, setTrendView] = useState<TrendView>("flow");
+  const [activeUsageIndex, setActiveUsageIndex] = useState<number | null>(null);
 
   /* =======================================================
      FETCH
   ======================================================= */
 
-  useEffect(
-    () => {
-      const controller =
-        new AbortController();
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
 
-      let active =
-        true;
+    const load = async () => {
+      setRefreshing(true);
+      setError("");
 
-      const load =
-        async () => {
-          setRefreshing(
-            true
-          );
+      try {
+        const result = await getAnalystWalletAnalytics(
+          { range, currency },
+          controller.signal
+        );
 
-          setError(
-            ""
-          );
-
-          try {
-            const result =
-              await getAnalystWalletAnalytics(
-                {
-                  range,
-
-                  currency,
-                },
-
-                controller.signal
-              );
-
-            if (
-              !active ||
-              controller.signal.aborted
-            ) {
-              return;
-            }
-
-            setData(
-              result
-            );
-          } catch (
-            loadError:
-              unknown
-          ) {
-            if (
-              !active ||
-              controller.signal.aborted ||
-              isApiAbortError(
-                loadError
-              )
-            ) {
-              return;
-            }
-
-            setError(
-              loadError instanceof
-                Error
-                ? loadError.message
-                : "Unable to load wallet analytics."
-            );
-          } finally {
-            if (
-              active &&
-              !controller.signal.aborted
-            ) {
-              setLoading(
-                false
-              );
-
-              setRefreshing(
-                false
-              );
-            }
-          }
-        };
-
-      void load();
-
-      return () => {
-        active =
-          false;
-
-        if (
-          !controller.signal.aborted
-        ) {
-          controller.abort();
+        if (!active || controller.signal.aborted) {
+          return;
         }
-      };
-    },
-    [
-      range,
-      currency,
-      refreshKey,
-    ]
-  );
+
+        setData(result);
+      } catch (loadError: unknown) {
+        if (!active || controller.signal.aborted || isApiAbortError(loadError)) {
+          return;
+        }
+
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load wallet analytics."
+        );
+      } finally {
+        if (active && !controller.signal.aborted) {
+          setLoading(false);
+          setRefreshing(false);
+        }
+      }
+    };
+
+    void load();
+
+    return () => {
+      active = false;
+
+      if (!controller.signal.aborted) {
+        controller.abort();
+      }
+    };
+  }, [range, currency, refreshKey]);
 
   /* =======================================================
      CURRENCY
   ======================================================= */
 
-  const applyCurrency =
-    (
-      event:
-        FormEvent
-    ) => {
-      event.preventDefault();
+  const applyCurrency = (event: FormEvent) => {
+    event.preventDefault();
 
-      const normalized =
-        currencyDraft
-          .trim()
-          .toUpperCase();
+    const normalized = currencyDraft.trim().toUpperCase();
 
-      if (
-        !/^[A-Z]{3}$/.test(
-          normalized
-        )
-      ) {
-        setError(
-          "Currency must be a valid three-letter code."
-        );
+    if (!/^[A-Z]{3}$/.test(normalized)) {
+      setError("Currency must be a valid three-letter code.");
+      return;
+    }
 
-        return;
-      }
+    setCurrency(normalized);
+  };
 
-      setCurrency(
-        normalized
-      );
-    };
+  const toggleSeries = (key: TrendSeriesKey) => {
+    setHiddenSeries((current) =>
+      current.includes(key)
+        ? current.filter((item) => item !== key)
+        : [...current, key]
+    );
+  };
 
   /* =======================================================
      CHART
   ======================================================= */
 
-  const trendData =
-    useMemo(
-      () =>
-        data?.trend.map(
-          (
-            item
-          ) => ({
-            name:
-              formatBucket(
-                item.bucket,
-                data.filters.range
-              ),
+  const trendData = useMemo(
+    () =>
+      data?.trend.map((item) => ({
+        name: formatBucket(item.bucket, data.filters.range),
+        engaged: item.engagedWallets,
+        newWallets: item.newWallets,
+        p2p: item.p2pTransferCount,
+        merchant: item.merchantPaymentCount,
+        funding: item.fundingCount,
+      })) ?? [],
+    [data]
+  );
 
-            engaged:
-              item.engagedWallets,
-
-            newWallets:
-              item.newWallets,
-
-            p2p:
-              item.p2pTransferCount,
-
-            merchant:
-              item.merchantPaymentCount,
-
-            funding:
-              item.fundingCount,
-          })
-        ) ??
-        [],
-      [
-        data,
-      ]
-    );
-
-  const usageData =
-    useMemo(
-      () =>
-        data?.usageMix ??
-        [],
-      [
-        data,
-      ]
-    );
+  const usageData = useMemo(() => data?.usageMix ?? [], [data]);
 
   /* =======================================================
      LOADING
   ======================================================= */
 
-  if (
-    loading &&
-    !data
-  ) {
+  if (loading && !data) {
     return (
       <div className="relative isolate space-y-5">
         <div className="h-44 animate-pulse rounded-[30px] border border-[#6D7CFF]/10 bg-gradient-to-r from-[#6D7CFF]/10 via-[#FF8BCB]/10 to-[#55E6C1]/10" />
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {Array.from({
-            length:
-              8,
-          }).map(
-            (
-              _,
-              index
-            ) => (
-              <div
-                key={
-                  index
-                }
-                className="h-40 animate-pulse rounded-[24px] border border-[#6D7CFF]/10 bg-white/70 shadow-sm dark:bg-slate-950/60"
-              />
-            )
-          )}
+          {Array.from({ length: 8 }).map((_, index) => (
+            <motion.div
+              key={index}
+              animate={{ opacity: [0.55, 1, 0.55] }}
+              transition={{
+                duration: 1.6,
+                repeat: Infinity,
+                delay: index * 0.08,
+                ease: "easeInOut",
+              }}
+              className="h-40 rounded-[24px] border border-[#6D7CFF]/10 bg-white/70 shadow-sm dark:bg-slate-950/60"
+            />
+          ))}
         </div>
       </div>
     );
@@ -864,59 +824,52 @@ export default function AnalystWalletsPage() {
      ERROR
   ======================================================= */
 
-  if (
-    !data &&
-    error
-  ) {
+  if (!data && error) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="max-w-lg rounded-[28px] border border-red-500/20 bg-white/[0.85] p-8 text-center shadow-[0_20px_70px_-42px_rgba(239,68,68,0.55)] backdrop-blur-xl dark:bg-slate-950/[0.75]">
-          <AlertTriangle className="mx-auto h-10 w-10 text-red-500" />
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="max-w-lg rounded-[28px] border border-red-500/20 bg-white/[0.85] p-8 text-center shadow-[0_20px_70px_-42px_rgba(239,68,68,0.55)] backdrop-blur-xl dark:bg-slate-950/[0.75]"
+        >
+          <motion.div
+            animate={{ scale: [1, 1.08, 1] }}
+            transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+          >
+            <AlertTriangle className="mx-auto h-10 w-10 text-red-500" />
+          </motion.div>
 
-          <h1 className="mt-4 text-xl font-black">
-            Wallet analytics unavailable
-          </h1>
+          <h1 className="mt-4 text-xl font-black">Wallet analytics unavailable</h1>
 
-          <p className="mt-2 text-sm text-muted-foreground">
-            {error}
-          </p>
+          <p className="mt-2 text-sm text-muted-foreground">{error}</p>
 
           <button
             type="button"
-            onClick={() =>
-              setRefreshKey(
-                (
-                  value
-                ) =>
-                  value +
-                  1
-              )
-            }
+            onClick={() => setRefreshKey((value) => value + 1)}
             className="mt-6 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#6D7CFF] to-[#FF8BCB] px-5 py-3 text-sm font-bold text-white shadow-[0_12px_30px_-14px_rgba(109,124,255,0.75)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_38px_-14px_rgba(109,124,255,0.9)]"
           >
             <RotateCcw className="h-4 w-4" />
-
             Try again
           </button>
-        </div>
+        </motion.div>
       </div>
     );
   }
 
-  if (
-    !data
-  ) {
+  if (!data) {
     return null;
   }
 
   const statusClass =
-    data.status ===
-    "critical"
+    data.status === "critical"
       ? "border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-400"
-      : data.status ===
-          "attention"
+      : data.status === "attention"
         ? "border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400"
         : "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+
+  const visibleSeries = TREND_SERIES.filter(
+    (series) => !hiddenSeries.includes(series.key)
+  );
 
   /* =======================================================
      RENDER
@@ -930,18 +883,29 @@ export default function AnalystWalletsPage() {
           "radial-gradient(circle at 8% 2%, rgba(109,124,255,0.10), transparent 25%), radial-gradient(circle at 92% 8%, rgba(255,139,203,0.09), transparent 22%), radial-gradient(circle at 78% 78%, rgba(85,230,193,0.08), transparent 24%)",
       }}
     >
-      <div className="pointer-events-none absolute left-[9%] top-16 -z-10 h-40 w-40 rounded-full bg-[#6D7CFF]/10 blur-[80px] motion-safe:animate-pulse" />
-      <div className="pointer-events-none absolute right-[6%] top-72 -z-10 h-44 w-44 rounded-full bg-[#FF8BCB]/10 blur-[90px] motion-safe:animate-pulse" />
+      <motion.div
+        aria-hidden
+        animate={{ opacity: [0.4, 0.85, 0.4], y: [0, -18, 0] }}
+        transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+        className="pointer-events-none absolute left-[9%] top-16 -z-10 h-40 w-40 rounded-full bg-[#6D7CFF]/10 blur-[80px]"
+      />
+      <motion.div
+        aria-hidden
+        animate={{ opacity: [0.35, 0.8, 0.35], y: [0, 20, 0] }}
+        transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
+        className="pointer-events-none absolute right-[6%] top-72 -z-10 h-44 w-44 rounded-full bg-[#FF8BCB]/10 blur-[90px]"
+      />
 
       {/* HEADER */}
 
       <motion.section
         initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+        transition={{ duration: 0.55, ease: easeOut }}
         className="relative overflow-hidden rounded-[30px] border border-[#6D7CFF]/[0.15] bg-white/[0.82] p-6 shadow-[0_28px_90px_-52px_rgba(85,102,242,0.68)] backdrop-blur-2xl sm:p-7 dark:border-white/10 dark:bg-slate-950/[0.76]"
       >
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(125deg,rgba(109,124,255,0.055),transparent_36%,rgba(255,139,203,0.05)_68%,rgba(85,230,193,0.06))]" />
+
         <motion.div
           aria-hidden
           animate={{ x: [0, 22, 0], y: [0, -14, 0], scale: [1, 1.08, 1] }}
@@ -957,7 +921,7 @@ export default function AnalystWalletsPage() {
         <div className="pointer-events-none absolute bottom-0 right-[18%] h-40 w-40 rounded-full bg-[#55E6C1]/[0.12] blur-3xl" />
 
         <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-          <div>
+          <div className="min-w-0">
             <div className="flex flex-wrap gap-2">
               <span
                 className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-wider shadow-sm backdrop-blur ${statusClass}`}
@@ -970,7 +934,12 @@ export default function AnalystWalletsPage() {
               </span>
 
               <span className="inline-flex items-center gap-2 rounded-full border border-[#6D7CFF]/[0.15] bg-[#6D7CFF]/[0.075] px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-[#5B68E8] shadow-sm backdrop-blur dark:text-[#B6BEFF]">
-                <Sparkles className="h-3.5 w-3.5" />
+                <motion.span
+                  animate={{ rotate: [0, 12, -12, 0] }}
+                  transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                </motion.span>
                 Opal Glow workspace
               </span>
 
@@ -985,9 +954,8 @@ export default function AnalystWalletsPage() {
             </h1>
 
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-              Analyze wallet adoption, engagement, P2P usage, funding activity and
-              Coffer Wallet merchant-payment behavior with a softer, luminous
-              operations view.
+              Analyze wallet adoption, engagement, P2P usage, funding activity and Coffer Wallet
+              merchant-payment behavior with a softer, luminous operations view.
             </p>
           </div>
 
@@ -1039,9 +1007,10 @@ export default function AnalystWalletsPage() {
               </div>
             </form>
 
-            <button
+            <motion.button
               type="button"
               disabled={refreshing}
+              whileTap={{ scale: 0.96 }}
               onClick={() => setRefreshKey((value) => value + 1)}
               className="group inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-[#6D7CFF] to-[#FF8BCB] px-4 text-xs font-black text-white shadow-[0_14px_32px_-16px_rgba(109,124,255,0.9)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_42px_-16px_rgba(109,124,255,1)] disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -1051,222 +1020,130 @@ export default function AnalystWalletsPage() {
                 }`}
               />
               Refresh
-            </button>
+            </motion.button>
           </div>
         </div>
 
         <div className="relative mt-5 flex flex-wrap gap-2 border-t border-[#6D7CFF]/10 pt-4 text-[11px] text-slate-500 dark:text-slate-400">
-          {[`Updated ${formatDate(data.generatedAt)}`, data.filters.currency, "Personal wallets only", "Live merchant payments"].map(
-            (item) => (
-              <span
-                key={item}
-                className="rounded-full border border-[#6D7CFF]/10 bg-white/[0.55] px-3 py-1.5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-950/[0.35]"
-              >
-                {item}
-              </span>
-            )
-          )}
+          {[
+            `Updated ${formatDate(data.generatedAt)}`,
+            data.filters.currency,
+            "Personal wallets only",
+            "Live merchant payments",
+          ].map((item, index) => (
+            <motion.span
+              key={item}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.15 + index * 0.06 }}
+              className="rounded-full border border-[#6D7CFF]/10 bg-white/[0.55] px-3 py-1.5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-950/[0.35]"
+            >
+              {item}
+            </motion.span>
+          ))}
         </div>
       </motion.section>
 
       {/* POPULATION */}
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <SummaryCard
           title="Total wallets"
-          value={formatNumber(
-            data.population
-              .totalWallets
-          )}
+          value={<AnimatedNumber value={data.population.totalWallets} />}
           description="Personal Coffer wallets"
-          icon={
-            WalletCards
-          }
+          icon={WalletCards}
           iconClass="bg-[#6D7CFF]/10 text-[#5B68E8] dark:text-[#AEB7FF]"
         />
 
         <SummaryCard
           title="Active status"
-          value={formatNumber(
-            data.population
-              .activeStatusWallets
-          )}
-          description={`${formatPercent(
-            data.population
-              .activeStatusRate
-          )} of wallets`}
-          icon={
-            BadgeCheck
-          }
+          value={<AnimatedNumber value={data.population.activeStatusWallets} />}
+          description={`${formatPercent(data.population.activeStatusRate)} of wallets`}
+          icon={BadgeCheck}
           iconClass="bg-emerald-500/10 text-emerald-600"
         />
 
         <SummaryCard
           title="Dormant this period"
-          value={formatNumber(
-            data.population
-              .dormantWallets
-          )}
-          description={`${formatPercent(
-            data.population
-              .dormantWalletRate
-          )} had no activity`}
-          icon={
-            Activity
-          }
+          value={<AnimatedNumber value={data.population.dormantWallets} />}
+          description={`${formatPercent(data.population.dormantWalletRate)} had no activity`}
+          icon={Activity}
           iconClass="bg-amber-500/10 text-amber-600"
         />
 
         <SummaryCard
           title="Locked wallets"
-          value={formatNumber(
-            data.population
-              .lockedWallets
-          )}
+          value={<AnimatedNumber value={data.population.lockedWallets} />}
           description={`${data.population.frozenWallets} frozen · ${data.population.blockedWallets} blocked`}
-          icon={
-            LockKeyhole
-          }
+          icon={LockKeyhole}
           iconClass="bg-red-500/10 text-red-600"
         />
       </section>
 
       {/* METRICS */}
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           label="Engaged wallets"
-          value={formatNumber(
-            data.metrics
-              .engagedWallets
-              .value
-          )}
-          metric={
-            data.metrics
-              .engagedWallets
-          }
-          icon={
-            UserRoundCheck
-          }
+          value={data.metrics.engagedWallets.value}
+          metric={data.metrics.engagedWallets}
+          icon={UserRoundCheck}
           iconClass="bg-[#6D7CFF]/10 text-[#5B68E8] dark:text-[#AEB7FF]"
         />
 
         <MetricCard
           label="New wallets"
-          value={formatNumber(
-            data.metrics
-              .newWallets
-              .value
-          )}
-          metric={
-            data.metrics
-              .newWallets
-          }
-          icon={
-            WalletCards
-          }
+          value={data.metrics.newWallets.value}
+          metric={data.metrics.newWallets}
+          icon={WalletCards}
           iconClass="bg-[#55E6C1]/[0.14] text-[#188E75] dark:text-[#82F3D6]"
         />
 
         <MetricCard
           label="Merchant-paying"
-          value={formatNumber(
-            data.metrics
-              .merchantPayingWallets
-              .value
-          )}
-          metric={
-            data.metrics
-              .merchantPayingWallets
-          }
-          icon={
-            CreditCard
-          }
+          value={data.metrics.merchantPayingWallets.value}
+          metric={data.metrics.merchantPayingWallets}
+          icon={CreditCard}
           iconClass="bg-[#FF8BCB]/[0.12] text-[#D85AA8] dark:text-[#FFA7D8]"
         />
 
         <MetricCard
           label="P2P wallets"
-          value={formatNumber(
-            data.metrics
-              .p2pWallets
-              .value
-          )}
-          metric={
-            data.metrics
-              .p2pWallets
-          }
-          icon={
-            UsersRound
-          }
+          value={data.metrics.p2pWallets.value}
+          metric={data.metrics.p2pWallets}
+          icon={UsersRound}
           iconClass="bg-emerald-500/10 text-emerald-600"
         />
 
         <MetricCard
           label="Repeat engaged"
-          value={formatNumber(
-            data.metrics
-              .repeatEngagedWallets
-              .value
-          )}
-          metric={
-            data.metrics
-              .repeatEngagedWallets
-          }
-          icon={
-            Repeat2
-          }
+          value={data.metrics.repeatEngagedWallets.value}
+          metric={data.metrics.repeatEngagedWallets}
+          icon={Repeat2}
           iconClass="bg-[#8AD8FF]/[0.15] text-[#397FAB] dark:text-[#A9E5FF]"
         />
 
         <MetricCard
           label="Wallet events"
-          value={formatNumber(
-            data.metrics
-              .walletActivityEvents
-              .value
-          )}
-          metric={
-            data.metrics
-              .walletActivityEvents
-          }
-          icon={
-            TrendingUp
-          }
+          value={data.metrics.walletActivityEvents.value}
+          metric={data.metrics.walletActivityEvents}
+          icon={TrendingUp}
           iconClass="bg-[#55E6C1]/[0.14] text-[#188E75] dark:text-[#82F3D6]"
         />
 
         <MetricCard
           label="Merchant payments"
-          value={formatNumber(
-            data.metrics
-              .merchantPaymentCount
-              .value
-          )}
-          metric={
-            data.metrics
-              .merchantPaymentCount
-          }
-          icon={
-            CreditCard
-          }
+          value={data.metrics.merchantPaymentCount.value}
+          metric={data.metrics.merchantPaymentCount}
+          icon={CreditCard}
           iconClass="bg-[#FF8BCB]/[0.12] text-[#D85AA8] dark:text-[#FFA7D8]"
         />
 
         <MetricCard
           label="P2P transfers"
-          value={formatNumber(
-            data.metrics
-              .p2pTransferCount
-              .value
-          )}
-          metric={
-            data.metrics
-              .p2pTransferCount
-          }
-          icon={
-            Activity
-          }
+          value={data.metrics.p2pTransferCount.value}
+          metric={data.metrics.p2pTransferCount}
+          icon={Activity}
           iconClass="bg-emerald-500/10 text-emerald-600"
         />
       </section>
@@ -1275,286 +1152,316 @@ export default function AnalystWalletsPage() {
 
       <Panel
         title="Wallet network activity"
-        description="Engaged wallets, P2P transfers, merchant payments and new wallet creation."
+        description="Engaged wallets, P2P transfers, merchant payments and new wallet creation. Click a series to isolate it."
+        action={
+          <div className="flex items-center gap-1 rounded-xl border border-[#6D7CFF]/[0.15] bg-white/60 p-1 shadow-sm backdrop-blur dark:bg-slate-950/50">
+            {(
+              [
+                { value: "flow", label: "Flow", icon: AreaChartIcon },
+                { value: "compare", label: "Compare", icon: BarChart3 },
+              ] as const
+            ).map((option) => {
+              const active = trendView === option.value;
+
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setTrendView(option.value)}
+                  className={`relative inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-black uppercase tracking-wide transition ${
+                    active
+                      ? "text-white"
+                      : "text-slate-500 hover:text-[#5B68E8] dark:text-slate-400"
+                  }`}
+                >
+                  {active ? (
+                    <motion.span
+                      layoutId="trend-view-pill"
+                      transition={{ type: "spring", stiffness: 320, damping: 28 }}
+                      className="absolute inset-0 rounded-lg bg-gradient-to-r from-[#6D7CFF] to-[#FF8BCB]"
+                    />
+                  ) : null}
+
+                  <option.icon className="relative h-3.5 w-3.5" />
+                  <span className="relative">{option.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        }
       >
-        {trendData.length >
-        0 ? (
-          <div className="h-[360px] rounded-2xl bg-gradient-to-b from-[#6D7CFF]/[0.025] to-transparent p-1">
-            <ResponsiveContainer
-              width="100%"
-              height="100%"
-            >
-              <ComposedChart
-                data={
-                  trendData
-                }
-              >
-                <defs>
-                  <linearGradient
-                    id="walletEngagementGradient"
-                    x1="0"
-                    y1="0"
-                    x2="0"
-                    y2="1"
+        {trendData.length > 0 ? (
+          <div className="space-y-4">
+            {/* Interactive legend — toggles series in the chart */}
+            <div className="flex flex-wrap gap-2">
+              {TREND_SERIES.map((series) => {
+                const hidden = hiddenSeries.includes(series.key);
+
+                return (
+                  <motion.button
+                    key={series.key}
+                    type="button"
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => toggleSeries(series.key)}
+                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-wide transition ${
+                      hidden
+                        ? "border-slate-200 bg-transparent text-slate-400 dark:border-white/10"
+                        : "border-[#6D7CFF]/15 bg-white/70 text-[#33415C] shadow-sm dark:bg-slate-950/50 dark:text-slate-200"
+                    }`}
                   >
-                    <stop
-                      offset="5%"
-                      stopColor={OPAL_GLOW.primary}
-                      stopOpacity={
-                        0.3
-                      }
+                    <motion.span
+                      animate={{ scale: hidden ? 0.7 : 1, opacity: hidden ? 0.35 : 1 }}
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: series.color }}
+                    />
+                    {series.name}
+                  </motion.button>
+                );
+              })}
+            </div>
+
+            <motion.div
+              key={trendView}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, ease: easeOut }}
+              className="h-[360px] rounded-2xl bg-gradient-to-b from-[#6D7CFF]/[0.025] to-transparent p-1"
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                {trendView === "flow" ? (
+                  <ComposedChart data={trendData}>
+                    <defs>
+                      <linearGradient id="walletEngagementGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor={OPAL_GLOW.primary} stopOpacity={0.3} />
+                        <stop offset="95%" stopColor={OPAL_GLOW.primary} stopOpacity={0.02} />
+                      </linearGradient>
+                    </defs>
+
+                    <CartesianGrid strokeDasharray="4 4" vertical={false} opacity={0.08} />
+
+                    <XAxis
+                      dataKey="name"
+                      axisLine={false}
+                      tickLine={false}
+                      minTickGap={24}
+                      tick={{ fill: "#7A849A", fontSize: 11 }}
                     />
 
-                    <stop
-                      offset="95%"
-                      stopColor={OPAL_GLOW.primary}
-                      stopOpacity={
-                        0.02
-                      }
+                    <YAxis
+                      allowDecimals={false}
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: "#7A849A", fontSize: 11 }}
                     />
-                  </linearGradient>
-                </defs>
 
-                <CartesianGrid
-                  strokeDasharray="4 4"
-                  vertical={
-                    false
-                  }
-                  opacity={
-                    0.08
-                  }
-                />
+                    <Tooltip
+                      content={<GlowTooltip />}
+                      cursor={{ stroke: "rgba(109,124,255,0.2)", strokeWidth: 2 }}
+                    />
 
-                <XAxis
-                  dataKey="name"
-                  axisLine={
-                    false
-                  }
-                  tickLine={
-                    false
-                  }
-                  minTickGap={
-                    24
-                  }
-                  tick={{ fill: "#7A849A", fontSize: 11 }}
-                />
+                    {!hiddenSeries.includes("engaged") ? (
+                      <Area
+                        type="monotone"
+                        dataKey="engaged"
+                        name="Engaged wallets"
+                        stroke={OPAL_GLOW.primary}
+                        strokeWidth={2.5}
+                        fill="url(#walletEngagementGradient)"
+                        isAnimationActive
+                        animationDuration={1200}
+                        animationEasing="ease-out"
+                        activeDot={{ r: 5, fill: OPAL_GLOW.primary, strokeWidth: 0 }}
+                      />
+                    ) : null}
 
-                <YAxis
-                  allowDecimals={
-                    false
-                  }
-                  axisLine={
-                    false
-                  }
-                  tickLine={
-                    false
-                  }
-                  tick={{ fill: "#7A849A", fontSize: 11 }}
-                />
+                    {TREND_SERIES.filter((series) => series.key !== "engaged").map(
+                      (series, index) =>
+                        hiddenSeries.includes(series.key) ? null : (
+                          <Line
+                            key={series.key}
+                            type="monotone"
+                            dataKey={series.key}
+                            name={series.name}
+                            stroke={series.color}
+                            strokeWidth={2}
+                            dot={false}
+                            isAnimationActive
+                            animationBegin={220 + index * 180}
+                            animationDuration={1200}
+                            activeDot={{ r: 4.5, fill: series.color, strokeWidth: 0 }}
+                          />
+                        )
+                    )}
+                  </ComposedChart>
+                ) : (
+                  <BarChart data={trendData} barGap={4}>
+                    <CartesianGrid strokeDasharray="4 4" vertical={false} opacity={0.08} />
 
-                <Tooltip contentStyle={chartTooltipStyle} cursor={{ stroke: "rgba(109,124,255,0.14)" }} />
+                    <XAxis
+                      dataKey="name"
+                      axisLine={false}
+                      tickLine={false}
+                      minTickGap={24}
+                      tick={{ fill: "#7A849A", fontSize: 11 }}
+                    />
 
-                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 16 }} />
+                    <YAxis
+                      allowDecimals={false}
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: "#7A849A", fontSize: 11 }}
+                    />
 
-                <Area
-                  type="monotone"
-                  dataKey="engaged"
-                  name="Engaged wallets"
-                  stroke={OPAL_GLOW.primary}
-                  strokeWidth={
-                    2.5
-                  }
-                  fill="url(#walletEngagementGradient)"
-                />
+                    <Tooltip
+                      content={<GlowTooltip />}
+                      cursor={{ fill: "rgba(109,124,255,0.05)" }}
+                    />
 
-                <Line
-                  type="monotone"
-                  dataKey="merchant"
-                  name="Merchant payments"
-                  stroke={OPAL_GLOW.rose}
-                  strokeWidth={
-                    2
-                  }
-                  dot={
-                    false
-                  }
-                />
-
-                <Line
-                  type="monotone"
-                  dataKey="p2p"
-                  name="P2P transfers"
-                  stroke={OPAL_GLOW.mint}
-                  strokeWidth={
-                    2
-                  }
-                  dot={
-                    false
-                  }
-                />
-
-                <Line
-                  type="monotone"
-                  dataKey="newWallets"
-                  name="New wallets"
-                  stroke={OPAL_GLOW.sky}
-                  strokeWidth={
-                    2
-                  }
-                  dot={
-                    false
-                  }
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
+                    {visibleSeries.map((series, index) => (
+                      <Bar
+                        key={series.key}
+                        dataKey={series.key}
+                        name={series.name}
+                        fill={series.color}
+                        radius={[6, 6, 0, 0]}
+                        isAnimationActive
+                        animationBegin={index * 140}
+                        animationDuration={900}
+                        animationEasing="ease-out"
+                      />
+                    ))}
+                  </BarChart>
+                )}
+              </ResponsiveContainer>
+            </motion.div>
           </div>
         ) : (
-          <EmptyData
-            text="Wallet activity will appear after real platform activity exists."
-          />
+          <EmptyData text="Wallet activity will appear after real platform activity exists." />
         )}
       </Panel>
 
       {/* FUNNEL + USAGE */}
 
-      <div className="grid gap-5 xl:grid-cols-2">
+      <div className="grid items-stretch gap-5 xl:grid-cols-2">
         <Panel
           title="Wallet engagement funnel"
           description="From provisioned wallets to wallets actively paying Coffer merchants."
         >
           <div className="space-y-5">
-            {data.funnel.map(
-              (
-                item
-              ) => (
-                <div
-                  key={
-                    item.key
-                  }
-                >
-                  <div className="mb-2 flex justify-between gap-4">
-                    <span className="text-xs font-bold">
-                      {item.label}
-                    </span>
+            {data.funnel.map((item, index) => (
+              <motion.div
+                key={item.key}
+                initial={{ opacity: 0, x: -10 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: index * 0.08, duration: 0.35, ease: easeOut }}
+              >
+                <div className="mb-2 flex justify-between gap-4">
+                  <span className="min-w-0 truncate text-xs font-bold">{item.label}</span>
 
-                    <span className="text-xs font-black text-muted-foreground">
-                      {formatNumber(
-                        item.value
-                      )}{" "}
-                      ·{" "}
-                      {formatPercent(
-                        item.percentage
-                      )}
-                    </span>
-                  </div>
-
-                  <div className="h-2.5 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-[#6D7CFF] via-[#FF8BCB] to-[#55E6C1] shadow-[0_0_18px_rgba(109,124,255,0.24)] transition-all duration-700"
-                      style={{
-                        width:
-                          `${Math.min(
-                            item.percentage,
-                            100
-                          )}%`,
-                      }}
-                    />
-                  </div>
+                  <span className="shrink-0 text-xs font-black tabular-nums text-muted-foreground">
+                    {formatNumber(item.value)} · {formatPercent(item.percentage)}
+                  </span>
                 </div>
-              )
-            )}
+
+                <div className="relative h-2.5 overflow-hidden rounded-full bg-muted">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    whileInView={{ width: `${Math.min(item.percentage, 100)}%` }}
+                    viewport={{ once: true }}
+                    transition={{
+                      duration: 1,
+                      delay: index * 0.09,
+                      ease: easeOut,
+                    }}
+                    className="relative h-full overflow-hidden rounded-full bg-gradient-to-r from-[#6D7CFF] via-[#FF8BCB] to-[#55E6C1] shadow-[0_0_18px_rgba(109,124,255,0.24)]"
+                  >
+                    {/* travelling shimmer along the filled bar */}
+                    <motion.span
+                      aria-hidden
+                      animate={{ x: ["-100%", "220%"] }}
+                      transition={{
+                        duration: 2.4,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                        delay: index * 0.2,
+                      }}
+                      className="absolute inset-y-0 w-12 bg-white/40 blur-sm"
+                    />
+                  </motion.div>
+                </div>
+              </motion.div>
+            ))}
           </div>
         </Panel>
 
         <Panel
           title="Wallet usage mix"
-          description="Completed wallet activity by use case. This is count-based, not transaction-volume based."
+          description="Completed wallet activity by use case. Hover a bar to highlight it."
         >
-          {usageData.some(
-            (
-              item
-            ) =>
-              item.count >
-              0
-          ) ? (
+          {usageData.some((item) => item.count > 0) ? (
             <div className="h-[280px] rounded-2xl bg-gradient-to-b from-[#FF8BCB]/[0.025] to-transparent p-1">
-              <ResponsiveContainer
-                width="100%"
-                height="100%"
-              >
+              <ResponsiveContainer width="100%" height="100%">
                 <BarChart
-                  data={
-                    usageData
-                  }
+                  data={usageData}
                   layout="vertical"
+                  onMouseLeave={() => setActiveUsageIndex(null)}
                 >
-                  <CartesianGrid
-                    strokeDasharray="4 4"
-                    horizontal={
-                      false
-                    }
-                    opacity={
-                      0.08
-                    }
-                  />
+                  <CartesianGrid strokeDasharray="4 4" horizontal={false} opacity={0.08} />
 
                   <XAxis
                     type="number"
-                    allowDecimals={
-                      false
-                    }
+                    allowDecimals={false}
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: "#7A849A", fontSize: 11 }}
                   />
 
                   <YAxis
                     type="category"
                     dataKey="label"
-                    width={
-                      120
-                    }
+                    width={120}
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: "#7A849A", fontSize: 11 }}
                   />
 
-                  <Tooltip contentStyle={chartTooltipStyle} cursor={{ fill: "rgba(109,124,255,0.05)" }} />
+                  <Tooltip content={<GlowTooltip />} cursor={{ fill: "rgba(109,124,255,0.05)" }} />
 
                   <Bar
                     dataKey="count"
-                    radius={[
-                      0,
-                      8,
-                      8,
-                      0,
-                    ]}
+                    radius={[0, 8, 8, 0]}
+                    isAnimationActive
+                    animationDuration={950}
+                    animationEasing="ease-out"
+                    onMouseEnter={(_, index) => setActiveUsageIndex(index)}
                   >
-                    {usageData.map(
-                      (
-                        item,
-                        index
-                      ) => (
+                    {usageData.map((item, index) => {
+                      const color = [
+                        OPAL_GLOW.primary,
+                        OPAL_GLOW.rose,
+                        OPAL_GLOW.mint,
+                        OPAL_GLOW.sky,
+                      ][index % 4];
+
+                      const dimmed =
+                        activeUsageIndex !== null && activeUsageIndex !== index;
+
+                      return (
                         <Cell
-                          key={
-                            item.key
-                          }
-                          fill={
-                            [
-                              OPAL_GLOW.primary,
-                              OPAL_GLOW.rose,
-                              OPAL_GLOW.mint,
-                              OPAL_GLOW.sky,
-                            ][
-                              index %
-                                4
-                            ]
-                          }
+                          key={item.key}
+                          fill={color}
+                          fillOpacity={dimmed ? 0.35 : 1}
+                          style={{ transition: "fill-opacity 220ms ease" }}
                         />
-                      )
-                    )}
+                      );
+                    })}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
           ) : (
-            <EmptyData
-              text="No completed wallet usage event exists for this period."
-            />
+            <EmptyData text="No completed wallet usage event exists for this period." />
           )}
         </Panel>
       </div>
@@ -1566,77 +1473,59 @@ export default function AnalystWalletsPage() {
         description="Adoption and repeat-usage indicators for the Coffer wallet ecosystem."
       >
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-          {[
-            {
-              label:
-                "Wallet engagement",
+          <RadialRate
+            label="Wallet engagement"
+            value={data.engagement.walletEngagementRate}
+            color={OPAL_GLOW.primary}
+            caption="Wallets active this period"
+          />
 
-              value:
-                data.engagement
-                  .walletEngagementRate,
-            },
+          <RadialRate
+            label="Merchant adoption"
+            value={data.engagement.merchantPaymentAdoptionRate}
+            color={OPAL_GLOW.rose}
+            caption="Paid a Coffer merchant"
+          />
 
-            {
-              label:
-                "Merchant adoption",
+          <RadialRate
+            label="P2P adoption"
+            value={data.engagement.p2pAdoptionRate}
+            color={OPAL_GLOW.mint}
+            caption="Sent a wallet-to-wallet transfer"
+          />
 
-              value:
-                data.engagement
-                  .merchantPaymentAdoptionRate,
-            },
+          <RadialRate
+            label="Repeat activity"
+            value={data.engagement.repeatActivityRate}
+            color={OPAL_GLOW.sky}
+            caption="More than one activity event"
+          />
 
-            {
-              label:
-                "P2P adoption",
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            whileHover={{ y: -4 }}
+            className="flex h-full flex-col justify-center rounded-2xl border border-[#6D7CFF]/10 bg-gradient-to-br from-white/90 to-[#6D7CFF]/[0.035] p-4 text-center shadow-sm transition hover:border-[#6D7CFF]/25 dark:from-slate-950/80 dark:to-[#6D7CFF]/[0.04]"
+          >
+            <motion.div
+              animate={{ y: [0, -4, 0] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+              className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-[#6D7CFF]/10 text-[#5B68E8] dark:text-[#AEB7FF]"
+            >
+              <Activity className="h-5 w-5" />
+            </motion.div>
 
-              value:
-                data.engagement
-                  .p2pAdoptionRate,
-            },
+            <AnimatedNumber
+              value={Number(data.engagement.transactionsPerEngagedWallet) || 0}
+              format={(current) => current.toFixed(2)}
+              className="mt-3 block text-2xl font-black tabular-nums text-[#33415C] dark:text-slate-50"
+            />
 
-            {
-              label:
-                "Repeat activity",
-
-              value:
-                data.engagement
-                  .repeatActivityRate,
-            },
-          ].map(
-            (
-              item
-            ) => (
-              <div
-                key={
-                  item.label
-                }
-                className="rounded-2xl border border-[#6D7CFF]/10 bg-gradient-to-br from-white/90 to-[#6D7CFF]/[0.035] p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-[#6D7CFF]/20 dark:from-slate-950/80 dark:to-[#6D7CFF]/[0.04]"
-              >
-                <p className="text-[10px] font-bold uppercase text-muted-foreground">
-                  {item.label}
-                </p>
-
-                <p className="mt-3 text-2xl font-black">
-                  {formatPercent(
-                    item.value
-                  )}
-                </p>
-              </div>
-            )
-          )}
-
-          <div className="rounded-2xl border border-[#6D7CFF]/10 bg-gradient-to-br from-white/90 to-[#6D7CFF]/[0.035] p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-[#6D7CFF]/20 dark:from-slate-950/80 dark:to-[#6D7CFF]/[0.04]">
-            <p className="text-[10px] font-bold uppercase text-muted-foreground">
+            <p className="mt-1 text-[10px] font-black uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400">
               Events / engaged
             </p>
-
-            <p className="mt-3 text-2xl font-black">
-              {
-                data.engagement
-                  .transactionsPerEngagedWallet
-              }
-            </p>
-          </div>
+          </motion.div>
         </div>
       </Panel>
 
@@ -1646,49 +1535,43 @@ export default function AnalystWalletsPage() {
         title="Wallet balance snapshot"
         description="Current wallet balances aggregated directly from the wallet collection for the selected currency."
       >
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid items-stretch gap-4 md:grid-cols-3">
           <SummaryCard
             title="Total balance"
-            value={formatMoney(
-              data.liquidity
-                .totalBalanceMinor,
-              data.filters
-                .currency
-            )}
-            description="Current aggregate wallet balance"
-            icon={
-              Banknote
+            value={
+              <AnimatedNumber
+                value={data.liquidity.totalBalanceMinor}
+                format={(current) => formatMoney(current, data.filters.currency)}
+              />
             }
+            description="Current aggregate wallet balance"
+            icon={Banknote}
             iconClass="bg-emerald-500/10 text-emerald-600"
           />
 
           <SummaryCard
             title="Pending balance"
-            value={formatMoney(
-              data.liquidity
-                .totalPendingBalanceMinor,
-              data.filters
-                .currency
-            )}
-            description="Aggregate pending wallet balance"
-            icon={
-              Activity
+            value={
+              <AnimatedNumber
+                value={data.liquidity.totalPendingBalanceMinor}
+                format={(current) => formatMoney(current, data.filters.currency)}
+              />
             }
+            description="Aggregate pending wallet balance"
+            icon={Activity}
             iconClass="bg-amber-500/10 text-amber-600"
           />
 
           <SummaryCard
             title="Average wallet balance"
-            value={formatMoney(
-              data.liquidity
-                .averageBalanceMinor,
-              data.filters
-                .currency
-            )}
-            description="Average across matching wallets"
-            icon={
-              WalletCards
+            value={
+              <AnimatedNumber
+                value={data.liquidity.averageBalanceMinor}
+                format={(current) => formatMoney(current, data.filters.currency)}
+              />
             }
+            description="Average across matching wallets"
+            icon={WalletCards}
             iconClass="bg-[#6D7CFF]/10 text-[#5B68E8] dark:text-[#AEB7FF]"
           />
         </div>
@@ -1700,48 +1583,54 @@ export default function AnalystWalletsPage() {
         title="Wallet status distribution"
         description="Current operational wallet state."
       >
-        <div className="grid gap-4 md:grid-cols-3">
-          {data.walletStatuses.map(
-            (
-              item
-            ) => {
-              const className =
-                item.status ===
-                "ACTIVE"
-                  ? "text-emerald-600 bg-emerald-500/10"
-                  : item.status ===
-                      "FROZEN"
-                    ? "text-amber-600 bg-amber-500/10"
-                    : "text-red-600 bg-red-500/10";
+        <div className="grid items-stretch gap-4 md:grid-cols-3">
+          {data.walletStatuses.map((item, index) => {
+            const className =
+              item.status === "ACTIVE"
+                ? "text-emerald-600 bg-emerald-500/10"
+                : item.status === "FROZEN"
+                  ? "text-amber-600 bg-amber-500/10"
+                  : "text-red-600 bg-red-500/10";
 
-              return (
-                <div
-                  key={
-                    item.status
-                  }
-                  className="rounded-2xl border border-[#6D7CFF]/10 bg-gradient-to-br from-white/90 to-[#6D7CFF]/[0.035] p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-[#6D7CFF]/20 dark:from-slate-950/80 dark:to-[#6D7CFF]/[0.04]"
+            return (
+              <motion.div
+                key={item.status}
+                initial={{ opacity: 0, y: 12 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: index * 0.08 }}
+                whileHover={{ y: -4 }}
+                className="flex h-full flex-col rounded-2xl border border-[#6D7CFF]/10 bg-gradient-to-br from-white/90 to-[#6D7CFF]/[0.035] p-4 shadow-sm transition hover:border-[#6D7CFF]/25 dark:from-slate-950/80 dark:to-[#6D7CFF]/[0.04]"
+              >
+                <span
+                  className={`inline-flex w-fit rounded-full px-2.5 py-1 text-[9px] font-black ${className}`}
                 >
-                  <span
-                    className={`inline-flex rounded-full px-2.5 py-1 text-[9px] font-black ${className}`}
-                  >
-                    {item.status}
-                  </span>
+                  {item.status}
+                </span>
 
-                  <p className="mt-4 text-2xl font-black">
-                    {formatNumber(
-                      item.count
-                    )}
-                  </p>
+                <AnimatedNumber
+                  value={item.count}
+                  className="mt-4 block text-2xl font-black tabular-nums"
+                />
 
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {formatPercent(
-                      item.percentage
-                    )}
+                <div className="mt-2">
+                  <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      whileInView={{ width: `${Math.min(item.percentage, 100)}%` }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 0.9, delay: index * 0.08, ease: easeOut }}
+                      className="h-full rounded-full bg-gradient-to-r from-[#6D7CFF] to-[#55E6C1]"
+                    />
+                  </div>
+
+                  <p className="mt-1.5 text-xs text-muted-foreground">
+                    {formatPercent(item.percentage)}
                   </p>
                 </div>
-              );
-            }
-          )}
+              </motion.div>
+            );
+          })}
         </div>
       </Panel>
 
@@ -1752,37 +1641,39 @@ export default function AnalystWalletsPage() {
         description="Deterministic signals derived from real Coffer wallet activity."
         action={
           <span className="inline-flex items-center gap-2 rounded-xl border border-[#6D7CFF]/[0.15] bg-[#6D7CFF]/[0.075] px-3 py-1.5 text-[10px] font-black text-[#5B68E8] shadow-sm dark:text-[#B6BEFF]">
-            <BrainCircuit className="h-3.5 w-3.5" />
-
+            <motion.span
+              animate={{ rotate: [0, 360] }}
+              transition={{ duration: 14, repeat: Infinity, ease: "linear" }}
+            >
+              <BrainCircuit className="h-3.5 w-3.5" />
+            </motion.span>
             Rules-based
           </span>
         }
       >
-        <div className="grid gap-3 lg:grid-cols-2">
-          {data.insights.map(
-            (
-              insight
-            ) => (
-              <InsightCard
-                key={
-                  insight.id
-                }
-                insight={
-                  insight
-                }
-              />
-            )
-          )}
-        </div>
+        {data.insights.length > 0 ? (
+          <div className="grid items-stretch gap-3 lg:grid-cols-2">
+            {data.insights.map((insight, index) => (
+              <InsightCard key={insight.id} insight={insight} index={index} />
+            ))}
+          </div>
+        ) : (
+          <EmptyData text="No deterministic wallet signal was generated for this period." />
+        )}
       </Panel>
 
       {/* PRIVACY */}
 
-      <div className="relative overflow-hidden rounded-[24px] border border-[#6D7CFF]/10 bg-white/[0.78] p-5 shadow-[0_18px_55px_-40px_rgba(85,102,242,0.5)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        className="relative overflow-hidden rounded-[24px] border border-[#6D7CFF]/10 bg-white/[0.78] p-5 shadow-[0_18px_55px_-40px_rgba(85,102,242,0.5)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70"
+      >
         <div className="flex gap-3">
           <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-[#5B68E8]" />
 
-          <div>
+          <div className="min-w-0">
             <p className="text-xs font-extrabold text-[#33415C] dark:text-slate-100">
               Privacy-safe wallet analytics
             </p>
@@ -1791,12 +1682,10 @@ export default function AnalystWalletsPage() {
               {data.privacy.note}
             </p>
 
-            <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
-              {data.scopeNote}
-            </p>
+            <p className="mt-1 text-[11px] leading-5 text-muted-foreground">{data.scopeNote}</p>
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }
