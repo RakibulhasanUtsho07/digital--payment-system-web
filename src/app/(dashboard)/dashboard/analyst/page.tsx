@@ -72,16 +72,18 @@ import {
 ========================================================= */
 
 const COLORS = {
-  navy: "#14213D",
-  indigo: "#3159C9",
-  cyan: "#0891B2",
-  violet: "#7C5CE6",
-  canvas: "#F4F7FB",
+  // Screenshot-inspired Ocean Glow palette.
+  // The legacy key names are kept so the page API stays untouched.
+  navy: "#17324D",
+  indigo: "#0F9D91",
+  cyan: "#22C7B8",
+  violet: "#38BDF8",
+  canvas: "#F4F8F7",
   emerald: "#059669",
   amber: "#D97706",
   red: "#DC2626",
-  inkMuted: "#64748B",
-  grid: "#E2E8F0",
+  inkMuted: "#64778A",
+  grid: "#DCE7E5",
   white: "#FFFFFF",
 };
 
@@ -108,7 +110,8 @@ const containerVariants = {
   hidden: {},
   show: {
     transition: {
-      staggerChildren: 0.055,
+      staggerChildren: 0.065,
+      delayChildren: 0.04,
     },
   },
 };
@@ -116,13 +119,17 @@ const containerVariants = {
 const itemVariants = {
   hidden: {
     opacity: 0,
-    y: 14,
+    y: 20,
+    scale: 0.988,
+    filter: "blur(7px)",
   },
   show: {
     opacity: 1,
     y: 0,
+    scale: 1,
+    filter: "blur(0px)",
     transition: {
-      duration: 0.38,
+      duration: 0.52,
       ease: [0.22, 1, 0.36, 1] as const,
     },
   },
@@ -247,7 +254,7 @@ function insightClasses(severity: AnalystInsight["severity"]): string {
     case "high":
       return "border-amber-200 bg-amber-50/80 dark:border-amber-900/60 dark:bg-amber-950/25";
     case "medium":
-      return "border-amber-200/80 bg-amber-50/55 dark:border-amber-900/50 dark:bg-amber-950/15";
+      return "border-amber-200/80 bg-amber-50/[0.55] dark:border-amber-900/50 dark:bg-amber-950/15";
     case "positive":
       return "border-emerald-200 bg-emerald-50/80 dark:border-emerald-900/60 dark:bg-emerald-950/25";
     case "info":
@@ -327,7 +334,7 @@ function Surface({
   return (
     <motion.section
       variants={itemVariants}
-      className={`rounded-[24px] border border-slate-200/80 bg-white shadow-[0_10px_35px_rgba(20,33,61,0.06)] dark:border-slate-800 dark:bg-slate-950 ${className}`}
+      className={`rounded-[26px] border border-[#DCE7E5] bg-white/95 shadow-[0_14px_42px_rgba(23,50,77,0.065)] ring-1 ring-white/70 backdrop-blur-xl transition-[border-color,box-shadow,transform] duration-300 hover:border-[#B9E8E1] hover:shadow-[0_18px_48px_rgba(15,157,145,0.09)] dark:border-slate-800 dark:bg-slate-950/95 dark:ring-white/5 ${className}`}
     >
       {children}
     </motion.section>
@@ -351,20 +358,20 @@ function SectionHeading({
 }) {
   const accents = {
     indigo: {
-      icon: "bg-[#3159C9]/10 text-[#3159C9]",
-      eyebrow: "text-[#3159C9]",
+      icon: "bg-[#0F9D91]/10 text-[#0F9D91]",
+      eyebrow: "text-[#0F9D91]",
     },
     cyan: {
-      icon: "bg-[#0891B2]/10 text-[#0891B2]",
-      eyebrow: "text-[#0891B2]",
+      icon: "bg-[#22C7B8]/10 text-[#22C7B8]",
+      eyebrow: "text-[#22C7B8]",
     },
     violet: {
-      icon: "bg-[#7C5CE6]/10 text-[#7C5CE6]",
-      eyebrow: "text-[#7C5CE6]",
+      icon: "bg-[#38BDF8]/10 text-[#38BDF8]",
+      eyebrow: "text-[#38BDF8]",
     },
     navy: {
-      icon: "bg-[#14213D]/10 text-[#14213D] dark:bg-white/10 dark:text-white",
-      eyebrow: "text-[#14213D] dark:text-slate-200",
+      icon: "bg-[#17324D]/10 text-[#17324D] dark:bg-white/10 dark:text-white",
+      eyebrow: "text-[#17324D] dark:text-slate-200",
     },
   } as const;
 
@@ -388,7 +395,7 @@ function SectionHeading({
             </p>
           ) : null}
 
-          <h2 className="mt-0.5 text-lg font-extrabold tracking-tight text-[#14213D] dark:text-white sm:text-xl">
+          <h2 className="mt-0.5 text-lg font-black tracking-[-0.02em] text-[#17324D] dark:text-white sm:text-xl">
             {title}
           </h2>
 
@@ -454,20 +461,20 @@ function MetricCard({
 }) {
   const accentConfig = {
     indigo: {
-      icon: "bg-[#3159C9]/10 text-[#3159C9]",
-      line: "bg-[#3159C9]",
+      icon: "bg-[#0F9D91]/10 text-[#0F9D91]",
+      line: "bg-[#0F9D91]",
     },
     cyan: {
-      icon: "bg-[#0891B2]/10 text-[#0891B2]",
-      line: "bg-[#0891B2]",
+      icon: "bg-[#22C7B8]/10 text-[#22C7B8]",
+      line: "bg-[#22C7B8]",
     },
     violet: {
-      icon: "bg-[#7C5CE6]/10 text-[#7C5CE6]",
-      line: "bg-[#7C5CE6]",
+      icon: "bg-[#38BDF8]/10 text-[#38BDF8]",
+      line: "bg-[#38BDF8]",
     },
     navy: {
-      icon: "bg-[#14213D]/10 text-[#14213D] dark:bg-white/10 dark:text-white",
-      line: "bg-[#14213D] dark:bg-slate-200",
+      icon: "bg-[#17324D]/10 text-[#17324D] dark:bg-white/10 dark:text-white",
+      line: "bg-[#17324D] dark:bg-slate-200",
     },
   } as const;
 
@@ -479,10 +486,14 @@ function MetricCard({
       variants={itemVariants}
       whileHover={{ y: -4 }}
       transition={{ duration: 0.2 }}
-      className="group relative overflow-hidden rounded-[22px] border border-slate-200/80 bg-white p-5 shadow-[0_8px_28px_rgba(20,33,61,0.055)] dark:border-slate-800 dark:bg-slate-950"
+      className="group relative overflow-hidden rounded-[24px] border border-[#DCE7E5] bg-white/95 p-5 shadow-[0_10px_30px_rgba(23,50,77,0.055)] ring-1 ring-white/80 backdrop-blur-xl transition-[border-color,box-shadow] duration-300 hover:border-[#A7E7DE] hover:shadow-[0_18px_46px_rgba(15,157,145,0.12)] dark:border-slate-800 dark:bg-slate-950/95 dark:ring-white/5"
     >
       <div
         className={`absolute inset-x-0 top-0 h-1 ${accentConfig[accent].line}`}
+      />
+      <div
+        className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-[#5EEAD4]/10 blur-3xl transition-opacity duration-300 group-hover:opacity-100"
+        aria-hidden="true"
       />
 
       <div className="flex items-start justify-between gap-4">
@@ -490,7 +501,7 @@ function MetricCard({
           <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
             {label}
           </p>
-          <p className="mt-3 text-2xl font-black tracking-tight text-[#14213D] dark:text-white">
+          <p className="mt-3 text-2xl font-black tracking-tight text-[#17324D] dark:text-white">
             {value}
           </p>
         </div>
@@ -530,10 +541,10 @@ function RatioRow({
   const width = Math.max(0, Math.min(100, value));
 
   const barClass = {
-    indigo: "bg-[#3159C9]",
-    cyan: "bg-[#0891B2]",
-    violet: "bg-[#7C5CE6]",
-    navy: "bg-[#14213D] dark:bg-slate-200",
+    indigo: "bg-[#0F9D91]",
+    cyan: "bg-[#22C7B8]",
+    violet: "bg-[#38BDF8]",
+    navy: "bg-[#17324D] dark:bg-slate-200",
   }[tone];
 
   return (
@@ -542,7 +553,7 @@ function RatioRow({
         <span className="font-medium text-slate-600 dark:text-slate-300">
           {label}
         </span>
-        <span className="font-extrabold text-[#14213D] dark:text-white">
+        <span className="font-extrabold text-[#17324D] dark:text-white">
           {formatPercent(value)}
         </span>
       </div>
@@ -573,14 +584,14 @@ function MiniStat({
   helper?: string;
 }) {
   const accents = {
-    navy: "bg-[#14213D]/8 text-[#14213D] dark:bg-white/10 dark:text-white",
-    indigo: "bg-[#3159C9]/10 text-[#3159C9]",
-    cyan: "bg-[#0891B2]/10 text-[#0891B2]",
-    violet: "bg-[#7C5CE6]/10 text-[#7C5CE6]",
+    navy: "bg-[#17324D]/[0.08] text-[#17324D] dark:bg-white/10 dark:text-white",
+    indigo: "bg-[#0F9D91]/10 text-[#0F9D91]",
+    cyan: "bg-[#22C7B8]/10 text-[#22C7B8]",
+    violet: "bg-[#38BDF8]/10 text-[#38BDF8]",
   } as const;
 
   return (
-    <div className="rounded-2xl border border-slate-200/70 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/70">
+    <div className="rounded-2xl border border-[#DCE7E5] bg-[linear-gradient(180deg,#FFFFFF_0%,#F7FBFA_100%)] p-4 shadow-[0_8px_22px_rgba(23,50,77,0.035)] transition duration-300 hover:-translate-y-0.5 hover:border-[#B9E8E1] dark:border-slate-800 dark:bg-slate-900/70">
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
           {label}
@@ -591,7 +602,7 @@ function MiniStat({
           <Icon className="h-4 w-4" />
         </div>
       </div>
-      <p className="mt-2 text-xl font-black tracking-tight text-[#14213D] dark:text-white">
+      <p className="mt-2 text-xl font-black tracking-tight text-[#17324D] dark:text-white">
         {value}
       </p>
       {helper ? (
@@ -614,16 +625,16 @@ function BreakdownList({
 }) {
   if (items.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
+      <div className="rounded-2xl border border-dashed border-[#D4E5E2] p-6 text-center text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
         {emptyLabel}
       </div>
     );
   }
 
   const barClass = {
-    indigo: "bg-[#3159C9]",
-    cyan: "bg-[#0891B2]",
-    violet: "bg-[#7C5CE6]",
+    indigo: "bg-[#0F9D91]",
+    cyan: "bg-[#22C7B8]",
+    violet: "bg-[#38BDF8]",
   }[tone];
 
   return (
@@ -637,14 +648,14 @@ function BreakdownList({
         >
           <div className="mb-2 flex items-center justify-between gap-4">
             <div className="min-w-0">
-              <p className="truncate text-sm font-bold text-[#14213D] dark:text-slate-100">
+              <p className="truncate text-sm font-bold text-[#17324D] dark:text-slate-100">
                 {item.label}
               </p>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 {formatNumber(item.count)} records
               </p>
             </div>
-            <span className="text-sm font-extrabold text-[#14213D] dark:text-white">
+            <span className="text-sm font-extrabold text-[#17324D] dark:text-white">
               {formatPercent(item.percentage)}
             </span>
           </div>
@@ -690,7 +701,7 @@ function PaymentChartTooltip({
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-xl backdrop-blur dark:border-slate-700 dark:bg-slate-950/95">
+    <div className="rounded-2xl border border-[#CDEAE5] bg-white/95 p-3 shadow-[0_16px_42px_rgba(23,50,77,0.14)] backdrop-blur-xl dark:border-slate-700 dark:bg-slate-950/95">
       <p className="mb-2 text-xs font-bold text-slate-500 dark:text-slate-400">
         {label ? formatBucket(label) : ""}
       </p>
@@ -707,7 +718,7 @@ function PaymentChartTooltip({
               />
               {entry.name}
             </span>
-            <span className="font-extrabold text-[#14213D] dark:text-white">
+            <span className="font-extrabold text-[#17324D] dark:text-white">
               {formatNumber(Number(entry.value ?? 0))}
             </span>
           </div>
@@ -724,7 +735,7 @@ function PaymentActivityChart({
 }) {
   if (points.length === 0) {
     return (
-      <div className="flex h-[320px] items-center justify-center rounded-2xl border border-dashed border-slate-200 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
+      <div className="flex h-[320px] items-center justify-center rounded-2xl border border-dashed border-[#D4E5E2] text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
         No trend data available.
       </div>
     );
@@ -825,8 +836,8 @@ function PulseChartTooltip({
   }
 
   return (
-    <div className="rounded-2xl border border-cyan-100 bg-white/95 p-3 shadow-xl backdrop-blur dark:border-cyan-900/60 dark:bg-slate-950/95">
-      <p className="mb-2 text-xs font-bold text-[#0891B2]">
+    <div className="rounded-2xl border border-[#BDEDE6] bg-white/95 p-3 shadow-[0_16px_42px_rgba(15,157,145,0.14)] backdrop-blur-xl dark:border-cyan-900/60 dark:bg-slate-950/95">
+      <p className="mb-2 text-xs font-bold text-[#22C7B8]">
         {label ? formatBucket(label) : ""}
       </p>
       {payload.map((entry) => (
@@ -835,7 +846,7 @@ function PulseChartTooltip({
           className="flex items-center justify-between gap-6 text-xs"
         >
           <span className="text-slate-600 dark:text-slate-300">{entry.name}</span>
-          <span className="font-extrabold text-[#14213D] dark:text-white">
+          <span className="font-extrabold text-[#17324D] dark:text-white">
             {formatNumber(Number(entry.value ?? 0))}
           </span>
         </div>
@@ -927,20 +938,20 @@ function LivePulseChart({
 
 function DashboardSkeleton() {
   return (
-    <div className="min-h-screen bg-[#F4F7FB] p-4 dark:bg-slate-950 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-[#F4F8F7] p-4 dark:bg-slate-950 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-[1500px] space-y-6">
-        <div className="h-36 animate-pulse rounded-[28px] bg-slate-200/80 dark:bg-slate-800" />
+        <div className="h-36 animate-pulse rounded-[28px] bg-[#DDEAE7]/[0.85] dark:bg-slate-800" />
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, index) => (
             <div
               key={index}
-              className="h-36 animate-pulse rounded-[22px] bg-slate-200/80 dark:bg-slate-800"
+              className="h-36 animate-pulse rounded-[22px] bg-[#DDEAE7]/[0.85] dark:bg-slate-800"
             />
           ))}
         </div>
         <div className="grid gap-6 xl:grid-cols-[1.45fr_0.8fr]">
-          <div className="h-[420px] animate-pulse rounded-[24px] bg-slate-200/80 dark:bg-slate-800" />
-          <div className="h-[420px] animate-pulse rounded-[24px] bg-slate-200/80 dark:bg-slate-800" />
+          <div className="h-[420px] animate-pulse rounded-[24px] bg-[#DDEAE7]/[0.85] dark:bg-slate-800" />
+          <div className="h-[420px] animate-pulse rounded-[24px] bg-[#DDEAE7]/[0.85] dark:bg-slate-800" />
         </div>
       </div>
     </div>
@@ -1080,37 +1091,61 @@ export default function AnalystDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F4F7FB] text-[#14213D] dark:bg-slate-950 dark:text-slate-100">
+    <div className="relative min-h-screen overflow-hidden bg-[#F4F8F7] text-[#17324D] dark:bg-slate-950 dark:text-slate-100">
+      <div
+        className="pointer-events-none fixed left-[18%] top-20 h-80 w-80 rounded-full bg-[#5EEAD4]/10 blur-3xl dark:opacity-30"
+        aria-hidden="true"
+      />
+      <div
+        className="pointer-events-none fixed bottom-[-80px] right-[8%] h-96 w-96 rounded-full bg-[#7DD3FC]/10 blur-3xl dark:opacity-20"
+        aria-hidden="true"
+      />
       <motion.main
         variants={containerVariants}
         initial="hidden"
         animate="show"
-        className="mx-auto max-w-[1500px] space-y-6 p-4 sm:p-6 lg:p-8"
+        className="relative z-10 mx-auto max-w-[1500px] space-y-6 p-4 sm:p-6 lg:p-8"
       >
         {/* ===================================================
             HERO
         ==================================================== */}
         <motion.section
           variants={itemVariants}
-          className="relative overflow-hidden rounded-[30px] bg-[#14213D] p-6 text-white shadow-[0_24px_70px_rgba(20,33,61,0.2)] sm:p-8"
+          className="relative overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(135deg,#10283F_0%,#0B4F52_47%,#10273A_100%)] p-6 text-white shadow-[0_30px_85px_rgba(9,78,80,0.24)] sm:p-8"
         >
           <div
-            className="pointer-events-none absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#3159C9]/25 blur-3xl"
+            className="pointer-events-none absolute inset-0 opacity-40"
+            style={{
+              backgroundImage:
+                "linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px)",
+              backgroundSize: "44px 44px",
+              maskImage: "linear-gradient(to bottom, black, transparent 82%)",
+            }}
             aria-hidden="true"
           />
-          <div
-            className="pointer-events-none absolute bottom-[-110px] left-[30%] h-64 w-64 rounded-full bg-[#0891B2]/20 blur-3xl"
+          <motion.div
+            animate={{ x: [0, 18, 0], y: [0, -14, 0], scale: [1, 1.08, 1] }}
+            transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+            className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-[#5EEAD4]/[0.22] blur-3xl"
             aria-hidden="true"
           />
-          <div
-            className="pointer-events-none absolute right-[22%] top-[30%] h-44 w-44 rounded-full bg-[#7C5CE6]/20 blur-3xl"
+          <motion.div
+            animate={{ x: [0, -14, 0], y: [0, 12, 0], scale: [1, 1.06, 1] }}
+            transition={{ duration: 12, repeat: Infinity, ease: "easeInOut", delay: 0.6 }}
+            className="pointer-events-none absolute bottom-[-120px] left-[26%] h-72 w-72 rounded-full bg-[#22C7B8]/[0.22] blur-3xl"
+            aria-hidden="true"
+          />
+          <motion.div
+            animate={{ x: [0, 10, 0], y: [0, -8, 0], opacity: [0.35, 0.62, 0.35] }}
+            transition={{ duration: 8.5, repeat: Infinity, ease: "easeInOut", delay: 1.1 }}
+            className="pointer-events-none absolute right-[18%] top-[26%] h-52 w-52 rounded-full bg-[#7DD3FC]/[0.24] blur-3xl"
             aria-hidden="true"
           />
 
           <div className="relative z-10 flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
             <div className="max-w-3xl">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/8 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.18em] text-white/75 backdrop-blur">
-                <BrainCircuit className="h-3.5 w-3.5 text-[#A99AF2]" />
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.09] px-3 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] text-[11px] font-bold uppercase tracking-[0.18em] text-white/75 backdrop-blur">
+                <BrainCircuit className="h-3.5 w-3.5 text-[#7CEFE0]" />
                 Coffer intelligence workspace
               </div>
 
@@ -1118,7 +1153,7 @@ export default function AnalystDashboardPage() {
                 Analyst Overview
               </h1>
 
-              <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300 sm:text-[15px]">
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-white/[0.72] sm:text-[15px]">
                 One read-only view for gateway performance, merchant health,
                 wallet activity, live operations, risk, revenue quality and
                 deterministic intelligence.
@@ -1140,7 +1175,7 @@ export default function AnalystDashboardPage() {
                 whileTap={{ scale: 0.98 }}
                 onClick={refreshAll}
                 disabled={overviewLoading || pulseLoading}
-                className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-2.5 text-sm font-bold text-white backdrop-blur transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-2xl border border-white/15 bg-white/[0.10] px-4 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(0,0,0,0.12)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:border-[#7CEFE0]/[0.35] hover:bg-white/[0.16] hover:shadow-[0_12px_30px_rgba(34,199,184,0.16)] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <RefreshCcw
                   className={`h-4 w-4 ${
@@ -1153,30 +1188,30 @@ export default function AnalystDashboardPage() {
           </div>
 
           <div className="relative z-10 mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-2xl border border-white/10 bg-white/7 p-4 backdrop-blur">
-              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/55">
+            <div className="rounded-2xl border border-white/[0.12] bg-white/[0.085] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-[#7CEFE0]/[0.35] hover:bg-white/[0.115] hover:shadow-[0_14px_34px_rgba(0,0,0,0.10)]">
+              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/[0.55]">
                 Scope
               </p>
               <p className="mt-1.5 text-sm font-bold text-white">
                 {RANGE_OPTIONS.find((item) => item.value === range)?.label} · {mode}
               </p>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/7 p-4 backdrop-blur">
-              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/55">
+            <div className="rounded-2xl border border-white/[0.12] bg-white/[0.085] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-[#7CEFE0]/[0.35] hover:bg-white/[0.115] hover:shadow-[0_14px_34px_rgba(0,0,0,0.10)]">
+              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/[0.55]">
                 Currency
               </p>
               <p className="mt-1.5 text-sm font-bold text-white">{currency}</p>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/7 p-4 backdrop-blur">
-              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/55">
+            <div className="rounded-2xl border border-white/[0.12] bg-white/[0.085] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-[#7CEFE0]/[0.35] hover:bg-white/[0.115] hover:shadow-[0_14px_34px_rgba(0,0,0,0.10)]">
+              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/[0.55]">
                 Priority signals
               </p>
               <p className="mt-1.5 text-sm font-bold text-white">
                 {formatNumber(topInsightCount)} high / critical
               </p>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/7 p-4 backdrop-blur">
-              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/55">
+            <div className="rounded-2xl border border-white/[0.12] bg-white/[0.085] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-[#7CEFE0]/[0.35] hover:bg-white/[0.115] hover:shadow-[0_14px_34px_rgba(0,0,0,0.10)]">
+              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/[0.55]">
                 Engine
               </p>
               <p className="mt-1.5 text-sm font-bold text-white">
@@ -1189,7 +1224,7 @@ export default function AnalystDashboardPage() {
         {/* ===================================================
             FILTERS
         ==================================================== */}
-        <Surface className="p-4 sm:p-5">
+        <Surface className="bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(246,251,250,0.98)_100%)] p-4 sm:p-5">
           <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-[1fr_1fr_1fr_auto] xl:items-end">
             <label className="space-y-2">
               <span className="text-[11px] font-bold uppercase tracking-[0.13em] text-slate-500 dark:text-slate-400">
@@ -1198,7 +1233,7 @@ export default function AnalystDashboardPage() {
               <select
                 value={range}
                 onChange={(event) => setRange(event.target.value as AnalystRange)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-[#14213D] outline-none transition focus:border-[#3159C9] focus:ring-4 focus:ring-[#3159C9]/10 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                className="w-full rounded-2xl border border-[#D7E5E2] bg-white px-3 py-2.5 shadow-[0_4px_14px_rgba(23,50,77,0.025)] text-sm font-semibold text-[#17324D] outline-none transition hover:border-[#B6DCD6] focus:border-[#0F9D91] focus:ring-4 focus:ring-[#0F9D91]/10 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
               >
                 {RANGE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -1215,7 +1250,7 @@ export default function AnalystDashboardPage() {
               <select
                 value={mode}
                 onChange={(event) => setMode(event.target.value as AnalystMode)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-[#14213D] outline-none transition focus:border-[#3159C9] focus:ring-4 focus:ring-[#3159C9]/10 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                className="w-full rounded-2xl border border-[#D7E5E2] bg-white px-3 py-2.5 shadow-[0_4px_14px_rgba(23,50,77,0.025)] text-sm font-semibold text-[#17324D] outline-none transition hover:border-[#B6DCD6] focus:border-[#0F9D91] focus:ring-4 focus:ring-[#0F9D91]/10 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
               >
                 {MODE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -1240,7 +1275,7 @@ export default function AnalystDashboardPage() {
                     applyCurrency();
                   }
                 }}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold uppercase text-[#14213D] outline-none transition focus:border-[#3159C9] focus:ring-4 focus:ring-[#3159C9]/10 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                className="w-full rounded-2xl border border-[#D7E5E2] bg-white px-3 py-2.5 shadow-[0_4px_14px_rgba(23,50,77,0.025)] text-sm font-semibold uppercase text-[#17324D] outline-none transition hover:border-[#B6DCD6] focus:border-[#0F9D91] focus:ring-4 focus:ring-[#0F9D91]/10 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                 placeholder="BDT"
               />
             </label>
@@ -1250,7 +1285,7 @@ export default function AnalystDashboardPage() {
               whileHover={{ y: -1 }}
               whileTap={{ scale: 0.98 }}
               onClick={applyCurrency}
-              className="rounded-xl bg-[#3159C9] px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_20px_rgba(49,89,201,0.24)] transition hover:bg-[#294DB0]"
+              className="rounded-2xl bg-[linear-gradient(135deg,#0F9D91_0%,#14B8A6_58%,#2DD4BF_100%)] px-5 py-2.5 text-sm font-bold text-white shadow-[0_10px_28px_rgba(15,157,145,0.28)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_15px_36px_rgba(15,157,145,0.34)]"
             >
               Apply filters
             </motion.button>
@@ -1384,11 +1419,11 @@ export default function AnalystDashboardPage() {
                   trailing={
                     <div className="flex flex-wrap gap-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
                       <span className="inline-flex items-center gap-1.5">
-                        <span className="h-2.5 w-2.5 rounded-full bg-[#14213D]" />
+                        <span className="h-2.5 w-2.5 rounded-full bg-[#17324D]" />
                         Attempts
                       </span>
                       <span className="inline-flex items-center gap-1.5">
-                        <span className="h-2.5 w-2.5 rounded-full bg-[#3159C9]" />
+                        <span className="h-2.5 w-2.5 rounded-full bg-[#0F9D91]" />
                         Completed
                       </span>
                       <span className="inline-flex items-center gap-1.5">
@@ -1441,17 +1476,17 @@ export default function AnalystDashboardPage() {
                   />
                 </div>
 
-                <div className="mt-6 rounded-2xl border border-[#3159C9]/10 bg-[#3159C9]/5 p-4">
+                <div className="mt-6 rounded-2xl border border-[#0F9D91]/10 bg-[#0F9D91]/5 p-4">
                   <div className="flex items-center justify-between gap-4">
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#3159C9]">
+                      <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#0F9D91]">
                         In-progress gateway payments
                       </p>
                       <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                         Current unresolved payment attempts
                       </p>
                     </div>
-                    <span className="text-2xl font-black text-[#14213D] dark:text-white">
+                    <span className="text-2xl font-black text-[#17324D] dark:text-white">
                       {formatNumber(overview.executive.pendingPaymentCount)}
                     </span>
                   </div>
@@ -1502,13 +1537,13 @@ export default function AnalystDashboardPage() {
 
                 <div className="mt-5 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-2xl border border-cyan-100 bg-cyan-50/50 p-4 dark:border-cyan-900/40 dark:bg-cyan-950/15">
-                    <div className="flex items-center gap-2 text-[#0891B2]">
+                    <div className="flex items-center gap-2 text-[#22C7B8]">
                       <Activity className="h-4 w-4" />
                       <p className="text-xs font-bold uppercase tracking-[0.12em]">
                         Wallet activity
                       </p>
                     </div>
-                    <p className="mt-2 text-2xl font-black text-[#14213D] dark:text-white">
+                    <p className="mt-2 text-2xl font-black text-[#17324D] dark:text-white">
                       {formatNumber(overview.metrics.walletTransactionCount.value)}
                     </p>
                     <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
@@ -1517,13 +1552,13 @@ export default function AnalystDashboardPage() {
                   </div>
 
                   <div className="rounded-2xl border border-violet-100 bg-violet-50/50 p-4 dark:border-violet-900/40 dark:bg-violet-950/15">
-                    <div className="flex items-center gap-2 text-[#7C5CE6]">
+                    <div className="flex items-center gap-2 text-[#38BDF8]">
                       <ShieldAlert className="h-4 w-4" />
                       <p className="text-xs font-bold uppercase tracking-[0.12em]">
                         Wallet risk
                       </p>
                     </div>
-                    <p className="mt-2 text-2xl font-black text-[#14213D] dark:text-white">
+                    <p className="mt-2 text-2xl font-black text-[#17324D] dark:text-white">
                       {formatNumber(overview.operations.highRiskTransactionCount)}
                     </p>
                     <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
@@ -1666,17 +1701,17 @@ export default function AnalystDashboardPage() {
                       <div className="rounded-2xl border border-cyan-100 bg-cyan-50/25 p-4 dark:border-cyan-900/40 dark:bg-cyan-950/10">
                         <div className="mb-2 flex items-center justify-between gap-3">
                           <div>
-                            <p className="text-sm font-extrabold text-[#14213D] dark:text-white">
+                            <p className="text-sm font-extrabold text-[#17324D] dark:text-white">
                               Live attempt flow
                             </p>
                             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                               Attempt and failure activity from the latest live timeline.
                             </p>
                           </div>
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#0891B2]/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#0891B2]">
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#22C7B8]/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-[#22C7B8]">
                             <span className="relative flex h-2 w-2">
-                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#0891B2] opacity-60" />
-                              <span className="relative inline-flex h-2 w-2 rounded-full bg-[#0891B2]" />
+                              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#22C7B8] opacity-60" />
+                              <span className="relative inline-flex h-2 w-2 rounded-full bg-[#22C7B8]" />
                             </span>
                             Live
                           </span>
@@ -1696,7 +1731,7 @@ export default function AnalystDashboardPage() {
                               className="rounded-2xl border border-slate-200/80 bg-white p-4 dark:border-slate-800 dark:bg-slate-950"
                             >
                               <div className="flex items-center justify-between gap-3">
-                                <p className="text-sm font-bold text-[#14213D] dark:text-white">
+                                <p className="text-sm font-bold text-[#17324D] dark:text-white">
                                   {score.label}
                                 </p>
                                 <span
@@ -1706,7 +1741,7 @@ export default function AnalystDashboardPage() {
                                 </span>
                               </div>
                               <div className="mt-2 flex items-end justify-between gap-3">
-                                <p className="text-2xl font-black text-[#14213D] dark:text-white">
+                                <p className="text-2xl font-black text-[#17324D] dark:text-white">
                                   {score.score}
                                 </p>
                                 <p className="text-[11px] text-slate-500 dark:text-slate-400">
@@ -1925,31 +1960,31 @@ export default function AnalystDashboardPage() {
                   <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
                     <div>
                       <p className="text-xs font-semibold text-slate-500">Overview generated</p>
-                      <p className="mt-1 text-sm font-bold text-[#14213D] dark:text-white">
+                      <p className="mt-1 text-sm font-bold text-[#17324D] dark:text-white">
                         {formatDateTime(overview.generatedAt)}
                       </p>
                     </div>
-                    <Clock3 className="h-5 w-5 text-[#3159C9]" />
+                    <Clock3 className="h-5 w-5 text-[#0F9D91]" />
                   </div>
 
                   <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
                     <div>
                       <p className="text-xs font-semibold text-slate-500">Latest daily fact</p>
-                      <p className="mt-1 text-sm font-bold text-[#14213D] dark:text-white">
+                      <p className="mt-1 text-sm font-bold text-[#17324D] dark:text-white">
                         {formatDateTime(overview.freshness.latestDailyFactGeneratedAt)}
                       </p>
                     </div>
-                    <Database className="h-5 w-5 text-[#0891B2]" />
+                    <Database className="h-5 w-5 text-[#22C7B8]" />
                   </div>
 
                   <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
                     <div>
                       <p className="text-xs font-semibold text-slate-500">Daily fact coverage</p>
-                      <p className="mt-1 text-sm font-bold text-[#14213D] dark:text-white">
+                      <p className="mt-1 text-sm font-bold text-[#17324D] dark:text-white">
                         {formatNumber(overview.freshness.dailyFactDaysCovered)} days
                       </p>
                     </div>
-                    <BadgeCheck className="h-5 w-5 text-[#7C5CE6]" />
+                    <BadgeCheck className="h-5 w-5 text-[#38BDF8]" />
                   </div>
                 </div>
               </Surface>
@@ -1967,7 +2002,7 @@ export default function AnalystDashboardPage() {
                   icon={BrainCircuit}
                   accent="violet"
                   trailing={
-                    <span className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-white px-3 py-1.5 text-[11px] font-bold text-[#7C5CE6] dark:border-violet-900/50 dark:bg-slate-950">
+                    <span className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-white px-3 py-1.5 text-[11px] font-bold text-[#38BDF8] dark:border-violet-900/50 dark:bg-slate-950">
                       <Sparkles className="h-3.5 w-3.5" />
                       {overview.insights.length} signals
                     </span>
@@ -1990,11 +2025,11 @@ export default function AnalystDashboardPage() {
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="flex min-w-0 gap-3">
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/75 text-[#7C5CE6] shadow-sm dark:bg-slate-950/60">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/75 text-[#38BDF8] shadow-sm dark:bg-slate-950/60">
                             <BrainCircuit className="h-4 w-4" />
                           </div>
                           <div>
-                            <p className="font-extrabold text-[#14213D] dark:text-white">
+                            <p className="font-extrabold text-[#17324D] dark:text-white">
                               {insight.title}
                             </p>
                             <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.11em] text-slate-500 dark:text-slate-400">
@@ -2035,14 +2070,14 @@ export default function AnalystDashboardPage() {
             ==================================================== */}
             <motion.div
               variants={itemVariants}
-              className="flex flex-col gap-3 rounded-[22px] border border-slate-200/80 bg-white px-5 py-4 shadow-sm dark:border-slate-800 dark:bg-slate-950 sm:flex-row sm:items-center sm:justify-between"
+              className="flex flex-col gap-3 rounded-[24px] border border-[#DCE7E5] bg-white/95 px-5 py-4 shadow-[0_10px_30px_rgba(23,50,77,0.05)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/95 sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#7C5CE6]/10 text-[#7C5CE6]">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#38BDF8]/10 text-[#38BDF8]">
                   <BrainCircuit className="h-4 w-4" />
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-[#14213D] dark:text-white">
+                  <p className="text-sm font-bold text-[#17324D] dark:text-white">
                     Read-only analyst workspace
                   </p>
                   <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
