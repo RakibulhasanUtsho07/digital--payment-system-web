@@ -4,254 +4,255 @@ import {
   useEffect,
   useMemo,
   useState,
+  type ElementType,
+  type ReactNode,
 } from "react";
-
 import {
   AnimatePresence,
   motion,
+  useReducedMotion,
 } from "framer-motion";
-
 import {
   Activity,
+  AlertTriangle,
   ArrowDownLeft,
   ArrowRight,
   ArrowUpRight,
   CalendarDays,
-  Check,
   CheckCircle2,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CircleDollarSign,
   Clock3,
   Copy,
+  CreditCard,
   Filter,
   Hash,
   Loader2,
   RefreshCw,
+  RotateCcw,
   Search,
+  Shield,
   ShieldAlert,
+  Sparkles,
+  TrendingUp,
   UserRound,
   WalletCards,
   X,
   XCircle,
 } from "lucide-react";
+import {
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
-import { apiClient } from "@/lib/api/client";
+import {
+  getAdminTransactions,
+  type AdminTransactionsMeta,
+  type TransactionItem,
+  type TransactionStatus,
+  type TransactionType,
+  type TransactionUser,
+} from "@/lib/api/transactionApi";
 
 /* =========================================================
    TYPES
 ========================================================= */
 
-interface TransactionUser {
-  _id: string;
-  name?: string;
-  email?: string;
-  phone?: string;
-}
-
-interface Transaction {
-  _id: string;
-
-  senderId: string | TransactionUser;
-
-  receiverId: string | TransactionUser;
-
-  amount: number;
-
-  currency: string;
-
-  type:
-    | "TRANSFER"
-    | "DEPOSIT"
-    | "WITHDRAW";
-
-  status:
-    | "PENDING"
-    | "COMPLETED"
-    | "FAILED";
-
-  reference?: string;
-
-  riskScore:
-    | "LOW"
-    | "MEDIUM"
-    | "HIGH";
-
-  createdAt?: string;
-
-  updatedAt?: string;
-}
-
-interface TransactionsResponse {
-  success: boolean;
-  count: number;
-  transactions: Transaction[];
-  message?: string;
-}
+type Transaction = TransactionItem;
 
 type StatusFilter =
   | "ALL"
-  | "PENDING"
-  | "COMPLETED"
-  | "FAILED";
+  | TransactionStatus;
 
 type TypeFilter =
   | "ALL"
-  | "TRANSFER"
-  | "DEPOSIT"
-  | "WITHDRAW";
+  | TransactionType;
 
-interface SelectOption<T extends string> {
-  value: T;
-  label: string;
-  description: string;
-  tone:
-    | "blue"
-    | "emerald"
-    | "amber"
-    | "rose"
-    | "violet"
-    | "slate";
-}
+type Stats = {
+  total: number;
+  completed: number;
+  pending: number;
+  failed: number;
+  cancelled: number;
+  volume: number;
+  completionRate: number;
+};
 
 /* =========================================================
    CONSTANTS
 ========================================================= */
 
-const STATUS_OPTIONS: SelectOption<StatusFilter>[] = [
+const PAGE_SIZE = 10;
+
+const EMPTY_META: AdminTransactionsMeta = {
+  integrityWarnings: 0,
+  sourceCounts: {
+    WALLET: 0,
+    ADD_MONEY: 0,
+    MERCHANT_PAYMENT: 0,
+    MERCHANT_REFUND: 0,
+  },
+};
+
+const STATUS_OPTIONS: Array<{
+  value: StatusFilter;
+  label: string;
+}> = [
   {
     value: "ALL",
-    label: "All Status",
-    description: "Show every transaction status",
-    tone: "blue",
+    label: "All statuses",
   },
   {
     value: "COMPLETED",
     label: "Completed",
-    description: "Successful settled transactions",
-    tone: "emerald",
   },
   {
     value: "PENDING",
     label: "Pending",
-    description: "Transactions still processing",
-    tone: "amber",
   },
   {
     value: "FAILED",
     label: "Failed",
-    description: "Unsuccessful transactions",
-    tone: "rose",
+  },
+  {
+    value: "CANCELLED",
+    label: "Cancelled",
   },
 ];
 
-const TYPE_OPTIONS: SelectOption<TypeFilter>[] = [
+const TYPE_OPTIONS: Array<{
+  value: TypeFilter;
+  label: string;
+}> = [
   {
     value: "ALL",
-    label: "All Types",
-    description: "Show every transaction type",
-    tone: "blue",
+    label: "All transaction types",
   },
   {
     value: "TRANSFER",
-    label: "Transfer",
-    description: "Wallet-to-wallet transfers",
-    tone: "violet",
+    label: "Send money",
   },
   {
     value: "DEPOSIT",
-    label: "Deposit",
-    description: "Incoming wallet deposits",
-    tone: "emerald",
+    label: "Add money",
+  },
+  {
+    value: "PAYMENT",
+    label: "Merchant payment",
+  },
+  {
+    value: "REFUND",
+    label: "Refund",
   },
   {
     value: "WITHDRAW",
     label: "Withdraw",
-    description: "Outgoing cash withdrawals",
-    tone: "amber",
   },
 ];
 
+const TYPE_META: Record<
+  TransactionType,
+  {
+    label: string;
+    color: string;
+  }
+> = {
+  TRANSFER: {
+    label: "Send money",
+    color: "#6366f1",
+  },
+  DEPOSIT: {
+    label: "Add money",
+    color: "#10b981",
+  },
+  PAYMENT: {
+    label: "Payment",
+    color: "#8b5cf6",
+  },
+  REFUND: {
+    label: "Refund",
+    color: "#ec4899",
+  },
+  WITHDRAW: {
+    label: "Withdraw",
+    color: "#f59e0b",
+  },
+};
+
+const STATUS_META: Record<
+  TransactionStatus,
+  {
+    label: string;
+    color: string;
+  }
+> = {
+  COMPLETED: {
+    label: "Completed",
+    color: "#10b981",
+  },
+  PENDING: {
+    label: "Pending",
+    color: "#f59e0b",
+  },
+  FAILED: {
+    label: "Failed",
+    color: "#f43f5e",
+  },
+  CANCELLED: {
+    label: "Cancelled",
+    color: "#64748b",
+  },
+};
+
 /* =========================================================
-   THEME TOKENS
+   ANIMATION
 ========================================================= */
 
-const TONE_CLASSES = {
-  blue: {
-    soft:
-      "bg-blue-500/10 dark:bg-blue-400/10",
-    border:
-      "border-blue-500/20 dark:border-blue-400/20",
-    text:
-      "text-blue-600 dark:text-blue-400",
-    dot:
-      "bg-blue-500",
+const pageContainer = {
+  hidden: {
+    opacity: 0,
   },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.06,
+      delayChildren: 0.04,
+    },
+  },
+};
 
-  emerald: {
-    soft:
-      "bg-emerald-500/10 dark:bg-emerald-400/10",
-    border:
-      "border-emerald-500/20 dark:border-emerald-400/20",
-    text:
-      "text-emerald-600 dark:text-emerald-400",
-    dot:
-      "bg-emerald-500",
+const fadeUp = {
+  hidden: {
+    opacity: 0,
+    y: 18,
   },
-
-  amber: {
-    soft:
-      "bg-amber-500/10 dark:bg-amber-400/10",
-    border:
-      "border-amber-500/20 dark:border-amber-400/20",
-    text:
-      "text-amber-600 dark:text-amber-400",
-    dot:
-      "bg-amber-500",
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.55,
+      ease: [0.22, 1, 0.36, 1] as const,
+    },
   },
-
-  rose: {
-    soft:
-      "bg-rose-500/10 dark:bg-rose-400/10",
-    border:
-      "border-rose-500/20 dark:border-rose-400/20",
-    text:
-      "text-rose-600 dark:text-rose-400",
-    dot:
-      "bg-rose-500",
-  },
-
-  violet: {
-    soft:
-      "bg-violet-500/10 dark:bg-violet-400/10",
-    border:
-      "border-violet-500/20 dark:border-violet-400/20",
-    text:
-      "text-violet-600 dark:text-violet-400",
-    dot:
-      "bg-violet-500",
-  },
-
-  slate: {
-    soft:
-      "bg-muted",
-    border:
-      "border-border",
-    text:
-      "text-muted-foreground",
-    dot:
-      "bg-slate-400",
-  },
-} as const;
+};
 
 /* =========================================================
    HELPERS
 ========================================================= */
 
-function getUserName(
+function getPartyName(
   value: string | TransactionUser
-) {
+): string {
   if (typeof value === "string") {
     return value;
   }
@@ -263,53 +264,87 @@ function getUserName(
   );
 }
 
-function getUserEmail(
+function getPartyDetail(
   value: string | TransactionUser
-) {
+): string {
   if (typeof value === "string") {
     return "";
   }
 
-  return value.email || "";
+  return (
+    value.email ||
+    value.phone ||
+    value.kind ||
+    ""
+  );
 }
 
-function getUserPhone(
+function getPartyId(
   value: string | TransactionUser
-) {
-  if (typeof value === "string") {
-    return "";
-  }
-
-  return value.phone || "";
-}
-
-function getUserId(
-  value: string | TransactionUser
-) {
+): string {
   return typeof value === "string"
     ? value
     : value._id;
 }
 
 function formatCurrency(
-  amount: number,
-  currency: string
-) {
-  return `${
+  amount: number | null,
+  currency = "BDT"
+): string {
+  if (
+    amount === null ||
+    !Number.isFinite(amount)
+  ) {
+    return "Unavailable";
+  }
+
+  const symbol =
     currency === "BDT"
       ? "৳"
-      : currency
-  } ${amount.toLocaleString("en-BD")}`;
+      : currency;
+
+  return `${symbol} ${amount.toLocaleString(
+    "en-BD",
+    {
+      maximumFractionDigits: 2,
+    }
+  )}`;
 }
 
-function formatDate(value?: string) {
+function formatCompactCurrency(
+  value: number
+): string {
+  if (value >= 1_000_000) {
+    return `৳${(
+      value / 1_000_000
+    ).toFixed(1)}M`;
+  }
+
+  if (value >= 1_000) {
+    return `৳${(
+      value / 1_000
+    ).toFixed(1)}K`;
+  }
+
+  return `৳${value.toLocaleString(
+    "en-BD"
+  )}`;
+}
+
+function formatDate(
+  value?: string
+): string {
   if (!value) {
     return "—";
   }
 
   const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) {
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
     return "—";
   }
 
@@ -326,21 +361,23 @@ function formatDate(value?: string) {
 }
 
 function shortId(
-  value: string,
-  start = 8,
-  end = 5
-) {
-  if (
-    value.length <=
-    start + end + 3
-  ) {
-    return value;
-  }
+  value: string
+): string {
+  return value.length > 17
+    ? `${value.slice(
+        0,
+        9
+      )}…${value.slice(-6)}`
+    : value;
+}
 
-  return `${value.slice(
-    0,
-    start
-  )}...${value.slice(-end)}`;
+function typeLabel(
+  type: TransactionType
+): string {
+  return (
+    TYPE_META[type]?.label ||
+    type
+  );
 }
 
 /* =========================================================
@@ -348,30 +385,36 @@ function shortId(
 ========================================================= */
 
 export default function AllTransactionsPage() {
+  const reduceMotion =
+    useReducedMotion();
+
   const [
     transactions,
     setTransactions,
   ] = useState<Transaction[]>([]);
 
-  const [
-    search,
-    setSearch,
-  ] = useState("");
+  const [meta, setMeta] =
+    useState<AdminTransactionsMeta>(
+      EMPTY_META
+    );
+
+  const [search, setSearch] =
+    useState("");
 
   const [
     statusFilter,
     setStatusFilter,
-  ] = useState<StatusFilter>("ALL");
+  ] =
+    useState<StatusFilter>("ALL");
 
   const [
     typeFilter,
     setTypeFilter,
-  ] = useState<TypeFilter>("ALL");
+  ] =
+    useState<TypeFilter>("ALL");
 
-  const [
-    refreshing,
-    setRefreshing,
-  ] = useState(false);
+  const [page, setPage] =
+    useState(1);
 
   const [
     loading,
@@ -379,27 +422,32 @@ export default function AllTransactionsPage() {
   ] = useState(true);
 
   const [
+    refreshing,
+    setRefreshing,
+  ] = useState(false);
+
+  const [
     errorMessage,
     setErrorMessage,
   ] = useState("");
 
   const [
-    page,
-    setPage,
-  ] = useState(1);
+    selected,
+    setSelected,
+  ] =
+    useState<Transaction | null>(
+      null
+    );
 
-  const [
-    selectedTransaction,
-    setSelectedTransaction,
-  ] = useState<Transaction | null>(null);
+  /* =======================================================
+     FETCH DATA
+  ======================================================= */
 
-  const pageSize = 10;
-
-  const loadTransactions = async (
-    showFullLoader = true
-  ) => {
+  async function loadTransactions(
+    fullLoader = true
+  ) {
     try {
-      if (showFullLoader) {
+      if (fullLoader) {
         setLoading(true);
       } else {
         setRefreshing(true);
@@ -408,67 +456,87 @@ export default function AllTransactionsPage() {
       setErrorMessage("");
 
       const data =
-        await apiClient<TransactionsResponse>(
-          "/admin/transactions"
-        );
+        await getAdminTransactions();
 
-      if (
-        !data ||
-        data.success !== true
-      ) {
+      if (!data?.success) {
         throw new Error(
           data?.message ||
-            "Failed to load all transactions."
+            "Failed to load transactions."
         );
       }
 
       setTransactions(
-        Array.isArray(data.transactions)
+        Array.isArray(
+          data.transactions
+        )
           ? data.transactions
           : []
       );
-    } catch (error: unknown) {
-      console.error(
-        "ADMIN ALL TRANSACTIONS ERROR:",
-        error
-      );
 
+      setMeta(
+        data.meta ||
+          EMPTY_META
+      );
+    } catch (error: unknown) {
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : "Failed to load all transactions."
+          : "Failed to load transactions."
       );
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }
 
   useEffect(() => {
-    void loadTransactions(true);
+    const timer =
+      window.setTimeout(
+        () => {
+          void loadTransactions(
+            true
+          );
+        },
+        0
+      );
+
+    return () =>
+      window.clearTimeout(
+        timer
+      );
   }, []);
 
+  /* =======================================================
+     ESC CLOSE DRAWER
+  ======================================================= */
+
   useEffect(() => {
-    const onKeyDown = (
+    const closeDrawer = (
       event: KeyboardEvent
     ) => {
-      if (event.key === "Escape") {
-        setSelectedTransaction(null);
+      if (
+        event.key ===
+        "Escape"
+      ) {
+        setSelected(null);
       }
     };
 
     window.addEventListener(
       "keydown",
-      onKeyDown
+      closeDrawer
     );
 
-    return () => {
+    return () =>
       window.removeEventListener(
         "keydown",
-        onKeyDown
+        closeDrawer
       );
-    };
   }, []);
+
+  /* =======================================================
+     FILTER
+  ======================================================= */
 
   const filteredTransactions =
     useMemo(() => {
@@ -479,44 +547,44 @@ export default function AllTransactionsPage() {
 
       return transactions.filter(
         (transaction) => {
-          const sender =
-            getUserName(
+          const haystack = [
+            transaction._id,
+            transaction.publicId,
+            transaction.reference,
+            transaction.source,
+            transaction.provider,
+            transaction.type,
+            transaction.status,
+            getPartyName(
               transaction.senderId
-            ).toLowerCase();
-
-          const receiver =
-            getUserName(
+            ),
+            getPartyName(
               transaction.receiverId
-            ).toLowerCase();
-
-          const reference =
-            transaction.reference
-              ?.toLowerCase() || "";
-
-          const id =
-            transaction._id.toLowerCase();
-
-          const matchesSearch =
-            !query ||
-            sender.includes(query) ||
-            receiver.includes(query) ||
-            reference.includes(query) ||
-            id.includes(query);
-
-          const matchesStatus =
-            statusFilter === "ALL" ||
-            transaction.status ===
-              statusFilter;
-
-          const matchesType =
-            typeFilter === "ALL" ||
-            transaction.type ===
-              typeFilter;
+            ),
+            getPartyDetail(
+              transaction.senderId
+            ),
+            getPartyDetail(
+              transaction.receiverId
+            ),
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
 
           return (
-            matchesSearch &&
-            matchesStatus &&
-            matchesType
+            (!query ||
+              haystack.includes(
+                query
+              )) &&
+            (statusFilter ===
+              "ALL" ||
+              transaction.status ===
+                statusFilter) &&
+            (typeFilter ===
+              "ALL" ||
+              transaction.type ===
+                typeFilter)
           );
         }
       );
@@ -527,235 +595,320 @@ export default function AllTransactionsPage() {
       typeFilter,
     ]);
 
+  /* =======================================================
+     PAGINATION
+  ======================================================= */
+
   const totalPages =
     Math.max(
       1,
       Math.ceil(
         filteredTransactions.length /
-          pageSize
+          PAGE_SIZE
       )
     );
 
   const safePage =
-    Math.min(page, totalPages);
-
-  const paginatedTransactions =
-    filteredTransactions.slice(
-      (safePage - 1) * pageSize,
-      safePage * pageSize
+    Math.min(
+      page,
+      totalPages
     );
 
-  useEffect(() => {
-    setPage(1);
-  }, [
-    search,
-    statusFilter,
-    typeFilter,
-  ]);
+  const visibleTransactions =
+    filteredTransactions.slice(
+      (safePage - 1) *
+        PAGE_SIZE,
+      safePage *
+        PAGE_SIZE
+    );
 
-  const stats =
-    useMemo(() => {
+  /* =======================================================
+     STATS
+  ======================================================= */
+
+  const stats = useMemo<Stats>(
+    () => {
+      const count = (
+        status: TransactionStatus
+      ) =>
+        transactions.filter(
+          (item) =>
+            item.status === status
+        ).length;
+
       const completed =
-        transactions.filter(
-          (item) =>
-            item.status ===
-            "COMPLETED"
-        );
-
-      const pending =
-        transactions.filter(
-          (item) =>
-            item.status ===
-            "PENDING"
-        );
-
-      const failed =
-        transactions.filter(
-          (item) =>
-            item.status ===
-            "FAILED"
-        );
+        count("COMPLETED");
 
       const volume =
-        completed.reduce(
-          (total, item) =>
-            total + item.amount,
+        transactions.reduce(
+          (sum, item) =>
+            item.status ===
+              "COMPLETED" &&
+            item.amount !== null
+              ? sum +
+                item.amount
+              : sum,
           0
         );
-
-      const completionRate =
-        transactions.length > 0
-          ? (
-              completed.length /
-              transactions.length
-            ) * 100
-          : 0;
 
       return {
         total:
           transactions.length,
-        completed:
-          completed.length,
+        completed,
         pending:
-          pending.length,
+          count("PENDING"),
         failed:
-          failed.length,
+          count("FAILED"),
+        cancelled:
+          count("CANCELLED"),
         volume,
-        completionRate,
+        completionRate:
+          transactions.length >
+          0
+            ? (completed /
+                transactions.length) *
+              100
+            : 0,
       };
-    }, [transactions]);
-
-  const activeFilters =
-    [
-      statusFilter !== "ALL",
-      typeFilter !== "ALL",
-      Boolean(search.trim()),
-    ].filter(Boolean).length;
-
-  const refreshTransactions =
-    async () => {
-      await loadTransactions(false);
-    };
+    },
+    [transactions]
+  );
 
   if (loading) {
-    return (
-      <TransactionLoadingState />
-    );
+    return <LoadingState />;
   }
 
   return (
-    <main className="min-h-screen bg-background pb-12 text-foreground transition-colors duration-300">
-      <div className="mx-auto max-w-[1600px] space-y-6 px-4 py-5 sm:px-6 lg:px-8">
+    <main className="relative min-h-screen overflow-hidden bg-background pb-14 text-foreground">
+      {/* Ambient page background */}
+      <div className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+        <div className="absolute left-[-220px] top-[300px] h-[520px] w-[520px] rounded-full bg-violet-500/[0.035] blur-[100px]" />
 
-        <AdminHero
-          refreshing={refreshing}
-          total={stats.total}
-          onRefresh={() =>
-            void refreshTransactions()
+        <div className="absolute right-[-200px] top-[900px] h-[500px] w-[500px] rounded-full bg-indigo-500/[0.035] blur-[110px]" />
+      </div>
+
+      <motion.div
+        variants={
+          reduceMotion
+            ? undefined
+            : pageContainer
+        }
+        initial={
+          reduceMotion
+            ? undefined
+            : "hidden"
+        }
+        animate={
+          reduceMotion
+            ? undefined
+            : "show"
+        }
+        className="mx-auto max-w-[1600px] space-y-5 px-4 py-5 sm:px-6 lg:space-y-6 lg:px-8 lg:py-7"
+      >
+        <motion.div
+          variants={
+            reduceMotion
+              ? undefined
+              : fadeUp
           }
-        />
+        >
+          <Hero
+            total={stats.total}
+            refreshing={
+              refreshing
+            }
+            onRefresh={() =>
+              void loadTransactions(
+                false
+              )
+            }
+          />
+        </motion.div>
 
-        <AnimatePresence>
+        <AnimatePresence
+          mode="popLayout"
+        >
           {errorMessage && (
-            <motion.section
-              initial={{
-                opacity: 0,
-                y: -8,
-              }}
-              animate={{
-                opacity: 1,
-                y: 0,
-              }}
-              exit={{
-                opacity: 0,
-                y: -8,
-              }}
-              className="rounded-[22px] border border-rose-500/20 bg-rose-500/10 p-4"
-            >
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-500/10 text-rose-500">
-                    <XCircle className="h-4 w-4" />
-                  </div>
-
-                  <div>
-                    <p className="text-[11px] font-black text-rose-600 dark:text-rose-400">
-                      Could not load transactions
-                    </p>
-
-                    <p className="mt-1 text-[10px] leading-5 text-rose-500/90">
-                      {errorMessage}
-                    </p>
-                  </div>
-                </div>
-
-                <button
+            <Notice
+              tone="error"
+              title="Could not load transactions"
+              message={
+                errorMessage
+              }
+              action={
+                <motion.button
                   type="button"
+                  whileHover={{
+                    y: -1,
+                  }}
+                  whileTap={{
+                    scale: 0.97,
+                  }}
                   onClick={() =>
-                    void loadTransactions(true)
+                    void loadTransactions(
+                      true
+                    )
                   }
-                  className="rounded-xl bg-rose-600 px-4 py-2.5 text-[10px] font-black text-white transition hover:bg-rose-700"
+                  className="rounded-xl bg-rose-600 px-4 py-2.5 text-[10px] font-black text-white shadow-lg shadow-rose-600/15 transition hover:bg-rose-700"
                 >
-                  Try Again
-                </button>
-              </div>
-            </motion.section>
+                  Try again
+                </motion.button>
+              }
+            />
           )}
         </AnimatePresence>
 
-        <StatsGrid stats={stats} />
+        <AnimatePresence>
+          {meta.integrityWarnings >
+            0 && (
+            <Notice
+              tone="warning"
+              title={`${
+                meta.integrityWarnings
+              } legacy record${
+                meta.integrityWarnings ===
+                1
+                  ? ""
+                  : "s"
+              } need encryption review`}
+              message="Those rows remain visible, but their amount is hidden because it cannot be authenticated with the current data-encryption key."
+            />
+          )}
+        </AnimatePresence>
 
-        <FilterBar
-          search={search}
-          onSearchChange={
-            setSearch
+        <motion.div
+          variants={
+            reduceMotion
+              ? undefined
+              : fadeUp
           }
-          statusFilter={
-            statusFilter
-          }
-          onStatusChange={
-            setStatusFilter
-          }
-          typeFilter={
-            typeFilter
-          }
-          onTypeChange={
-            setTypeFilter
-          }
-          activeFilters={
-            activeFilters
-          }
-          onClear={() => {
-            setSearch("");
-            setStatusFilter("ALL");
-            setTypeFilter("ALL");
-          }}
-        />
+        >
+          <StatsGrid
+            stats={stats}
+          />
+        </motion.div>
 
-        <TransactionTable
-          rows={
-            paginatedTransactions
+        <motion.div
+          variants={
+            reduceMotion
+              ? undefined
+              : fadeUp
           }
-          filteredCount={
-            filteredTransactions.length
+        >
+          <TransactionAnalytics
+            transactions={
+              transactions
+            }
+          />
+        </motion.div>
+
+        <motion.div
+          variants={
+            reduceMotion
+              ? undefined
+              : fadeUp
           }
-          safePage={safePage}
-          totalPages={totalPages}
-          pageSize={pageSize}
-          onPrevious={() =>
-            setPage(
-              (current) =>
-                Math.max(
-                  1,
-                  current - 1
-                )
-            )
+        >
+          <FilterBar
+            search={search}
+            status={
+              statusFilter
+            }
+            type={typeFilter}
+            filteredCount={
+              filteredTransactions.length
+            }
+            totalCount={
+              transactions.length
+            }
+            onSearch={(
+              value
+            ) => {
+              setSearch(
+                value
+              );
+              setPage(1);
+            }}
+            onStatus={(
+              value
+            ) => {
+              setStatusFilter(
+                value
+              );
+              setPage(1);
+            }}
+            onType={(
+              value
+            ) => {
+              setTypeFilter(
+                value
+              );
+              setPage(1);
+            }}
+            onClear={() => {
+              setSearch("");
+              setStatusFilter(
+                "ALL"
+              );
+              setTypeFilter(
+                "ALL"
+              );
+              setPage(1);
+            }}
+          />
+        </motion.div>
+
+        <motion.div
+          variants={
+            reduceMotion
+              ? undefined
+              : fadeUp
           }
-          onNext={() =>
-            setPage(
-              (current) =>
-                Math.min(
-                  totalPages,
-                  current + 1
-                )
-            )
-          }
-          onOpenTransaction={
-            setSelectedTransaction
-          }
-        />
-      </div>
+        >
+          <TransactionTable
+            rows={
+              visibleTransactions
+            }
+            filteredCount={
+              filteredTransactions.length
+            }
+            page={safePage}
+            totalPages={
+              totalPages
+            }
+            onPrevious={() =>
+              setPage(
+                (value) =>
+                  Math.max(
+                    1,
+                    value - 1
+                  )
+              )
+            }
+            onNext={() =>
+              setPage(
+                (value) =>
+                  Math.min(
+                    totalPages,
+                    value + 1
+                  )
+              )
+            }
+            onOpen={
+              setSelected
+            }
+          />
+        </motion.div>
+      </motion.div>
 
       <AnimatePresence>
-        {selectedTransaction && (
+        {selected && (
           <TransactionDrawer
             transaction={
-              selectedTransaction
+              selected
             }
             onClose={() =>
-              setSelectedTransaction(
-                null
-              )
+              setSelected(null)
             }
           />
         )}
@@ -768,31 +921,70 @@ export default function AllTransactionsPage() {
    LOADING
 ========================================================= */
 
-function TransactionLoadingState() {
+function LoadingState() {
   return (
-    <main className="flex min-h-[72vh] items-center justify-center bg-background px-4 text-foreground">
+    <main className="relative flex min-h-[72vh] items-center justify-center overflow-hidden bg-background px-4">
+      <div className="pointer-events-none absolute h-[360px] w-[360px] rounded-full bg-violet-500/10 blur-[110px]" />
+
       <motion.div
         initial={{
           opacity: 0,
-          scale: 0.96,
+          scale: 0.94,
+          y: 8,
         }}
         animate={{
           opacity: 1,
           scale: 1,
+          y: 0,
         }}
-        className="text-center"
+        transition={{
+          duration: 0.45,
+        }}
+        className="relative text-center"
       >
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] bg-indigo-950 text-white shadow-[0_18px_40px_rgba(30,27,75,0.25)]">
+        <motion.div
+          animate={{
+            boxShadow: [
+              "0 12px 35px rgba(76,39,133,.15)",
+              "0 20px 55px rgba(124,58,237,.28)",
+              "0 12px 35px rgba(76,39,133,.15)",
+            ],
+          }}
+          transition={{
+            duration: 2.4,
+            repeat: Infinity,
+          }}
+          className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] bg-[linear-gradient(135deg,#211754,#5b21b6)] text-white"
+        >
           <Loader2 className="h-6 w-6 animate-spin" />
+        </motion.div>
+
+        <p className="mt-5 text-sm font-black tracking-tight">
+          Loading unified
+          ledger
+        </p>
+
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          Combining wallet and
+          merchant transactions…
+        </p>
+
+        <div className="mx-auto mt-5 h-1 w-32 overflow-hidden rounded-full bg-muted">
+          <motion.div
+            animate={{
+              x: [
+                "-100%",
+                "200%",
+              ],
+            }}
+            transition={{
+              repeat: Infinity,
+              duration: 1.25,
+              ease: "easeInOut",
+            }}
+            className="h-full w-1/2 rounded-full bg-violet-600"
+          />
         </div>
-
-        <p className="mt-4 text-sm font-black text-foreground">
-          Loading transactions
-        </p>
-
-        <p className="mt-1 text-xs text-muted-foreground">
-          Fetching secure platform transaction data...
-        </p>
       </motion.div>
     </main>
   );
@@ -802,27 +994,27 @@ function TransactionLoadingState() {
    HERO
 ========================================================= */
 
-function AdminHero({
-  refreshing,
+function Hero({
   total,
+  refreshing,
   onRefresh,
 }: {
-  refreshing: boolean;
   total: number;
+  refreshing: boolean;
   onRefresh: () => void;
 }) {
   return (
     <motion.section
       initial={{
         opacity: 0,
-        y: -10,
+        y: -14,
       }}
       animate={{
         opacity: 1,
         y: 0,
       }}
       transition={{
-        duration: 0.5,
+        duration: 0.65,
         ease: [
           0.22,
           1,
@@ -830,68 +1022,184 @@ function AdminHero({
           1,
         ],
       }}
-      className="relative overflow-hidden rounded-[32px] border border-indigo-800/70 bg-indigo-950 p-6 text-white shadow-[0_22px_55px_rgba(30,27,75,0.24)] sm:p-8"
+      className="group relative overflow-hidden rounded-[30px] border border-violet-800/60 bg-[linear-gradient(115deg,#100b25_0%,#211754_52%,#4c2785_100%)] p-5 text-white shadow-[0_28px_80px_rgba(39,25,86,0.22)] sm:p-7 lg:p-8"
     >
-      <div className="pointer-events-none absolute -right-20 -top-28 h-72 w-72 rounded-full bg-violet-400/10 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-28 left-1/3 h-64 w-64 rounded-full bg-indigo-400/10 blur-3xl" />
+      {/* Grid */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-[0.055]"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(255,255,255,.25) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.25) 1px, transparent 1px)",
+          backgroundSize:
+            "42px 42px",
+        }}
+      />
 
-      <div className="relative z-10 flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-2.5">
-            <p className="text-[9px] font-black uppercase tracking-[0.18em] text-indigo-200/75">
+      {/* Animated glow */}
+      <motion.div
+        animate={{
+          x: [
+            0,
+            -35,
+            0,
+          ],
+          y: [
+            0,
+            28,
+            0,
+          ],
+          scale: [
+            1,
+            1.08,
+            1,
+          ],
+        }}
+        transition={{
+          duration: 10,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+        className="pointer-events-none absolute -right-16 -top-28 h-80 w-80 rounded-full bg-violet-300/[0.17] blur-3xl"
+      />
+
+      <motion.div
+        animate={{
+          x: [
+            0,
+            45,
+            0,
+          ],
+          scale: [
+            1,
+            1.12,
+            1,
+          ],
+        }}
+        transition={{
+          duration: 12,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+        className="pointer-events-none absolute -bottom-40 left-[28%] h-80 w-80 rounded-full bg-indigo-400/[0.12] blur-3xl"
+      />
+
+      <div className="pointer-events-none absolute right-[12%] top-0 h-full w-px bg-gradient-to-b from-transparent via-white/10 to-transparent" />
+
+      <div className="relative z-10 flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+        <div className="max-w-3xl">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-violet-200/70">
               Administrator
-            </p>
+            </span>
 
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-300/15 bg-emerald-300/10 px-2.5 py-1 text-[8px] font-black text-emerald-200">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-300" />
-              Live ledger
+            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/15 bg-emerald-300/10 px-3 py-1.5 text-[8px] font-black text-emerald-200 backdrop-blur-xl">
+              <motion.span
+                animate={{
+                  scale: [
+                    1,
+                    1.35,
+                    1,
+                  ],
+                  opacity: [
+                    1,
+                    0.5,
+                    1,
+                  ],
+                }}
+                transition={{
+                  duration: 1.8,
+                  repeat: Infinity,
+                }}
+                className="h-1.5 w-1.5 rounded-full bg-emerald-300"
+              />
+
+              Unified live
+              ledger
             </span>
           </div>
 
-          <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-[34px]">
+          <h1 className="mt-4 text-3xl font-black tracking-[-0.035em] sm:text-4xl lg:text-[42px]">
             All Transactions
           </h1>
 
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-indigo-100/70">
-            Monitor payment activity, transaction status, risk level and wallet flow from a single operational view.
+          <p className="mt-3 max-w-2xl text-[12px] font-medium leading-6 text-violet-100/65 sm:text-sm">
+            Send money, add
+            money, merchant
+            payments, refunds and
+            withdrawals in one
+            secure operational
+            view.
           </p>
 
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="mt-6 flex flex-wrap gap-2">
             <HeroPill
               icon={Activity}
-              label={`${total.toLocaleString()} records`}
+              label={`${total} records`}
             />
 
             <HeroPill
-              icon={ShieldAlert}
-              label="Risk monitored"
+              icon={Shield}
+              label="Integrity monitored"
             />
 
             <HeroPill
-              icon={ArrowRight}
-              label="Open row details"
+              icon={
+                WalletCards
+              }
+              label="All money flows"
             />
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={onRefresh}
-          disabled={refreshing}
-          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-indigo-600 px-5 text-[11px] font-black text-white shadow-[0_10px_24px_rgba(79,70,229,0.28)] transition duration-200 hover:-translate-y-0.5 hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <RefreshCw
-            className={`h-4 w-4 ${
-              refreshing
-                ? "animate-spin"
-                : ""
-            }`}
-          />
+        <div className="flex shrink-0 flex-col gap-3 sm:flex-row lg:flex-col">
+          <div className="hidden min-w-[190px] rounded-2xl border border-white/10 bg-white/[0.055] p-4 backdrop-blur-xl lg:block">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[7px] font-black uppercase tracking-[0.17em] text-violet-200/55">
+                  Ledger status
+                </p>
 
-          {refreshing
-            ? "Refreshing"
-            : "Refresh Data"}
-        </button>
+                <p className="mt-1.5 text-xs font-black">
+                  Operational
+                </p>
+              </div>
+
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-300/15 bg-emerald-300/10 text-emerald-200">
+                <TrendingUp className="h-4 w-4" />
+              </div>
+            </div>
+          </div>
+
+          <motion.button
+            type="button"
+            whileHover={{
+              y: -2,
+              scale: 1.015,
+            }}
+            whileTap={{
+              scale: 0.97,
+            }}
+            onClick={
+              onRefresh
+            }
+            disabled={
+              refreshing
+            }
+            className="group/refresh inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-[10px] font-black text-violet-950 shadow-[0_12px_35px_rgba(0,0,0,.15)] transition hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <RefreshCw
+              className={`h-4 w-4 transition-transform group-hover/refresh:rotate-45 ${
+                refreshing
+                  ? "animate-spin"
+                  : ""
+              }`}
+            />
+
+            {refreshing
+              ? "Refreshing…"
+              : "Refresh data"}
+          </motion.button>
+        </div>
       </div>
     </motion.section>
   );
@@ -901,14 +1209,100 @@ function HeroPill({
   icon: Icon,
   label,
 }: {
-  icon: React.ElementType;
+  icon: ElementType;
   label: string;
 }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-2.5 py-1.5 text-[8px] font-black text-indigo-100/75">
+    <motion.span
+      whileHover={{
+        y: -2,
+      }}
+      className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.065] px-3 py-1.5 text-[8px] font-black text-violet-100/80 backdrop-blur-lg transition-colors hover:bg-white/[0.1]"
+    >
       <Icon className="h-3 w-3" />
       {label}
-    </span>
+    </motion.span>
+  );
+}
+
+/* =========================================================
+   NOTICE
+========================================================= */
+
+function Notice({
+  tone,
+  title,
+  message,
+  action,
+}: {
+  tone: "error" | "warning";
+  title: string;
+  message: string;
+  action?: ReactNode;
+}) {
+  const error =
+    tone === "error";
+
+  const Icon = error
+    ? XCircle
+    : AlertTriangle;
+
+  return (
+    <motion.section
+      layout
+      initial={{
+        opacity: 0,
+        y: -10,
+        scale: 0.99,
+      }}
+      animate={{
+        opacity: 1,
+        y: 0,
+        scale: 1,
+      }}
+      exit={{
+        opacity: 0,
+        y: -10,
+        scale: 0.99,
+      }}
+      className={`overflow-hidden rounded-[22px] border p-4 ${
+        error
+          ? "border-rose-500/20 bg-rose-500/[0.08]"
+          : "border-amber-500/20 bg-amber-500/[0.08]"
+      }`}
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <div
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+              error
+                ? "bg-rose-500/10 text-rose-500"
+                : "bg-amber-500/10 text-amber-600"
+            }`}
+          >
+            <Icon className="h-4 w-4" />
+          </div>
+
+          <div>
+            <p
+              className={`text-[11px] font-black ${
+                error
+                  ? "text-rose-600"
+                  : "text-amber-700 dark:text-amber-400"
+              }`}
+            >
+              {title}
+            </p>
+
+            <p className="mt-1 max-w-4xl text-[10px] leading-5 text-muted-foreground">
+              {message}
+            </p>
+          </div>
+        </div>
+
+        {action}
+      </div>
+    </motion.section>
   );
 }
 
@@ -919,51 +1313,37 @@ function HeroPill({
 function StatsGrid({
   stats,
 }: {
-  stats: {
-    total: number;
-    completed: number;
-    pending: number;
-    failed: number;
-    volume: number;
-    completionRate: number;
-  };
+  stats: Stats;
 }) {
-  const items = [
+  const cards = [
     {
-      label: "Total Transactions",
+      label:
+        "Total transactions",
       value:
         stats.total.toLocaleString(),
       helper:
-        "All ledger records",
+        "Unified ledger records",
       icon: Activity,
-      tone: "blue" as const,
-      progress: 100,
+      color: "blue",
     },
     {
       label: "Completed",
       value:
         stats.completed.toLocaleString(),
-      helper:
-        `${stats.completionRate.toFixed(1)}% success rate`,
+      helper: `${stats.completionRate.toFixed(
+        1
+      )}% success rate`,
       icon: CheckCircle2,
-      tone: "emerald" as const,
-      progress:
-        stats.completionRate,
+      color: "emerald",
     },
     {
       label: "Pending",
       value:
         stats.pending.toLocaleString(),
       helper:
-        "Awaiting settlement",
+        "Awaiting completion",
       icon: Clock3,
-      tone: "amber" as const,
-      progress:
-        stats.total > 0
-          ? (stats.pending /
-              stats.total) *
-            100
-          : 0,
+      color: "amber",
     },
     {
       label: "Failed",
@@ -971,455 +1351,1107 @@ function StatsGrid({
         stats.failed.toLocaleString(),
       helper: "Needs review",
       icon: XCircle,
-      tone: "rose" as const,
-      progress:
-        stats.total > 0
-          ? (stats.failed /
-              stats.total) *
-            100
-          : 0,
+      color: "rose",
     },
     {
-      label: "Completed Volume",
-      value: formatCurrency(
-        stats.volume,
-        "BDT"
-      ),
+      label: "Cancelled",
+      value:
+        stats.cancelled.toLocaleString(),
       helper:
-        "Settled transaction value",
-      icon: CircleDollarSign,
-      tone: "violet" as const,
-      progress:
-        stats.completed > 0
-          ? 100
-          : 0,
+        "Stopped transactions",
+      icon: X,
+      color: "slate",
     },
-  ];
+    {
+      label:
+        "Completed volume",
+      value:
+        formatCompactCurrency(
+          stats.volume
+        ),
+      helper:
+        "Readable settled value",
+      icon: CircleDollarSign,
+      color: "violet",
+    },
+  ] as const;
+
+  const styles = {
+    blue: {
+      icon: "border-blue-500/20 bg-blue-500/10 text-blue-600",
+      glow: "group-hover:shadow-blue-500/10",
+    },
+    emerald: {
+      icon: "border-emerald-500/20 bg-emerald-500/10 text-emerald-600",
+      glow: "group-hover:shadow-emerald-500/10",
+    },
+    amber: {
+      icon: "border-amber-500/20 bg-amber-500/10 text-amber-600",
+      glow: "group-hover:shadow-amber-500/10",
+    },
+    rose: {
+      icon: "border-rose-500/20 bg-rose-500/10 text-rose-600",
+      glow: "group-hover:shadow-rose-500/10",
+    },
+    slate: {
+      icon: "border-slate-500/20 bg-slate-500/10 text-slate-600",
+      glow: "group-hover:shadow-slate-500/10",
+    },
+    violet: {
+      icon: "border-violet-500/20 bg-violet-500/10 text-violet-600",
+      glow: "group-hover:shadow-violet-500/10",
+    },
+  };
 
   return (
-    <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-      {items.map(
-        (item, index) => (
-          <StatCard
-            key={item.label}
-            {...item}
-            index={index}
-          />
-        )
+    <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
+      {cards.map(
+        (
+          card,
+          index
+        ) => {
+          const style =
+            styles[
+              card.color
+            ];
+
+          return (
+            <motion.article
+              key={
+                card.label
+              }
+              initial={{
+                opacity: 0,
+                y: 14,
+              }}
+              animate={{
+                opacity: 1,
+                y: 0,
+              }}
+              transition={{
+                delay:
+                  index *
+                  0.045,
+                duration: 0.45,
+              }}
+              whileHover={{
+                y: -5,
+              }}
+              className={`group relative overflow-hidden rounded-[24px] border border-border bg-card p-4 shadow-sm transition-all duration-300 hover:border-violet-500/15 hover:shadow-xl ${style.glow}`}
+            >
+              <div className="pointer-events-none absolute -right-12 -top-12 h-28 w-28 rounded-full bg-violet-500/[0.03] blur-2xl transition duration-300 group-hover:bg-violet-500/[0.07]" />
+
+              <div className="relative">
+                <motion.div
+                  whileHover={{
+                    rotate: -5,
+                    scale: 1.05,
+                  }}
+                  className={`flex h-10 w-10 items-center justify-center rounded-2xl border ${style.icon}`}
+                >
+                  <card.icon className="h-4 w-4" />
+                </motion.div>
+
+                <p className="mt-4 text-[8px] font-black uppercase tracking-[0.13em] text-muted-foreground">
+                  {card.label}
+                </p>
+
+                <p className="mt-1.5 text-2xl font-black tracking-[-0.03em]">
+                  {card.value}
+                </p>
+
+                <p className="mt-1 truncate text-[8px] font-semibold text-muted-foreground">
+                  {card.helper}
+                </p>
+              </div>
+            </motion.article>
+          );
+        }
       )}
     </section>
   );
 }
 
-function StatCard({
-  label,
-  value,
-  helper,
-  icon: Icon,
-  tone,
-  progress,
-  index,
+/* =========================================================
+   ANALYTICS
+========================================================= */
+
+function TransactionAnalytics({
+  transactions,
 }: {
-  label: string;
-  value: string;
-  helper: string;
-  icon: React.ElementType;
-  tone: keyof typeof TONE_CLASSES;
-  progress: number;
-  index: number;
+  transactions: Transaction[];
 }) {
-  const selected =
-    TONE_CLASSES[tone];
+  const lineData =
+    useMemo(() => {
+      const today =
+        new Date();
+
+      return Array.from(
+        {
+          length: 7,
+        },
+        (_, index) => {
+          const date =
+            new Date(
+              today
+            );
+
+          date.setHours(
+            0,
+            0,
+            0,
+            0
+          );
+
+          date.setDate(
+            today.getDate() -
+              (6 - index)
+          );
+
+          const next =
+            new Date(
+              date
+            );
+
+          next.setDate(
+            date.getDate() +
+              1
+          );
+
+          const rows =
+            transactions.filter(
+              (item) => {
+                if (
+                  !item.createdAt
+                ) {
+                  return false;
+                }
+
+                const created =
+                  new Date(
+                    item.createdAt
+                  );
+
+                return (
+                  created >=
+                    date &&
+                  created <
+                    next
+                );
+              }
+            );
+
+          return {
+            name: new Intl.DateTimeFormat(
+              "en-GB",
+              {
+                day: "2-digit",
+                month:
+                  "short",
+              }
+            ).format(date),
+
+            volume:
+              rows.reduce(
+                (
+                  sum,
+                  item
+                ) =>
+                  sum +
+                  (item.amount ??
+                    0),
+                0
+              ),
+
+            count:
+              rows.length,
+          };
+        }
+      );
+    }, [transactions]);
+
+  const statusData =
+    useMemo(
+      () =>
+        (
+          Object.keys(
+            STATUS_META
+          ) as TransactionStatus[]
+        )
+          .map(
+            (
+              status
+            ) => ({
+              name: STATUS_META[
+                status
+              ].label,
+
+              value:
+                transactions.filter(
+                  (
+                    item
+                  ) =>
+                    item.status ===
+                    status
+                ).length,
+
+              color:
+                STATUS_META[
+                  status
+                ].color,
+            })
+          )
+          .filter(
+            (item) =>
+              item.value > 0
+          ),
+      [transactions]
+    );
+
+  const typeData =
+    useMemo(
+      () =>
+        (
+          Object.keys(
+            TYPE_META
+          ) as TransactionType[]
+        )
+          .map(
+            (
+              type
+            ) => ({
+              name: TYPE_META[
+                type
+              ].label,
+
+              value:
+                transactions.filter(
+                  (
+                    item
+                  ) =>
+                    item.type ===
+                    type
+                ).length,
+
+              color:
+                TYPE_META[
+                  type
+                ].color,
+            })
+          )
+          .filter(
+            (item) =>
+              item.value > 0
+          ),
+      [transactions]
+    );
+
+  const safeStatusData =
+    statusData.length > 0
+      ? statusData
+      : [
+          {
+            name: "No data",
+            value: 1,
+            color:
+              "#cbd5e1",
+          },
+        ];
+
+  const safeTypeData =
+    typeData.length > 0
+      ? typeData
+      : [
+          {
+            name: "No data",
+            value: 1,
+            color:
+              "#e2e8f0",
+          },
+        ];
 
   return (
-    <motion.div
-      initial={{
-        opacity: 0,
-        y: 12,
-      }}
-      animate={{
-        opacity: 1,
-        y: 0,
-      }}
-      transition={{
-        duration: 0.42,
-        delay: index * 0.045,
-      }}
-      whileHover={{
-        y: -3,
-      }}
-      className="group relative overflow-hidden rounded-[24px] border border-border bg-card p-4 shadow-sm transition hover:border-indigo-500/25 hover:shadow-lg"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div
-          className={`flex h-10 w-10 items-center justify-center rounded-2xl border ${selected.border} ${selected.soft} ${selected.text}`}
-        >
-          <Icon className="h-4 w-4" />
+    <section className="grid gap-4 xl:grid-cols-[1.55fr_1fr]">
+      {/* LINE CHART */}
+      <motion.article
+        initial={{
+          opacity: 0,
+          y: 12,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        whileHover={{
+          y: -2,
+        }}
+        transition={{
+          duration: 0.4,
+        }}
+        className="group relative overflow-hidden rounded-[28px] border border-border bg-card shadow-sm transition-shadow duration-300 hover:shadow-xl"
+      >
+        <div className="pointer-events-none absolute right-0 top-0 h-44 w-44 rounded-full bg-violet-500/[0.045] blur-3xl" />
+
+        <ChartHeader
+          eyebrow="7-day movement"
+          title="Transaction flow"
+          description="Daily value and transaction count across every ledger source."
+          icon={Activity}
+        />
+
+        <div className="relative h-[325px] px-2 pb-4 pr-5 sm:h-[350px]">
+          <ResponsiveContainer
+            width="100%"
+            height="100%"
+          >
+            <LineChart
+              data={lineData}
+              margin={{
+                top: 18,
+                right: 8,
+                left: 4,
+              }}
+            >
+              <CartesianGrid
+                stroke="var(--border)"
+                strokeDasharray="4 7"
+                vertical={
+                  false
+                }
+                opacity={0.7}
+              />
+
+              <XAxis
+                dataKey="name"
+                axisLine={
+                  false
+                }
+                tickLine={
+                  false
+                }
+                tick={{
+                  fontSize: 10,
+                  fontWeight: 700,
+                  fill: "var(--muted-foreground)",
+                }}
+              />
+
+              <YAxis
+                yAxisId="volume"
+                axisLine={
+                  false
+                }
+                tickLine={
+                  false
+                }
+                width={62}
+                tickFormatter={
+                  formatCompactCurrency
+                }
+                tick={{
+                  fontSize: 9,
+                  fill: "var(--muted-foreground)",
+                }}
+              />
+
+              <YAxis
+                yAxisId="count"
+                orientation="right"
+                axisLine={
+                  false
+                }
+                tickLine={
+                  false
+                }
+                allowDecimals={
+                  false
+                }
+                width={32}
+                tick={{
+                  fontSize: 9,
+                  fill: "var(--muted-foreground)",
+                }}
+              />
+
+              <Tooltip
+                cursor={{
+                  stroke:
+                    "#8b5cf6",
+                  strokeOpacity:
+                    0.15,
+                  strokeWidth:
+                    1.5,
+                }}
+                contentStyle={{
+                  borderRadius:
+                    16,
+                  border:
+                    "1px solid var(--border)",
+                  background:
+                    "var(--card)",
+                  color:
+                    "var(--card-foreground)",
+                  fontSize: 11,
+                  fontWeight:
+                    700,
+                  boxShadow:
+                    "0 18px 45px rgba(15,23,42,.12)",
+                }}
+              />
+
+              <Legend
+                verticalAlign="top"
+                align="right"
+                height={38}
+                iconType="circle"
+                wrapperStyle={{
+                  fontSize: 10,
+                  fontWeight:
+                    800,
+                }}
+              />
+
+              <Line
+                yAxisId="volume"
+                type="monotone"
+                dataKey="volume"
+                name="Volume (BDT)"
+                stroke="#7c3aed"
+                strokeWidth={3}
+                dot={{
+                  r: 3,
+                  fill: "#7c3aed",
+                  stroke:
+                    "var(--card)",
+                  strokeWidth: 2,
+                }}
+                activeDot={{
+                  r: 6,
+                  fill: "#7c3aed",
+                  stroke:
+                    "var(--card)",
+                  strokeWidth: 3,
+                }}
+                isAnimationActive
+                animationBegin={
+                  100
+                }
+                animationDuration={
+                  1250
+                }
+                animationEasing="ease-out"
+              />
+
+              <Line
+                yAxisId="count"
+                type="monotone"
+                dataKey="count"
+                name="Transactions"
+                stroke="#10b981"
+                strokeWidth={2.5}
+                dot={{
+                  r: 3,
+                  fill: "#10b981",
+                  stroke:
+                    "var(--card)",
+                  strokeWidth: 2,
+                }}
+                activeDot={{
+                  r: 5,
+                  fill: "#10b981",
+                  stroke:
+                    "var(--card)",
+                  strokeWidth: 3,
+                }}
+                isAnimationActive
+                animationBegin={
+                  220
+                }
+                animationDuration={
+                  1450
+                }
+                animationEasing="ease-out"
+              />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
+      </motion.article>
 
-        <span
-          className={`h-2 w-2 rounded-full ${selected.dot}`}
+      {/* PIE CHART */}
+      <motion.article
+        initial={{
+          opacity: 0,
+          y: 12,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        whileHover={{
+          y: -2,
+        }}
+        transition={{
+          delay: 0.08,
+          duration: 0.4,
+        }}
+        className="group relative overflow-hidden rounded-[28px] border border-border bg-card shadow-sm transition-shadow duration-300 hover:shadow-xl"
+      >
+        <div className="pointer-events-none absolute -right-20 top-20 h-48 w-48 rounded-full bg-indigo-500/[0.04] blur-3xl" />
+
+        <ChartHeader
+          eyebrow="Ledger mix"
+          title="Status & type distribution"
+          description="Inner ring shows status; outer ring shows transaction type."
+          icon={
+            CircleDollarSign
+          }
         />
-      </div>
 
-      <p className="mt-4 text-[8px] font-black uppercase tracking-[0.13em] text-muted-foreground">
-        {label}
-      </p>
+        <div className="relative grid items-center gap-2 px-3 pb-5 sm:grid-cols-[1fr_150px] xl:grid-cols-1 2xl:grid-cols-[1fr_145px]">
+          <div className="relative h-[260px]">
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+            >
+              <PieChart>
+                <Tooltip
+                  contentStyle={{
+                    borderRadius:
+                      14,
+                    border:
+                      "1px solid var(--border)",
+                    background:
+                      "var(--card)",
+                    color:
+                      "var(--card-foreground)",
+                    fontSize:
+                      11,
+                    fontWeight:
+                      700,
+                    boxShadow:
+                      "0 16px 40px rgba(15,23,42,.12)",
+                  }}
+                />
 
-      <p className="mt-1 text-2xl font-black tracking-tight text-card-foreground">
-        {value}
-      </p>
+                <Pie
+                  data={
+                    safeStatusData
+                  }
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius="22%"
+                  outerRadius="48%"
+                  paddingAngle={
+                    3
+                  }
+                  stroke="var(--card)"
+                  strokeWidth={
+                    3
+                  }
+                  isAnimationActive
+                  animationBegin={
+                    100
+                  }
+                  animationDuration={
+                    1100
+                  }
+                >
+                  {safeStatusData.map(
+                    (
+                      entry
+                    ) => (
+                      <Cell
+                        key={
+                          entry.name
+                        }
+                        fill={
+                          entry.color
+                        }
+                      />
+                    )
+                  )}
+                </Pie>
 
-      <p className="mt-1 truncate text-[8px] font-semibold text-muted-foreground">
-        {helper}
-      </p>
+                <Pie
+                  data={
+                    safeTypeData
+                  }
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius="58%"
+                  outerRadius="82%"
+                  paddingAngle={
+                    3
+                  }
+                  stroke="var(--card)"
+                  strokeWidth={
+                    3
+                  }
+                  isAnimationActive
+                  animationBegin={
+                    260
+                  }
+                  animationDuration={
+                    1350
+                  }
+                >
+                  {safeTypeData.map(
+                    (
+                      entry
+                    ) => (
+                      <Cell
+                        key={
+                          entry.name
+                        }
+                        fill={
+                          entry.color
+                        }
+                      />
+                    )
+                  )}
+                </Pie>
+              </PieChart>
+            </ResponsiveContainer>
 
-      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
-        <motion.div
-          initial={{
-            width: 0,
-          }}
-          animate={{
-            width: `${Math.max(
-              0,
-              Math.min(
-                100,
-                progress
+            <motion.div
+              initial={{
+                opacity: 0,
+                scale: 0.8,
+              }}
+              animate={{
+                opacity: 1,
+                scale: 1,
+              }}
+              transition={{
+                delay: 0.45,
+              }}
+              className="pointer-events-none absolute inset-0 flex items-center justify-center"
+            >
+              <div className="text-center">
+                <p className="text-2xl font-black tracking-[-0.04em]">
+                  {
+                    transactions.length
+                  }
+                </p>
+
+                <p className="text-[7px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+                  Total
+                </p>
+              </div>
+            </motion.div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-1 xl:grid-cols-2 2xl:grid-cols-1">
+            {typeData.map(
+              (
+                item,
+                index
+              ) => (
+                <motion.div
+                  key={
+                    item.name
+                  }
+                  initial={{
+                    opacity: 0,
+                    x: 8,
+                  }}
+                  animate={{
+                    opacity: 1,
+                    x: 0,
+                  }}
+                  transition={{
+                    delay:
+                      0.25 +
+                      index *
+                        0.06,
+                  }}
+                  whileHover={{
+                    x: 2,
+                  }}
+                  className="flex items-center justify-between gap-2 rounded-xl border border-border bg-muted/35 px-3 py-2.5 transition hover:border-violet-500/20 hover:bg-violet-500/[0.04]"
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span
+                      className="h-2 w-2 shrink-0 rounded-full shadow-sm"
+                      style={{
+                        backgroundColor:
+                          item.color,
+                      }}
+                    />
+
+                    <span className="truncate text-[8px] font-bold text-muted-foreground">
+                      {
+                        item.name
+                      }
+                    </span>
+                  </span>
+
+                  <span className="text-[9px] font-black">
+                    {
+                      item.value
+                    }
+                  </span>
+                </motion.div>
               )
-            )}%`,
-          }}
-          transition={{
-            duration: 0.75,
-            delay:
-              0.1 +
-              index * 0.04,
-          }}
-          className={`h-full rounded-full ${selected.dot}`}
-        />
-      </div>
-    </motion.div>
+            )}
+          </div>
+        </div>
+      </motion.article>
+    </section>
   );
 }
 
 /* =========================================================
-   FILTERS
+   CHART HEADER
+========================================================= */
+
+function ChartHeader({
+  eyebrow,
+  title,
+  description,
+  icon: Icon,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+  icon: ElementType;
+}) {
+  return (
+    <div className="relative flex items-start gap-3 border-b border-border px-5 py-4 sm:px-6">
+      <motion.span
+        whileHover={{
+          rotate: -5,
+          scale: 1.05,
+        }}
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-violet-500/10 bg-violet-500/10 text-violet-600"
+      >
+        <Icon className="h-4 w-4" />
+      </motion.span>
+
+      <div className="min-w-0">
+        <p className="text-[8px] font-black uppercase tracking-[0.14em] text-violet-600">
+          {eyebrow}
+        </p>
+
+        <h2 className="mt-0.5 text-sm font-black tracking-tight">
+          {title}
+        </h2>
+
+        <p className="mt-1 text-[9px] leading-4 text-muted-foreground">
+          {description}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   FILTER
 ========================================================= */
 
 function FilterBar({
   search,
-  onSearchChange,
-  statusFilter,
-  onStatusChange,
-  typeFilter,
-  onTypeChange,
-  activeFilters,
+  status,
+  type,
+  filteredCount,
+  totalCount,
+  onSearch,
+  onStatus,
+  onType,
   onClear,
 }: {
   search: string;
-  onSearchChange: (
+  status: StatusFilter;
+  type: TypeFilter;
+  filteredCount: number;
+  totalCount: number;
+  onSearch: (
     value: string
   ) => void;
-  statusFilter: StatusFilter;
-  onStatusChange: (
+  onStatus: (
     value: StatusFilter
   ) => void;
-  typeFilter: TypeFilter;
-  onTypeChange: (
+  onType: (
     value: TypeFilter
   ) => void;
-  activeFilters: number;
   onClear: () => void;
 }) {
+  const hasFilters =
+    Boolean(
+      search.trim()
+    ) ||
+    status !== "ALL" ||
+    type !== "ALL";
+
   return (
-    <motion.section
-      initial={{
-        opacity: 0,
-        y: 10,
-      }}
-      animate={{
-        opacity: 1,
-        y: 0,
-      }}
-      className="relative z-20 overflow-visible rounded-[26px] border border-border bg-card p-4 shadow-sm"
-    >
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-end">
-        <div className="min-w-0 flex-1">
-          <label className="mb-1.5 block text-[8px] font-black uppercase tracking-[0.13em] text-muted-foreground">
-            Search Transactions
-          </label>
+    <section className="overflow-hidden rounded-[26px] border border-border bg-card shadow-sm">
+      <div className="flex flex-col gap-3 border-b border-border px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+        <div className="flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600">
+            <Filter className="h-3.5 w-3.5" />
+          </span>
 
-          <div className="relative">
-            <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <div>
+            <p className="text-[9px] font-black">
+              Filter transactions
+            </p>
 
-            <input
-              value={search}
-              onChange={(event) =>
-                onSearchChange(
-                  event.target.value
-                )
-              }
-              placeholder="Search user, transaction ID or reference..."
-              className="h-12 w-full rounded-2xl border border-border bg-muted/60 pl-10 pr-4 text-xs font-semibold text-foreground outline-none transition placeholder:text-muted-foreground focus:border-indigo-500 focus:bg-card focus:ring-4 focus:ring-indigo-500/10"
-            />
+            <p className="mt-0.5 text-[8px] text-muted-foreground">
+              Search and narrow
+              the unified
+              ledger.
+            </p>
           </div>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 xl:w-[430px]">
-          <PremiumSelect
-            label="Status"
-            icon={Filter}
-            value={statusFilter}
-            options={STATUS_OPTIONS}
-            onChange={onStatusChange}
-          />
-
-          <PremiumSelect
-            label="Type"
-            icon={WalletCards}
-            value={typeFilter}
-            options={TYPE_OPTIONS}
-            onChange={onTypeChange}
-          />
-        </div>
-
-        <AnimatePresence>
-          {activeFilters > 0 && (
-            <motion.button
-              type="button"
-              initial={{
-                opacity: 0,
-                scale: 0.95,
-              }}
-              animate={{
-                opacity: 1,
-                scale: 1,
-              }}
-              exit={{
-                opacity: 0,
-                scale: 0.95,
-              }}
-              onClick={onClear}
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-border bg-muted px-4 text-[9px] font-black text-muted-foreground transition hover:border-rose-500/20 hover:bg-rose-500/10 hover:text-rose-500"
-            >
-              <X className="h-3.5 w-3.5" />
-              Clear {activeFilters}
-            </motion.button>
-          )}
-        </AnimatePresence>
+        <motion.span
+          layout
+          className="w-fit rounded-full border border-border bg-muted/50 px-3 py-1.5 text-[8px] font-black text-muted-foreground"
+        >
+          {filteredCount} of{" "}
+          {totalCount} records
+        </motion.span>
       </div>
-    </motion.section>
+
+      <div className="grid gap-3 p-4 lg:grid-cols-[1fr_210px_220px_auto]">
+        <label className="group relative">
+          <span className="sr-only">
+            Search
+            transactions
+          </span>
+
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition group-focus-within:text-violet-600" />
+
+          <input
+            value={search}
+            onChange={(
+              event
+            ) =>
+              onSearch(
+                event.target
+                  .value
+              )
+            }
+            placeholder="Search ID, reference, user, merchant or provider…"
+            className="h-12 w-full rounded-2xl border border-border bg-background pl-11 pr-10 text-[11px] font-semibold outline-none transition-all duration-200 placeholder:text-muted-foreground/60 focus:border-violet-500/60 focus:ring-4 focus:ring-violet-500/10"
+          />
+
+          <AnimatePresence>
+            {search && (
+              <motion.button
+                type="button"
+                initial={{
+                  opacity: 0,
+                  scale: 0.8,
+                }}
+                animate={{
+                  opacity: 1,
+                  scale: 1,
+                }}
+                exit={{
+                  opacity: 0,
+                  scale: 0.8,
+                }}
+                onClick={() =>
+                  onSearch("")
+                }
+                className="absolute right-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                aria-label="Clear search"
+              >
+                <X className="h-3.5 w-3.5" />
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </label>
+
+        <select
+          value={status}
+          onChange={(
+            event
+          ) =>
+            onStatus(
+              event.target
+                .value as StatusFilter
+            )
+          }
+          className="h-12 cursor-pointer rounded-2xl border border-border bg-background px-4 text-[10px] font-black outline-none transition focus:border-violet-500/60 focus:ring-4 focus:ring-violet-500/10"
+        >
+          {STATUS_OPTIONS.map(
+            (option) => (
+              <option
+                key={
+                  option.value
+                }
+                value={
+                  option.value
+                }
+              >
+                {option.label}
+              </option>
+            )
+          )}
+        </select>
+
+        <select
+          value={type}
+          onChange={(
+            event
+          ) =>
+            onType(
+              event.target
+                .value as TypeFilter
+            )
+          }
+          className="h-12 cursor-pointer rounded-2xl border border-border bg-background px-4 text-[10px] font-black outline-none transition focus:border-violet-500/60 focus:ring-4 focus:ring-violet-500/10"
+        >
+          {TYPE_OPTIONS.map(
+            (option) => (
+              <option
+                key={
+                  option.value
+                }
+                value={
+                  option.value
+                }
+              >
+                {option.label}
+              </option>
+            )
+          )}
+        </select>
+
+        <motion.button
+          type="button"
+          whileHover={
+            hasFilters
+              ? {
+                  y: -1,
+                }
+              : undefined
+          }
+          whileTap={
+            hasFilters
+              ? {
+                  scale:
+                    0.97,
+                }
+              : undefined
+          }
+          onClick={onClear}
+          disabled={
+            !hasFilters
+          }
+          className="h-12 whitespace-nowrap rounded-2xl border border-border bg-muted/60 px-5 text-[10px] font-black transition hover:border-violet-500/20 hover:bg-violet-500/10 hover:text-violet-600 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Clear filters
+        </motion.button>
+      </div>
+
+      <AnimatePresence>
+        {hasFilters && (
+          <motion.div
+            initial={{
+              opacity: 0,
+              height: 0,
+            }}
+            animate={{
+              opacity: 1,
+              height: "auto",
+            }}
+            exit={{
+              opacity: 0,
+              height: 0,
+            }}
+            className="overflow-hidden"
+          >
+            <div className="flex flex-wrap gap-2 border-t border-border px-4 py-3">
+              <span className="text-[8px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+                Active:
+              </span>
+
+              {search.trim() && (
+                <ActiveFilter
+                  label={`Search: ${search.trim()}`}
+                  onRemove={() =>
+                    onSearch("")
+                  }
+                />
+              )}
+
+              {status !==
+                "ALL" && (
+                <ActiveFilter
+                  label={
+                    STATUS_META[
+                      status
+                    ].label
+                  }
+                  onRemove={() =>
+                    onStatus(
+                      "ALL"
+                    )
+                  }
+                />
+              )}
+
+              {type !==
+                "ALL" && (
+                <ActiveFilter
+                  label={
+                    TYPE_META[
+                      type
+                    ].label
+                  }
+                  onRemove={() =>
+                    onType(
+                      "ALL"
+                    )
+                  }
+                />
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </section>
   );
 }
 
-function PremiumSelect<
-  T extends string
->({
+function ActiveFilter({
   label,
-  icon: Icon,
-  value,
-  options,
-  onChange,
+  onRemove,
 }: {
   label: string;
-  icon: React.ElementType;
-  value: T;
-  options: SelectOption<T>[];
-  onChange: (value: T) => void;
+  onRemove: () => void;
 }) {
-  const [
-    open,
-    setOpen,
-  ] = useState(false);
-
-  const selected =
-    options.find(
-      (item) =>
-        item.value === value
-    ) ?? options[0];
-
-  const selectedTone =
-    TONE_CLASSES[
-      selected.tone
-    ];
-
   return (
-    <div
-      className={`relative ${
-        open
-          ? "z-[80]"
-          : "z-10"
-      }`}
+    <motion.button
+      layout
+      initial={{
+        opacity: 0,
+        scale: 0.9,
+      }}
+      animate={{
+        opacity: 1,
+        scale: 1,
+      }}
+      exit={{
+        opacity: 0,
+        scale: 0.9,
+      }}
+      type="button"
+      onClick={
+        onRemove
+      }
+      className="inline-flex items-center gap-1.5 rounded-full border border-violet-500/15 bg-violet-500/[0.08] px-2.5 py-1 text-[8px] font-black text-violet-600 transition hover:bg-violet-500/[0.14]"
     >
-      <label className="mb-1.5 block text-[8px] font-black uppercase tracking-[0.13em] text-muted-foreground">
-        {label}
-      </label>
-
-      <button
-        type="button"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        onClick={() =>
-          setOpen(
-            (current) =>
-              !current
-          )
-        }
-        className={`group flex h-12 w-full items-center gap-2.5 rounded-[15px] border bg-card px-3 text-left shadow-sm outline-none transition duration-200 ${
-          open
-            ? "border-indigo-500 ring-4 ring-indigo-500/10"
-            : "border-border hover:border-indigo-500/30 hover:shadow-md"
-        }`}
-      >
-        <span
-          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] ${selectedTone.soft} ${selectedTone.text}`}
-        >
-          <Icon className="h-3.5 w-3.5" />
-        </span>
-
-        <span className="min-w-0 flex-1">
-          <span className="block text-[8px] font-black uppercase tracking-[0.11em] text-muted-foreground">
-            {label}
-          </span>
-
-          <span className="mt-0.5 block truncate text-[10px] font-black text-indigo-600 dark:text-indigo-400">
-            {selected.label}
-          </span>
-        </span>
-
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground transition group-hover:bg-indigo-500/10 group-hover:text-indigo-500">
-          <ChevronDown
-            className={`h-3.5 w-3.5 transition-transform duration-200 ${
-              open
-                ? "rotate-180"
-                : ""
-            }`}
-          />
-        </span>
-      </button>
-
-      <AnimatePresence>
-        {open && (
-          <>
-            <button
-              type="button"
-              aria-label={`Close ${label} filter`}
-              onClick={() =>
-                setOpen(false)
-              }
-              className="fixed inset-0 z-[70] cursor-default"
-            />
-
-            <motion.div
-              role="listbox"
-              initial={{
-                opacity: 0,
-                y: -7,
-                scale: 0.985,
-              }}
-              animate={{
-                opacity: 1,
-                y: 0,
-                scale: 1,
-              }}
-              exit={{
-                opacity: 0,
-                y: -5,
-                scale: 0.99,
-              }}
-              transition={{
-                duration: 0.15,
-                ease: [
-                  0.22,
-                  1,
-                  0.36,
-                  1,
-                ],
-              }}
-              className="absolute left-0 top-[calc(100%+7px)] z-[90] w-full min-w-[220px] overflow-hidden rounded-[16px] border border-border bg-popover p-1.5 shadow-2xl"
-            >
-              <div className="flex items-center justify-between px-2.5 pb-1.5 pt-1">
-                <span className="text-[7px] font-black uppercase tracking-[0.14em] text-muted-foreground">
-                  Select {label}
-                </span>
-
-                <span className="text-[7px] font-bold text-muted-foreground">
-                  {options.length} options
-                </span>
-              </div>
-
-              <div className="space-y-0.5">
-                {options.map(
-                  (option) => {
-                    const tone =
-                      TONE_CLASSES[
-                        option.tone
-                      ];
-
-                    const active =
-                      option.value ===
-                      value;
-
-                    return (
-                      <motion.button
-                        type="button"
-                        role="option"
-                        aria-selected={
-                          active
-                        }
-                        key={
-                          option.value
-                        }
-                        whileHover={{
-                          x: 1,
-                        }}
-                        onClick={() => {
-                          onChange(
-                            option.value
-                          );
-
-                          setOpen(false);
-                        }}
-                        className={`flex w-full items-center gap-2.5 rounded-[11px] px-2.5 py-2.5 text-left transition ${
-                          active
-                            ? "bg-indigo-500/10"
-                            : "hover:bg-muted"
-                        }`}
-                      >
-                        <span
-                          className={`h-2 w-2 shrink-0 rounded-full ${tone.dot}`}
-                        />
-
-                        <span
-                          className={`min-w-0 flex-1 truncate text-[10px] font-black ${
-                            active
-                              ? "text-indigo-600 dark:text-indigo-400"
-                              : "text-foreground"
-                          }`}
-                        >
-                          {
-                            option.label
-                          }
-                        </span>
-
-                        <span
-                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full transition ${
-                            active
-                              ? "bg-indigo-600 text-white"
-                              : "border border-border bg-card text-transparent"
-                          }`}
-                        >
-                          <Check className="h-3 w-3" />
-                        </span>
-                      </motion.button>
-                    );
-                  }
-                )}
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-    </div>
+      {label}
+      <X className="h-2.5 w-2.5" />
+    </motion.button>
   );
 }
 
@@ -1430,66 +2462,62 @@ function PremiumSelect<
 function TransactionTable({
   rows,
   filteredCount,
-  safePage,
+  page,
   totalPages,
-  pageSize,
   onPrevious,
   onNext,
-  onOpenTransaction,
+  onOpen,
 }: {
   rows: Transaction[];
   filteredCount: number;
-  safePage: number;
+  page: number;
   totalPages: number;
-  pageSize: number;
   onPrevious: () => void;
   onNext: () => void;
-  onOpenTransaction: (
+  onOpen: (
     transaction: Transaction
   ) => void;
 }) {
   return (
-    <motion.section
-      initial={{
-        opacity: 0,
-        y: 10,
-      }}
-      animate={{
-        opacity: 1,
-        y: 0,
-      }}
-      className="overflow-hidden rounded-[28px] border border-border bg-card shadow-sm"
-    >
+    <section className="overflow-hidden rounded-[28px] border border-border bg-card shadow-sm">
       <div className="flex flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-[9px] font-black uppercase tracking-[0.13em] text-indigo-500 dark:text-indigo-400">
-            Transaction Ledger
+          <p className="text-[8px] font-black uppercase tracking-[0.14em] text-violet-600">
+            Unified
+            transaction ledger
           </p>
 
-          <h2 className="mt-1 text-base font-black text-card-foreground">
-            Transaction Activity
+          <h2 className="mt-1 text-base font-black tracking-tight">
+            Transaction
+            activity
           </h2>
         </div>
 
-        <span className="inline-flex w-fit items-center rounded-full border border-border bg-muted px-3 py-1.5 text-[8px] font-black text-muted-foreground">
-          Row click opens details
+        <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-border bg-muted/60 px-3 py-1.5 text-[8px] font-black text-muted-foreground">
+          <Sparkles className="h-3 w-3 text-violet-600" />
+          Click a row for
+          details
         </span>
       </div>
 
-      <div className="overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-        <table className="w-full min-w-[980px] border-collapse">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[1080px] border-collapse">
           <thead>
-            <tr className="border-b border-border bg-muted/50">
+            <tr className="border-b border-border bg-muted/40">
               <TableHead>
                 Transaction
               </TableHead>
 
               <TableHead>
-                Sender
+                From
               </TableHead>
 
               <TableHead>
-                Receiver
+                To
+              </TableHead>
+
+              <TableHead>
+                Source
               </TableHead>
 
               <TableHead align="right">
@@ -1509,50 +2537,45 @@ function TransactionTable({
               </TableHead>
 
               <TableHead align="right">
-                Action
+                Open
               </TableHead>
             </tr>
           </thead>
 
           <tbody>
-            {rows.map(
-              (
-                transaction,
-                index
-              ) => {
-                const sender =
-                  getUserName(
-                    transaction.senderId
-                  );
-
-                const receiver =
-                  getUserName(
-                    transaction.receiverId
-                  );
-
-                return (
+            <AnimatePresence
+              mode="popLayout"
+            >
+              {rows.map(
+                (
+                  transaction,
+                  index
+                ) => (
                   <motion.tr
-                    key={
-                      transaction._id
-                    }
+                    layout
+                    key={`${transaction.source || "ledger"}-${transaction._id}`}
                     initial={{
                       opacity: 0,
-                      y: 4,
+                      y: 8,
                     }}
                     animate={{
                       opacity: 1,
                       y: 0,
                     }}
+                    exit={{
+                      opacity: 0,
+                      y: -6,
+                    }}
                     transition={{
-                      duration: 0.3,
                       delay:
                         index *
                         0.025,
+                      duration: 0.3,
                     }}
                     tabIndex={0}
                     role="button"
                     onClick={() =>
-                      onOpenTransaction(
+                      onOpen(
                         transaction
                       )
                     }
@@ -1567,12 +2590,12 @@ function TransactionTable({
                       ) {
                         event.preventDefault();
 
-                        onOpenTransaction(
+                        onOpen(
                           transaction
                         );
                       }
                     }}
-                    className="group cursor-pointer border-b border-border outline-none transition hover:bg-indigo-500/5 focus-visible:bg-indigo-500/10"
+                    className="group cursor-pointer border-b border-border/80 outline-none transition-colors duration-200 last:border-b-0 hover:bg-violet-500/[0.045] focus-visible:bg-violet-500/[0.07]"
                   >
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-3">
@@ -1583,61 +2606,72 @@ function TransactionTable({
                         />
 
                         <div className="min-w-0">
-                          <p className="max-w-[210px] truncate text-[11px] font-black text-card-foreground">
-                            {
-                              transaction.reference ||
-                              "No reference"
-                            }
+                          <p className="max-w-[190px] truncate text-[10px] font-black transition-colors group-hover:text-violet-600">
+                            {transaction.reference ||
+                              typeLabel(
+                                transaction.type
+                              )}
                           </p>
 
-                          <p className="mt-0.5 font-mono text-[8px] text-muted-foreground">
-                            {
-                              shortId(
+                          <p className="mt-1 font-mono text-[8px] text-muted-foreground">
+                            {shortId(
+                              transaction.publicId ||
                                 transaction._id
-                              )
-                            }
+                            )}
                           </p>
                         </div>
                       </div>
                     </td>
 
                     <td className="px-5 py-4">
-                      <PersonCell
-                        name={
-                          sender
-                        }
-                        user={
+                      <PartyCell
+                        party={
                           transaction.senderId
                         }
                       />
                     </td>
 
                     <td className="px-5 py-4">
-                      <PersonCell
-                        name={
-                          receiver
-                        }
-                        user={
+                      <PartyCell
+                        party={
                           transaction.receiverId
                         }
                       />
                     </td>
 
-                    <td className="px-5 py-4 text-right">
-                      <p className="text-[12px] font-black text-card-foreground">
-                        {
-                          formatCurrency(
-                            transaction.amount,
-                            transaction.currency
-                          )
+                    <td className="px-5 py-4">
+                      <SourceBadge
+                        source={
+                          transaction.source
                         }
-                      </p>
-
-                      <p className="mt-0.5 text-[8px] font-semibold text-muted-foreground">
-                        {
+                        type={
                           transaction.type
                         }
+                      />
+                    </td>
+
+                    <td className="px-5 py-4 text-right">
+                      <p
+                        className={`whitespace-nowrap text-[12px] font-black tracking-tight ${
+                          transaction.amount ===
+                          null
+                            ? "text-amber-600"
+                            : ""
+                        }`}
+                      >
+                        {formatCurrency(
+                          transaction.amount,
+                          transaction.currency
+                        )}
                       </p>
+
+                      {transaction.integrity ===
+                        "UNREADABLE" && (
+                        <p className="mt-1 whitespace-nowrap text-[7px] font-black uppercase tracking-wide text-amber-600">
+                          Encryption
+                          review
+                        </p>
+                      )}
                     </td>
 
                     <td className="px-5 py-4">
@@ -1651,107 +2685,169 @@ function TransactionTable({
                     <td className="px-5 py-4">
                       <RiskBadge
                         risk={
-                          transaction.riskScore
+                          transaction.riskScore ||
+                          "LOW"
                         }
                       />
                     </td>
 
                     <td className="px-5 py-4">
-                      <p className="whitespace-nowrap text-[10px] font-semibold text-muted-foreground">
-                        {
-                          formatDate(
-                            transaction.createdAt
-                          )
-                        }
+                      <p className="whitespace-nowrap text-[9px] font-semibold text-muted-foreground">
+                        {formatDate(
+                          transaction.createdAt
+                        )}
                       </p>
                     </td>
 
                     <td className="px-5 py-4 text-right">
-                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition group-hover:border-indigo-500/30 group-hover:bg-indigo-500/10 group-hover:text-indigo-500">
+                      <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-background text-muted-foreground transition-all duration-200 group-hover:translate-x-0.5 group-hover:border-violet-500/30 group-hover:bg-violet-500/10 group-hover:text-violet-600">
                         <ArrowRight className="h-4 w-4" />
                       </span>
                     </td>
                   </motion.tr>
-                );
-              }
-            )}
+                )
+              )}
+            </AnimatePresence>
           </tbody>
         </table>
       </div>
 
-      {rows.length === 0 && (
-        <div className="py-16 text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
-            <Search className="h-5 w-5" />
-          </div>
+      <AnimatePresence>
+        {rows.length ===
+          0 && (
+          <motion.div
+            initial={{
+              opacity: 0,
+              y: 10,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+            }}
+            className="px-4 py-16 text-center"
+          >
+            <motion.div
+              animate={{
+                y: [
+                  0,
+                  -4,
+                  0,
+                ],
+              }}
+              transition={{
+                duration: 3,
+                repeat: Infinity,
+                ease: "easeInOut",
+              }}
+              className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-muted/60 text-muted-foreground"
+            >
+              <Search className="h-5 w-5" />
+            </motion.div>
 
-          <p className="mt-3 text-sm font-black text-foreground">
-            No transactions found
-          </p>
+            <p className="mt-4 text-sm font-black">
+              No transactions
+              found
+            </p>
 
-          <p className="mt-1 text-xs text-muted-foreground">
-            Try changing your search or filters.
-          </p>
-        </div>
-      )}
+            <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-muted-foreground">
+              No ledger records
+              match the current
+              search and filters.
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <div className="flex flex-col gap-3 border-t border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-[10px] text-muted-foreground">
+      <div className="flex flex-col gap-3 border-t border-border bg-muted/[0.15] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-[9px] font-medium text-muted-foreground">
           Showing{" "}
-          {filteredCount === 0
-            ? 0
-            : (safePage - 1) *
-                pageSize +
-              1}{" "}
-          –{" "}
-          {Math.min(
-            safePage * pageSize,
-            filteredCount
-          )}{" "}
-          of {filteredCount}
+          <span className="font-black text-foreground">
+            {filteredCount ===
+            0
+              ? 0
+              : (page - 1) *
+                  PAGE_SIZE +
+                1}
+          </span>
+          {" – "}
+          <span className="font-black text-foreground">
+            {Math.min(
+              page *
+                PAGE_SIZE,
+              filteredCount
+            )}
+          </span>{" "}
+          of{" "}
+          <span className="font-black text-foreground">
+            {filteredCount}
+          </span>
         </p>
 
         <div className="flex items-center gap-2">
-          <PaginationButton
-            disabled={safePage <= 1}
-            onClick={onPrevious}
+          <PageButton
             label="Previous page"
+            disabled={
+              page <= 1
+            }
+            onClick={
+              onPrevious
+            }
           >
             <ChevronLeft className="h-4 w-4" />
-          </PaginationButton>
+          </PageButton>
 
-          <span className="min-w-20 rounded-xl border border-border bg-muted px-3 py-2 text-center text-[9px] font-black text-muted-foreground">
-            {safePage} /{" "}
+          <motion.span
+            key={`${page}-${totalPages}`}
+            initial={{
+              opacity: 0,
+              scale: 0.95,
+            }}
+            animate={{
+              opacity: 1,
+              scale: 1,
+            }}
+            className="min-w-20 rounded-xl border border-border bg-background px-3 py-2 text-center text-[9px] font-black"
+          >
+            {page} /{" "}
             {totalPages}
-          </span>
+          </motion.span>
 
-          <PaginationButton
+          <PageButton
+            label="Next page"
             disabled={
-              safePage >=
+              page >=
               totalPages
             }
-            onClick={onNext}
-            label="Next page"
+            onClick={
+              onNext
+            }
           >
             <ChevronRight className="h-4 w-4" />
-          </PaginationButton>
+          </PageButton>
         </div>
       </div>
-    </motion.section>
+    </section>
   );
 }
+
+/* =========================================================
+   TABLE HELPERS
+========================================================= */
 
 function TableHead({
   children,
   align = "left",
 }: {
-  children: React.ReactNode;
-  align?: "left" | "right";
+  children: ReactNode;
+  align?:
+    | "left"
+    | "right";
 }) {
   return (
     <th
       className={`px-5 py-4 text-[8px] font-black uppercase tracking-[0.12em] text-muted-foreground ${
-        align === "right"
+        align ===
+        "right"
           ? "text-right"
           : "text-left"
       }`}
@@ -1764,130 +2860,181 @@ function TableHead({
 function TransactionIcon({
   type,
 }: {
-  type: Transaction["type"];
+  type: TransactionType;
 }) {
-  const config =
-    type === "DEPOSIT"
-      ? {
-          icon: ArrowDownLeft,
-          className:
-            "border-emerald-500/20 bg-emerald-500/10 text-emerald-500",
-        }
-      : type === "WITHDRAW"
-        ? {
-            icon: ArrowUpRight,
-            className:
-              "border-amber-500/20 bg-amber-500/10 text-amber-500",
-          }
-        : {
-            icon: ArrowUpRight,
-            className:
-              "border-indigo-500/20 bg-indigo-500/10 text-indigo-500",
-          };
+  const config: Record<
+    TransactionType,
+    {
+      icon: ElementType;
+      className: string;
+    }
+  > = {
+    TRANSFER: {
+      icon: ArrowUpRight,
+      className:
+        "border-indigo-500/20 bg-indigo-500/10 text-indigo-600",
+    },
+
+    DEPOSIT: {
+      icon: ArrowDownLeft,
+      className:
+        "border-emerald-500/20 bg-emerald-500/10 text-emerald-600",
+    },
+
+    WITHDRAW: {
+      icon: ArrowUpRight,
+      className:
+        "border-amber-500/20 bg-amber-500/10 text-amber-600",
+    },
+
+    PAYMENT: {
+      icon: CreditCard,
+      className:
+        "border-violet-500/20 bg-violet-500/10 text-violet-600",
+    },
+
+    REFUND: {
+      icon: RotateCcw,
+      className:
+        "border-pink-500/20 bg-pink-500/10 text-pink-600",
+    },
+  };
+
+  const selected =
+    config[type];
 
   const Icon =
-    config.icon;
+    selected.icon;
 
   return (
-    <div
-      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border ${config.className}`}
+    <motion.div
+      whileHover={{
+        scale: 1.06,
+        rotate: -3,
+      }}
+      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border transition-shadow group-hover:shadow-md ${selected.className}`}
     >
       <Icon className="h-4 w-4" />
-    </div>
+    </motion.div>
   );
 }
 
-function PersonCell({
-  name,
-  user,
+function PartyCell({
+  party,
 }: {
-  name: string;
-  user:
+  party:
     | string
     | TransactionUser;
 }) {
-  const email =
-    getUserEmail(user);
-
   return (
     <div className="min-w-0">
-      <p className="max-w-[180px] truncate text-[10px] font-black text-foreground">
-        {name}
+      <p className="max-w-[175px] truncate text-[10px] font-black">
+        {getPartyName(
+          party
+        )}
       </p>
 
-      {email && (
-        <p className="mt-0.5 max-w-[180px] truncate text-[8px] text-muted-foreground">
-          {email}
-        </p>
-      )}
+      <p className="mt-1 max-w-[175px] truncate text-[8px] text-muted-foreground">
+        {getPartyDetail(
+          party
+        ) ||
+          shortId(
+            getPartyId(
+              party
+            )
+          )}
+      </p>
     </div>
   );
 }
 
-function PaginationButton({
-  disabled,
-  onClick,
-  label,
-  children,
+function SourceBadge({
+  source,
+  type,
 }: {
-  disabled: boolean;
-  onClick: () => void;
-  label: string;
-  children: React.ReactNode;
+  source?:
+    | Transaction["source"];
+  type: TransactionType;
 }) {
+  const label =
+    source ===
+    "ADD_MONEY"
+      ? "Add money"
+      : source ===
+          "MERCHANT_PAYMENT"
+        ? "Merchant"
+        : source ===
+            "MERCHANT_REFUND"
+          ? "Refund"
+          : typeLabel(
+              type
+            );
+
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      aria-label={label}
-      className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition hover:border-indigo-500/30 hover:bg-indigo-500/10 hover:text-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
-    >
-      {children}
-    </button>
+    <span className="inline-flex whitespace-nowrap rounded-full border border-violet-500/20 bg-violet-500/[0.08] px-2.5 py-1.5 text-[8px] font-black text-violet-600">
+      {label}
+    </span>
   );
 }
-
-/* =========================================================
-   BADGES
-========================================================= */
 
 function StatusBadge({
   status,
 }: {
-  status: Transaction["status"];
+  status: TransactionStatus;
 }) {
-  const config =
-    status === "COMPLETED"
-      ? {
-          label: "Completed",
-          className:
-            "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-          icon: CheckCircle2,
-        }
-      : status === "PENDING"
-        ? {
-            label: "Pending",
-            className:
-              "border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400",
-            icon: Clock3,
-          }
-        : {
-            label: "Failed",
-            className:
-              "border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-400",
-            icon: XCircle,
-          };
+  const classes: Record<
+    TransactionStatus,
+    string
+  > = {
+    COMPLETED:
+      "border-emerald-500/20 bg-emerald-500/10 text-emerald-600",
+
+    PENDING:
+      "border-amber-500/20 bg-amber-500/10 text-amber-600",
+
+    FAILED:
+      "border-rose-500/20 bg-rose-500/10 text-rose-600",
+
+    CANCELLED:
+      "border-slate-500/20 bg-slate-500/10 text-slate-600",
+  };
+
+  const icons: Record<
+    TransactionStatus,
+    ElementType
+  > = {
+    COMPLETED:
+      CheckCircle2,
+    PENDING: Clock3,
+    FAILED: XCircle,
+    CANCELLED: X,
+  };
 
   const Icon =
-    config.icon;
+    icons[status];
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[8px] font-black ${config.className}`}
+      className={`inline-flex whitespace-nowrap items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[8px] font-black ${classes[status]}`}
     >
-      <Icon className="h-3 w-3" />
-      {config.label}
+      {status ===
+        "PENDING" && (
+        <span className="relative flex h-1.5 w-1.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-30" />
+          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-current" />
+        </span>
+      )}
+
+      {status !==
+        "PENDING" && (
+        <Icon className="h-3 w-3" />
+      )}
+
+      {
+        STATUS_META[
+          status
+        ].label
+      }
     </span>
   );
 }
@@ -1895,22 +3042,72 @@ function StatusBadge({
 function RiskBadge({
   risk,
 }: {
-  risk: Transaction["riskScore"];
+  risk: string;
 }) {
-  const config =
-    risk === "HIGH"
-      ? "border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-400"
-      : risk === "MEDIUM"
-        ? "border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400"
-        : "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400";
+  const normalized =
+    risk.toUpperCase();
+
+  const className =
+    normalized ===
+    "HIGH"
+      ? "border-rose-500/20 bg-rose-500/10 text-rose-600"
+      : normalized ===
+          "MEDIUM"
+        ? "border-amber-500/20 bg-amber-500/10 text-amber-600"
+        : "border-emerald-500/20 bg-emerald-500/10 text-emerald-600";
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[8px] font-black ${config}`}
+      className={`inline-flex whitespace-nowrap items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-[8px] font-black ${className}`}
     >
       <ShieldAlert className="h-3 w-3" />
-      {risk}
+      {normalized}
     </span>
+  );
+}
+
+function PageButton({
+  label,
+  disabled,
+  onClick,
+  children,
+}: {
+  label: string;
+  disabled: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <motion.button
+      type="button"
+      whileHover={
+        !disabled
+          ? {
+              y: -1,
+              scale: 1.03,
+            }
+          : undefined
+      }
+      whileTap={
+        !disabled
+          ? {
+              scale: 0.95,
+            }
+          : undefined
+      }
+      aria-label={
+        label
+      }
+      disabled={
+        disabled
+      }
+      onClick={
+        onClick
+      }
+      className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-background transition hover:border-violet-500/30 hover:bg-violet-500/10 hover:text-violet-600 disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      {children}
+    </motion.button>
   );
 }
 
@@ -1925,12 +3122,6 @@ function TransactionDrawer({
   transaction: Transaction;
   onClose: () => void;
 }) {
-  const sender =
-    transaction.senderId;
-
-  const receiver =
-    transaction.receiverId;
-
   return (
     <motion.div
       initial={{
@@ -1942,32 +3133,46 @@ function TransactionDrawer({
       exit={{
         opacity: 0,
       }}
-      className="fixed inset-0 z-[120] bg-black/45 backdrop-blur-[3px]"
-      onMouseDown={onClose}
+      transition={{
+        duration: 0.22,
+      }}
+      onMouseDown={
+        onClose
+      }
+      className="fixed inset-0 z-[120] bg-black/45 backdrop-blur-[6px]"
     >
       <motion.aside
         initial={{
           x: "100%",
+          opacity: 0.8,
         }}
         animate={{
           x: 0,
+          opacity: 1,
         }}
         exit={{
           x: "100%",
+          opacity: 0.8,
         }}
         transition={{
           type: "spring",
-          stiffness: 290,
-          damping: 30,
+          stiffness: 320,
+          damping: 32,
+          mass: 0.85,
         }}
-        onMouseDown={(event) =>
+        onMouseDown={(
+          event
+        ) =>
           event.stopPropagation()
         }
-        className="absolute right-0 top-0 flex h-full w-full max-w-[520px] flex-col border-l border-border bg-background text-foreground shadow-[-24px_0_70px_rgba(0,0,0,0.22)]"
+        className="absolute right-0 top-0 flex h-full w-full max-w-[540px] flex-col border-l border-border bg-background shadow-[0_0_80px_rgba(0,0,0,.24)]"
       >
-        <div className="border-b border-border bg-card px-5 py-5 sm:px-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex min-w-0 items-start gap-3">
+        {/* HEADER */}
+        <div className="relative overflow-hidden border-b border-border bg-card p-5 sm:p-6">
+          <div className="pointer-events-none absolute -right-20 -top-20 h-52 w-52 rounded-full bg-violet-500/[0.07] blur-3xl" />
+
+          <div className="relative flex items-start justify-between gap-4">
+            <div className="flex min-w-0 gap-3">
               <TransactionIcon
                 type={
                   transaction.type
@@ -1975,31 +3180,45 @@ function TransactionDrawer({
               />
 
               <div className="min-w-0">
-                <p className="text-[8px] font-black uppercase tracking-[0.15em] text-indigo-500 dark:text-indigo-400">
-                  Transaction Details
+                <p className="text-[8px] font-black uppercase tracking-[0.15em] text-violet-600">
+                  Transaction
+                  details
                 </p>
 
-                <h2 className="mt-1 truncate text-xl font-black text-card-foreground">
+                <h2 className="mt-1 truncate text-xl font-black tracking-tight">
                   {transaction.reference ||
-                    "Transaction Record"}
+                    typeLabel(
+                      transaction.type
+                    )}
                 </h2>
 
-                <p className="mt-1 font-mono text-[8px] text-muted-foreground">
-                  {transaction._id}
+                <p className="mt-1 truncate font-mono text-[8px] text-muted-foreground">
+                  {transaction.publicId ||
+                    transaction._id}
                 </p>
               </div>
             </div>
 
-            <button
+            <motion.button
               type="button"
-              onClick={onClose}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border bg-muted text-muted-foreground transition hover:bg-indigo-500/10 hover:text-indigo-500"
+              whileHover={{
+                rotate: 5,
+                scale: 1.04,
+              }}
+              whileTap={{
+                scale: 0.94,
+              }}
+              onClick={
+                onClose
+              }
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border bg-muted/70 text-muted-foreground transition hover:bg-violet-500/10 hover:text-violet-600"
+              aria-label="Close transaction details"
             >
               <X className="h-4 w-4" />
-            </button>
+            </motion.button>
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-2">
+          <div className="relative mt-4 flex flex-wrap gap-2">
             <StatusBadge
               status={
                 transaction.status
@@ -2008,201 +3227,297 @@ function TransactionDrawer({
 
             <RiskBadge
               risk={
-                transaction.riskScore
+                transaction.riskScore ||
+                "LOW"
               }
             />
 
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-indigo-500/20 bg-indigo-500/10 px-2.5 py-1.5 text-[8px] font-black text-indigo-600 dark:text-indigo-400">
-              <WalletCards className="h-3 w-3" />
-              {transaction.type}
-            </span>
+            <SourceBadge
+              source={
+                transaction.source
+              }
+              type={
+                transaction.type
+              }
+            />
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6">
-          <section className="rounded-[24px] border border-indigo-500/20 bg-indigo-500/10 p-5">
-            <p className="text-[8px] font-black uppercase tracking-[0.14em] text-indigo-500 dark:text-indigo-400">
-              Transaction Amount
-            </p>
-
-            <motion.p
-              initial={{
-                opacity: 0,
-                y: 5,
-              }}
-              animate={{
-                opacity: 1,
-                y: 0,
-              }}
-              className="mt-2 text-3xl font-black tracking-tight text-foreground"
-            >
-              {formatCurrency(
-                transaction.amount,
-                transaction.currency
-              )}
-            </motion.p>
-
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <DrawerMiniStat
-                label="Currency"
-                value={
-                  transaction.currency
-                }
-              />
-
-              <DrawerMiniStat
-                label="Type"
-                value={
-                  transaction.type
-                }
-              />
-            </div>
-          </section>
-
-          <DrawerSection
-            icon={UserRound}
-            eyebrow="Parties"
-            title="Sender & Receiver"
+        {/* CONTENT */}
+        <div className="flex-1 space-y-4 overflow-y-auto p-5 sm:space-y-5 sm:p-6">
+          {/* AMOUNT */}
+          <motion.section
+            initial={{
+              opacity: 0,
+              y: 10,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+            }}
+            transition={{
+              delay: 0.08,
+            }}
+            className="relative overflow-hidden rounded-[24px] border border-violet-500/20 bg-violet-500/[0.08] p-5"
           >
-            <div className="grid gap-3 sm:grid-cols-2">
-              <PartyCard
-                role="Sender"
-                user={sender}
-                tone="blue"
-              />
+            <div className="pointer-events-none absolute -right-14 -top-14 h-32 w-32 rounded-full bg-violet-500/10 blur-2xl" />
 
-              <PartyCard
-                role="Receiver"
-                user={receiver}
-                tone="emerald"
-              />
-            </div>
-          </DrawerSection>
-
-          <DrawerSection
-            icon={Hash}
-            eyebrow="Identifiers"
-            title="Reference & Transaction ID"
-          >
-            <CopyField
-              label="Reference"
-              value={
-                transaction.reference ||
-                "No reference"
-              }
-            />
-
-            <div className="mt-3">
-              <CopyField
-                label="Transaction ID"
-                value={
-                  transaction._id
-                }
-              />
-            </div>
-          </DrawerSection>
-
-          <DrawerSection
-            icon={CalendarDays}
-            eyebrow="Timeline"
-            title="Transaction Timeline"
-          >
-            <TimelineItem
-              label="Created"
-              value={formatDate(
-                transaction.createdAt
-              )}
-              active
-            />
-
-            <TimelineItem
-              label="Last Updated"
-              value={formatDate(
-                transaction.updatedAt
-              )}
-            />
-
-            <TimelineItem
-              label="Current Status"
-              value={
-                transaction.status
-              }
-            />
-          </DrawerSection>
-
-          <DrawerSection
-            icon={ShieldAlert}
-            eyebrow="Risk Review"
-            title="Transaction Risk"
-          >
-            <div className="rounded-[20px] border border-border bg-muted/40 p-4">
-              <div className="flex items-start justify-between gap-4">
+            <div className="relative">
+              <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-[9px] font-black text-indigo-600 dark:text-indigo-400">
-                    Risk classification
+                  <p className="text-[8px] font-black uppercase tracking-[0.14em] text-violet-600">
+                    Transaction
+                    amount
                   </p>
 
-                  <p className="mt-1 text-[9px] leading-5 text-muted-foreground">
-                    This value comes from the transaction record currently returned by the admin transactions API.
+                  <p
+                    className={`mt-2 text-3xl font-black tracking-[-0.045em] ${
+                      transaction.amount ===
+                      null
+                        ? "text-amber-600"
+                        : ""
+                    }`}
+                  >
+                    {formatCurrency(
+                      transaction.amount,
+                      transaction.currency
+                    )}
                   </p>
                 </div>
 
-                <RiskBadge
-                  risk={
-                    transaction.riskScore
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-violet-500/15 bg-background/70 text-violet-600 shadow-sm backdrop-blur">
+                  <CircleDollarSign className="h-5 w-5" />
+                </div>
+              </div>
+
+              {transaction.integrity ===
+                "UNREADABLE" && (
+                <div className="mt-4 flex gap-2 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-3 text-[9px] leading-5 text-amber-700 dark:text-amber-400">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+
+                  <span>
+                    This legacy
+                    amount could
+                    not be
+                    authenticated.
+                    It is excluded
+                    from financial
+                    totals.
+                  </span>
+                </div>
+              )}
+            </div>
+          </motion.section>
+
+          <AnimatedDrawerSection
+            delay={0.12}
+          >
+            <DrawerSection
+              icon={UserRound}
+              title="Parties"
+            >
+              <div className="grid gap-3 sm:grid-cols-2">
+                <PartyCard
+                  label="From"
+                  party={
+                    transaction.senderId
+                  }
+                />
+
+                <PartyCard
+                  label="To"
+                  party={
+                    transaction.receiverId
                   }
                 />
               </div>
-            </div>
-          </DrawerSection>
+            </DrawerSection>
+          </AnimatedDrawerSection>
+
+          <AnimatedDrawerSection
+            delay={0.16}
+          >
+            <DrawerSection
+              icon={Hash}
+              title="Identifiers"
+            >
+              <CopyField
+                label="Public transaction ID"
+                value={
+                  transaction.publicId ||
+                  transaction._id
+                }
+              />
+
+              <div className="mt-3">
+                <CopyField
+                  label="Reference"
+                  value={
+                    transaction.reference ||
+                    "No reference"
+                  }
+                />
+              </div>
+            </DrawerSection>
+          </AnimatedDrawerSection>
+
+          <AnimatedDrawerSection
+            delay={0.2}
+          >
+            <DrawerSection
+              icon={
+                WalletCards
+              }
+              title="Ledger information"
+            >
+              <div className="grid grid-cols-2 gap-3">
+                <MiniInfo
+                  label="Type"
+                  value={typeLabel(
+                    transaction.type
+                  )}
+                />
+
+                <MiniInfo
+                  label="Source"
+                  value={
+                    transaction.source ||
+                    "WALLET"
+                  }
+                />
+
+                <MiniInfo
+                  label="Currency"
+                  value={
+                    transaction.currency
+                  }
+                />
+
+                <MiniInfo
+                  label="Mode"
+                  value={
+                    transaction.mode ||
+                    "—"
+                  }
+                />
+
+                {transaction.provider && (
+                  <MiniInfo
+                    label="Provider"
+                    value={
+                      transaction.provider
+                    }
+                  />
+                )}
+
+                <MiniInfo
+                  label="Integrity"
+                  value={
+                    transaction.integrity ||
+                    "VERIFIED"
+                  }
+                />
+              </div>
+            </DrawerSection>
+          </AnimatedDrawerSection>
+
+          <AnimatedDrawerSection
+            delay={0.24}
+          >
+            <DrawerSection
+              icon={
+                CalendarDays
+              }
+              title="Timeline"
+            >
+              <MiniInfo
+                label="Created"
+                value={formatDate(
+                  transaction.createdAt
+                )}
+              />
+
+              <div className="mt-3">
+                <MiniInfo
+                  label="Last updated"
+                  value={formatDate(
+                    transaction.updatedAt
+                  )}
+                />
+              </div>
+            </DrawerSection>
+          </AnimatedDrawerSection>
         </div>
 
-        <div className="border-t border-border bg-card px-5 py-4 sm:px-6">
-          <button
+        {/* FOOTER */}
+        <div className="border-t border-border bg-card/95 p-5 backdrop-blur-xl">
+          <motion.button
             type="button"
-            onClick={onClose}
-            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-indigo-600 text-[10px] font-black text-white transition hover:bg-indigo-700"
+            whileHover={{
+              y: -1,
+            }}
+            whileTap={{
+              scale: 0.985,
+            }}
+            onClick={
+              onClose
+            }
+            className="h-11 w-full rounded-2xl bg-violet-600 text-[10px] font-black text-white shadow-lg shadow-violet-600/15 transition hover:bg-violet-700"
           >
-            <CheckCircle2 className="h-4 w-4" />
             Done
-          </button>
+          </motion.button>
         </div>
       </motion.aside>
     </motion.div>
   );
 }
 
-/* =========================================================
-   DRAWER SECTION
-========================================================= */
+function AnimatedDrawerSection({
+  children,
+  delay,
+}: {
+  children: ReactNode;
+  delay: number;
+}) {
+  return (
+    <motion.div
+      initial={{
+        opacity: 0,
+        y: 12,
+      }}
+      animate={{
+        opacity: 1,
+        y: 0,
+      }}
+      transition={{
+        delay,
+        duration: 0.38,
+      }}
+    >
+      {children}
+    </motion.div>
+  );
+}
 
 function DrawerSection({
   icon: Icon,
-  eyebrow,
   title,
   children,
 }: {
-  icon: React.ElementType;
-  eyebrow: string;
+  icon: ElementType;
   title: string;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
-    <section className="mt-5 rounded-[24px] border border-border bg-card p-5 shadow-sm">
+    <section className="rounded-[24px] border border-border bg-card p-5 shadow-sm transition-shadow hover:shadow-md">
       <div className="flex items-center gap-3">
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-violet-500/10 bg-violet-500/10 text-violet-600">
           <Icon className="h-4 w-4" />
         </span>
 
-        <div>
-          <p className="text-[7px] font-black uppercase tracking-[0.14em] text-indigo-500 dark:text-indigo-400">
-            {eyebrow}
-          </p>
-
-          <h3 className="mt-0.5 text-[12px] font-black text-card-foreground">
-            {title}
-          </h3>
-        </div>
+        <h3 className="text-[12px] font-black">
+          {title}
+        </h3>
       </div>
 
       <div className="mt-4">
@@ -2212,11 +3527,45 @@ function DrawerSection({
   );
 }
 
-/* =========================================================
-   DRAWER MINI STAT
-========================================================= */
+function PartyCard({
+  label,
+  party,
+}: {
+  label: string;
+  party:
+    | string
+    | TransactionUser;
+}) {
+  return (
+    <motion.div
+      whileHover={{
+        y: -2,
+      }}
+      className="rounded-2xl border border-border bg-muted/35 p-4 transition hover:border-violet-500/15 hover:bg-violet-500/[0.035]"
+    >
+      <p className="text-[7px] font-black uppercase tracking-[0.13em] text-violet-600">
+        {label}
+      </p>
 
-function DrawerMiniStat({
+      <p className="mt-2 truncate text-[10px] font-black">
+        {getPartyName(
+          party
+        )}
+      </p>
+
+      <p className="mt-1 truncate text-[8px] text-muted-foreground">
+        {getPartyDetail(
+          party
+        ) ||
+          getPartyId(
+            party
+          )}
+      </p>
+    </motion.div>
+  );
+}
+
+function MiniInfo({
   label,
   value,
 }: {
@@ -2224,76 +3573,13 @@ function DrawerMiniStat({
   value: string;
 }) {
   return (
-    <div className="rounded-[16px] border border-border bg-muted/70 p-3">
-      <p className="text-[7px] font-black uppercase tracking-[0.11em] text-muted-foreground">
+    <div className="rounded-2xl border border-border bg-muted/35 p-3 transition hover:bg-muted/55">
+      <p className="text-[7px] font-black uppercase tracking-[0.12em] text-muted-foreground">
         {label}
       </p>
 
-      <p className="mt-1 text-[10px] font-black text-indigo-600 dark:text-indigo-400">
+      <p className="mt-1 break-words text-[9px] font-black">
         {value}
-      </p>
-    </div>
-  );
-}
-
-/* =========================================================
-   PARTY CARD
-========================================================= */
-
-function PartyCard({
-  role,
-  user,
-  tone,
-}: {
-  role: string;
-  user:
-    | string
-    | TransactionUser;
-  tone: "blue" | "emerald";
-}) {
-  const style =
-    TONE_CLASSES[tone];
-
-  const name =
-    getUserName(user);
-
-  const email =
-    getUserEmail(user);
-
-  const phone =
-    getUserPhone(user);
-
-  const id =
-    getUserId(user);
-
-  return (
-    <div
-      className={`rounded-[20px] border p-4 ${style.border} ${style.soft}`}
-    >
-      <p
-        className={`text-[7px] font-black uppercase tracking-[0.13em] ${style.text}`}
-      >
-        {role}
-      </p>
-
-      <p className="mt-2 truncate text-[11px] font-black text-card-foreground">
-        {name}
-      </p>
-
-      {email && (
-        <p className="mt-1 truncate text-[8px] text-muted-foreground">
-          {email}
-        </p>
-      )}
-
-      {phone && (
-        <p className="mt-1 truncate text-[8px] text-muted-foreground">
-          {phone}
-        </p>
-      )}
-
-      <p className="mt-2 font-mono text-[7px] text-muted-foreground">
-        {shortId(id, 7, 4)}
       </p>
     </div>
   );
@@ -2313,92 +3599,105 @@ function CopyField({
   const [
     copied,
     setCopied,
-  ] = useState(false);
+  ] =
+    useState(false);
 
-  const copy = async () => {
+  async function copy() {
     try {
       await navigator.clipboard.writeText(
         value
       );
 
-      setCopied(true);
+      setCopied(
+        true
+      );
 
       window.setTimeout(
-        () => setCopied(false),
-        1200
+        () =>
+          setCopied(
+            false
+          ),
+        1400
       );
     } catch {
-      setCopied(false);
+      setCopied(
+        false
+      );
     }
-  };
+  }
 
   return (
-    <div className="flex items-center gap-3 rounded-[18px] border border-border bg-muted/40 p-3">
-      <div className="min-w-0 flex-1">
-        <p className="text-[7px] font-black uppercase tracking-[0.11em] text-muted-foreground">
+    <div className="group flex items-center justify-between gap-3 rounded-2xl border border-border bg-muted/35 p-3 transition hover:border-violet-500/15 hover:bg-muted/50">
+      <div className="min-w-0">
+        <p className="text-[7px] font-black uppercase tracking-[0.12em] text-muted-foreground">
           {label}
         </p>
 
-        <p className="mt-1 break-all font-mono text-[8px] leading-4 text-indigo-600 dark:text-indigo-400">
+        <p className="mt-1 truncate font-mono text-[8px] font-bold">
           {value}
         </p>
       </div>
 
-      <button
+      <motion.button
         type="button"
-        onClick={() => void copy()}
+        whileHover={{
+          scale: 1.05,
+        }}
+        whileTap={{
+          scale: 0.92,
+        }}
+        aria-label={`Copy ${label}`}
+        onClick={() =>
+          void copy()
+        }
         className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition ${
           copied
-            ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-500"
-            : "border-border bg-card text-muted-foreground hover:border-indigo-500/20 hover:bg-indigo-500/10 hover:text-indigo-500"
+            ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-600"
+            : "border-border bg-card text-violet-600 hover:border-violet-500/20 hover:bg-violet-500/10"
         }`}
       >
-        {copied ? (
-          <Check className="h-4 w-4" />
-        ) : (
-          <Copy className="h-4 w-4" />
-        )}
-      </button>
-    </div>
-  );
-}
-
-/* =========================================================
-   TIMELINE
-========================================================= */
-
-function TimelineItem({
-  label,
-  value,
-  active = false,
-}: {
-  label: string;
-  value: string;
-  active?: boolean;
-}) {
-  return (
-    <div className="relative flex gap-3 pb-4 last:pb-0">
-      <div className="relative z-10 mt-1">
-        <span
-          className={`block h-2.5 w-2.5 rounded-full ${
-            active
-              ? "bg-indigo-500"
-              : "bg-muted-foreground/30"
-          }`}
-        />
-      </div>
-
-      <div className="min-w-0">
-        <p className="text-[8px] font-black text-muted-foreground">
-          {label}
-        </p>
-
-        <p className="mt-0.5 text-[9px] font-semibold text-indigo-600 dark:text-indigo-400">
-          {value}
-        </p>
-      </div>
-
-      <span className="absolute bottom-0 left-[4px] top-3 w-px bg-border last:hidden" />
+        <AnimatePresence
+          mode="wait"
+        >
+          {copied ? (
+            <motion.span
+              key="done"
+              initial={{
+                opacity: 0,
+                scale: 0.7,
+              }}
+              animate={{
+                opacity: 1,
+                scale: 1,
+              }}
+              exit={{
+                opacity: 0,
+                scale: 0.7,
+              }}
+            >
+              <CheckCircle2 className="h-4 w-4" />
+            </motion.span>
+          ) : (
+            <motion.span
+              key="copy"
+              initial={{
+                opacity: 0,
+                scale: 0.7,
+              }}
+              animate={{
+                opacity: 1,
+                scale: 1,
+              }}
+              exit={{
+                opacity: 0,
+                scale: 0.7,
+              }}
+            >
+              <Copy className="h-4 w-4" />
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </motion.button>
     </div>
   );
 }
