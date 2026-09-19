@@ -88,6 +88,15 @@ type SupportAiAnalysis = {
 
   suggestedReply: string;
 
+  verification: {
+    status:
+      | "verified"
+      | "partially_verified"
+      | "unverified";
+    label: string;
+    evidence: string[];
+  };
+
   safety: {
     humanApprovalRequired: true;
     canExecuteFinancialActions: false;
@@ -756,6 +765,55 @@ export default function SupportAiCopilotPage() {
                           <UserRound className="h-4 w-4" />
                         }
                       />
+                    </div>
+
+                    <div
+                      className={`rounded-[26px] border p-5 shadow-[0_12px_38px_rgba(15,23,42,0.04)] ${
+                        analysis.verification.status ===
+                        "verified"
+                          ? "border-emerald-200 bg-emerald-50"
+                          : analysis.verification.status ===
+                              "partially_verified"
+                            ? "border-amber-200 bg-amber-50"
+                            : "border-slate-200 bg-white"
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-violet-600" />
+
+                        <div>
+                          <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-500">
+                            Evidence status · {analysis.verification.status.replace(
+                              "_",
+                              " "
+                            )}
+                          </p>
+
+                          <p className="mt-1 text-sm font-black text-slate-900">
+                            {analysis.verification.label}
+                          </p>
+
+                          {analysis.verification.evidence.length > 0 ? (
+                            <ul className="mt-3 space-y-1.5">
+                              {analysis.verification.evidence.map(
+                                (item) => (
+                                  <li
+                                    key={item}
+                                    className="flex gap-2 text-xs leading-5 text-slate-600"
+                                  >
+                                    <CheckCircle2 className="mt-1 h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                                    <span>{item}</span>
+                                  </li>
+                                )
+                              )}
+                            </ul>
+                          ) : (
+                            <p className="mt-2 text-xs leading-5 text-slate-500">
+                              The customer claim needs manual verification because no matching live record was found.
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
                     {/* ==========================================

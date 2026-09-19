@@ -1,6 +1,7 @@
 import { ChevronRight } from "lucide-react";
-import { AnimatePresence, motion } from "framer-motion";
-function AttentionCard({
+import { motion } from "framer-motion";
+
+export default function AttentionCard({
   title,
   value,
   description,

@@ -41,6 +41,8 @@ import {
   type TicketStatus,
 } from "@/lib/api/supportDashboardApi";
 
+import SupportAiCopilot from "@/components/dashboard/support/SupportAiCopilot";
+
 /* =========================================================
    OPTIONS
 ========================================================= */
@@ -1976,6 +1978,13 @@ function TicketDrawer({
                     </p>
                   ) : null}
                 </div>
+
+                {/* AI verifies and recommends; the supporter remains in control. */}
+
+                <SupportAiCopilot
+                  ticket={ticket}
+                  onUseReply={setReply}
+                />
 
                 {/* MESSAGES */}
 
