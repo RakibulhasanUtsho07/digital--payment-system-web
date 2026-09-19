@@ -70,7 +70,7 @@ const adminNavItems = [
   },
   {
     label: "Security & Audits",
-    href: "/dashboard/security",
+    href: "/dashboard/admin/security",
     icon: Lock,
   },
   {

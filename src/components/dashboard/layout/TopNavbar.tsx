@@ -23,6 +23,7 @@ import {
   ArrowLeftRight,
   BarChart3,
   Bell,
+  Bot,
   BookOpen,
   ChevronDown,
   Command,
@@ -47,6 +48,8 @@ import {
 } from "lucide-react";
 
 import CofferAiCopilot from "@/components/dashboard/ai/CofferAiCopilot";
+import SupportChat from "@/components/shared/SupportChat";
+
 
 /* =========================================================
    TYPES
@@ -357,6 +360,34 @@ const searchItems: SearchItem[] = [
     icon: Activity,
     roles: ["admin", "super_admin"],
   },
+
+  /* =======================================================
+     SUPPORT OPERATIONS
+  ======================================================= */
+
+  {
+    id: "support-overview",
+    title: "Support Overview",
+    href: "/dashboard/support-dashboard",
+    icon: LayoutDashboard,
+    roles: ["support", "admin", "super_admin"],
+  },
+
+  {
+    id: "support-tickets",
+    title: "Support Tickets",
+    href: "/dashboard/support-dashboard/tickets",
+    icon: ReceiptText,
+    roles: ["support", "admin", "super_admin"],
+  },
+
+  {
+    id: "support-ai-copilot",
+    title: "Support AI Copilot",
+    href: "/dashboard/support-dashboard/ai-copilot",
+    icon: Bot,
+    roles: ["support", "admin", "super_admin"],
+  },
 ];
 
 /* =========================================================
@@ -402,6 +433,31 @@ const pageTitles: Record<string, string> = {
 
   "/dashboard/logs":
     "System Logs",
+
+  /* =======================================================
+     SUPPORT
+  ======================================================= */
+
+  "/dashboard/support-dashboard":
+    "Support Overview",
+
+  "/dashboard/support-dashboard/tickets":
+    "Support Tickets",
+
+  "/dashboard/support-dashboard/ai-copilot":
+    "Support AI Copilot",
+
+  "/dashboard/support-dashboard/conversations":
+    "Support Conversations",
+
+  "/dashboard/support-dashboard/escalations":
+    "Support Escalations",
+
+  "/dashboard/support-dashboard/providers":
+    "Provider Health",
+
+  "/dashboard/support-dashboard/sla":
+    "SLA Monitoring",
 
   /* =======================================================
      MERCHANT
@@ -2193,16 +2249,53 @@ export default function TopNavbar({
 
       {(userRole === "user" ||
         userRole === "merchant") && (
-        <CofferAiCopilot
-          userName={
-            userName
+        <>
+          <SupportChat />
+
+          <CofferAiCopilot
+            userName={
+              userName
+            }
+            portal={
+              userRole === "merchant"
+                ? "merchant"
+                : "personal"
+            }
+          />
+        </>
+      )}
+
+      {(userRole === "support" ||
+        userRole === "admin" ||
+        userRole === "super_admin") && (
+        <motion.button
+          type="button"
+          onClick={() =>
+            router.push(
+              "/dashboard/support-dashboard/ai-copilot"
+            )
           }
-          portal={
-            userRole === "merchant"
-              ? "merchant"
-              : "personal"
-          }
-        />
+          initial={{ opacity: 0, y: 18, scale: 0.9 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          whileHover={{ y: -3, scale: 1.02 }}
+          whileTap={{ scale: 0.97 }}
+          className="fixed bottom-4 right-4 z-[120] flex h-[58px] items-center gap-3 rounded-[20px] border border-violet-300/25 bg-[#120b27] px-3.5 text-white shadow-[0_22px_65px_rgba(65,31,132,.38)] outline-none focus-visible:ring-4 focus-visible:ring-violet-400/35 sm:bottom-6 sm:right-6"
+          aria-label="Open Support AI Copilot"
+        >
+          <span className="flex h-9 w-9 items-center justify-center rounded-[13px] border border-white/15 bg-white/10">
+            <Bot className="h-[19px] w-[19px]" />
+          </span>
+
+          <span className="hidden pr-1 text-left sm:block">
+            <span className="block text-[11px] font-black">
+              Support AI
+            </span>
+
+            <span className="mt-0.5 block text-[8px] font-bold uppercase tracking-[0.16em] text-violet-200/70">
+              Human-approved copilot
+            </span>
+          </span>
+        </motion.button>
       )}
     </>
   );
