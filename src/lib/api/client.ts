@@ -1,6 +1,12 @@
-const API_URL =
+const rawApiUrl = (
   process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:5000/api";
+  "http://localhost:5000"
+).replace(/\/+$/, "");
+
+/* Accept a host URL with or without the trailing /api segment. */
+const API_URL = /\/api$/i.test(rawApiUrl)
+  ? rawApiUrl
+  : `${rawApiUrl}/api`;
 
 /* =========================================================
    API ERROR TYPE
