@@ -10,6 +10,10 @@ import React, {
 import { AnimatePresence, motion } from "framer-motion";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   Activity,
   AlertTriangle,
   Bell,
@@ -38,7 +42,16 @@ import {
   XCircle,
 } from "lucide-react";
 
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
+
 import { apiClient } from "@/lib/api/client";
+import { TwoFactorOtpSettings } from "@/components/dashboard/security/TwoFactorOtpSettings";
 import {
   getPasskeys,
   registerDevicePasskey,
@@ -419,6 +432,45 @@ const securityLabel = (
 ========================================================= */
 
 export default function SecurityPage() {
+  const router =
+    useRouter();
+
+  /*
+   * DashboardSessionContext is populated from the
+   * authenticated backend profile by the dashboard layout.
+   * The backend-confirmed role is the source of truth.
+   */
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isUserRole =
+    user.role === "user";
+
+  /* =======================================================
+     USER-ONLY PAGE GUARD
+
+     Only personal role=user accounts may use Security Center.
+     Merchant / Analyst / Support / Admin / Super Admin
+     are redirected to their own dashboard home.
+  ======================================================= */
+
+  useEffect(() => {
+    if (isUserRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isUserRole,
+    router,
+    user.role,
+  ]);
+
   /* =======================================================
      MOUNT
   ======================================================= */
@@ -706,6 +758,10 @@ export default function SecurityPage() {
   const loadOverview =
     useCallback(
       async () => {
+        if (!isUserRole) {
+          return;
+        }
+
         setLoadingOverview(
           true
         );
@@ -776,7 +832,9 @@ export default function SecurityPage() {
           );
         }
       },
-      []
+      [
+        isUserRole,
+      ]
     );
 
   /* =======================================================
@@ -786,6 +844,10 @@ export default function SecurityPage() {
   const loadSessions =
     useCallback(
       async () => {
+        if (!isUserRole) {
+          return;
+        }
+
         setSessionsLoading(
           true
         );
@@ -870,7 +932,9 @@ export default function SecurityPage() {
           );
         }
       },
-      []
+      [
+        isUserRole,
+      ]
     );
 
   /* =======================================================
@@ -880,6 +944,10 @@ export default function SecurityPage() {
   const loadActivity =
     useCallback(
       async () => {
+        if (!isUserRole) {
+          return;
+        }
+
         setActivityLoading(
           true
         );
@@ -925,7 +993,10 @@ export default function SecurityPage() {
           );
         }
       },
-      [showToast]
+      [
+        isUserRole,
+        showToast,
+      ]
     );
 
   /* =======================================================
@@ -935,6 +1006,10 @@ export default function SecurityPage() {
   const loadPasskeys =
     useCallback(
       async () => {
+        if (!isUserRole) {
+          return;
+        }
+
         setPasskeysLoading(true);
         setPasskeyError("");
 
@@ -958,11 +1033,17 @@ export default function SecurityPage() {
           setPasskeysLoading(false);
         }
       },
-      []
+      [
+        isUserRole,
+      ]
     );
 
   const addPaymentPasskey =
     async () => {
+      if (!isUserRole) {
+        return;
+      }
+
       if (passkeyAction) return;
 
       if (
@@ -1006,6 +1087,10 @@ export default function SecurityPage() {
 
   const removePaymentPasskey =
     async (passkeyId: string) => {
+      if (!isUserRole) {
+        return;
+      }
+
       if (passkeyAction) return;
 
       setPasskeyAction(passkeyId);
@@ -1051,6 +1136,10 @@ export default function SecurityPage() {
   const refreshAll =
     useCallback(
       async () => {
+        if (!isUserRole) {
+          return;
+        }
+
         await Promise.all([
           loadOverview(),
           loadSessions(),
@@ -1058,6 +1147,7 @@ export default function SecurityPage() {
         ]);
       },
       [
+        isUserRole,
         loadOverview,
         loadSessions,
         loadActivity,
@@ -1070,6 +1160,10 @@ export default function SecurityPage() {
 
   useEffect(() => {
     setMounted(true);
+
+    if (!isUserRole) {
+      return;
+    }
 
     void refreshAll();
 
@@ -1106,9 +1200,19 @@ export default function SecurityPage() {
         handleFocus
       );
     };
-  }, [refreshAll]);
+  }, [
+    isUserRole,
+    refreshAll,
+  ]);
 
   useEffect(() => {
+    if (!isUserRole) {
+      setPasskeys([]);
+      setPasskeyError("");
+
+      return;
+    }
+
     if (
       !loadingOverview &&
       security.checklist
@@ -1120,6 +1224,7 @@ export default function SecurityPage() {
       setPasskeyError("");
     }
   }, [
+    isUserRole,
     loadingOverview,
     security.checklist
       .kycCompleted,
@@ -1180,6 +1285,10 @@ export default function SecurityPage() {
     async (
       key: keyof AlertSettings
     ) => {
+      if (!isUserRole) {
+        return;
+      }
+
       const previousValue =
         alerts[key];
 
@@ -1287,6 +1396,10 @@ export default function SecurityPage() {
     async (
       sessionId: string
     ) => {
+      if (!isUserRole) {
+        return;
+      }
+
       if (!sessionId) {
         return;
       }
@@ -1355,6 +1468,10 @@ export default function SecurityPage() {
 
   const terminateOtherSessions =
     async () => {
+      if (!isUserRole) {
+        return;
+      }
+
       setSessionActionLoading(
         "others"
       );
@@ -1416,6 +1533,10 @@ export default function SecurityPage() {
 
   const runSecurityCheck =
     async () => {
+      if (!isUserRole) {
+        return;
+      }
+
       if (isScanning) {
         return;
       }
@@ -1470,6 +1591,10 @@ export default function SecurityPage() {
 
   const startTwoFASetup =
     async () => {
+      if (!isUserRole) {
+        return;
+      }
+
       if (
         !twoFAPassword.trim()
       ) {
@@ -1551,6 +1676,10 @@ export default function SecurityPage() {
 
   const verifyTwoFASetup =
     async () => {
+      if (!isUserRole) {
+        return;
+      }
+
       const code =
         setupCode.trim();
 
@@ -1650,6 +1779,10 @@ export default function SecurityPage() {
 
   const disableTwoFA =
     async () => {
+      if (!isUserRole) {
+        return;
+      }
+
       if (
         !twoFAPassword.trim()
       ) {
@@ -1737,6 +1870,10 @@ export default function SecurityPage() {
 
   const updateTwoFAMethod =
     async () => {
+      if (!isUserRole) {
+        return;
+      }
+
       if (
         !twoFAPassword.trim()
       ) {
@@ -1826,6 +1963,10 @@ export default function SecurityPage() {
 
   const regenerateBackupCodes =
     async () => {
+      if (!isUserRole) {
+        return;
+      }
+
       if (
         !twoFAPassword.trim()
       ) {
@@ -1906,6 +2047,10 @@ export default function SecurityPage() {
       currentPassword: string,
       newPassword: string
     ) => {
+      if (!isUserRole) {
+        return;
+      }
+
       setPasswordBusy(
         true
       );
@@ -1973,6 +2118,10 @@ export default function SecurityPage() {
 
   const freezeWallet =
     async () => {
+      if (!isUserRole) {
+        return;
+      }
+
       if (
         !walletPassword.trim()
       ) {
@@ -2048,6 +2197,10 @@ export default function SecurityPage() {
 
   const unfreezeWallet =
     async () => {
+      if (!isUserRole) {
+        return;
+      }
+
       if (
         !walletPassword.trim()
       ) {
@@ -2122,6 +2275,10 @@ export default function SecurityPage() {
 
   const copySetupData =
     async () => {
+      if (!isUserRole) {
+        return;
+      }
+
       if (!setupSecret) {
         return;
       }
@@ -2156,6 +2313,10 @@ export default function SecurityPage() {
 
   const copyBackupCodes =
     async () => {
+      if (!isUserRole) {
+        return;
+      }
+
       if (
         backupCodes.length ===
         0
@@ -2185,6 +2346,10 @@ export default function SecurityPage() {
 
   const reviewSessions =
     async () => {
+      if (!isUserRole) {
+        return;
+      }
+
       await loadSessions();
 
       window.setTimeout(
@@ -2202,6 +2367,30 @@ export default function SecurityPage() {
         50
       );
     };
+
+  /* =======================================================
+     USER-ONLY REDIRECTING
+  ======================================================= */
+
+  if (!isUserRole) {
+    return (
+      <div className="flex min-h-[70vh] items-center justify-center bg-background px-4 text-foreground">
+        <div className="flex flex-col items-center text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-200/50 bg-violet-50 text-violet-700 shadow-sm dark:border-violet-900/60 dark:bg-violet-950/30 dark:text-violet-200">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-foreground">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">
+            Security Center is available only to personal user accounts.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   /* =======================================================
      PRE-MOUNT
@@ -2257,119 +2446,18 @@ export default function SecurityPage() {
 
             {/* 2FA */}
 
-            <TwoFactorCard
-              enabled={
-                twoFAEnabled
+            <TwoFactorOtpSettings
+              initialEnabled={twoFAEnabled}
+              initialMethod={
+                twoFAMethod === "sms"
+                  ? "sms"
+                  : "email"
               }
-              method={
-                twoFAMethod
-              }
-              availability={
-                deliveryAvailability
-              }
-              busy={
-                twoFABusy
-              }
-              onEnable={() => {
-                setTwoFAPassword(
-                  ""
-                );
-
-                setShowTwoFAPassword(
-                  false
-                );
-
-                setSetupSecret(
-                  ""
-                );
-
-                setSetupUri(
-                  ""
-                );
-
-                setSetupCode(
-                  ""
-                );
-
-                setTwoFAModal(
-                  "setup"
-                );
+              availability={{
+                email: deliveryAvailability.email,
+                sms: deliveryAvailability.sms,
               }}
-              onDisable={() => {
-                setTwoFAPassword(
-                  ""
-                );
-
-                setShowTwoFAPassword(
-                  false
-                );
-
-                setTwoFAModal(
-                  "disable"
-                );
-              }}
-              onMethodChange={(
-                method
-              ) => {
-                setSelectedMethod(
-                  method
-                );
-
-                setTwoFAPassword(
-                  ""
-                );
-
-                setShowTwoFAPassword(
-                  false
-                );
-
-                setTwoFAModal(
-                  "method"
-                );
-              }}
-              onBackupCodes={() => {
-                setTwoFAPassword(
-                  ""
-                );
-
-                setShowTwoFAPassword(
-                  false
-                );
-
-                setTwoFAModal(
-                  "backup"
-                );
-              }}
-            />
-
-            {/* BIOMETRIC PAYMENT */}
-
-            <PasskeyCard
-              passkeys={passkeys}
-              loading={passkeysLoading}
-              action={passkeyAction}
-              error={passkeyError}
-              kycVerified={
-                security.checklist
-                  .kycCompleted
-              }
-              supported={
-                typeof window !==
-                  "undefined" &&
-                "PublicKeyCredential" in
-                  window
-              }
-              onRegister={() =>
-                void addPaymentPasskey()
-              }
-              onRemove={(id) =>
-                void removePaymentPasskey(
-                  id
-                )
-              }
-              onReload={() =>
-                void loadPasskeys()
-              }
+              onChanged={refreshAll}
             />
 
             {/* PASSWORD */}
@@ -2552,89 +2640,6 @@ export default function SecurityPage() {
             }
             onSubmit={
               changePassword
-            }
-          />
-        )}
-      </AnimatePresence>
-
-      {/* 2FA MODAL */}
-
-      <AnimatePresence>
-        {twoFAModal && (
-          <TwoFAModal
-            mode={
-              twoFAModal
-            }
-            enabled={
-              twoFAEnabled
-            }
-            busy={
-              twoFABusy
-            }
-            password={
-              twoFAPassword
-            }
-            setPassword={
-              setTwoFAPassword
-            }
-            showPassword={
-              showTwoFAPassword
-            }
-            setShowPassword={
-              setShowTwoFAPassword
-            }
-            secret={
-              setupSecret
-            }
-            uri={
-              setupUri
-            }
-            code={
-              setupCode
-            }
-            setCode={
-              setSetupCode
-            }
-            selectedMethod={
-              selectedMethod
-            }
-            setSelectedMethod={
-              setSelectedMethod
-            }
-            availability={
-              deliveryAvailability
-            }
-            backupCodes={
-              backupCodes
-            }
-            onClose={() =>
-              setTwoFAModal(
-                null
-              )
-            }
-            onStart={
-              startTwoFASetup
-            }
-            onVerify={
-              verifyTwoFASetup
-            }
-            onDisable={
-              disableTwoFA
-            }
-            onUpdateMethod={
-              updateTwoFAMethod
-            }
-            onRegenerate={
-              regenerateBackupCodes
-            }
-            onCopySecret={
-              copySetupData
-            }
-            copied={
-              copied
-            }
-            onCopyBackupCodes={
-              copyBackupCodes
             }
           />
         )}
