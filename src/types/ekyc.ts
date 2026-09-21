@@ -23,6 +23,7 @@ export interface AdminEKYCVerification extends EKYCVerification {
     role: string;
     kycStatus: string;
   };
+
   providerName?: string;
   faceScore: number | null;
   faceQualityScore?: number | null;
@@ -34,6 +35,7 @@ export interface AdminEKYCVerification extends EKYCVerification {
   possibleDuplicateScore: number | null;
   processingStartedAt?: string;
   hasReviewBiometricTemplate: boolean;
+
   identity?: {
     claimedName: string;
     nid: string;
@@ -42,11 +44,29 @@ export interface AdminEKYCVerification extends EKYCVerification {
   };
 }
 
+export type PhoneOtpChannel =
+  | "sms"
+  | "whatsapp";
+
 export interface PhoneOtpChallenge {
+  id?: string;
   challengeId: string;
+  channel: PhoneOtpChannel;
+  provider?: string;
   maskedPhone: string;
   expiresAt: string;
+  resendAvailableAt?: string;
   resendAfterSeconds: number;
+}
+
+export interface PhoneOtpVerification {
+  challengeId: string;
+  verified: true;
+  phone: string;
+  maskedPhone: string;
+  channel: PhoneOtpChannel;
+  verifiedAt: string;
+  validUntil: string;
 }
 
 export interface NIDDocumentValidation {
