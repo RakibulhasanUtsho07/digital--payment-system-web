@@ -12,6 +12,10 @@ import {
 } from "framer-motion";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   Activity,
   AlertTriangle,
   ArrowRight,
@@ -35,6 +39,14 @@ import {
   X,
   Zap,
 } from "lucide-react";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   createCashFlowPlan,
@@ -259,6 +271,45 @@ function getRecurringOccurrences(
 ========================================================= */
 
 export default function CashFlowPage() {
+  const router =
+    useRouter();
+
+  /*
+   * DashboardSessionContext is populated from the
+   * authenticated backend profile by the dashboard layout.
+   * The backend-confirmed role is the source of truth.
+   */
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isUserRole =
+    user.role === "user";
+
+  /* =======================================================
+     USER-ONLY PAGE GUARD
+
+     Only personal role=user accounts may use Cash Flow.
+     Merchant / Analyst / Support / Admin / Super Admin
+     are sent back to their own dashboard home.
+  ======================================================= */
+
+  useEffect(() => {
+    if (isUserRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isUserRole,
+    router,
+    user.role,
+  ]);
+
   const [
     isMounted,
     setIsMounted,
@@ -486,6 +537,18 @@ export default function CashFlowPage() {
     async (
       silent = false
     ) => {
+      /*
+       * Non-user roles must not start personal wallet,
+       * transaction or cash-flow-plan requests from here.
+       */
+      if (!isUserRole) {
+        setIsLoading(false);
+        setIsRefreshing(false);
+        setIsMounted(true);
+
+        return;
+      }
+
       try {
         if (silent) {
           setIsRefreshing(true);
@@ -607,8 +670,20 @@ export default function CashFlowPage() {
     };
 
   useEffect(() => {
+    if (!isUserRole) {
+      setIsLoading(false);
+      setIsRefreshing(false);
+      setIsMounted(true);
+
+      return;
+    }
+
     void loadCashFlow();
-  }, []);
+
+    // Dashboard session role is stable for the signed-in session.
+    // We intentionally reload only when the authenticated role changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUserRole]);
 
   /* =======================================================
      TOAST
@@ -1484,6 +1559,16 @@ export default function CashFlowPage() {
   const openAddEvent = (
     type: TransactionType
   ) => {
+    if (!isUserRole) {
+      router.replace(
+        getDashboardHome(
+          user.role
+        )
+      );
+
+      return;
+    }
+
     setFormType(type);
 
     setFormDate(
@@ -1502,6 +1587,16 @@ export default function CashFlowPage() {
       event: React.FormEvent
     ) => {
       event.preventDefault();
+
+      if (!isUserRole) {
+        router.replace(
+          getDashboardHome(
+            user.role
+          )
+        );
+
+        return;
+      }
 
       if (isSavingPlan) {
         return;
@@ -1613,6 +1708,16 @@ export default function CashFlowPage() {
 
   const handleDeletePlan =
     async (id: string) => {
+      if (!isUserRole) {
+        router.replace(
+          getDashboardHome(
+            user.role
+          )
+        );
+
+        return;
+      }
+
       if (
         id.startsWith("txn_") ||
         deletingPlanId
@@ -1665,6 +1770,16 @@ export default function CashFlowPage() {
     };
 
   const refreshCashFlow = () => {
+    if (!isUserRole) {
+      router.replace(
+        getDashboardHome(
+          user.role
+        )
+      );
+
+      return;
+    }
+
     setSimulator(
       (current) => ({
         ...current,
@@ -1682,6 +1797,26 @@ export default function CashFlowPage() {
   /* =======================================================
      RENDER
   ======================================================= */
+
+  if (!isUserRole) {
+    return (
+      <main className="flex min-h-[70vh] items-center justify-center bg-background px-4">
+        <div className="flex flex-col items-center text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-200/50 bg-violet-50 text-violet-700 shadow-sm dark:border-violet-900/60 dark:bg-violet-950/30 dark:text-violet-200">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-foreground">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">
+            Cash Flow is available only to personal user accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   if (
     !isMounted ||

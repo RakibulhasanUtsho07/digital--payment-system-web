@@ -12,6 +12,10 @@ import {
 } from "framer-motion";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   AlertCircle,
   BarChart3,
   Camera,
@@ -32,6 +36,14 @@ import {
   X,
   Zap,
 } from "lucide-react";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   addReceiptTag,
@@ -126,6 +138,45 @@ function getErrorMessage(
 ========================================================= */
 
 export default function ReceiptsPage() {
+  const router =
+    useRouter();
+
+  /*
+   * DashboardSessionContext is populated from the
+   * authenticated backend profile by the dashboard layout.
+   * The backend-confirmed role is the source of truth.
+   */
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isUserRole =
+    user.role === "user";
+
+  /* =======================================================
+     USER-ONLY PAGE GUARD
+
+     Only role=user can stay in Receipts & Purchase Vault.
+     Merchant / Analyst / Support / Admin / Super Admin
+     are redirected to their own dashboard home.
+  ======================================================= */
+
+  useEffect(() => {
+    if (isUserRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isUserRole,
+    router,
+    user.role,
+  ]);
+
   const [
     receipts,
     setReceipts,
@@ -211,6 +262,17 @@ export default function ReceiptsPage() {
   const loadReceipts = async (
     silent = false
   ) => {
+    /*
+     * Non-user roles must not start personal receipt
+     * vault requests from this page.
+     */
+    if (!isUserRole) {
+      setLoading(false);
+      setRefreshing(false);
+
+      return;
+    }
+
     try {
       if (silent) {
         setRefreshing(true);
@@ -273,8 +335,18 @@ export default function ReceiptsPage() {
   };
 
   useEffect(() => {
+    if (!isUserRole) {
+      setLoading(false);
+      setRefreshing(false);
+
+      return;
+    }
+
     void loadReceipts();
-  }, []);
+
+    // Authenticated dashboard role is stable for this session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUserRole]);
 
   /* =======================================================
      DERIVED DATA
@@ -461,6 +533,16 @@ export default function ReceiptsPage() {
   const handleReceiptCreated = (
     receipt: ReceiptData
   ) => {
+    if (!isUserRole) {
+      router.replace(
+        getDashboardHome(
+          user.role
+        )
+      );
+
+      return;
+    }
+
     setReceipts((current) => [
       receipt,
       ...current,
@@ -476,6 +558,16 @@ export default function ReceiptsPage() {
   const handleFavorite = async (
     receipt: ReceiptData
   ) => {
+    if (!isUserRole) {
+      router.replace(
+        getDashboardHome(
+          user.role
+        )
+      );
+
+      return;
+    }
+
     try {
       const response =
         await setReceiptFavorite(
@@ -514,6 +606,16 @@ export default function ReceiptsPage() {
   const handleDelete = async (
     receipt: ReceiptData
   ) => {
+    if (!isUserRole) {
+      router.replace(
+        getDashboardHome(
+          user.role
+        )
+      );
+
+      return;
+    }
+
     try {
       const response =
         await deleteReceipt(
@@ -549,6 +651,16 @@ export default function ReceiptsPage() {
     receipt: ReceiptData,
     tag: string
   ) => {
+    if (!isUserRole) {
+      router.replace(
+        getDashboardHome(
+          user.role
+        )
+      );
+
+      return;
+    }
+
     try {
       const response =
         await addReceiptTag(
@@ -582,6 +694,30 @@ export default function ReceiptsPage() {
       );
     }
   };
+
+  /* =======================================================
+     USER-ONLY REDIRECTING
+  ======================================================= */
+
+  if (!isUserRole) {
+    return (
+      <main className="flex min-h-[70vh] items-center justify-center bg-background px-4 text-foreground">
+        <div className="flex flex-col items-center text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-200/50 bg-violet-50 text-violet-700 shadow-sm dark:border-violet-900/60 dark:bg-violet-950/30 dark:text-violet-200">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-foreground">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">
+            Receipts & Purchase Vault is available only to personal user accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   /* =======================================================
      LOADING
@@ -2078,6 +2214,35 @@ function AddReceiptModal({
     receipt: ReceiptData
   ) => void;
 }) {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isUserRole =
+    user.role === "user";
+
+  useEffect(() => {
+    if (isUserRole) {
+      return;
+    }
+
+    onClose();
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isUserRole,
+    onClose,
+    router,
+    user.role,
+  ]);
+
   const [
     step,
     setStep,
@@ -2240,6 +2405,19 @@ function AddReceiptModal({
   ====================================================== */
 
   const handleSave = async () => {
+    if (!isUserRole) {
+      onClose();
+
+      router.replace(
+        getDashboardHome(
+          user.role
+        )
+      );
+
+      return;
+    }
+
+
     const amount =
       Number(total);
 

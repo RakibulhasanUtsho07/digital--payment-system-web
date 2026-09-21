@@ -10,6 +10,10 @@ import {
   motion,
 } from "framer-motion";
 
+import {
+  useRouter,
+} from "next/navigation";
+
 import type {
   Variants,
 } from "framer-motion";
@@ -42,6 +46,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   getFinancialInsights,
@@ -155,6 +167,45 @@ const itemVariants: Variants = {
 ========================================================= */
 
 export default function InsightsPage() {
+  const router =
+    useRouter();
+
+  /*
+   * DashboardSessionContext is populated from the
+   * authenticated backend profile by the dashboard layout.
+   * Do not trust localStorage role for authorization.
+   */
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isUserRole =
+    user.role === "user";
+
+  /* =======================================================
+     USER-ONLY PAGE GUARD
+
+     Only role=user can remain on Financial Insights.
+     All other dashboard roles are redirected to their
+     own dashboard home.
+  ======================================================== */
+
+  useEffect(() => {
+    if (isUserRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isUserRole,
+    router,
+    user.role,
+  ]);
+
   const [
     timeRange,
     setTimeRange,
@@ -197,6 +248,16 @@ export default function InsightsPage() {
     async (
       range: TimeRange
     ) => {
+      /*
+       * A non-user role must not start the personal
+       * financial-insights request from this page.
+       */
+      if (!isUserRole) {
+        setIsLoading(false);
+
+        return;
+      }
+
       try {
         setIsLoading(true);
         setErrorMessage("");
@@ -242,10 +303,17 @@ export default function InsightsPage() {
   ======================================================== */
 
   useEffect(() => {
+    if (!isUserRole) {
+      setIsLoading(false);
+
+      return;
+    }
+
     void loadInsights(
       timeRange
     );
   }, [
+    isUserRole,
     timeRange,
   ]);
 
@@ -297,6 +365,26 @@ export default function InsightsPage() {
   /* =========================================================
      RENDER
   ========================================================== */
+
+  if (!isUserRole) {
+    return (
+      <main className="flex min-h-[70vh] items-center justify-center bg-background px-4">
+        <div className="flex flex-col items-center text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-200/50 bg-violet-50 text-violet-700 shadow-sm dark:border-violet-900/60 dark:bg-violet-950/30 dark:text-violet-200">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-foreground">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">
+            Financial Insights is available only to personal user accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main

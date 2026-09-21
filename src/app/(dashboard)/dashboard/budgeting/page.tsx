@@ -1,6 +1,7 @@
 "use client";
 
 import React, {
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -10,6 +11,10 @@ import {
   AnimatePresence,
   motion,
 } from "framer-motion";
+
+import {
+  useRouter,
+} from "next/navigation";
 
 import {
   Activity,
@@ -41,6 +46,14 @@ import {
   X,
   Zap,
 } from "lucide-react";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   addBudgetSavings,
@@ -256,6 +269,45 @@ function ModalShell({
 ========================================================= */
 
 export default function BudgetingPage() {
+  const router =
+    useRouter();
+
+  /*
+   * The dashboard layout/session gets the authenticated
+   * user from the backend profile. That server-confirmed
+   * role is the source of truth for this page.
+   */
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isUserRole =
+    user.role === "user";
+
+  /* =======================================================
+     USER-ONLY PAGE GUARD
+
+     Only a normal personal user can use Budgeting.
+     Merchant / Analyst / Support / Admin / Super Admin
+     are redirected to their own dashboard home.
+  ====================================================== */
+
+  useEffect(() => {
+    if (isUserRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isUserRole,
+    router,
+    user.role,
+  ]);
+
   const [
     isMounted,
     setIsMounted,
@@ -371,73 +423,117 @@ export default function BudgetingPage() {
      BACKEND DATA
   ====================================================== */
 
-  const loadBudgetData = async () => {
-    try {
-      setIsLoading(true);
-      setErrorMessage("");
+  const loadBudgetData =
+    useCallback(
+      async () => {
+        /*
+         * A non-user role must not even start personal
+         * budgeting API requests from this page.
+         */
+        if (!isUserRole) {
+          setIsLoading(false);
 
-      const current = new Date();
+          return;
+        }
 
-      const response =
-        await getBudgetDashboard(
-          current.getMonth() + 1,
-          current.getFullYear()
-        );
+        try {
+          setIsLoading(true);
+          setErrorMessage("");
 
-      if (
-        !response ||
-        response.success !== true
-      ) {
-        throw new Error(
-          response?.message ||
-            "Unable to load budget data."
-        );
-      }
+          const current =
+            new Date();
 
-      setSettings(response.settings);
-      setCategories(response.categories);
-      setExpenses(response.expenses);
-
-      setExpCategory(
-        (currentValue) => {
-          const stillExists =
-            response.categories.some(
-              (category) =>
-                category.id ===
-                currentValue
+          const response =
+            await getBudgetDashboard(
+              current.getMonth() + 1,
+              current.getFullYear()
             );
 
-          if (stillExists) {
-            return currentValue;
+          if (
+            !response ||
+            response.success !== true
+          ) {
+            throw new Error(
+              response?.message ||
+                "Unable to load budget data."
+            );
           }
 
-          return (
-            response.categories[0]?.id ||
-            ""
+          setSettings(
+            response.settings
+          );
+
+          setCategories(
+            response.categories
+          );
+
+          setExpenses(
+            response.expenses
+          );
+
+          setExpCategory(
+            (
+              currentValue
+            ) => {
+              const stillExists =
+                response.categories.some(
+                  (
+                    category
+                  ) =>
+                    category.id ===
+                    currentValue
+                );
+
+              if (
+                stillExists
+              ) {
+                return currentValue;
+              }
+
+              return (
+                response.categories[0]
+                  ?.id ||
+                ""
+              );
+            }
+          );
+        } catch (error) {
+          console.error(
+            "Budget dashboard loading error:",
+            error
+          );
+
+          setErrorMessage(
+            getErrorMessage(
+              error,
+              "Unable to load budget data."
+            )
+          );
+        } finally {
+          setIsLoading(
+            false
           );
         }
-      );
-    } catch (error) {
-      console.error(
-        "Budget dashboard loading error:",
-        error
-      );
-
-      setErrorMessage(
-        getErrorMessage(
-          error,
-          "Unable to load budget data."
-        )
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      },
+      [
+        isUserRole,
+      ]
+    );
 
   useEffect(() => {
     setIsMounted(true);
+
+    if (!isUserRole) {
+      setIsLoading(false);
+
+      return;
+    }
+
     void loadBudgetData();
-  }, []);
+  }, [
+    isUserRole,
+    loadBudgetData,
+  ]);
 
   /* =======================================================
      TOAST
@@ -854,6 +950,16 @@ export default function BudgetingPage() {
   ) => {
     event.preventDefault();
 
+    if (!isUserRole) {
+      router.replace(
+        getDashboardHome(
+          user.role
+        )
+      );
+
+      return;
+    }
+
     if (isSaving) {
       return;
     }
@@ -933,6 +1039,16 @@ export default function BudgetingPage() {
     ) => {
       event.preventDefault();
 
+      if (!isUserRole) {
+        router.replace(
+          getDashboardHome(
+            user.role
+          )
+        );
+
+        return;
+      }
+
       if (isSaving) {
         return;
       }
@@ -1011,6 +1127,16 @@ export default function BudgetingPage() {
     ) => {
       event.preventDefault();
 
+      if (!isUserRole) {
+        router.replace(
+          getDashboardHome(
+            user.role
+          )
+        );
+
+        return;
+      }
+
       if (isSaving) {
         return;
       }
@@ -1080,6 +1206,16 @@ export default function BudgetingPage() {
       event: React.FormEvent
     ) => {
       event.preventDefault();
+
+      if (!isUserRole) {
+        router.replace(
+          getDashboardHome(
+            user.role
+          )
+        );
+
+        return;
+      }
 
       if (isSaving) {
         return;
@@ -1181,6 +1317,17 @@ export default function BudgetingPage() {
       id: string,
       value: string
     ) => {
+
+      if (!isUserRole) {
+        router.replace(
+          getDashboardHome(
+            user.role
+          )
+        );
+
+        return;
+      }
+
       if (isSaving) {
         return;
       }
@@ -1262,6 +1409,26 @@ export default function BudgetingPage() {
   /* =======================================================
      RENDER
   ====================================================== */
+
+  if (!isUserRole) {
+    return (
+      <main className="flex min-h-[70vh] items-center justify-center bg-background px-4">
+        <div className="flex flex-col items-center text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-200/50 bg-violet-50 text-violet-700 shadow-sm dark:border-violet-900/60 dark:bg-violet-950/30 dark:text-violet-200">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-foreground">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">
+            Budgeting is available only to personal user accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   if (
     !isMounted ||
