@@ -356,30 +356,30 @@ export default function MerchantOnboardingPage() {
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full min-w-0">
       <header className="mb-6">
         <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-violet-700 dark:bg-violet-500/10 dark:text-violet-300">
           <Building2 className="h-3.5 w-3.5" />
           Business onboarding
         </div>
 
-        <h1 className="text-3xl font-black tracking-[-0.04em] text-slate-950 dark:text-white">
+        <h1 className="text-2xl font-black leading-tight tracking-[-0.04em] text-slate-950 sm:text-3xl dark:text-white">
           Set up your payment gateway
         </h1>
 
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+        <p className="mt-2 max-w-2xl text-xs leading-5 text-slate-500 sm:text-sm sm:leading-6 dark:text-slate-400">
           Tell us about the business that will accept customer payments through Coffer. Test checkout is enabled after this step; live access still requires verification.
         </p>
       </header>
       {checking ? (
-        <div className="flex min-h-72 flex-col items-center justify-center rounded-3xl border border-slate-200 bg-white p-8 text-center dark:border-white/10 dark:bg-white/[0.04]">
+        <div className="flex min-h-56 flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white p-5 text-center sm:min-h-72 sm:rounded-3xl sm:p-8 dark:border-white/10 dark:bg-white/[0.04]">
           <Loader2 className="h-8 w-8 animate-spin text-violet-600" />
           <p className="mt-4 text-sm font-extrabold text-slate-800 dark:text-slate-200">
             Checking your account…
           </p>
         </div>
       ) : blocked ? (
-        <div className="rounded-3xl border border-red-200 bg-red-50 p-6 text-red-800 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
+        <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-red-800 sm:rounded-3xl sm:p-6 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300">
           <LockKeyhole className="h-8 w-8" />
           <h2 className="mt-4 text-lg font-black">
             Gateway access is unavailable
@@ -390,7 +390,7 @@ export default function MerchantOnboardingPage() {
         </div>
       ) : (
         <>
-          <div className="mb-5 grid gap-3 sm:grid-cols-2">
+          <div className="mb-4 grid grid-cols-1 gap-3 sm:mb-5 sm:grid-cols-2">
             <div className="flex items-start gap-3 rounded-2xl border border-violet-200 bg-violet-50 p-4 dark:border-violet-500/20 dark:bg-violet-500/10">
               <FlaskConical className="mt-0.5 h-5 w-5 shrink-0 text-violet-600 dark:text-violet-300" />
               <div>
@@ -419,7 +419,7 @@ export default function MerchantOnboardingPage() {
           {error && (
             <div
               role="alert"
-              className="mb-5 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-xs font-semibold leading-5 text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300"
+              className="mb-4 flex flex-col items-start gap-2 rounded-2xl border border-red-200 bg-red-50 p-3 text-[11px] font-semibold leading-5 text-red-700 min-[380px]:flex-row sm:mb-5 sm:gap-3 sm:p-4 sm:text-xs dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300"
             >
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
               <span className="flex-1">
@@ -444,7 +444,7 @@ export default function MerchantOnboardingPage() {
                 event,
               );
             }}
-            className="grid gap-4 sm:grid-cols-2"
+            className="grid min-w-0 grid-cols-1 gap-3.5 sm:grid-cols-2 sm:gap-4"
           >
             <label className="block">
               <span className="text-xs font-extrabold text-slate-700 dark:text-slate-300">
@@ -624,7 +624,7 @@ export default function MerchantOnboardingPage() {
               />
             </label>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
               <label className="block">
                 <span className="text-xs font-extrabold text-slate-700 dark:text-slate-300">
                   Code

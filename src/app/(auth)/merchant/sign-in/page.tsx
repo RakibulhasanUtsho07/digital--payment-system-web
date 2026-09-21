@@ -220,21 +220,21 @@ export default function MerchantSignInPage() {
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full min-w-0">
       <header className="mb-6">
         <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-violet-700 dark:bg-violet-500/10 dark:text-violet-300">
           <ShieldCheck className="h-3.5 w-3.5" />
           Merchant portal
         </div>
 
-        <h1 className="text-3xl font-black tracking-[-0.04em] text-slate-950 dark:text-white">
+        <h1 className="text-2xl font-black leading-tight tracking-[-0.04em] text-slate-950 sm:text-3xl dark:text-white">
           {step ===
           "credentials"
             ? "Sign in to your payment gateway"
             : "Verify it’s you"}
         </h1>
 
-        <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+        <p className="mt-2 text-xs leading-5 text-slate-500 sm:text-sm sm:leading-6 dark:text-slate-400">
           {step ===
           "credentials"
             ? "Use your merchant-owner credentials to manage checkout, integrations, transactions and settlements."
@@ -244,7 +244,7 @@ export default function MerchantSignInPage() {
       {error && (
         <div
           role="alert"
-          className="mb-5 flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-xs font-semibold leading-5 text-red-700 dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300"
+          className="mb-4 flex items-start gap-2.5 rounded-2xl border border-red-200 bg-red-50 p-3 text-[11px] font-semibold leading-5 text-red-700 sm:mb-5 sm:gap-3 sm:p-4 sm:text-xs dark:border-red-900/50 dark:bg-red-950/30 dark:text-red-300"
         >
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           {error}
@@ -259,7 +259,7 @@ export default function MerchantSignInPage() {
               event,
             );
           }}
-          className="space-y-4"
+          className="space-y-3.5 sm:space-y-4"
         >
           <label className="block">
             <span className="text-xs font-extrabold text-slate-700 dark:text-slate-300">
@@ -362,7 +362,7 @@ export default function MerchantSignInPage() {
               event,
             );
           }}
-          className="space-y-4"
+          className="space-y-3.5 sm:space-y-4"
         >
           <div className="flex items-start gap-3 rounded-2xl border border-violet-200 bg-violet-50 p-4 text-xs leading-5 text-violet-800 dark:border-violet-500/20 dark:bg-violet-500/10 dark:text-violet-200">
             <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
@@ -430,7 +430,7 @@ export default function MerchantSignInPage() {
         </form>
       )}
 
-      <div className="mt-6 flex flex-col gap-3 border-t border-slate-200 pt-6 text-center text-xs text-slate-500 dark:border-white/10">
+      <div className="mt-5 flex flex-col gap-2.5 border-t border-slate-200 pt-5 text-center text-[11px] leading-5 text-slate-500 sm:mt-6 sm:gap-3 sm:pt-6 sm:text-xs dark:border-white/10">
         <p>
           New to the Coffer payment gateway?{" "}
           <Link

@@ -394,21 +394,21 @@ export default function MerchantSignUpPage() {
   };
 
   return (
-    <div className="w-full">
+    <div className="w-full min-w-0">
       <header className="mb-6">
         <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-violet-700 dark:bg-violet-500/10 dark:text-violet-300">
           <UserPlus className="h-3.5 w-3.5" />
           Merchant registration
         </div>
 
-        <h1 className="text-3xl font-black tracking-[-0.04em] text-slate-950 dark:text-white">
+        <h1 className="text-2xl font-black leading-tight tracking-[-0.04em] text-slate-950 sm:text-3xl dark:text-white">
           {step ===
           "account"
             ? "Create your gateway owner account"
             : "Verify your email"}
         </h1>
 
-        <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+        <p className="mt-2 break-words text-xs leading-5 text-slate-500 sm:text-sm sm:leading-6 dark:text-slate-400">
           {step ===
           "account"
             ? "Create the secure owner identity that will control your Coffer payment gateway. Business details come next."
@@ -443,7 +443,7 @@ export default function MerchantSignUpPage() {
               event,
             );
           }}
-          className="grid gap-4 sm:grid-cols-2"
+          className="grid min-w-0 grid-cols-1 gap-3.5 sm:grid-cols-2 sm:gap-4"
         >
           <label className="block sm:col-span-2">
             <span className="text-xs font-extrabold text-slate-700 dark:text-slate-300">
@@ -592,7 +592,7 @@ export default function MerchantSignUpPage() {
               onClick={() => {
                 fileInputRef.current?.click();
               }}
-              className="mt-2 flex min-h-16 w-full items-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-white px-4 text-left transition hover:border-violet-400 dark:border-white/15 dark:bg-white/[0.04]"
+              className="mt-2 flex min-h-16 w-full min-w-0 items-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-white px-3 py-2.5 text-left transition hover:border-violet-400 sm:px-4 dark:border-white/15 dark:bg-white/[0.04]"
             >
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-500/10 dark:text-violet-300">
                 <Camera className="h-4 w-4" />
@@ -676,7 +676,7 @@ export default function MerchantSignUpPage() {
                     ),
                 );
               }}
-              className="mt-2 h-14 w-full rounded-2xl border border-slate-200 bg-white px-4 text-center font-mono text-xl font-black tracking-[0.45em] text-slate-950 outline-none focus:border-violet-500 dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
+              className="mt-2 h-14 w-full rounded-2xl border border-slate-200 bg-white px-3 text-center font-mono text-lg font-black tracking-[0.28em] text-slate-950 outline-none focus:border-violet-500 sm:px-4 sm:text-xl sm:tracking-[0.45em] dark:border-white/10 dark:bg-white/[0.04] dark:text-white"
               placeholder="000000"
             />
           </label>
@@ -733,7 +733,7 @@ export default function MerchantSignUpPage() {
         </form>
       )}
 
-      <div className="mt-6 flex flex-col gap-3 border-t border-slate-200 pt-6 text-center text-xs text-slate-500 dark:border-white/10">
+      <div className="mt-5 flex flex-col gap-2.5 border-t border-slate-200 pt-5 text-center text-[11px] leading-5 text-slate-500 sm:mt-6 sm:gap-3 sm:pt-6 sm:text-xs dark:border-white/10">
         <p>
           Already have a Coffer account?{" "}
           <Link
