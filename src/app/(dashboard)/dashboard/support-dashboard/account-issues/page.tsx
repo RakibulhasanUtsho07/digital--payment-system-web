@@ -116,37 +116,37 @@ const STATUS_OPTIONS: Array<
     value: "All",
     label: "All statuses",
     description:
-      "Every account-support state",
+     "Every account-support state",
   },
   {
     value: "Open",
     label: "Open",
     description:
-      "New or active issue",
+     "New or active issue",
   },
   {
     value: "Waiting for Customer",
     label: "Waiting for Customer",
     description:
-      "Customer response required",
+     "Customer response required",
   },
   {
     value: "In Progress",
     label: "In Progress",
     description:
-      "Support investigation active",
+     "Support investigation active",
   },
   {
     value: "Escalated",
     label: "Escalated",
     description:
-      "Needs higher-level review",
+     "Needs higher-level review",
   },
   {
     value: "Resolved",
     label: "Resolved",
     description:
-      "Issue closed",
+     "Issue closed",
   },
 ];
 
@@ -157,31 +157,31 @@ const PRIORITY_OPTIONS: Array<
     value: "All",
     label: "All priorities",
     description:
-      "Any support priority",
+     "Any support priority",
   },
   {
     value: "Urgent",
     label: "Urgent",
     description:
-      "Immediate attention",
+     "Immediate attention",
   },
   {
     value: "High",
     label: "High",
     description:
-      "Important customer impact",
+     "Important customer impact",
   },
   {
     value: "Normal",
     label: "Normal",
     description:
-      "Standard workflow",
+     "Standard workflow",
   },
   {
     value: "Low",
     label: "Low",
     description:
-      "Lower urgency",
+     "Lower urgency",
   },
 ];
 
@@ -192,19 +192,19 @@ const SLA_OPTIONS: Array<
     value: "All",
     label: "All SLA states",
     description:
-      "No SLA restriction",
+     "No SLA restriction",
   },
   {
     value: "Due Soon",
     label: "Due Soon",
     description:
-      "SLA deadline approaching",
+     "SLA deadline approaching",
   },
   {
     value: "Breached",
     label: "Breached",
     description:
-      "SLA deadline passed",
+     "SLA deadline passed",
   },
 ];
 
@@ -350,28 +350,28 @@ function statusStyle(
 ): string {
   if (
     status ===
-    "Resolved"
+   "Resolved"
   ) {
     return "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
   }
 
   if (
     status ===
-    "Escalated"
+   "Escalated"
   ) {
     return "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300";
   }
 
   if (
     status ===
-    "Waiting for Customer"
+   "Waiting for Customer"
   ) {
     return "border-amber-500/20 bg-amber-500/10 text-amber-800 dark:text-amber-300";
   }
 
   if (
     status ===
-    "In Progress"
+   "In Progress"
   ) {
     return "border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300";
   }
@@ -384,23 +384,23 @@ function priorityStyle(
 ): string {
   if (
     priority ===
-    "Urgent"
+   "Urgent"
   ) {
     return "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300";
   }
 
   if (
     priority ===
-    "High"
+   "High"
   ) {
     return "border-orange-500/20 bg-orange-500/10 text-orange-700 dark:text-orange-300";
   }
 
   if (
     priority ===
-    "Low"
+   "Low"
   ) {
-    return "border-slate-300 bg-slate-100 text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300";
+    return "border-slate-300 bg-muted text-slate-600  dark:text-slate-300";
   }
 
   return "border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300";
@@ -468,14 +468,14 @@ const reveal = {
     opacity: 0,
     y: 16,
     filter:
-      "blur(7px)",
+     "blur(7px)",
   },
 
   show: {
     opacity: 1,
     y: 0,
     filter:
-      "blur(0px)",
+     "blur(0px)",
   },
 };
 
@@ -560,7 +560,7 @@ function SupportSelect<
       ) {
         if (
           event.key ===
-          "Escape"
+         "Escape"
         ) {
           setOpen(
             false
@@ -569,23 +569,23 @@ function SupportSelect<
       }
 
       document.addEventListener(
-        "pointerdown",
+       "pointerdown",
         onPointerDown
       );
 
       document.addEventListener(
-        "keydown",
+       "keydown",
         onKeyDown
       );
 
       return () => {
         document.removeEventListener(
-          "pointerdown",
+         "pointerdown",
           onPointerDown
         );
 
         document.removeEventListener(
-          "keydown",
+         "keydown",
           onKeyDown
         );
       };
@@ -598,9 +598,9 @@ function SupportSelect<
       ref={
         rootRef
       }
-      className="relative"
+      className={`relative ${open ? "z-[80]" : "z-10"}`}
     >
-      <p className="mb-1.5 px-1 text-[9px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+      <p className="mb-1.5 px-1 text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
         {label}
       </p>
 
@@ -618,18 +618,18 @@ function SupportSelect<
               !current
           )
         }
-        className={`flex h-12 w-full items-center gap-3 rounded-2xl border bg-white px-3.5 text-left shadow-sm outline-none transition duration-200 dark:bg-slate-950/70 ${
+        className={`flex h-12 w-full items-center gap-3 rounded-2xl border bg-card px-3.5 text-left text-foreground shadow-sm outline-none transition duration-200 ${
           open
-            ? "border-emerald-500/60 ring-4 ring-emerald-500/10"
-            : "border-emerald-100 hover:border-emerald-300 dark:border-white/10"
+            ? "border-emerald-500/70 ring-4 ring-emerald-500/10"
+            : "border-border hover:border-emerald-500/45 hover:bg-muted/35"
         }`}
       >
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-emerald-500/12 text-emerald-600">
           <Icon className="h-4 w-4" />
         </span>
 
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-xs font-black text-slate-900 dark:text-white">
+          <span className="block truncate text-xs font-black text-foreground">
             {
               selected
                 ?.label
@@ -637,7 +637,7 @@ function SupportSelect<
           </span>
 
           {selected?.description && (
-            <span className="mt-0.5 block truncate text-[9px] text-slate-500 dark:text-slate-400">
+            <span className="mt-0.5 block truncate text-[9px] text-muted-foreground">
               {
                 selected.description
               }
@@ -656,7 +656,7 @@ function SupportSelect<
             duration:
               0.2,
           }}
-          className="text-slate-400"
+          className="text-muted-foreground"
         >
           <ChevronDown className="h-4 w-4" />
         </motion.span>
@@ -694,7 +694,7 @@ function SupportSelect<
                 0.16,
             }}
             role="listbox"
-            className="absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-2xl border border-emerald-100 bg-white/95 p-1.5 shadow-[0_24px_70px_-20px_rgba(5,150,105,.28)] backdrop-blur-xl dark:border-white/10 dark:bg-[#071b16]/95"
+            className="absolute left-0 right-0 z-[100] mt-2 overflow-hidden rounded-2xl border border-border bg-card/98 p-1.5 text-foreground shadow-[0_24px_70px_-20px_rgba(5,150,105,.28)] backdrop-blur-xl"
           >
             {options.map(
               (
@@ -725,15 +725,15 @@ function SupportSelect<
                     }}
                     className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
                       active
-                        ? "bg-emerald-500/10"
-                        : "hover:bg-emerald-50 dark:hover:bg-white/5"
+                        ? "bg-emerald-500/12"
+                        : "hover:bg-muted/70"
                     }`}
                   >
                     <span
                       className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg ${
                         active
                           ? "bg-emerald-600 text-white"
-                          : "bg-slate-100 text-slate-400 dark:bg-white/5"
+                          : "bg-muted text-muted-foreground"
                       }`}
                     >
                       {active ? (
@@ -744,14 +744,14 @@ function SupportSelect<
                     </span>
 
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-xs font-extrabold text-slate-900 dark:text-white">
+                      <span className="block truncate text-xs font-extrabold text-foreground">
                         {
                           option.label
                         }
                       </span>
 
                       {option.description && (
-                        <span className="mt-0.5 block truncate text-[9px] text-slate-500 dark:text-slate-400">
+                        <span className="mt-0.5 block truncate text-[9px] text-muted-foreground">
                           {
                             option.description
                           }
@@ -783,67 +783,67 @@ function metricTone(
 } {
   if (
     tone ===
-    "cyan"
+   "cyan"
   ) {
     return {
       shell:
-        "border-cyan-500/15 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300",
+       "border-cyan-500/15 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300",
       glow:
-        "bg-cyan-400/10",
+       "bg-cyan-400/10",
       bar:
-        "from-cyan-500 to-sky-400",
+       "from-cyan-500 to-sky-400",
     };
   }
 
   if (
     tone ===
-    "violet"
+   "violet"
   ) {
     return {
       shell:
-        "border-violet-500/15 bg-violet-500/10 text-violet-700 dark:text-violet-300",
+       "border-violet-500/15 bg-violet-500/10 text-violet-700 dark:text-violet-300",
       glow:
-        "bg-violet-400/10",
+       "bg-violet-400/10",
       bar:
-        "from-violet-500 to-fuchsia-400",
+       "from-violet-500 to-fuchsia-400",
     };
   }
 
   if (
     tone ===
-    "amber"
+   "amber"
   ) {
     return {
       shell:
-        "border-amber-500/15 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+       "border-amber-500/15 bg-amber-500/10 text-amber-700 dark:text-amber-300",
       glow:
-        "bg-amber-400/10",
+       "bg-amber-400/10",
       bar:
-        "from-amber-500 to-orange-400",
+       "from-amber-500 to-orange-400",
     };
   }
 
   if (
     tone ===
-    "rose"
+   "rose"
   ) {
     return {
       shell:
-        "border-rose-500/15 bg-rose-500/10 text-rose-700 dark:text-rose-300",
+       "border-rose-500/15 bg-rose-500/10 text-rose-700 dark:text-rose-300",
       glow:
-        "bg-rose-400/10",
+       "bg-rose-400/10",
       bar:
-        "from-rose-500 to-pink-400",
+       "from-rose-500 to-pink-400",
     };
   }
 
   return {
     shell:
-      "border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+     "border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
     glow:
-      "bg-emerald-400/10",
+     "bg-emerald-400/10",
     bar:
-      "from-emerald-500 to-teal-400",
+     "from-emerald-500 to-teal-400",
   };
 }
 
@@ -879,13 +879,13 @@ function MetricCard({
       }}
       transition={{
         type:
-          "spring",
+         "spring",
         stiffness:
           280,
         damping:
           22,
       }}
-      className="group relative overflow-hidden rounded-[24px] border border-emerald-100/90 bg-white p-5 shadow-[0_18px_50px_-40px_rgba(5,150,105,.48)] dark:border-white/10 dark:bg-slate-950/70"
+      className="group relative overflow-hidden rounded-[24px] border border-border bg-card p-5 text-card-foreground shadow-[0_18px_50px_-40px_rgba(5,150,105,.38)]"
     >
       <div
         className={`pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full blur-3xl ${styles.glow}`}
@@ -893,15 +893,15 @@ function MetricCard({
 
       <div className="relative flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">
+          <p className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground">
             {label}
           </p>
 
-          <p className="mt-3 break-words text-2xl font-black tracking-tight text-slate-950 dark:text-white">
+          <p className="mt-3 break-words text-2xl font-black tracking-tight text-foreground">
             {value}
           </p>
 
-          <p className="mt-1 text-[10px] leading-4 text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
             {
               description
             }
@@ -921,17 +921,17 @@ function MetricCard({
         </motion.div>
       </div>
 
-      <div className="relative mt-4 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-white/5">
+      <div className="relative mt-4 h-1.5 overflow-hidden rounded-full bg-muted">
         <motion.div
           initial={{
             width:
-              "20%",
+             "20%",
           }}
           animate={{
             width: [
-              "20%",
-              "72%",
-              "46%",
+             "20%",
+             "72%",
+             "46%",
             ],
           }}
           transition={{
@@ -940,7 +940,7 @@ function MetricCard({
             repeat:
               Infinity,
             ease:
-              "easeInOut",
+             "easeInOut",
           }}
           className={`h-full rounded-full bg-gradient-to-r ${styles.bar}`}
         />
@@ -980,9 +980,9 @@ function Panel({
         amount:
           0.08,
       }}
-      className="overflow-hidden rounded-[26px] border border-emerald-100 bg-white shadow-[0_20px_60px_-45px_rgba(5,150,105,.42)] dark:border-white/10 dark:bg-slate-950/70"
+      className="overflow-hidden rounded-[26px] border border-border bg-card text-card-foreground shadow-[0_20px_60px_-45px_rgba(5,150,105,.34)]"
     >
-      <div className="flex flex-col gap-3 border-b border-emerald-100/80 px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/10">
+      <div className="flex flex-col gap-3 border-b border-emerald-500/15 bg-emerald-500/[0.07] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
           <motion.div
             whileHover={{
@@ -991,17 +991,17 @@ function Panel({
               scale:
                 1.06,
             }}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-emerald-500/15 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-emerald-500/20 bg-emerald-500/12 text-emerald-600"
           >
             <Icon className="h-5 w-5" />
           </motion.div>
 
           <div>
-            <h2 className="text-sm font-black text-slate-950 dark:text-white">
+            <h2 className="text-sm font-black text-foreground">
               {title}
             </h2>
 
-            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
               {
                 description
               }
@@ -1031,11 +1031,11 @@ function MessageBubble({
 }) {
   const customer =
     message.authorType ===
-    "customer";
+   "customer";
 
   const internal =
     message.visibility ===
-    "internal";
+   "internal";
 
   return (
     <motion.div
@@ -1071,13 +1071,13 @@ function MessageBubble({
           </span>
 
           <div>
-            <p className="text-xs font-black text-slate-900 dark:text-white">
+            <p className="text-xs font-black text-foreground">
               {
                 message.authorName
               }
             </p>
 
-            <p className="text-[9px] text-slate-400">
+            <p className="text-[9px] text-muted-foreground">
               {internal
                 ? "Internal note"
                 : humanize(
@@ -1087,14 +1087,14 @@ function MessageBubble({
           </div>
         </div>
 
-        <p className="text-[9px] text-slate-400">
+        <p className="text-[9px] text-muted-foreground">
           {formatDateTime(
             message.createdAt
           )}
         </p>
       </div>
 
-      <p className="mt-3 whitespace-pre-wrap text-xs leading-6 text-slate-600 dark:text-slate-300">
+      <p className="mt-3 whitespace-pre-wrap text-xs leading-6 text-muted-foreground">
         {message.body}
       </p>
     </motion.div>
@@ -1128,21 +1128,21 @@ function ActivityItem({
           index *
           0.035,
       }}
-      className="relative rounded-2xl border border-emerald-100 bg-emerald-50/25 px-4 py-3 dark:border-white/10 dark:bg-white/[0.025]"
+      className="relative rounded-2xl border border-border bg-muted/35 px-4 py-3"
     >
       <span className="absolute -left-[23px] top-4 h-3 w-3 rounded-full border-2 border-white bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,.10)] dark:border-slate-950" />
 
-      <p className="text-[9px] font-black uppercase tracking-[0.13em] text-slate-400">
+      <p className="text-[9px] font-black uppercase tracking-[0.13em] text-muted-foreground">
         {humanize(
           item.eventType
         )}
       </p>
 
-      <p className="mt-1 text-xs font-black text-slate-800 dark:text-slate-100">
+      <p className="mt-1 text-xs font-black text-foreground">
         {item.summary}
       </p>
 
-      <div className="mt-2 flex flex-wrap items-center gap-2 text-[9px] text-slate-400">
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-[9px] text-muted-foreground">
         <span>
           {item.actorName}
         </span>
@@ -1206,26 +1206,26 @@ function ActionComposer({
 
   const buttonTone =
     tone ===
-    "rose"
+   "rose"
       ? "bg-rose-600 hover:bg-rose-700"
       : tone ===
-          "amber"
+         "amber"
         ? "bg-amber-600 hover:bg-amber-700"
         : "bg-emerald-600 hover:bg-emerald-700";
 
   return (
-    <div className="rounded-[22px] border border-emerald-100 bg-emerald-50/25 p-4 dark:border-white/10 dark:bg-white/[0.025]">
+    <div className="rounded-[22px] border border-border bg-muted/30 p-4">
       <div className="flex items-start gap-3">
         <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
           <Icon className="h-4 w-4" />
         </span>
 
         <div>
-          <p className="text-xs font-black text-slate-900 dark:text-white">
+          <p className="text-xs font-black text-foreground">
             {title}
           </p>
 
-          <p className="mt-1 text-[10px] leading-5 text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-[10px] leading-5 text-muted-foreground">
             {
               description
             }
@@ -1248,11 +1248,11 @@ function ActionComposer({
         placeholder={
           placeholder
         }
-        className="mt-4 min-h-28 w-full resize-y rounded-2xl border border-emerald-100 bg-white px-4 py-3 text-xs leading-5 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10 dark:border-white/10 dark:bg-slate-950/70 dark:text-white"
+        className="mt-4 min-h-28 w-full resize-y rounded-2xl border border-border bg-background px-4 py-3 text-xs leading-5 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-emerald-500/70 focus:ring-4 focus:ring-emerald-500/10"
       />
 
       <div className="mt-3 flex items-center justify-between gap-3">
-        <p className="text-[9px] text-slate-400">
+        <p className="text-[9px] text-muted-foreground">
           {value.trim().length} characters
         </p>
 
@@ -1292,7 +1292,7 @@ export default function SupportAccountIssuesPage() {
     setSearch,
   ] =
     useState(
-      ""
+     ""
     );
 
   const [
@@ -1300,7 +1300,7 @@ export default function SupportAccountIssuesPage() {
     setStatus,
   ] =
     useState<StatusFilter>(
-      "All"
+     "All"
     );
 
   const [
@@ -1308,7 +1308,7 @@ export default function SupportAccountIssuesPage() {
     setPriority,
   ] =
     useState<PriorityFilter>(
-      "All"
+     "All"
     );
 
   const [
@@ -1316,7 +1316,7 @@ export default function SupportAccountIssuesPage() {
     setSla,
   ] =
     useState<SlaFilter>(
-      "All"
+     "All"
     );
 
   const [
@@ -1378,7 +1378,7 @@ export default function SupportAccountIssuesPage() {
     setDrawerTab,
   ] =
     useState<DrawerTab>(
-      "overview"
+     "overview"
     );
 
   const [
@@ -1410,7 +1410,7 @@ export default function SupportAccountIssuesPage() {
     setError,
   ] =
     useState(
-      ""
+     ""
     );
 
   const [
@@ -1418,7 +1418,7 @@ export default function SupportAccountIssuesPage() {
     setSuccess,
   ] =
     useState(
-      ""
+     ""
     );
 
   const [
@@ -1442,7 +1442,7 @@ export default function SupportAccountIssuesPage() {
     setReply,
   ] =
     useState(
-      ""
+     ""
     );
 
   const [
@@ -1450,7 +1450,7 @@ export default function SupportAccountIssuesPage() {
     setNote,
   ] =
     useState(
-      ""
+     ""
     );
 
   const [
@@ -1458,7 +1458,7 @@ export default function SupportAccountIssuesPage() {
     setEscalation,
   ] =
     useState(
-      ""
+     ""
     );
 
   const [
@@ -1466,7 +1466,7 @@ export default function SupportAccountIssuesPage() {
     setResolution,
   ] =
     useState(
-      ""
+     ""
     );
 
   const loadTickets =
@@ -1488,7 +1488,7 @@ export default function SupportAccountIssuesPage() {
         }
 
         setError(
-          ""
+         ""
         );
 
         try {
@@ -1501,7 +1501,7 @@ export default function SupportAccountIssuesPage() {
                 status,
                 priority,
                 category:
-                  "Account",
+                 "Account",
                 sla,
                 page,
                 limit:
@@ -1601,7 +1601,7 @@ export default function SupportAccountIssuesPage() {
       );
 
       setError(
-        ""
+       ""
       );
 
       void supportApi
@@ -1673,7 +1673,7 @@ export default function SupportAccountIssuesPage() {
       ) {
         if (
           event.key ===
-          "Escape"
+         "Escape"
         ) {
           setSelectedId(
             null
@@ -1682,13 +1682,13 @@ export default function SupportAccountIssuesPage() {
       }
 
       window.addEventListener(
-        "keydown",
+       "keydown",
         onKeyDown
       );
 
       return () =>
         window.removeEventListener(
-          "keydown",
+         "keydown",
           onKeyDown
         );
     },
@@ -1705,11 +1705,11 @@ export default function SupportAccountIssuesPage() {
             search.trim()
           ),
           status !==
-            "All",
+           "All",
           priority !==
-            "All",
+           "All",
           sla !==
-            "All",
+           "All",
         ].filter(
           Boolean
         ).length,
@@ -1729,7 +1729,7 @@ export default function SupportAccountIssuesPage() {
             ticket
           ) =>
             ticket.status ===
-            "Open"
+           "Open"
         ).length,
       [
         tickets,
@@ -1744,7 +1744,7 @@ export default function SupportAccountIssuesPage() {
             ticket
           ) =>
             ticket.status ===
-            "In Progress"
+           "In Progress"
         ).length,
       [
         tickets,
@@ -1759,7 +1759,7 @@ export default function SupportAccountIssuesPage() {
             ticket
           ) =>
             ticket.status ===
-            "Escalated"
+           "Escalated"
         ).length,
       [
         tickets,
@@ -1782,19 +1782,19 @@ export default function SupportAccountIssuesPage() {
 
   function resetFilters() {
     setSearch(
-      ""
+     ""
     );
 
     setStatus(
-      "All"
+     "All"
     );
 
     setPriority(
-      "All"
+     "All"
     );
 
     setSla(
-      "All"
+     "All"
     );
 
     setPage(
@@ -1802,7 +1802,7 @@ export default function SupportAccountIssuesPage() {
     );
 
     setError(
-      ""
+     ""
     );
   }
 
@@ -1857,11 +1857,11 @@ export default function SupportAccountIssuesPage() {
     );
 
     setError(
-      ""
+     ""
     );
 
     setSuccess(
-      ""
+     ""
     );
 
     try {
@@ -1887,7 +1887,7 @@ export default function SupportAccountIssuesPage() {
   }
 
   return (
-    <main className="space-y-6">
+    <main className="support-page-no-scrollbar space-y-6 bg-transparent pb-8 text-foreground">
       {/* ===================================================
           HERO
       ==================================================== */}
@@ -1915,7 +1915,7 @@ export default function SupportAccountIssuesPage() {
             1,
           ],
         }}
-        className="relative isolate overflow-hidden rounded-[30px] border border-emerald-300/10 bg-[linear-gradient(135deg,#052E2B_0%,#064E3B_48%,#065F46_100%)] p-6 text-white shadow-[0_28px_80px_-42px_rgba(5,150,105,.58)] md:p-7 lg:p-8"
+        className="relative isolate overflow-hidden rounded-[30px] border border-emerald-300/25 bg-[linear-gradient(135deg,#10B981_0%,#059669_52%,#0F766E_100%)] p-6 text-white shadow-[0_28px_80px_-42px_rgba(16,185,129,.52)] md:p-7 lg:p-8"
       >
         <motion.div
           animate={{
@@ -1944,7 +1944,7 @@ export default function SupportAccountIssuesPage() {
             repeat:
               Infinity,
             ease:
-              "easeInOut",
+             "easeInOut",
           }}
           className="pointer-events-none absolute -right-20 -top-24 h-80 w-80 rounded-full bg-emerald-300/15 blur-[90px]"
         />
@@ -1970,7 +1970,7 @@ export default function SupportAccountIssuesPage() {
             repeat:
               Infinity,
             ease:
-              "easeInOut",
+             "easeInOut",
           }}
           className="pointer-events-none absolute -bottom-28 left-[20%] h-72 w-72 rounded-full bg-cyan-300/10 blur-[100px]"
         />
@@ -1996,7 +1996,7 @@ export default function SupportAccountIssuesPage() {
             repeat:
               Infinity,
             ease:
-              "easeInOut",
+             "easeInOut",
           }}
           className="pointer-events-none absolute -left-[14%] top-[10%] h-[50%] w-[70%] rounded-[50%] bg-[linear-gradient(90deg,rgba(16,185,129,0),rgba(52,211,153,.12),rgba(34,211,238,.08),rgba(16,185,129,0))] blur-[55px]"
         />
@@ -2056,7 +2056,7 @@ export default function SupportAccountIssuesPage() {
                 repeat:
                   Infinity,
                 ease:
-                  "easeInOut",
+                 "easeInOut",
               }}
             />
           )
@@ -2065,8 +2065,8 @@ export default function SupportAccountIssuesPage() {
         <motion.div
           animate={{
             x: [
-              "-30%",
-              "130%",
+             "-30%",
+             "130%",
             ],
           }}
           transition={{
@@ -2077,7 +2077,7 @@ export default function SupportAccountIssuesPage() {
             repeatDelay:
               2.6,
             ease:
-              "easeInOut",
+             "easeInOut",
           }}
           className="pointer-events-none absolute top-0 h-px w-1/3 bg-gradient-to-r from-transparent via-emerald-100 to-transparent shadow-[0_0_18px_rgba(209,250,229,.9)]"
         />
@@ -2115,7 +2115,7 @@ export default function SupportAccountIssuesPage() {
 
                 {
                   total.toLocaleString(
-                    "en-BD"
+                   "en-BD"
                   )
                 }{" "}
                 matches
@@ -2152,7 +2152,7 @@ export default function SupportAccountIssuesPage() {
                 repeat:
                   Infinity,
                 ease:
-                  "linear",
+                 "linear",
               }}
               className="pointer-events-none absolute -left-5 -top-5 hidden h-24 w-24 rounded-full border border-dashed border-emerald-100/20 xl:block"
             >
@@ -2235,15 +2235,15 @@ export default function SupportAccountIssuesPage() {
           duration:
             0.45,
         }}
-        className="relative z-30 rounded-[26px] border border-emerald-100 bg-white p-4 shadow-[0_18px_55px_-42px_rgba(5,150,105,.45)] dark:border-white/10 dark:bg-slate-950/70"
+        className="relative z-30 rounded-[26px] border border-emerald-500/20 bg-emerald-500/[0.06] p-4 shadow-[0_18px_55px_-42px_rgba(5,150,105,.28)]"
       >
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-700 dark:text-slate-200">
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-foreground">
               Account issue filters
             </p>
 
-            <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-[10px] text-muted-foreground">
               Real server filters · {activeFilterCount} active
             </p>
           </div>
@@ -2257,7 +2257,7 @@ export default function SupportAccountIssuesPage() {
               activeFilterCount ===
               0
             }
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-100 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-wide text-slate-600 transition hover:border-emerald-300 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-[10px] font-black uppercase tracking-wide text-foreground transition hover:border-emerald-500/40 hover:bg-emerald-500/10 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <RotateCcw className="h-3.5 w-3.5" />
 
@@ -2267,11 +2267,11 @@ export default function SupportAccountIssuesPage() {
 
         <div className="grid gap-3 xl:grid-cols-[1.5fr_1fr_1fr_1fr]">
           <div>
-            <p className="mb-1.5 px-1 text-[9px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+            <p className="mb-1.5 px-1 text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
               Ticket / customer search
             </p>
 
-            <label className="flex h-12 items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/40 px-4 transition focus-within:border-emerald-400 focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald-500/10 dark:border-white/10 dark:bg-white/[0.035]">
+            <label className="flex h-12 items-center gap-3 rounded-2xl border border-border bg-card px-4 transition focus-within:border-emerald-500/70 focus-within:ring-4 focus-within:ring-emerald-500/10">
               <Search className="h-4 w-4 shrink-0 text-emerald-600" />
 
               <input
@@ -2290,7 +2290,7 @@ export default function SupportAccountIssuesPage() {
                     1
                   );
                 }}
-                className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-white"
+                className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-foreground outline-none placeholder:text-muted-foreground"
                 placeholder="Ticket, subject, customer or reference"
               />
 
@@ -2299,14 +2299,14 @@ export default function SupportAccountIssuesPage() {
                   type="button"
                   onClick={() => {
                     setSearch(
-                      ""
+                     ""
                     );
 
                     setPage(
                       1
                     );
                   }}
-                  className="rounded-lg p-1 text-slate-400 transition hover:bg-emerald-100 hover:text-emerald-700"
+                  className="rounded-lg p-1 text-muted-foreground transition hover:bg-emerald-100 hover:text-emerald-700"
                   aria-label="Clear account issue search"
                 >
                   <X className="h-3.5 w-3.5" />
@@ -2473,7 +2473,7 @@ export default function SupportAccountIssuesPage() {
               type="button"
               onClick={() =>
                 setSuccess(
-                  ""
+                 ""
                 )
               }
               className="ml-auto rounded-lg p-1 text-emerald-600 hover:bg-emerald-500/10"
@@ -2500,7 +2500,7 @@ export default function SupportAccountIssuesPage() {
           label="Total matches"
           value={
             total.toLocaleString(
-              "en-BD"
+             "en-BD"
             )
           }
           description="Server-reported Account-category matches"
@@ -2514,7 +2514,7 @@ export default function SupportAccountIssuesPage() {
           label="Visible open"
           value={
             visibleOpen.toLocaleString(
-              "en-BD"
+             "en-BD"
             )
           }
           description="Open issues on the current page"
@@ -2528,7 +2528,7 @@ export default function SupportAccountIssuesPage() {
           label="Visible in progress"
           value={
             visibleProgress.toLocaleString(
-              "en-BD"
+             "en-BD"
             )
           }
           description="Active investigations on this page"
@@ -2542,7 +2542,7 @@ export default function SupportAccountIssuesPage() {
           label="Visible escalated"
           value={
             visibleEscalated.toLocaleString(
-              "en-BD"
+             "en-BD"
             )
           }
           description="Escalated issues on the current page"
@@ -2556,7 +2556,7 @@ export default function SupportAccountIssuesPage() {
           label="Visible SLA breach"
           value={
             visibleBreached.toLocaleString(
-              "en-BD"
+             "en-BD"
             )
           }
           description="Breached issue SLAs on this page"
@@ -2598,7 +2598,7 @@ export default function SupportAccountIssuesPage() {
                     repeat:
                       Infinity,
                     ease:
-                      "linear",
+                     "linear",
                   }}
                   className="absolute inset-0 rounded-full border border-dashed border-emerald-500/40"
                 />
@@ -2606,28 +2606,28 @@ export default function SupportAccountIssuesPage() {
                 <Loader2 className="absolute inset-0 m-auto h-7 w-7 animate-spin text-emerald-600" />
               </div>
 
-              <p className="mt-4 text-sm font-black text-slate-900 dark:text-white">
+              <p className="mt-4 text-sm font-black text-foreground">
                 Loading account issues
               </p>
 
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              <p className="mt-1 text-xs text-muted-foreground">
                 Reading the real Account support queue...
               </p>
             </div>
           </div>
         ) : tickets.length ===
           0 ? (
-          <div className="grid min-h-[340px] place-items-center rounded-[22px] border border-dashed border-emerald-200 bg-emerald-50/30 px-6 text-center dark:border-white/10 dark:bg-white/[0.02]">
+          <div className="grid min-h-[340px] place-items-center rounded-[22px] border border-dashed border-emerald-200 bg-emerald-50/30 px-6 text-center ">
             <div>
               <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
                 <Search className="h-6 w-6" />
               </div>
 
-              <p className="mt-4 text-sm font-black text-slate-900 dark:text-white">
+              <p className="mt-4 text-sm font-black text-foreground">
                 No account issues match
               </p>
 
-              <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+              <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">
                 Try another search, status, priority or SLA filter.
               </p>
             </div>
@@ -2666,7 +2666,7 @@ export default function SupportAccountIssuesPage() {
                           0.18
                         ),
                     }}
-                    className="rounded-[20px] border border-emerald-100 bg-emerald-50/20 p-4 dark:border-white/10 dark:bg-white/[0.025]"
+                    className="rounded-[20px] border border-border bg-card p-4"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -2676,13 +2676,13 @@ export default function SupportAccountIssuesPage() {
                           }
                         </p>
 
-                        <p className="mt-1 truncate text-sm font-black text-slate-950 dark:text-white">
+                        <p className="mt-1 truncate text-sm font-black text-foreground">
                           {
                             ticket.subject
                           }
                         </p>
 
-                        <p className="mt-1 truncate text-[10px] text-slate-500 dark:text-slate-400">
+                        <p className="mt-1 truncate text-[10px] text-muted-foreground">
                           {
                             ticket.customerName
                           }{" "}
@@ -2705,8 +2705,8 @@ export default function SupportAccountIssuesPage() {
                     </div>
 
                     <div className="mt-4 grid grid-cols-2 gap-2 text-[10px]">
-                      <div className="rounded-xl bg-white p-3 dark:bg-white/5">
-                        <p className="font-bold text-slate-400">
+                      <div className="rounded-xl bg-muted/40 p-3">
+                        <p className="font-bold text-muted-foreground">
                           Priority
                         </p>
 
@@ -2721,8 +2721,8 @@ export default function SupportAccountIssuesPage() {
                         </span>
                       </div>
 
-                      <div className="rounded-xl bg-white p-3 dark:bg-white/5">
-                        <p className="font-bold text-slate-400">
+                      <div className="rounded-xl bg-muted/40 p-3">
+                        <p className="font-bold text-muted-foreground">
                           SLA
                         </p>
 
@@ -2748,11 +2748,11 @@ export default function SupportAccountIssuesPage() {
                         );
 
                         setDrawerTab(
-                          "overview"
+                         "overview"
                         );
 
                         setSuccess(
-                          ""
+                         ""
                         );
                       }}
                       className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white transition hover:bg-emerald-700"
@@ -2771,7 +2771,7 @@ export default function SupportAccountIssuesPage() {
             <div className="support-scroll-hidden hidden overflow-x-auto lg:block">
               <table className="w-full min-w-[1160px] text-left">
                 <thead>
-                  <tr className="border-b border-emerald-100 bg-emerald-50/60 text-[9px] font-black uppercase tracking-[0.13em] text-slate-500 dark:border-white/10 dark:bg-white/[0.035] dark:text-slate-400">
+                  <tr className="border-b border-border bg-emerald-500/[0.08] text-[9px] font-black uppercase tracking-[0.13em] text-muted-foreground">
                     <th className="px-4 py-3.5">
                       Ticket
                     </th>
@@ -2836,7 +2836,7 @@ export default function SupportAccountIssuesPage() {
                               0.16
                             ),
                         }}
-                        className="border-b border-emerald-100/70 text-xs transition hover:bg-emerald-50/60 dark:border-white/5 dark:hover:bg-emerald-500/[0.04]"
+                        className="border-b border-border/70 text-xs transition hover:bg-emerald-50/60 dark:hover:bg-emerald-500/[0.04]"
                       >
                         <td className="px-4 py-4">
                           <p className="font-black text-emerald-700 dark:text-emerald-300">
@@ -2845,7 +2845,7 @@ export default function SupportAccountIssuesPage() {
                             }
                           </p>
 
-                          <p className="mt-1 font-mono text-[9px] text-slate-400">
+                          <p className="mt-1 font-mono text-[9px] text-muted-foreground">
                             {
                               compactId(
                                 ticket.id
@@ -2861,13 +2861,13 @@ export default function SupportAccountIssuesPage() {
                             </div>
 
                             <div className="min-w-0">
-                              <p className="max-w-[180px] truncate font-black text-slate-900 dark:text-white">
+                              <p className="max-w-[180px] truncate font-black text-foreground">
                                 {
                                   ticket.customerName
                                 }
                               </p>
 
-                              <p className="mt-1 max-w-[190px] truncate text-[9px] text-slate-400">
+                              <p className="mt-1 max-w-[190px] truncate text-[9px] text-muted-foreground">
                                 {
                                   ticket.customerEmail
                                 }
@@ -2877,19 +2877,19 @@ export default function SupportAccountIssuesPage() {
                         </td>
 
                         <td className="px-4 py-4">
-                          <p className="max-w-[260px] truncate font-black text-slate-800 dark:text-slate-100">
+                          <p className="max-w-[260px] truncate font-black text-foreground">
                             {
                               ticket.subject
                             }
                           </p>
 
-                          <p className="mt-1 text-[9px] text-slate-400">
+                          <p className="mt-1 text-[9px] text-muted-foreground">
                             {
                               ticket.waitingOn ===
-                              "customer"
+                             "customer"
                                 ? "Waiting on customer"
                                 : ticket.waitingOn ===
-                                    "admin"
+                                   "admin"
                                   ? "Waiting on support"
                                   : "No waiting party"
                             }
@@ -2933,7 +2933,7 @@ export default function SupportAccountIssuesPage() {
                             )}
                           </p>
 
-                          <p className="mt-1 text-[9px] text-slate-400">
+                          <p className="mt-1 text-[9px] text-muted-foreground">
                             {
                               ticket.slaBreached
                                 ? "Needs attention"
@@ -2947,7 +2947,7 @@ export default function SupportAccountIssuesPage() {
                             className={`max-w-[150px] truncate text-[10px] font-black ${
                               ticket.assignee
                                 .id
-                                ? "text-slate-700 dark:text-slate-200"
+                                ? "text-foreground"
                                 : "text-amber-700 dark:text-amber-300"
                             }`}
                           >
@@ -2975,11 +2975,11 @@ export default function SupportAccountIssuesPage() {
                               );
 
                               setDrawerTab(
-                                "overview"
+                               "overview"
                               );
 
                               setSuccess(
-                                ""
+                               ""
                               );
                             }}
                             className="rounded-xl bg-emerald-600 px-3.5 py-2 text-[10px] font-black text-white shadow-sm transition hover:bg-emerald-700 hover:shadow-md"
@@ -2998,19 +2998,19 @@ export default function SupportAccountIssuesPage() {
 
             {/* PAGINATION */}
 
-            <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/30 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-white/[0.02]">
-              <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+            <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-border bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-[10px] font-bold text-muted-foreground">
                 Page{" "}
-                <span className="font-black text-slate-900 dark:text-white">
+                <span className="font-black text-foreground">
                   {page}
                 </span>{" "}
                 of{" "}
-                <span className="font-black text-slate-900 dark:text-white">
+                <span className="font-black text-foreground">
                   {totalPages}
                 </span>{" "}
                 ·{" "}
                 {total.toLocaleString(
-                  "en-BD"
+                 "en-BD"
                 )}{" "}
                 account issues
               </p>
@@ -3031,7 +3031,7 @@ export default function SupportAccountIssuesPage() {
                         1
                     )
                   }
-                  className="grid h-9 w-9 place-items-center rounded-xl border border-emerald-100 bg-white text-slate-500 transition hover:border-emerald-300 hover:text-emerald-700 disabled:opacity-30 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
+                  className="grid h-9 w-9 place-items-center rounded-xl border border-border bg-card text-muted-foreground transition hover:border-emerald-500/40 hover:bg-emerald-500/10 hover:text-emerald-600 disabled:opacity-30"
                   aria-label="Previous account issues page"
                 >
                   <ChevronLeft className="h-4 w-4" />
@@ -3052,7 +3052,7 @@ export default function SupportAccountIssuesPage() {
                         1
                     )
                   }
-                  className="grid h-9 w-9 place-items-center rounded-xl border border-emerald-100 bg-white text-slate-500 transition hover:border-emerald-300 hover:text-emerald-700 disabled:opacity-30 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
+                  className="grid h-9 w-9 place-items-center rounded-xl border border-border bg-card text-muted-foreground transition hover:border-emerald-500/40 hover:bg-emerald-500/10 hover:text-emerald-600 disabled:opacity-30"
                   aria-label="Next account issues page"
                 >
                   <ChevronRight className="h-4 w-4" />
@@ -3103,7 +3103,7 @@ export default function SupportAccountIssuesPage() {
             <motion.aside
               initial={{
                 x:
-                  "100%",
+                 "100%",
               }}
               animate={{
                 x:
@@ -3111,17 +3111,17 @@ export default function SupportAccountIssuesPage() {
               }}
               exit={{
                 x:
-                  "100%",
+                 "100%",
               }}
               transition={{
                 type:
-                  "spring",
+                 "spring",
                 stiffness:
                   260,
                 damping:
                   30,
               }}
-              className="support-scroll-hidden absolute inset-y-0 right-0 w-full max-w-3xl overflow-y-auto bg-white text-slate-900 shadow-[-24px_0_80px_rgba(15,23,42,.32)] dark:bg-slate-950 dark:text-white"
+              className="support-scroll-hidden absolute inset-y-0 right-0 w-full max-w-3xl overflow-y-auto bg-background text-foreground shadow-[-24px_0_80px_rgba(15,23,42,.32)]"
             >
               {/* DRAWER HEADER */}
 
@@ -3147,7 +3147,7 @@ export default function SupportAccountIssuesPage() {
                     repeat:
                       Infinity,
                     ease:
-                      "easeInOut",
+                     "easeInOut",
                   }}
                   className="pointer-events-none absolute -right-14 -top-14 h-40 w-40 rounded-full bg-emerald-300/15 blur-3xl"
                 />
@@ -3160,7 +3160,7 @@ export default function SupportAccountIssuesPage() {
 
                     <h2 className="mt-1 truncate text-xl font-black text-white">
                       {detail?.ticketNumber ??
-                        "Loading issue..."}
+                       "Loading issue..."}
                     </h2>
 
                     <p className="mt-1 truncate text-[10px] text-emerald-50/60">
@@ -3191,20 +3191,20 @@ export default function SupportAccountIssuesPage() {
                   {(
                     [
                       [
-                        "overview",
-                        "Overview",
+                       "overview",
+                       "Overview",
                       ],
                       [
-                        "conversation",
-                        "Conversation",
+                       "conversation",
+                       "Conversation",
                       ],
                       [
-                        "activity",
-                        "Activity",
+                       "activity",
+                       "Activity",
                       ],
                       [
-                        "actions",
-                        "Actions",
+                       "actions",
+                       "Actions",
                       ],
                     ] as Array<
                       [
@@ -3248,7 +3248,7 @@ export default function SupportAccountIssuesPage() {
                   <div className="text-center">
                     <Loader2 className="mx-auto h-7 w-7 animate-spin text-emerald-600" />
 
-                    <p className="mt-3 text-xs font-black text-slate-600 dark:text-slate-300">
+                    <p className="mt-3 text-xs font-black text-muted-foreground">
                       Loading account issue...
                     </p>
                   </div>
@@ -3281,7 +3281,7 @@ export default function SupportAccountIssuesPage() {
                   ========================================== */}
 
                   {drawerTab ===
-                    "overview" && (
+                   "overview" && (
                     <>
                       <motion.section
                         variants={
@@ -3289,7 +3289,7 @@ export default function SupportAccountIssuesPage() {
                         }
                         initial="hidden"
                         animate="show"
-                        className="relative overflow-hidden rounded-[24px] border border-emerald-100 bg-emerald-50/45 p-5 dark:border-white/10 dark:bg-white/[0.03]"
+                        className="relative overflow-hidden rounded-[24px] border border-emerald-500/15 bg-emerald-500/[0.06] p-5"
                       >
                         <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-emerald-400/10 blur-3xl" />
 
@@ -3317,21 +3317,21 @@ export default function SupportAccountIssuesPage() {
                               </span>
                             </div>
 
-                            <p className="mt-4 text-lg font-black text-slate-950 dark:text-white">
+                            <p className="mt-4 text-lg font-black text-foreground">
                               {
                                 detail.subject
                               }
                             </p>
 
-                            <p className="mt-2 max-w-xl text-xs leading-6 text-slate-500 dark:text-slate-400">
+                            <p className="mt-2 max-w-xl text-xs leading-6 text-muted-foreground">
                               {
                                 detail.description
                               }
                             </p>
                           </div>
 
-                          <div className="rounded-2xl border border-emerald-100 bg-white px-4 py-3 text-right dark:border-white/10 dark:bg-white/5">
-                            <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
+                          <div className="rounded-2xl border border-border bg-card px-4 py-3 text-right ">
+                            <p className="text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">
                               SLA
                             </p>
 
@@ -3358,21 +3358,21 @@ export default function SupportAccountIssuesPage() {
                         }
                       >
                         <div className="grid gap-3 sm:grid-cols-2">
-                          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/25 p-4 dark:border-white/10 dark:bg-white/[0.025]">
+                          <div className="rounded-2xl border border-border bg-muted/30 p-4">
                             <Mail className="h-4 w-4 text-emerald-600" />
 
-                            <p className="mt-3 text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
+                            <p className="mt-3 text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">
                               Customer
                             </p>
 
-                            <p className="mt-1 text-xs font-black text-slate-800 dark:text-slate-100">
+                            <p className="mt-1 text-xs font-black text-foreground">
                               {
                                 detail.customer
                                   .name
                               }
                             </p>
 
-                            <p className="mt-1 break-all text-[10px] text-slate-500 dark:text-slate-400">
+                            <p className="mt-1 break-all text-[10px] text-muted-foreground">
                               {
                                 detail.customer
                                   .email
@@ -3380,14 +3380,14 @@ export default function SupportAccountIssuesPage() {
                             </p>
                           </div>
 
-                          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/25 p-4 dark:border-white/10 dark:bg-white/[0.025]">
+                          <div className="rounded-2xl border border-border bg-muted/30 p-4">
                             <Hash className="h-4 w-4 text-emerald-600" />
 
-                            <p className="mt-3 text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
+                            <p className="mt-3 text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">
                               User ID
                             </p>
 
-                            <p className="mt-1 break-all font-mono text-[10px] font-black text-slate-800 dark:text-slate-100">
+                            <p className="mt-1 break-all font-mono text-[10px] font-black text-foreground">
                               {
                                 detail.customer
                                   .userId
@@ -3395,14 +3395,14 @@ export default function SupportAccountIssuesPage() {
                             </p>
                           </div>
 
-                          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/25 p-4 dark:border-white/10 dark:bg-white/[0.025]">
+                          <div className="rounded-2xl border border-border bg-muted/30 p-4">
                             <BadgeCheck className="h-4 w-4 text-emerald-600" />
 
-                            <p className="mt-3 text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
+                            <p className="mt-3 text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">
                               KYC status
                             </p>
 
-                            <p className="mt-1 text-xs font-black text-slate-800 dark:text-slate-100">
+                            <p className="mt-1 text-xs font-black text-foreground">
                               {humanize(
                                 detail.customer
                                   .kycStatus
@@ -3410,14 +3410,14 @@ export default function SupportAccountIssuesPage() {
                             </p>
                           </div>
 
-                          <div className="rounded-2xl border border-emerald-100 bg-emerald-50/25 p-4 dark:border-white/10 dark:bg-white/[0.025]">
+                          <div className="rounded-2xl border border-border bg-muted/30 p-4">
                             <WalletCards className="h-4 w-4 text-emerald-600" />
 
-                            <p className="mt-3 text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
+                            <p className="mt-3 text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">
                               Wallet link
                             </p>
 
-                            <p className="mt-1 text-xs font-black text-slate-800 dark:text-slate-100">
+                            <p className="mt-1 text-xs font-black text-foreground">
                               {detail.customer
                                 .walletLinked
                                 ? "Linked"
@@ -3437,49 +3437,49 @@ export default function SupportAccountIssuesPage() {
                         <div className="grid gap-3 sm:grid-cols-2">
                           {[
                             [
-                              "Ticket ID",
+                             "Ticket ID",
                               detail.id,
                             ],
                             [
-                              "Ticket number",
+                             "Ticket number",
                               detail.ticketNumber,
                             ],
                             [
-                              "Assignee",
+                             "Assignee",
                               detail.assignee
                                 .name,
                             ],
                             [
-                              "Waiting on",
+                             "Waiting on",
                               humanize(
                                 detail.waitingOn
                               ),
                             ],
                             [
-                              "Related reference",
+                             "Related reference",
                               detail.relatedReference ||
-                                "Not available",
+                               "Not available",
                             ],
                             [
-                              "Created",
+                             "Created",
                               formatDateTime(
                                 detail.createdAt
                               ),
                             ],
                             [
-                              "Last activity",
+                             "Last activity",
                               formatDateTime(
                                 detail.lastActivityAt
                               ),
                             ],
                             [
-                              "First response",
+                             "First response",
                               formatDateTime(
                                 detail.firstResponseAt
                               ),
                             ],
                             [
-                              "Resolved",
+                             "Resolved",
                               formatDateTime(
                                 detail.resolvedAt
                               ),
@@ -3497,15 +3497,15 @@ export default function SupportAccountIssuesPage() {
                                     label
                                   )
                                 }
-                                className="rounded-2xl border border-emerald-100 bg-emerald-50/25 p-4 dark:border-white/10 dark:bg-white/[0.025]"
+                                className="rounded-2xl border border-border bg-muted/30 p-4"
                               >
-                                <p className="text-[9px] font-black uppercase tracking-[0.13em] text-slate-400">
+                                <p className="text-[9px] font-black uppercase tracking-[0.13em] text-muted-foreground">
                                   {
                                     label
                                   }
                                 </p>
 
-                                <p className="mt-1 break-words text-xs font-black text-slate-800 dark:text-slate-100">
+                                <p className="mt-1 break-words text-xs font-black text-foreground">
                                   {
                                     value
                                   }
@@ -3518,7 +3518,7 @@ export default function SupportAccountIssuesPage() {
                         {detail.tags.length >
                           0 && (
                           <div className="mt-4">
-                            <p className="mb-2 text-[9px] font-black uppercase tracking-[0.13em] text-slate-400">
+                            <p className="mb-2 text-[9px] font-black uppercase tracking-[0.13em] text-muted-foreground">
                               Tags
                             </p>
 
@@ -3558,11 +3558,11 @@ export default function SupportAccountIssuesPage() {
                           </div>
 
                           <div>
-                            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-700 dark:text-slate-200">
+                            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-foreground">
                               Account security boundary
                             </p>
 
-                            <p className="mt-1 text-[10px] leading-5 text-slate-500 dark:text-slate-400">
+                            <p className="mt-1 text-[10px] leading-5 text-muted-foreground">
                               This page manages the support case itself. It does
                               not reveal or reset passwords, PINs, OTPs or other
                               authentication secrets, and it does not invent
@@ -3580,7 +3580,7 @@ export default function SupportAccountIssuesPage() {
                   ========================================== */}
 
                   {drawerTab ===
-                    "conversation" && (
+                   "conversation" && (
                     <motion.div
                       variants={
                         stagger
@@ -3589,19 +3589,19 @@ export default function SupportAccountIssuesPage() {
                       animate="show"
                       className="space-y-4"
                     >
-                      <div className="rounded-[22px] border border-emerald-100 bg-emerald-50/35 p-4 dark:border-white/10 dark:bg-white/[0.025]">
+                      <div className="rounded-[22px] border border-emerald-500/15 bg-emerald-500/[0.06] p-4">
                         <p className="text-[9px] font-black uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
                           Original account issue
                         </p>
 
-                        <p className="mt-2 text-xs leading-6 text-slate-600 dark:text-slate-300">
+                        <p className="mt-2 text-xs leading-6 text-muted-foreground">
                           {
                             detail.description
                           }
                         </p>
 
                         {detail.relatedReference && (
-                          <p className="mt-3 text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                          <p className="mt-3 text-[10px] font-bold text-muted-foreground">
                             Reference:{" "}
                             {
                               detail.relatedReference
@@ -3612,10 +3612,10 @@ export default function SupportAccountIssuesPage() {
 
                       {detail.messages.length ===
                       0 ? (
-                        <div className="rounded-[22px] border border-dashed border-emerald-200 bg-emerald-50/25 p-8 text-center dark:border-white/10 dark:bg-white/[0.02]">
+                        <div className="rounded-[22px] border border-dashed border-emerald-200 bg-emerald-50/25 p-8 text-center ">
                           <MessageSquare className="mx-auto h-6 w-6 text-emerald-600" />
 
-                          <p className="mt-3 text-xs font-black text-slate-800 dark:text-slate-100">
+                          <p className="mt-3 text-xs font-black text-foreground">
                             No conversation messages yet
                           </p>
                         </div>
@@ -3652,7 +3652,7 @@ export default function SupportAccountIssuesPage() {
                         }
                         busy={
                           actionMode ===
-                          "reply"
+                         "reply"
                         }
                         minLength={
                           2
@@ -3668,17 +3668,17 @@ export default function SupportAccountIssuesPage() {
                           }
 
                           void runAction(
-                            "reply",
+                           "reply",
                             () =>
                               supportApi.addReply(
                                 detail.id,
                                 body
                               ),
-                            "Customer reply sent."
+                           "Customer reply sent."
                           ).then(
                             () =>
                               setReply(
-                                ""
+                               ""
                               )
                           );
                         }}
@@ -3700,7 +3700,7 @@ export default function SupportAccountIssuesPage() {
                         }
                         busy={
                           actionMode ===
-                          "note"
+                         "note"
                         }
                         tone="amber"
                         minLength={
@@ -3717,17 +3717,17 @@ export default function SupportAccountIssuesPage() {
                           }
 
                           void runAction(
-                            "note",
+                           "note",
                             () =>
                               supportApi.addInternalNote(
                                 detail.id,
                                 body
                               ),
-                            "Internal note added."
+                           "Internal note added."
                           ).then(
                             () =>
                               setNote(
-                                ""
+                               ""
                               )
                           );
                         }}
@@ -3740,20 +3740,20 @@ export default function SupportAccountIssuesPage() {
                   ========================================== */}
 
                   {drawerTab ===
-                    "activity" && (
+                   "activity" && (
                     <div>
                       {detail.activity.length ===
                       0 ? (
-                        <div className="rounded-[22px] border border-dashed border-emerald-200 bg-emerald-50/25 p-8 text-center dark:border-white/10 dark:bg-white/[0.02]">
+                        <div className="rounded-[22px] border border-dashed border-emerald-200 bg-emerald-50/25 p-8 text-center ">
                           <Clock3 className="mx-auto h-6 w-6 text-emerald-600" />
 
-                          <p className="mt-3 text-xs font-black text-slate-800 dark:text-slate-100">
+                          <p className="mt-3 text-xs font-black text-foreground">
                             No activity events yet
                           </p>
                         </div>
                       ) : (
                         <div className="relative space-y-3 pl-7">
-                          <div className="absolute bottom-2 left-[9px] top-2 w-px bg-emerald-100 dark:bg-white/10" />
+                          <div className="absolute bottom-2 left-[9px] top-2 w-px bg-border" />
 
                           {detail.activity.map(
                             (
@@ -3783,7 +3783,7 @@ export default function SupportAccountIssuesPage() {
                   ========================================== */}
 
                   {drawerTab ===
-                    "actions" && (
+                   "actions" && (
                     <div className="space-y-5">
                       <Panel
                         title="Workflow Status"
@@ -3795,11 +3795,11 @@ export default function SupportAccountIssuesPage() {
                         <div className="grid gap-2 sm:grid-cols-2">
                           {(
                             [
-                              "Open",
-                              "Waiting for Customer",
-                              "In Progress",
-                              "Escalated",
-                              "Resolved",
+                             "Open",
+                             "Waiting for Customer",
+                             "In Progress",
+                             "Escalated",
+                             "Resolved",
                             ] as TicketStatus[]
                           ).map(
                             (
@@ -3823,7 +3823,7 @@ export default function SupportAccountIssuesPage() {
                                   }
                                   onClick={() =>
                                     void runAction(
-                                      "status",
+                                     "status",
                                       () =>
                                         supportApi.updateTicket(
                                           detail.id,
@@ -3838,11 +3838,11 @@ export default function SupportAccountIssuesPage() {
                                   className={`rounded-2xl border px-4 py-3 text-left transition disabled:cursor-not-allowed ${
                                     active
                                       ? "border-emerald-500 bg-emerald-500/10"
-                                      : "border-emerald-100 bg-white hover:border-emerald-300 hover:bg-emerald-50 dark:border-white/10 dark:bg-white/[0.025] dark:hover:bg-white/5"
+                                      : "border-border bg-card hover:border-emerald-300 hover:bg-emerald-50  "
                                   }`}
                                 >
                                   <div className="flex items-center justify-between gap-2">
-                                    <span className="text-xs font-black text-slate-800 dark:text-slate-100">
+                                    <span className="text-xs font-black text-foreground">
                                       {
                                         nextStatus
                                       }
@@ -3869,10 +3869,10 @@ export default function SupportAccountIssuesPage() {
                         <div className="grid gap-2 sm:grid-cols-2">
                           {(
                             [
-                              "Urgent",
-                              "High",
-                              "Normal",
-                              "Low",
+                             "Urgent",
+                             "High",
+                             "Normal",
+                             "Low",
                             ] as TicketPriority[]
                           ).map(
                             (
@@ -3896,7 +3896,7 @@ export default function SupportAccountIssuesPage() {
                                   }
                                   onClick={() =>
                                     void runAction(
-                                      "priority",
+                                     "priority",
                                       () =>
                                         supportApi.updateTicket(
                                           detail.id,
@@ -3911,11 +3911,11 @@ export default function SupportAccountIssuesPage() {
                                   className={`rounded-2xl border px-4 py-3 text-left transition disabled:cursor-not-allowed ${
                                     active
                                       ? "border-emerald-500 bg-emerald-500/10"
-                                      : "border-emerald-100 bg-white hover:border-emerald-300 hover:bg-emerald-50 dark:border-white/10 dark:bg-white/[0.025] dark:hover:bg-white/5"
+                                      : "border-border bg-card hover:border-emerald-300 hover:bg-emerald-50  "
                                   }`}
                                 >
                                   <div className="flex items-center justify-between gap-2">
-                                    <span className="text-xs font-black text-slate-800 dark:text-slate-100">
+                                    <span className="text-xs font-black text-foreground">
                                       {
                                         nextPriority
                                       }
@@ -3948,7 +3948,7 @@ export default function SupportAccountIssuesPage() {
                         }
                         busy={
                           actionMode ===
-                          "escalate"
+                         "escalate"
                         }
                         tone="rose"
                         minLength={
@@ -3966,17 +3966,17 @@ export default function SupportAccountIssuesPage() {
                           }
 
                           void runAction(
-                            "escalate",
+                           "escalate",
                             () =>
                               supportApi.escalate(
                                 detail.id,
                                 body
                               ),
-                            "Account issue escalated."
+                           "Account issue escalated."
                           ).then(
                             () =>
                               setEscalation(
-                                ""
+                               ""
                               )
                           );
                         }}
@@ -3998,7 +3998,7 @@ export default function SupportAccountIssuesPage() {
                         }
                         busy={
                           actionMode ===
-                          "resolve"
+                         "resolve"
                         }
                         minLength={
                           4
@@ -4015,34 +4015,34 @@ export default function SupportAccountIssuesPage() {
                           }
 
                           void runAction(
-                            "resolve",
+                           "resolve",
                             () =>
                               supportApi.resolve(
                                 detail.id,
                                 body
                               ),
-                            "Account issue resolved."
+                           "Account issue resolved."
                           ).then(
                             () =>
                               setResolution(
-                                ""
+                               ""
                               )
                           );
                         }}
                       />
 
-                      <div className="rounded-[22px] border border-emerald-100 bg-emerald-50/35 p-4 dark:border-white/10 dark:bg-white/[0.025]">
+                      <div className="rounded-[22px] border border-emerald-500/15 bg-emerald-500/[0.06] p-4">
                         <div className="flex items-start gap-3">
                           <div className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
                             <ShieldCheck className="h-4 w-4" />
                           </div>
 
                           <div>
-                            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-700 dark:text-slate-200">
+                            <p className="text-[10px] font-black uppercase tracking-[0.14em] text-foreground">
                               Existing backend actions only
                             </p>
 
-                            <p className="mt-1 text-[10px] leading-5 text-slate-500 dark:text-slate-400">
+                            <p className="mt-1 text-[10px] leading-5 text-muted-foreground">
                               Available mutations on this page are ticket reply,
                               internal note, status, priority, escalation and
                               resolution because those actions are present in the
@@ -4060,11 +4060,11 @@ export default function SupportAccountIssuesPage() {
                   <div className="max-w-sm text-center">
                     <XCircle className="mx-auto h-7 w-7 text-rose-500" />
 
-                    <p className="mt-3 text-sm font-black text-slate-900 dark:text-white">
+                    <p className="mt-3 text-sm font-black text-foreground">
                       Account issue detail unavailable
                     </p>
 
-                    <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
                       Close the drawer and retry the request.
                     </p>
                   </div>
@@ -4080,6 +4080,19 @@ export default function SupportAccountIssuesPage() {
       ==================================================== */}
 
       <style jsx global>{`
+        .support-page-no-scrollbar,
+        .support-page-no-scrollbar * {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+
+        .support-page-no-scrollbar::-webkit-scrollbar,
+        .support-page-no-scrollbar *::-webkit-scrollbar {
+          width: 0 !important;
+          height: 0 !important;
+          display: none !important;
+        }
+
         .support-scroll-hidden {
           -ms-overflow-style: none;
           scrollbar-width: none;

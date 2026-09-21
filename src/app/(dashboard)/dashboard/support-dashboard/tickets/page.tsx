@@ -4,6 +4,7 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -13,7 +14,21 @@ import {
 } from "framer-motion";
 
 import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+
+import {
   AlertCircle,
+  BarChart3,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -512,7 +527,7 @@ export default function SupportTicketsPage() {
   ======================================================= */
 
   return (
-    <main className="min-h-screen bg-transparent">
+    <main className="support-ticket-page min-h-screen bg-transparent text-foreground">
       <div className="mx-auto max-w-[1600px]">
 
         {/* =================================================
@@ -528,34 +543,91 @@ export default function SupportTicketsPage() {
             opacity: 1,
             y: 0,
           }}
-          className="
-            relative
-            overflow-hidden
-            rounded-[28px]
-            border
-            border-emerald-200
-            bg-white
-            shadow-[0_16px_50px_rgba(15,23,42,0.06)]
-          "
+          className="relative isolate overflow-hidden rounded-[30px] border border-emerald-300/25 bg-[linear-gradient(135deg,#10B981_0%,#059669_50%,#047857_100%)] text-white shadow-[0_28px_80px_-38px_rgba(5,150,105,.72)]"
         >
-          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-500 via-teal-400 to-cyan-400" />
+          <motion.div
+            aria-hidden
+            animate={{
+              x: [0, 36, -18, 0],
+              y: [0, -22, 14, 0],
+              scale: [1, 1.18, 0.96, 1],
+              opacity: [0.36, 0.68, 0.42, 0.36],
+            }}
+            transition={{
+              duration: 12,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+            className="pointer-events-none absolute -right-24 -top-28 h-80 w-80 rounded-full bg-white/20 blur-[90px]"
+          />
+
+          <motion.div
+            aria-hidden
+            animate={{
+              x: [0, -28, 18, 0],
+              y: [0, 18, -12, 0],
+              scale: [1, 1.12, 1, 1],
+              opacity: [0.22, 0.48, 0.24, 0.22],
+            }}
+            transition={{
+              duration: 15,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+            className="pointer-events-none absolute -bottom-28 left-[18%] h-72 w-72 rounded-full bg-cyan-200/25 blur-[95px]"
+          />
+
+          <motion.div
+            aria-hidden
+            animate={{ rotate: 360 }}
+            transition={{
+              duration: 24,
+              repeat: Infinity,
+              ease: "linear",
+            }}
+            className="pointer-events-none absolute right-[18%] top-1/2 hidden h-44 w-44 -translate-y-1/2 rounded-full border border-white/15 xl:block"
+          >
+            <span className="absolute left-1/2 top-[-5px] h-2.5 w-2.5 -translate-x-1/2 rounded-full bg-white shadow-[0_0_22px_rgba(255,255,255,.85)]" />
+          </motion.div>
+
+          <motion.div
+            aria-hidden
+            animate={{
+              x: ["-25%", "125%"],
+              opacity: [0, 0.34, 0],
+            }}
+            transition={{
+              duration: 7,
+              repeat: Infinity,
+              ease: "easeInOut",
+              repeatDelay: 1.4,
+            }}
+            className="pointer-events-none absolute inset-y-0 w-28 rotate-12 bg-gradient-to-r from-transparent via-white/15 to-transparent blur-xl"
+          />
+
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 opacity-[0.12] [background-image:radial-gradient(circle_at_center,white_1px,transparent_1px)] [background-size:24px_24px]"
+          />
+
+          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-white/20 via-white/90 to-cyan-100/50" />
 
           <div className="relative flex flex-col gap-5 p-5 md:p-6 xl:flex-row xl:items-center xl:justify-between">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2.5">
 
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/15 bg-white/[0.12] text-white backdrop-blur">
                   <MessageSquare className="h-5 w-5" />
                 </div>
 
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
 
-                    <h1 className="text-2xl font-black tracking-tight text-slate-900">
+                    <h1 className="text-2xl font-black tracking-tight text-white">
                       Ticket Queue
                     </h1>
 
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[9px] font-black text-emerald-700">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[9px] font-black text-emerald-50 backdrop-blur">
                       <span className="relative flex h-1.5 w-1.5">
                         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-60" />
                         <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
@@ -565,7 +637,7 @@ export default function SupportTicketsPage() {
                     </span>
                   </div>
 
-                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                  <p className="mt-1 text-xs leading-5 text-emerald-50/80">
                     Investigate customer cases,
                     prioritize SLA risk, and keep
                     every support conversation moving.
@@ -576,12 +648,12 @@ export default function SupportTicketsPage() {
 
             <div className="flex items-center gap-2">
 
-              <div className="hidden rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 sm:block">
-                <p className="text-[8px] font-black uppercase tracking-[0.14em] text-slate-400">
+              <div className="hidden rounded-2xl border border-white/15 bg-white/10 px-4 py-2.5 backdrop-blur sm:block">
+                <p className="text-[8px] font-black uppercase tracking-[0.14em] text-emerald-50/65">
                   Queue Size
                 </p>
 
-                <p className="mt-0.5 text-sm font-black text-slate-800">
+                <p className="mt-0.5 text-sm font-black text-white">
                   {total.toLocaleString()}
                 </p>
               </div>
@@ -594,25 +666,7 @@ export default function SupportTicketsPage() {
                 disabled={
                   isRefreshing
                 }
-                className="
-                  inline-flex
-                  h-11
-                  items-center
-                  gap-2
-                  rounded-2xl
-                  border
-                  border-emerald-200
-                  bg-white
-                  px-4
-                  text-xs
-                  font-black
-                  text-emerald-700
-                  transition
-                  hover:-translate-y-0.5
-                  hover:bg-emerald-50
-                  disabled:cursor-not-allowed
-                  disabled:opacity-50
-                "
+                className="inline-flex h-11 items-center gap-2 rounded-2xl border border-white/20 bg-white px-4 text-xs font-black text-emerald-700 shadow-[0_12px_30px_rgba(0,0,0,.14)] transition hover:-translate-y-0.5 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <RefreshCcw
                   className={`h-4 w-4 ${
@@ -699,18 +753,23 @@ export default function SupportTicketsPage() {
           />
         </section>
 
+        <QueueAnalytics
+          tickets={tickets}
+          loading={isLoading}
+        />
+
         {/* =================================================
             TOOLBAR
         ================================================= */}
 
-        <section className="mt-5 overflow-visible rounded-[28px] border border-slate-200 bg-white shadow-[0_14px_45px_rgba(15,23,42,0.05)]">
+        <section className="mt-5 overflow-visible rounded-[28px] border border-border bg-card shadow-sm">
 
-          <div className="flex flex-col gap-3 border-b border-slate-100 p-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-col gap-3 border-b border-border bg-emerald-500/[0.055] p-4 lg:flex-row lg:items-center lg:justify-between">
 
             <div className="flex min-w-0 flex-1 items-center gap-2">
 
               <div className="relative min-w-0 flex-1">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 
                 <input
                   type="search"
@@ -726,26 +785,7 @@ export default function SupportTicketsPage() {
                     )
                   }
                   placeholder="Search ticket, customer, email, reference..."
-                  className="
-                    h-11
-                    w-full
-                    rounded-2xl
-                    border
-                    border-slate-200
-                    bg-slate-50
-                    pl-10
-                    pr-4
-                    text-xs
-                    font-semibold
-                    text-slate-700
-                    outline-none
-                    transition
-                    placeholder:text-slate-400
-                    focus:border-emerald-400
-                    focus:bg-white
-                    focus:ring-4
-                    focus:ring-emerald-50
-                  "
+                  className="h-11 w-full rounded-2xl border border-border bg-background pl-10 pr-4 text-xs font-semibold text-foreground outline-none transition placeholder:text-muted-foreground focus:border-emerald-400 focus:bg-background focus:ring-4 focus:ring-emerald-500/10"
                 />
               </div>
 
@@ -761,8 +801,8 @@ export default function SupportTicketsPage() {
                 }
                 className={`inline-flex h-11 shrink-0 items-center gap-2 rounded-2xl border px-3 text-xs font-black transition ${
                   showFilters
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                    : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-emerald-700"
+                    ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+                    : "border-border bg-card text-muted-foreground hover:bg-muted/40 hover:text-emerald-700"
                 }`}
               >
                 <Filter className="h-4 w-4" />
@@ -784,7 +824,7 @@ export default function SupportTicketsPage() {
 
             <div className="flex items-center justify-between gap-3">
 
-              <p className="text-[10px] font-bold text-slate-400">
+              <p className="text-[10px] font-bold text-muted-foreground">
                 {
                   total.toLocaleString()
                 }{" "}
@@ -828,7 +868,7 @@ export default function SupportTicketsPage() {
                   opacity: 0,
                   height: 0,
                 }}
-                className="overflow-visible border-b border-slate-100"
+                className="overflow-visible border-b border-border"
               >
                 <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
 
@@ -1028,24 +1068,39 @@ export default function SupportTicketsPage() {
               opacity: 0,
               y: 15,
             }}
-            className="fixed bottom-5 right-5 z-[100] flex max-w-sm items-start gap-3 rounded-2xl border border-emerald-200 bg-white p-4 shadow-[0_18px_50px_rgba(15,23,42,0.16)]"
+            className="fixed bottom-5 right-5 z-[100] flex max-w-sm items-start gap-3 rounded-2xl border border-emerald-500/20 bg-card p-4 shadow-[0_18px_50px_rgba(15,23,42,0.16)]"
           >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
               <Check className="h-4 w-4" />
             </div>
 
             <div>
-              <p className="text-xs font-black text-slate-800">
+              <p className="text-xs font-black text-foreground">
                 Support Operations
               </p>
 
-              <p className="mt-1 text-[10px] leading-5 text-slate-500">
+              <p className="mt-1 text-[10px] leading-5 text-muted-foreground">
                 {toast}
               </p>
             </div>
           </motion.div>
         ) : null}
       </AnimatePresence>
+
+      <style>{`
+        .support-ticket-page,
+        .support-ticket-page * {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+
+        .support-ticket-page::-webkit-scrollbar,
+        .support-ticket-page *::-webkit-scrollbar {
+          width: 0 !important;
+          height: 0 !important;
+          display: none !important;
+        }
+      `}</style>
     </main>
   );
 }
@@ -1072,46 +1127,54 @@ function QueueStat({
   const theme = {
     emerald: {
       wrap:
-        "border-emerald-100 bg-emerald-50/70",
-
+        "border-emerald-400/25 bg-emerald-500 text-white shadow-[0_18px_50px_-30px_rgba(16,185,129,.75)]",
       icon:
-        "bg-white text-emerald-600",
-
+        "border-white/15 bg-white/15 text-white",
+      label:
+        "text-emerald-50/75",
       value:
-        "text-emerald-700",
+        "text-white",
+      glow:
+        "bg-white/18",
     },
 
     rose: {
       wrap:
-        "border-rose-100 bg-rose-50/70",
-
+        "border-rose-500/20 bg-card",
       icon:
-        "bg-white text-rose-600",
-
+        "border-rose-500/15 bg-rose-500/10 text-rose-600 dark:text-rose-300",
+      label:
+        "text-muted-foreground",
       value:
-        "text-rose-700",
+        "text-foreground",
+      glow:
+        "bg-rose-500/10",
     },
 
     amber: {
       wrap:
-        "border-amber-100 bg-amber-50/70",
-
+        "border-amber-500/20 bg-card",
       icon:
-        "bg-white text-amber-600",
-
+        "border-amber-500/15 bg-amber-500/10 text-amber-600 dark:text-amber-300",
+      label:
+        "text-muted-foreground",
       value:
-        "text-amber-700",
+        "text-foreground",
+      glow:
+        "bg-amber-500/10",
     },
 
     violet: {
       wrap:
-        "border-violet-100 bg-violet-50/70",
-
+        "border-violet-500/20 bg-card",
       icon:
-        "bg-white text-violet-600",
-
+        "border-violet-500/15 bg-violet-500/10 text-violet-600 dark:text-violet-300",
+      label:
+        "text-muted-foreground",
       value:
-        "text-violet-700",
+        "text-foreground",
+      glow:
+        "bg-violet-500/10",
     },
   }[tone];
 
@@ -1119,32 +1182,373 @@ function QueueStat({
     <motion.div
       initial={{
         opacity: 0,
-        y: 8,
+        y: 10,
       }}
       animate={{
         opacity: 1,
         y: 0,
       }}
-      className={`rounded-[22px] border p-4 ${theme.wrap}`}
+      whileHover={{
+        y: -4,
+        scale: 1.008,
+      }}
+      transition={{
+        type: "spring",
+        stiffness: 280,
+        damping: 22,
+      }}
+      className={`group relative overflow-hidden rounded-[24px] border p-4 ${theme.wrap}`}
     >
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
+      <motion.div
+        aria-hidden
+        animate={{
+          scale: [1, 1.15, 1],
+          opacity: [0.35, 0.75, 0.35],
+        }}
+        transition={{
+          duration: 5,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+        className={`pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full blur-3xl ${theme.glow}`}
+      />
+
+      <div className="relative flex items-center justify-between gap-3">
+        <p
+          className={`text-[9px] font-black uppercase tracking-[0.14em] ${theme.label}`}
+        >
           {label}
         </p>
 
         <span
-          className={`flex h-9 w-9 items-center justify-center rounded-xl shadow-sm ${theme.icon}`}
+          className={`flex h-9 w-9 items-center justify-center rounded-xl border shadow-sm ${theme.icon}`}
         >
           <Icon className="h-4 w-4" />
         </span>
       </div>
 
       <p
-        className={`mt-3 text-2xl font-black ${theme.value}`}
+        className={`relative mt-3 text-2xl font-black ${theme.value}`}
       >
         {value}
       </p>
     </motion.div>
+  );
+}
+
+/* =========================================================
+   QUEUE ANALYTICS
+========================================================= */
+
+function QueueAnalytics({
+  tickets,
+  loading,
+}: {
+  tickets: SupportTicketSummary[];
+  loading: boolean;
+}) {
+  const statusData =
+    useMemo(
+      () =>
+        STATUS_OPTIONS
+          .filter(
+            (item) =>
+              item !== "All"
+          )
+          .map(
+            (item) => ({
+              name: item,
+              value:
+                tickets.filter(
+                  (ticket) =>
+                    ticket.status ===
+                    item
+                ).length,
+            })
+          )
+          .filter(
+            (item) =>
+              item.value > 0
+          ),
+      [tickets]
+    );
+
+  const priorityData =
+    useMemo(
+      () =>
+        PRIORITY_OPTIONS
+          .filter(
+            (item) =>
+              item !== "All"
+          )
+          .map(
+            (item) => ({
+              name: item,
+              count:
+                tickets.filter(
+                  (ticket) =>
+                    ticket.priority ===
+                    item
+                ).length,
+            })
+          ),
+      [tickets]
+    );
+
+  const STATUS_CHART_COLORS = [
+    "#D1FAE5",
+    "#67E8F9",
+    "#FDE68A",
+    "#FDA4AF",
+    "#A7F3D0",
+  ];
+
+  return (
+    <section className="mt-5 grid gap-4 xl:grid-cols-[1.15fr_.85fr]">
+      <motion.article
+        initial={{
+          opacity: 0,
+          y: 12,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        className="overflow-hidden rounded-[28px] border border-border bg-card shadow-sm"
+      >
+        <div className="flex items-start gap-3 border-b border-border bg-emerald-500/[0.055] px-5 py-4">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">
+            <BarChart3 className="h-5 w-5" />
+          </span>
+
+          <div>
+            <p className="text-[8px] font-black uppercase tracking-[0.14em] text-emerald-600 dark:text-emerald-300">
+              Current page analytics
+            </p>
+
+            <h2 className="mt-0.5 text-sm font-black text-foreground">
+              Priority distribution
+            </h2>
+
+            <p className="mt-1 text-[9px] leading-4 text-muted-foreground">
+              Real priority mix from the tickets currently returned by the backend.
+            </p>
+          </div>
+        </div>
+
+        <div className="h-[300px] p-4">
+          {loading ? (
+            <div className="flex h-full items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-emerald-500" />
+            </div>
+          ) : (
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+            >
+              <BarChart
+                data={priorityData}
+                margin={{
+                  top: 14,
+                  right: 10,
+                  left: -18,
+                  bottom: 0,
+                }}
+              >
+                <CartesianGrid
+                  vertical={false}
+                  stroke="var(--border)"
+                  strokeDasharray="4 6"
+                  opacity={0.75}
+                />
+
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{
+                    fontSize: 10,
+                    fill:
+                      "var(--muted-foreground)",
+                  }}
+                />
+
+                <YAxis
+                  allowDecimals={false}
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{
+                    fontSize: 10,
+                    fill:
+                      "var(--muted-foreground)",
+                  }}
+                />
+
+                <Tooltip
+                  cursor={{
+                    fill:
+                      "rgba(16,185,129,.06)",
+                  }}
+                  contentStyle={{
+                    borderRadius: 14,
+                    border:
+                      "1px solid var(--border)",
+                    background:
+                      "var(--card)",
+                    color:
+                      "var(--card-foreground)",
+                    fontSize: 11,
+                    boxShadow:
+                      "0 18px 45px rgba(15,23,42,.12)",
+                  }}
+                />
+
+                <Bar
+                  dataKey="count"
+                  name="Tickets"
+                  fill="#10B981"
+                  radius={[
+                    9,
+                    9,
+                    0,
+                    0,
+                  ]}
+                  isAnimationActive
+                  animationDuration={
+                    1200
+                  }
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </motion.article>
+
+      <motion.article
+        initial={{
+          opacity: 0,
+          y: 12,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        transition={{
+          delay: 0.06,
+        }}
+        className="relative overflow-hidden rounded-[28px] border border-emerald-400/20 bg-emerald-500 text-white shadow-[0_24px_65px_-36px_rgba(16,185,129,.72)]"
+      >
+        <motion.div
+          aria-hidden
+          animate={{
+            scale: [1, 1.16, 1],
+            opacity: [0.22, 0.5, 0.22],
+          }}
+          transition={{
+            duration: 7,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-white/20 blur-3xl"
+        />
+
+        <div className="relative border-b border-white/15 px-5 py-4">
+          <p className="text-[8px] font-black uppercase tracking-[0.14em] text-emerald-50/75">
+            Queue health
+          </p>
+
+          <h2 className="mt-0.5 text-sm font-black text-white">
+            Status distribution
+          </h2>
+
+          <p className="mt-1 text-[9px] leading-4 text-emerald-50/75">
+            Live status composition for the currently visible support queue.
+          </p>
+        </div>
+
+        <div className="relative h-[300px]">
+          {loading ? (
+            <div className="flex h-full items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-white" />
+            </div>
+          ) : statusData.length ===
+            0 ? (
+            <div className="flex h-full items-center justify-center px-6 text-center text-xs font-bold text-emerald-50/70">
+              No visible ticket status data yet.
+            </div>
+          ) : (
+            <>
+              <ResponsiveContainer
+                width="100%"
+                height="100%"
+              >
+                <PieChart>
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: 14,
+                      border:
+                        "1px solid rgba(255,255,255,.16)",
+                      background:
+                        "#064E3B",
+                      color: "#FFFFFF",
+                      fontSize: 11,
+                    }}
+                  />
+
+                  <Pie
+                    data={statusData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius="52%"
+                    outerRadius="78%"
+                    paddingAngle={3}
+                    stroke="rgba(255,255,255,.85)"
+                    strokeWidth={2}
+                    isAnimationActive
+                    animationDuration={
+                      1250
+                    }
+                  >
+                    {statusData.map(
+                      (
+                        item,
+                        index
+                      ) => (
+                        <Cell
+                          key={
+                            item.name
+                          }
+                          fill={
+                            STATUS_CHART_COLORS[
+                              index %
+                                STATUS_CHART_COLORS.length
+                            ]
+                          }
+                        />
+                      )
+                    )}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+
+              <div className="pointer-events-none absolute inset-0 grid place-items-center">
+                <div className="text-center">
+                  <p className="text-3xl font-black">
+                    {tickets.length}
+                  </p>
+
+                  <p className="text-[8px] font-black uppercase tracking-[0.14em] text-emerald-50/70">
+                    Visible
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </motion.article>
+    </section>
   );
 }
 
@@ -1165,65 +1569,183 @@ function FilterSelect({
     value: string
   ) => void;
 }) {
+  const [
+    open,
+    setOpen,
+  ] = useState(false);
+
+  const rootRef =
+    useRef<HTMLDivElement | null>(
+      null
+    );
+
+  useEffect(() => {
+    function handleOutside(
+      event: PointerEvent
+    ) {
+      if (
+        rootRef.current &&
+        !rootRef.current.contains(
+          event.target as Node
+        )
+      ) {
+        setOpen(false);
+      }
+    }
+
+    function handleKey(
+      event: KeyboardEvent
+    ) {
+      if (
+        event.key === "Escape"
+      ) {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener(
+      "pointerdown",
+      handleOutside
+    );
+
+    document.addEventListener(
+      "keydown",
+      handleKey
+    );
+
+    return () => {
+      document.removeEventListener(
+        "pointerdown",
+        handleOutside
+      );
+
+      document.removeEventListener(
+        "keydown",
+        handleKey
+      );
+    };
+  }, []);
+
   return (
-    <label className="block">
-      <span className="mb-1.5 block text-[8px] font-black uppercase tracking-[0.14em] text-slate-400">
+    <div
+      ref={rootRef}
+      className={`relative ${
+        open
+          ? "z-[90]"
+          : "z-10"
+      }`}
+    >
+      <span className="mb-1.5 block text-[8px] font-black uppercase tracking-[0.14em] text-muted-foreground">
         {label}
       </span>
 
-      <div className="relative">
-        <select
-          value={
-            value
-          }
-          onChange={(
-            event
-          ) =>
-            onChange(
-              event.target.value
-            )
-          }
-          className="
-            h-11
-            w-full
-            appearance-none
-            rounded-2xl
-            border
-            border-slate-200
-            bg-white
-            px-3
-            pr-9
-            text-xs
-            font-black
-            text-slate-700
-            outline-none
-            transition
-            focus:border-emerald-400
-            focus:ring-4
-            focus:ring-emerald-50
-          "
-        >
-          {options.map(
-            (
-              option
-            ) => (
-              <option
-                key={
-                  option
-                }
-                value={
-                  option
-                }
-              >
-                {option}
-              </option>
-            )
-          )}
-        </select>
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() =>
+          setOpen(
+            (current) =>
+              !current
+          )
+        }
+        className={`flex h-11 w-full items-center justify-between gap-3 rounded-2xl border bg-background px-3.5 text-left outline-none transition ${
+          open
+            ? "border-emerald-500/60 ring-4 ring-emerald-500/10"
+            : "border-border hover:border-emerald-500/35"
+        }`}
+      >
+        <span className="truncate text-xs font-black text-foreground">
+          {value}
+        </span>
 
-        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-      </div>
-    </label>
+        <motion.span
+          animate={{
+            rotate:
+              open
+                ? 180
+                : 0,
+          }}
+          transition={{
+            duration: 0.18,
+          }}
+          className="shrink-0 text-muted-foreground"
+        >
+          <ChevronDown className="h-4 w-4" />
+        </motion.span>
+      </button>
+
+      <AnimatePresence>
+        {open ? (
+          <motion.div
+            initial={{
+              opacity: 0,
+              y: -7,
+              scale: 0.98,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+              scale: 1,
+            }}
+            exit={{
+              opacity: 0,
+              y: -5,
+              scale: 0.98,
+            }}
+            transition={{
+              duration: 0.16,
+            }}
+            role="listbox"
+            className="support-scrollbar-hidden absolute left-0 right-0 top-[calc(100%+8px)] z-[100] max-h-64 overflow-y-auto rounded-2xl border border-border bg-card p-1.5 shadow-[0_24px_70px_-20px_rgba(5,150,105,.30)] backdrop-blur-xl"
+          >
+            {options.map(
+              (
+                option
+              ) => {
+                const active =
+                  option === value;
+
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    role="option"
+                    aria-selected={
+                      active
+                    }
+                    onClick={() => {
+                      onChange(
+                        option
+                      );
+
+                      setOpen(
+                        false
+                      );
+                    }}
+                    className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition ${
+                      active
+                        ? "bg-emerald-500 text-white"
+                        : "text-foreground hover:bg-emerald-500/10"
+                    }`}
+                  >
+                    <span className="truncate text-xs font-extrabold">
+                      {option}
+                    </span>
+
+                    {active ? (
+                      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg bg-white/15">
+                        <Check className="h-3.5 w-3.5" />
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              }
+            )}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </div>
   );
 }
 
@@ -1258,7 +1780,7 @@ function TicketQueue({
               key={
                 index
               }
-              className="h-20 animate-pulse rounded-2xl bg-slate-100"
+              className="h-20 animate-pulse rounded-2xl bg-muted"
             />
           )
         )}
@@ -1274,15 +1796,15 @@ function TicketQueue({
       <div className="flex min-h-[360px] items-center justify-center p-8">
         <div className="max-w-sm text-center">
 
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-emerald-500/15 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300">
             <Inbox className="h-6 w-6" />
           </div>
 
-          <h3 className="mt-4 text-sm font-black text-slate-900">
+          <h3 className="mt-4 text-sm font-black text-foreground">
             No tickets match this view
           </h3>
 
-          <p className="mt-2 text-xs leading-5 text-slate-500">
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">
             Adjust the search or filters to return to the active support queue.
           </p>
         </div>
@@ -1291,11 +1813,11 @@ function TicketQueue({
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="support-scrollbar-hidden overflow-x-auto">
       <table className="w-full min-w-[1080px] border-collapse text-left">
 
         <thead>
-          <tr className="border-b border-slate-100 bg-slate-50/80">
+          <tr className="border-b border-border bg-muted/40">
 
             {[
               "Ticket",
@@ -1315,7 +1837,7 @@ function TicketQueue({
                   key={
                     label
                   }
-                  className={`px-5 py-3.5 text-[8px] font-black uppercase tracking-[0.14em] text-slate-400 ${
+                  className={`px-5 py-3.5 text-[8px] font-black uppercase tracking-[0.14em] text-muted-foreground ${
                     index ===
                     7
                       ? "text-right"
@@ -1329,7 +1851,7 @@ function TicketQueue({
           </tr>
         </thead>
 
-        <tbody className="divide-y divide-slate-100">
+        <tbody className="divide-y divide-border">
 
           {tickets.map(
             (
@@ -1358,7 +1880,7 @@ function TicketQueue({
                     ticket.id
                   )
                 }
-                className="group cursor-pointer bg-white transition hover:bg-emerald-50/30"
+                className="group cursor-pointer bg-card transition hover:bg-emerald-500/[0.055]"
               >
 
                 {/* TICKET */}
@@ -1370,7 +1892,7 @@ function TicketQueue({
                     }
                   </p>
 
-                  <p className="mt-1 text-[8px] text-slate-400">
+                  <p className="mt-1 text-[8px] text-muted-foreground">
                     {formatRelativeTime(
                       ticket.lastActivityAt
                     )}
@@ -1389,13 +1911,13 @@ function TicketQueue({
                     </span>
 
                     <div className="min-w-0">
-                      <p className="max-w-[180px] truncate text-xs font-black text-slate-800">
+                      <p className="max-w-[180px] truncate text-xs font-black text-foreground">
                         {
                           ticket.customerName
                         }
                       </p>
 
-                      <p className="mt-0.5 max-w-[190px] truncate text-[9px] text-slate-400">
+                      <p className="mt-0.5 max-w-[190px] truncate text-[9px] text-muted-foreground">
                         {
                           ticket.customerEmail
                         }
@@ -1407,13 +1929,13 @@ function TicketQueue({
                 {/* ISSUE */}
 
                 <td className="px-5 py-4">
-                  <p className="max-w-[260px] truncate text-xs font-bold text-slate-800">
+                  <p className="max-w-[260px] truncate text-xs font-bold text-foreground">
                     {
                       ticket.subject
                     }
                   </p>
 
-                  <p className="mt-1 text-[8px] font-semibold text-slate-400">
+                  <p className="mt-1 text-[8px] font-semibold text-muted-foreground">
                     {
                       ticket.category
                     }
@@ -1447,7 +1969,7 @@ function TicketQueue({
                     className={`text-[10px] font-black ${
                       ticket.assignee
                         .id
-                        ? "text-slate-700"
+                        ? "text-foreground"
                         : "text-amber-700"
                     }`}
                   >
@@ -1485,22 +2007,7 @@ function TicketQueue({
                         ticket.id
                       );
                     }}
-                    className="
-                      inline-flex
-                      h-9
-                      items-center
-                      gap-1.5
-                      rounded-xl
-                      border
-                      border-emerald-200
-                      bg-white
-                      px-3
-                      text-[9px]
-                      font-black
-                      text-emerald-700
-                      transition
-                      hover:bg-emerald-50
-                    "
+                    className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-emerald-200 bg-card px-3 text-[9px] font-black text-emerald-700 transition hover:bg-emerald-50"
                   >
                     Open
 
@@ -1540,9 +2047,9 @@ function QueuePagination({
     );
 
   return (
-    <div className="flex flex-col gap-3 border-t border-slate-100 bg-slate-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 border-t border-border bg-muted/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
 
-      <p className="text-[10px] font-semibold text-slate-400">
+      <p className="text-[10px] font-semibold text-muted-foreground">
         {total.toLocaleString()} total tickets
       </p>
 
@@ -1561,23 +2068,7 @@ function QueuePagination({
               )
             )
           }
-          className="
-            inline-flex
-            h-9
-            w-9
-            items-center
-            justify-center
-            rounded-xl
-            border
-            border-slate-200
-            bg-white
-            text-slate-500
-            transition
-            hover:bg-emerald-50
-            hover:text-emerald-700
-            disabled:cursor-not-allowed
-            disabled:opacity-40
-          "
+          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
@@ -1600,23 +2091,7 @@ function QueuePagination({
               )
             )
           }
-          className="
-            inline-flex
-            h-9
-            w-9
-            items-center
-            justify-center
-            rounded-xl
-            border
-            border-slate-200
-            bg-white
-            text-slate-500
-            transition
-            hover:bg-emerald-50
-            hover:text-emerald-700
-            disabled:cursor-not-allowed
-            disabled:opacity-40
-          "
+          className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground transition hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <ChevronRight className="h-4 w-4" />
         </button>
@@ -1749,18 +2224,7 @@ function TicketDrawer({
         damping: 28,
         stiffness: 230,
       }}
-      className="
-        fixed
-        inset-y-0
-        right-0
-        z-[80]
-        flex
-        w-full
-        max-w-3xl
-        flex-col
-        bg-white
-        shadow-[-24px_0_70px_rgba(15,23,42,0.18)]
-      "
+      className="fixed inset-y-0 right-0 z-[80] flex w-full max-w-3xl flex-col border-l border-border bg-card shadow-[-24px_0_70px_rgba(15,23,42,0.18)]"
     >
       {!ticket ? (
         <div className="flex h-full items-center justify-center">
@@ -1772,7 +2236,7 @@ function TicketDrawer({
               HEADER
           ============================================== */}
 
-          <div className="shrink-0 border-b border-slate-100 bg-slate-50 p-5 md:p-6">
+          <div className="shrink-0 border-b border-border bg-emerald-500/[0.06] p-5 md:p-6">
             <div className="flex items-start justify-between gap-4">
 
               <div className="min-w-0">
@@ -1798,13 +2262,13 @@ function TicketDrawer({
                   />
                 </div>
 
-                <h2 className="mt-3 text-xl font-black leading-7 text-slate-900">
+                <h2 className="mt-3 text-xl font-black leading-7 text-foreground">
                   {
                     ticket.subject
                   }
                 </h2>
 
-                <p className="mt-1 text-[9px] text-slate-400">
+                <p className="mt-1 text-[9px] text-muted-foreground">
                   {
                     ticket.category
                   }{" "}
@@ -1820,22 +2284,7 @@ function TicketDrawer({
                 onClick={
                   onClose
                 }
-                className="
-                  inline-flex
-                  h-10
-                  w-10
-                  shrink-0
-                  items-center
-                  justify-center
-                  rounded-2xl
-                  border
-                  border-slate-200
-                  bg-white
-                  text-slate-400
-                  transition
-                  hover:bg-emerald-50
-                  hover:text-emerald-600
-                "
+                className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-border bg-card text-muted-foreground transition hover:bg-emerald-50 hover:text-emerald-600"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -1895,7 +2344,7 @@ function TicketDrawer({
               TABS
           ============================================== */}
 
-          <div className="shrink-0 border-b border-slate-100 bg-white px-5 md:px-6">
+          <div className="shrink-0 border-b border-border bg-card px-5 md:px-6">
             <div className="flex items-center gap-1">
 
               <button
@@ -1909,7 +2358,7 @@ function TicketDrawer({
                   tab ===
                   "conversation"
                     ? "text-emerald-700"
-                    : "text-slate-400 hover:text-slate-600"
+                    : "text-muted-foreground hover:text-muted-foreground"
                 }`}
               >
                 Conversation
@@ -1931,7 +2380,7 @@ function TicketDrawer({
                   tab ===
                   "activity"
                     ? "text-emerald-700"
-                    : "text-slate-400 hover:text-slate-600"
+                    : "text-muted-foreground hover:text-muted-foreground"
                 }`}
               >
                 Activity
@@ -1949,7 +2398,7 @@ function TicketDrawer({
               BODY
           ============================================== */}
 
-          <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50 p-4 md:p-5">
+          <div className="min-h-0 flex-1 support-scrollbar-hidden overflow-y-auto bg-background p-4 md:p-5">
 
             {tab ===
             "conversation" ? (
@@ -1963,7 +2412,7 @@ function TicketDrawer({
                     Customer Issue
                   </p>
 
-                  <p className="mt-2 whitespace-pre-wrap text-xs leading-6 text-slate-600">
+                  <p className="mt-2 whitespace-pre-wrap text-xs leading-6 text-muted-foreground">
                     {
                       ticket.description
                     }
@@ -1990,15 +2439,15 @@ function TicketDrawer({
 
                 {ticket.messages.length ===
                 0 ? (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-7 text-center">
+                  <div className="rounded-2xl border border-dashed border-border bg-card p-7 text-center">
 
-                    <MessageSquare className="mx-auto h-5 w-5 text-slate-300" />
+                    <MessageSquare className="mx-auto h-5 w-5 text-muted-foreground" />
 
-                    <p className="mt-3 text-xs font-black text-slate-700">
+                    <p className="mt-3 text-xs font-black text-foreground">
                       No conversation messages yet.
                     </p>
 
-                    <p className="mt-1 text-[10px] text-slate-400">
+                    <p className="mt-1 text-[10px] text-muted-foreground">
                       Send the first reply to the customer.
                     </p>
                   </div>
@@ -2079,11 +2528,11 @@ function TicketDrawer({
 
                 {ticket.activity.length ===
                 0 ? (
-                  <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-7 text-center">
+                  <div className="rounded-2xl border border-dashed border-border bg-card p-7 text-center">
 
-                    <ShieldAlert className="mx-auto h-5 w-5 text-slate-300" />
+                    <ShieldAlert className="mx-auto h-5 w-5 text-muted-foreground" />
 
-                    <p className="mt-3 text-xs font-black text-slate-700">
+                    <p className="mt-3 text-xs font-black text-foreground">
                       No activity recorded yet.
                     </p>
                   </div>
@@ -2096,19 +2545,19 @@ function TicketDrawer({
                         key={
                           item.id
                         }
-                        className="flex gap-3 rounded-2xl border border-slate-200 bg-white p-4"
+                        className="flex gap-3 rounded-2xl border border-border bg-card p-4"
                       >
                         <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-emerald-500" />
 
                         <div className="min-w-0">
 
-                          <p className="text-xs font-black text-slate-800">
+                          <p className="text-xs font-black text-foreground">
                             {
                               item.summary
                             }
                           </p>
 
-                          <p className="mt-1 text-[9px] text-slate-400">
+                          <p className="mt-1 text-[9px] text-muted-foreground">
                             {
                               item.actorName
                             }{" "}
@@ -2145,19 +2594,19 @@ function ContextCard({
   icon: React.ElementType;
 }) {
   return (
-    <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3">
+    <div className="min-w-0 rounded-2xl border border-border bg-card p-3">
       <div className="flex items-center gap-2">
 
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
           <Icon className="h-3.5 w-3.5" />
         </span>
 
-        <p className="truncate text-[8px] font-black uppercase tracking-[0.12em] text-slate-400">
+        <p className="truncate text-[8px] font-black uppercase tracking-[0.12em] text-muted-foreground">
           {label}
         </p>
       </div>
 
-      <p className="mt-2 truncate text-[10px] font-black text-slate-700">
+      <p className="mt-2 truncate text-[10px] font-black text-foreground">
         {value || "Not assigned"}
       </p>
     </div>
@@ -2197,7 +2646,7 @@ function MessageBubble({
             ? "border border-amber-200 bg-amber-50"
             : isAgent
               ? "bg-emerald-600 text-white"
-              : "border border-slate-200 bg-white text-slate-700"
+              : "border border-border bg-card text-foreground"
         }`}
       >
 
@@ -2218,7 +2667,7 @@ function MessageBubble({
           </p>
 
           {isInternal ? (
-            <span className="rounded-full bg-white px-2 py-0.5 text-[7px] font-black text-amber-700">
+            <span className="rounded-full bg-card px-2 py-0.5 text-[7px] font-black text-amber-700">
               INTERNAL
             </span>
           ) : isAgent ? (
@@ -2226,7 +2675,7 @@ function MessageBubble({
               SUPPORT
             </span>
           ) : (
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[7px] font-black text-slate-600">
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[7px] font-black text-muted-foreground">
               CUSTOMER
             </span>
           )}
@@ -2237,7 +2686,7 @@ function MessageBubble({
             isAgent &&
             !isInternal
               ? "text-emerald-50"
-              : "text-slate-600"
+              : "text-muted-foreground"
           }`}
         >
           {
@@ -2250,7 +2699,7 @@ function MessageBubble({
             isAgent &&
             !isInternal
               ? "text-emerald-100/70"
-              : "text-slate-400"
+              : "text-muted-foreground"
           }`}
         >
           {formatRelativeTime(
@@ -2293,8 +2742,8 @@ function Composer({
     <div
       className={`rounded-2xl border p-4 ${
         internal
-          ? "border-amber-200 bg-amber-50/60"
-          : "border-emerald-100 bg-white"
+          ? "border-amber-500/20 bg-amber-500/[0.08]"
+          : "border-border bg-card"
       }`}
     >
 
@@ -2325,30 +2774,12 @@ function Composer({
         }
         rows={4}
         maxLength={4000}
-        className="
-          mt-3
-          w-full
-          resize-none
-          rounded-xl
-          border
-          border-slate-200
-          bg-white
-          p-3
-          text-xs
-          leading-5
-          text-slate-700
-          outline-none
-          transition
-          placeholder:text-slate-400
-          focus:border-emerald-400
-          focus:ring-4
-          focus:ring-emerald-50
-        "
+        className="mt-3 w-full resize-none rounded-xl border border-border bg-card p-3 text-xs leading-5 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10"
       />
 
       <div className="mt-3 flex items-center justify-between gap-3">
 
-        <span className="text-[8px] text-slate-400">
+        <span className="text-[8px] text-muted-foreground">
           {
             value.length
           }
@@ -2397,16 +2828,16 @@ function PriorityBadge({
     string
   > = {
     Urgent:
-      "border-rose-200 bg-rose-50 text-rose-700",
+      "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300",
 
     High:
-      "border-amber-200 bg-amber-50 text-amber-700",
+      "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300",
 
     Normal:
-      "border-slate-200 bg-slate-50 text-slate-600",
+      "border-border bg-muted/50 text-muted-foreground",
 
     Low:
-      "border-emerald-200 bg-emerald-50 text-emerald-700",
+      "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
   };
 
   return (
@@ -2432,19 +2863,19 @@ function StatusBadge({
     string
   > = {
     Open:
-      "border-blue-200 bg-blue-50 text-blue-700",
+      "border-blue-500/20 bg-blue-500/10 text-blue-700 dark:text-blue-300",
 
     "In Progress":
-      "border-cyan-200 bg-cyan-50 text-cyan-700",
+      "border-cyan-500/20 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300",
 
     "Waiting for Customer":
-      "border-amber-200 bg-amber-50 text-amber-700",
+      "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300",
 
     Escalated:
-      "border-rose-200 bg-rose-50 text-rose-700",
+      "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300",
 
     Resolved:
-      "border-emerald-200 bg-emerald-50 text-emerald-700",
+      "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
   };
 
   return (
@@ -2488,8 +2919,8 @@ function SlaBadge({
     <span
       className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[8px] font-black ${
         dueSoon
-          ? "border-amber-200 bg-amber-50 text-amber-700"
-          : "border-slate-200 bg-slate-50 text-slate-500"
+          ? "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300"
+          : "border-border bg-muted/50 text-muted-foreground"
       }`}
     >
       <Clock3 className="h-3 w-3" />
