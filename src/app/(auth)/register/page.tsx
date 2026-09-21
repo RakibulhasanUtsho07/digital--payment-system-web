@@ -882,7 +882,7 @@ export default function RegisterPage() {
   ======================================================== */
 
   return (
-    <div className="relative z-10 w-full pointer-events-auto">
+    <div className="relative z-10 w-full min-w-0 pointer-events-auto">
       <AnimatePresence mode="wait">
 
         {/* =================================================
@@ -960,7 +960,7 @@ export default function RegisterPage() {
                 font-black
                 tracking-[-0.045em]
                 text-[#102A43]
-                sm:text-[30px]
+                sm:text-[30px] lg:text-[32px]
               ">
                 Create account
               </h1>
@@ -1043,7 +1043,7 @@ export default function RegisterPage() {
                 delay: 0.05,
                 duration: 0.4,
               }}
-              className="mt-4 space-y-3"
+              className="mt-4 space-y-3 sm:space-y-3.5"
             >
 
               {/* PROFILE IMAGE */}
@@ -1057,7 +1057,7 @@ export default function RegisterPage() {
                 to-[#F4F9FC]
                 p-2.5
               ">
-                <div className="flex items-center gap-3">
+                <div className="flex min-w-0 items-center gap-3">
 
                   <div className="relative">
                     <input
@@ -1080,8 +1080,10 @@ export default function RegisterPage() {
                         group
                         relative
                         flex
-                        h-[62px]
-                        w-[62px]
+                        h-[56px]
+                        w-[56px]
+                        sm:h-[62px]
+                        sm:w-[62px]
                         cursor-pointer
                         items-center
                         justify-center
@@ -1656,7 +1658,7 @@ export default function RegisterPage() {
                 font-black
                 tracking-[-0.045em]
                 text-[#102A43]
-                sm:text-[30px]
+                sm:text-[30px] lg:text-[32px]
               ">
                 Verify your email
               </h1>
