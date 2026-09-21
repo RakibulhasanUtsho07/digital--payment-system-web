@@ -14,6 +14,10 @@ import {
 } from "framer-motion";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   Activity,
   AlertTriangle,
   ArrowDownRight,
@@ -44,6 +48,14 @@ import {
 } from "recharts";
 
 import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
+
+import {
   getAnalystConversionAnalytics,
   type AnalystConversionData,
   type AnalystConversionInsight,
@@ -52,6 +64,42 @@ import {
   type AnalystPaymentSource,
   type AnalystRange,
 } from "@/lib/api/analystApi";
+
+const ANALYST = {
+  navy: "#10243A",
+  tealDeep: "#0B4F52",
+  navySoft: "#10273A",
+  teal: "#0D9488",
+  tealBright: "#14B8A6",
+  cyan: "#22C7D6",
+  sky: "#38BDF8",
+  emerald: "#10B981",
+  amber: "#F59E0B",
+  red: "#EF4444",
+  violet: "#8B5CF6",
+};
+
+const reveal = {
+  hidden: {
+    opacity: 0,
+    y: 16,
+    filter: "blur(7px)",
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    filter: "blur(0px)",
+  },
+};
+
+const stagger = {
+  hidden: {},
+  show: {
+    transition: {
+      staggerChildren: 0.055,
+    },
+  },
+};
 
 /* =========================================================
    OPTIONS
@@ -316,39 +364,48 @@ function MetricCard({
 }) {
   return (
     <motion.div
-      initial={{
-        opacity: 0,
-        y: 12,
+      variants={reveal}
+      whileHover={{
+        y: -4,
+        scale: 1.008,
       }}
-      animate={{
-        opacity: 1,
-        y: 0,
+      transition={{
+        type: "spring",
+        stiffness: 280,
+        damping: 22,
       }}
-      className="rounded-2xl border border-border bg-card p-5 shadow-sm"
+      className="group relative overflow-hidden rounded-[22px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_18px_50px_-38px_rgba(15,118,110,0.48)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70"
     >
-      <div className="flex items-start justify-between gap-4">
+      <div className="pointer-events-none absolute -right-10 -top-12 h-28 w-28 rounded-full bg-teal-500/10 blur-3xl" />
+      <div className="pointer-events-none absolute inset-x-7 top-0 h-px bg-gradient-to-r from-transparent via-teal-400/60 to-transparent" />
+
+      <div className="relative flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+          <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">
             {label}
           </p>
 
-          <p className="mt-3 truncate text-2xl font-black tracking-tight text-foreground">
+          <p className="mt-3 truncate text-2xl font-black tracking-tight text-slate-950 dark:text-white">
             {value}
           </p>
 
-          <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
+          <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
             {description}
           </p>
         </div>
 
-        <div
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${iconClass}`}
+        <motion.div
+          whileHover={{
+            rotate: 9,
+            scale: 1.08,
+          }}
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/50 shadow-sm ${iconClass}`}
         >
           <Icon className="h-5 w-5" />
-        </div>
+        </motion.div>
       </div>
 
-      <div className="mt-4 border-t border-border/70 pt-3">
+      <div className="relative mt-4 border-t border-slate-200/70 pt-3 dark:border-white/10">
         <Change
           metric={metric}
           inverse={inverse}
@@ -372,21 +429,50 @@ function Panel({
   children: ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-      <div className="border-b border-border px-5 py-4">
-        <h2 className="text-base font-extrabold text-foreground">
-          {title}
-        </h2>
+    <motion.section
+      variants={reveal}
+      initial="hidden"
+      whileInView="show"
+      viewport={{
+        once: true,
+        amount: 0.08,
+      }}
+      transition={{
+        duration: 0.45,
+        ease: [0.22, 1, 0.36, 1],
+      }}
+      className="group relative overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/90 shadow-[0_18px_55px_-35px_rgba(15,118,110,0.40)] backdrop-blur-xl transition duration-300 hover:-translate-y-0.5 dark:border-white/10 dark:bg-slate-950/70"
+    >
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-teal-400/70 to-transparent" />
 
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          {description}
-        </p>
+      <div className="border-b border-slate-200/70 px-5 py-4 dark:border-white/10">
+        <div className="flex items-start gap-3">
+          <motion.div
+            whileHover={{
+              rotate: 8,
+              scale: 1.06,
+            }}
+            className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-teal-500/15 bg-gradient-to-br from-teal-500/12 to-cyan-500/10 text-teal-700 dark:text-teal-300"
+          >
+            <Activity className="h-5 w-5" />
+          </motion.div>
+
+          <div>
+            <h2 className="text-base font-black tracking-tight text-slate-950 dark:text-white">
+              {title}
+            </h2>
+
+            <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500 dark:text-slate-400">
+              {description}
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="p-5">
         {children}
       </div>
-    </section>
+    </motion.section>
   );
 }
 
@@ -452,9 +538,22 @@ function InsightCard({
           : TriangleAlert;
 
   return (
-    <div
-      className={`rounded-2xl border p-4 ${style}`}
+    <motion.div
+      initial={{
+        opacity: 0,
+        y: 12,
+        filter: "blur(5px)",
+      }}
+      whileInView={{
+        opacity: 1,
+        y: 0,
+        filter: "blur(0px)",
+      }}
+      viewport={{ once: true }}
+      whileHover={{ y: -3 }}
+      className={`relative overflow-hidden rounded-[22px] border bg-gradient-to-br from-white/90 via-white to-white p-4 shadow-[0_18px_50px_-42px_rgba(15,23,42,0.55)] dark:from-slate-950 dark:via-slate-950 dark:to-slate-950 ${style}`}
     >
+      <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-teal-400/50 to-transparent" />
       <div className="flex items-start gap-3">
         <Icon className="mt-0.5 h-5 w-5 shrink-0" />
 
@@ -489,7 +588,7 @@ function InsightCard({
           </p>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -498,6 +597,41 @@ function InsightCard({
 ========================================================= */
 
 export default function AnalystConversionPage() {
+  const router =
+    useRouter();
+
+  /*
+   * DashboardSessionContext is populated from the
+   * authenticated backend profile by the dashboard layout.
+   * The backend-confirmed role is the source of truth.
+   */
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isAnalystRole =
+    user.role === "analyst";
+
+  /* =======================================================
+     ANALYST-ONLY PAGE GUARD
+  ======================================================= */
+
+  useEffect(() => {
+    if (isAnalystRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isAnalystRole,
+    router,
+    user.role,
+  ]);
+
   const [
     range,
     setRange,
@@ -603,6 +737,15 @@ export default function AnalystConversionPage() {
 
   useEffect(
     () => {
+      if (!isAnalystRole) {
+        setLoading(false);
+        setRefreshing(false);
+        setData(null);
+        setError("");
+
+        return;
+      }
+
       const controller =
         new AbortController();
 
@@ -687,6 +830,7 @@ export default function AnalystConversionPage() {
       };
     },
     [
+      isAnalystRole,
       range,
       mode,
       currency,
@@ -729,6 +873,10 @@ export default function AnalystConversionPage() {
   ) {
     event.preventDefault();
 
+    if (!isAnalystRole) {
+      return;
+    }
+
     const nextCurrency =
       currencyDraft
         .trim()
@@ -757,20 +905,73 @@ export default function AnalystConversionPage() {
     );
   }
 
+  if (!isAnalystRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center px-4">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-teal-500/15 bg-teal-500/10 text-teal-700 shadow-sm dark:text-teal-300">
+            <RefreshCcw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening analyst workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Payment Conversion is available only to analyst accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
   if (
     loading &&
     !data
   ) {
     return (
-      <div className="flex min-h-[65vh] items-center justify-center">
+      <div className="grid min-h-[65vh] place-items-center rounded-[28px] border border-slate-200/80 bg-white/80 shadow-sm dark:border-white/10 dark:bg-slate-950/60">
         <div className="text-center">
-          <TrendingUp className="mx-auto h-9 w-9 animate-pulse text-primary" />
+          <div className="relative mx-auto h-20 w-20">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{
+                duration: 7,
+                repeat: Infinity,
+                ease: "linear",
+              }}
+              className="absolute inset-0 rounded-full border border-dashed border-teal-500/35"
+            />
 
-          <p className="mt-3 text-sm font-extrabold">
-            Building conversion funnel
+            <motion.div
+              animate={{ rotate: -360 }}
+              transition={{
+                duration: 4,
+                repeat: Infinity,
+                ease: "linear",
+              }}
+              className="absolute inset-2 rounded-full border border-cyan-500/30"
+            />
+
+            <motion.div
+              animate={{
+                scale: [1, 1.08, 1],
+              }}
+              transition={{
+                duration: 1.8,
+                repeat: Infinity,
+              }}
+              className="absolute inset-4 flex items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 via-cyan-500 to-sky-500 text-white shadow-lg shadow-teal-500/20"
+            >
+              <TrendingUp className="h-6 w-6" />
+            </motion.div>
+          </div>
+
+          <p className="mt-5 text-sm font-black text-slate-900 dark:text-white">
+            Building conversion intelligence
           </p>
 
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
             Reading real payment lifecycle records...
           </p>
         </div>
@@ -782,88 +983,196 @@ export default function AnalystConversionPage() {
     <main className="space-y-6">
       {/* HEADER */}
 
-      <section className="relative overflow-hidden rounded-[28px] border border-border bg-card p-6 shadow-sm">
-        <div className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-violet-500/10 blur-[90px]" />
+      <motion.section
+        initial={{
+          opacity: 0,
+          y: 14,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        transition={{
+          duration: 0.55,
+          ease: [0.22, 1, 0.36, 1],
+        }}
+        className="relative isolate overflow-hidden rounded-[30px] border border-white/10 bg-gradient-to-br from-[#10243A] via-[#0B4F52] to-[#10273A] p-6 text-white shadow-[0_30px_90px_-45px_rgba(13,148,136,0.65)] md:p-7 lg:p-8"
+      >
+        <motion.div
+          animate={{
+            x: [0, 34, -12, 0],
+            y: [0, -16, 12, 0],
+            scale: [1, 1.12, 0.96, 1],
+          }}
+          transition={{
+            duration: 12,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="pointer-events-none absolute -right-20 -top-24 h-80 w-80 rounded-full bg-cyan-400/15 blur-[90px]"
+        />
 
-        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-full border border-violet-500/20 bg-violet-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-violet-600 dark:text-violet-400">
-              <TrendingUp className="h-3.5 w-3.5" />
+        <motion.div
+          animate={{
+            x: [0, -24, 18, 0],
+            y: [0, 18, -10, 0],
+          }}
+          transition={{
+            duration: 14,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="pointer-events-none absolute -bottom-28 left-[20%] h-72 w-72 rounded-full bg-teal-300/15 blur-[100px]"
+        />
 
-              Lifecycle Intelligence
+        <div className="pointer-events-none absolute inset-0 opacity-[0.08] [background-image:radial-gradient(circle_at_center,white_1px,transparent_1px)] [background-size:22px_22px]" />
+
+        <motion.div
+          animate={{
+            x: ["-30%", "130%"],
+          }}
+          transition={{
+            duration: 5.5,
+            repeat: Infinity,
+            repeatDelay: 2.5,
+            ease: "easeInOut",
+          }}
+          className="pointer-events-none absolute top-0 h-px w-1/3 bg-gradient-to-r from-transparent via-cyan-300 to-transparent shadow-[0_0_18px_rgba(34,211,238,0.9)]"
+        />
+
+        <div className="relative z-10 flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
+          <div className="max-w-4xl">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-2 rounded-full border border-cyan-200/15 bg-white/[0.07] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.17em] text-cyan-100 backdrop-blur-md">
+                <TrendingUp className="h-3.5 w-3.5" />
+                Lifecycle Intelligence
+              </div>
+
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200/15 bg-emerald-300/[0.08] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-100">
+                <BadgeCheck className="h-3.5 w-3.5" />
+                Analyst only
+              </div>
             </div>
 
-            <h1 className="mt-4 text-2xl font-black tracking-tight md:text-3xl">
+            <h1 className="mt-4 max-w-3xl text-2xl font-black tracking-[-0.03em] md:text-3xl lg:text-[36px] lg:leading-[1.08]">
               Payment Conversion
             </h1>
 
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-200/80">
               Follow real payments from creation through authorization,
-              capture and successful completion.
+              capture and successful completion with analyst-grade lifecycle intelligence.
             </p>
 
             {data && (
-              <p className="mt-3 text-[11px] font-semibold text-muted-foreground">
-                Updated{" "}
-                {dateText(
-                  data.generatedAt
-                )}{" "}
-                · Engine{" "}
-                {
-                  data
-                    .calculationEngine
-                    .version
-                }
-              </p>
+              <div className="mt-5 flex flex-wrap items-center gap-2 text-[10px] font-semibold text-slate-200/75">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 backdrop-blur">
+                  <Activity className="h-3.5 w-3.5 text-cyan-300" />
+                  Updated {dateText(data.generatedAt)}
+                </span>
+
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 backdrop-blur">
+                  <DatabaseZap className="h-3.5 w-3.5 text-teal-300" />
+                  Engine {data.calculationEngine.version}
+                </span>
+
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200/15 bg-emerald-300/[0.08] px-3 py-1.5 text-emerald-100">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Live analytics
+                </span>
+              </div>
             )}
           </div>
 
-          <button
-            type="button"
-            disabled={
-              refreshing
-            }
-            onClick={() =>
-              setRefreshKey(
-                (
-                  value
-                ) =>
-                  value +
-                  1
-              )
-            }
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-4 py-3 text-xs font-extrabold transition hover:bg-muted disabled:opacity-50"
-          >
-            <RefreshCcw
-              className={`h-4 w-4 ${
-                refreshing
-                  ? "animate-spin"
-                  : ""
-              }`}
-            />
+          <div className="relative flex shrink-0 items-center">
+            <div className="pointer-events-none absolute -inset-6 rounded-full bg-cyan-300/10 blur-3xl" />
 
-            Refresh
-          </button>
+            <motion.div
+              animate={{
+                rotate: 360,
+              }}
+              transition={{
+                duration: 18,
+                repeat: Infinity,
+                ease: "linear",
+              }}
+              className="pointer-events-none absolute -left-5 -top-5 hidden h-24 w-24 rounded-full border border-dashed border-cyan-200/20 lg:block"
+            >
+              <span className="absolute left-1/2 top-[-3px] h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-cyan-300 shadow-[0_0_12px_rgba(103,232,249,0.9)]" />
+            </motion.div>
+
+            <button
+              type="button"
+              disabled={refreshing}
+              onClick={() => {
+                if (!isAnalystRole) {
+                  return;
+                }
+
+                setRefreshKey(
+                  (value) =>
+                    value + 1
+                );
+              }}
+              className="relative inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.08] px-4 py-3 text-xs font-black text-white shadow-lg backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/[0.12] disabled:opacity-60"
+            >
+              <RefreshCcw
+                className={`h-4 w-4 ${
+                  refreshing
+                    ? "animate-spin"
+                    : ""
+                }`}
+              />
+
+              {refreshing
+                ? "Refreshing"
+                : "Refresh"}
+            </button>
+          </div>
         </div>
-      </section>
+
+        {refreshing && data && (
+          <motion.div
+            initial={{
+              scaleX: 0,
+            }}
+            animate={{
+              scaleX: 1,
+            }}
+            transition={{
+              duration: 1.15,
+              repeat: Infinity,
+            }}
+            className="absolute bottom-0 left-0 h-[2px] w-full origin-left bg-gradient-to-r from-transparent via-cyan-300 to-transparent"
+          />
+        )}
+      </motion.section>
 
       {/* ERROR */}
 
       {error && (
-        <div className="flex items-start gap-3 rounded-2xl border border-red-500/20 bg-red-500/5 p-4 text-red-600">
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-start gap-3 rounded-[22px] border border-red-500/20 bg-red-500/[0.06] p-4 text-red-600 shadow-sm dark:text-red-400"
+        >
           <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
 
           <p className="text-xs">
             {error}
           </p>
-        </div>
+        </motion.div>
       )}
 
       {/* FILTERS */}
 
-      <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+      <motion.section
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.08, duration: 0.45 }}
+        className="relative z-30 rounded-[24px] border border-slate-200/80 bg-white/90 p-4 shadow-[0_18px_55px_-40px_rgba(15,118,110,0.45)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70"
+      >
         <div className="mb-4 flex items-center gap-2">
-          <Filter className="h-4 w-4 text-primary" />
+          <Filter className="h-4 w-4 text-teal-700 dark:text-teal-300" />
 
           <p className="text-xs font-extrabold uppercase tracking-[0.14em] text-muted-foreground">
             Conversion Filters
@@ -884,7 +1193,7 @@ export default function AnalystConversionPage() {
                   AnalystRange
               )
             }
-            className="h-11 rounded-xl border border-border bg-background px-3 text-xs font-bold"
+            className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
           >
             {RANGE_OPTIONS.map(
               (
@@ -919,7 +1228,7 @@ export default function AnalystConversionPage() {
                   AnalystMode
               )
             }
-            className="h-11 rounded-xl border border-border bg-background px-3 text-xs font-bold"
+            className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
           >
             {MODE_OPTIONS.map(
               (
@@ -954,7 +1263,7 @@ export default function AnalystConversionPage() {
                   AnalystPaymentSource
               )
             }
-            className="h-11 rounded-xl border border-border bg-background px-3 text-xs font-bold"
+            className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-xs font-bold text-slate-700 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
           >
             {SOURCE_OPTIONS.map(
               (
@@ -1005,7 +1314,7 @@ export default function AnalystConversionPage() {
               )
             }
             placeholder="BDT"
-            className="h-11 rounded-xl border border-border bg-background px-3 text-xs font-black uppercase"
+            className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black uppercase text-slate-700 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
           />
 
           <input
@@ -1021,23 +1330,28 @@ export default function AnalystConversionPage() {
               )
             }
             placeholder="Provider filter, e.g. paypal"
-            className="h-11 rounded-xl border border-border bg-background px-3 text-xs font-semibold"
+            className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 dark:border-white/10 dark:bg-white/5 dark:text-slate-200"
           />
 
           <button
             type="submit"
-            className="h-11 rounded-xl bg-primary px-5 text-xs font-extrabold text-primary-foreground"
+            className="h-11 rounded-xl bg-gradient-to-r from-teal-600 to-cyan-600 px-5 text-xs font-extrabold text-white shadow-lg shadow-teal-500/15 transition hover:-translate-y-0.5 hover:from-teal-500 hover:to-cyan-500"
           >
             Apply
           </button>
         </form>
-      </section>
+      </motion.section>
 
       {data && (
         <>
           {/* METRICS */}
 
-          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <motion.section
+            variants={stagger}
+            initial="hidden"
+            animate="show"
+            className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+          >
             <MetricCard
               label="Created"
               value={numberText(
@@ -1112,7 +1426,7 @@ export default function AnalystConversionPage() {
               iconClass="bg-red-500/10 text-red-600"
               inverse
             />
-          </section>
+          </motion.section>
 
           {/* FUNNEL */}
 
@@ -1196,7 +1510,7 @@ export default function AnalystConversionPage() {
                               index *
                               0.08,
                           }}
-                          className="h-full rounded-full bg-gradient-to-r from-blue-500 via-violet-500 to-emerald-500"
+                          className="h-full rounded-full bg-gradient-to-r from-teal-500 via-cyan-500 to-emerald-500 shadow-[0_0_14px_rgba(20,184,166,0.35)]"
                         />
                       </div>
                     </div>
@@ -1221,8 +1535,11 @@ export default function AnalystConversionPage() {
                 point.createdCount >
                 0
             ) ? (
-              <div className="h-[350px]">
-                <ResponsiveContainer
+              <div className="relative overflow-hidden rounded-[22px] border border-white/10 bg-gradient-to-br from-[#0A2028] via-[#0A2A2D] to-[#0A1B26] p-3 shadow-inner">
+                <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-cyan-400/10 blur-[90px]" />
+
+                <div className="relative h-[350px]">
+                  <ResponsiveContainer
                   width="100%"
                   height="100%"
                 >
@@ -1241,10 +1558,9 @@ export default function AnalystConversionPage() {
                       vertical={
                         false
                       }
-                      strokeDasharray="4 4"
-                      opacity={
-                        0.15
-                      }
+                      stroke="rgba(148,163,184,0.14)"
+                      strokeDasharray="4 6"
+                      opacity={1}
                     />
 
                     <XAxis
@@ -1300,7 +1616,7 @@ export default function AnalystConversionPage() {
                       yAxisId="count"
                       dataKey="createdCount"
                       name="Created"
-                      fill="#6366f1"
+                      fill="#38BDF8"
                       maxBarSize={
                         20
                       }
@@ -1316,7 +1632,7 @@ export default function AnalystConversionPage() {
                       yAxisId="count"
                       dataKey="failedCount"
                       name="Failed"
-                      fill="#ef4444"
+                      fill="#EF4444"
                       maxBarSize={
                         16
                       }
@@ -1333,7 +1649,7 @@ export default function AnalystConversionPage() {
                       type="monotone"
                       dataKey="completedCount"
                       name="Completed"
-                      stroke="#10b981"
+                      stroke="#10B981"
                       strokeWidth={
                         2.5
                       }
@@ -1347,7 +1663,7 @@ export default function AnalystConversionPage() {
                       type="monotone"
                       dataKey="completionRate"
                       name="Completion %"
-                      stroke="#8b5cf6"
+                      stroke="#22C7D6"
                       strokeWidth={
                         2
                       }
@@ -1356,7 +1672,8 @@ export default function AnalystConversionPage() {
                       }
                     />
                   </ComposedChart>
-                </ResponsiveContainer>
+                  </ResponsiveContainer>
+                </div>
               </div>
             ) : (
               <Empty message="No conversion trend is available for the selected period." />
@@ -1406,7 +1723,7 @@ export default function AnalystConversionPage() {
                             key={
                               item.provider
                             }
-                            className="border-t border-border/60"
+                            className="border-t border-slate-200/70 transition hover:bg-teal-500/[0.04] dark:border-white/10"
                           >
                             <td className="py-3 font-extrabold">
                               {humanize(
@@ -1484,7 +1801,7 @@ export default function AnalystConversionPage() {
 
                       <div className="h-2 overflow-hidden rounded-full bg-muted">
                         <div
-                          className="h-full rounded-full bg-primary"
+                          className="h-full rounded-full bg-gradient-to-r from-teal-500 to-cyan-500"
                           style={{
                             width:
                               `${Math.min(
@@ -1517,7 +1834,7 @@ export default function AnalystConversionPage() {
                       key={
                         item.source
                       }
-                      className="rounded-2xl border border-border bg-background p-4"
+                      className="rounded-2xl border border-slate-200/80 bg-white/75 p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-500/20 dark:border-white/10 dark:bg-black/10"
                     >
                       <p className="text-xs font-extrabold">
                         {humanize(
@@ -1577,7 +1894,12 @@ export default function AnalystConversionPage() {
 
           {/* OPERATIONS */}
 
-          <section className="grid gap-3 rounded-2xl border border-border bg-card p-5 shadow-sm sm:grid-cols-2 xl:grid-cols-4">
+          <motion.section
+            initial={{ opacity: 0, y: 12 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="grid gap-3 rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_18px_55px_-40px_rgba(15,118,110,0.45)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70 sm:grid-cols-2 xl:grid-cols-4"
+          >
             <Operation
               label="In progress"
               value={
@@ -1609,7 +1931,7 @@ export default function AnalystConversionPage() {
                   .expiredCount
               }
             />
-          </section>
+          </motion.section>
         </>
       )}
     </main>
@@ -1628,7 +1950,14 @@ function Operation({
   value: number;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-background p-4">
+    <motion.div
+      whileHover={{
+        y: -3,
+        scale: 1.01,
+      }}
+      className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white/75 p-4 shadow-sm dark:border-white/10 dark:bg-black/10"
+    >
+      <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-teal-400/60 to-transparent" />
       <p className="text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">
         {label}
       </p>
@@ -1638,6 +1967,6 @@ function Operation({
           value
         )}
       </p>
-    </div>
+    </motion.div>
   );
 }
