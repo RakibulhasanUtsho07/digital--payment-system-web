@@ -9,6 +9,10 @@ import {
 } from "react";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   AnimatePresence,
   motion,
 } from "framer-motion";
@@ -55,6 +59,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   getAnalystPayoutAnalytics,
@@ -772,15 +784,43 @@ function LedgerStat({
 }) {
   const styles =
     tone === "emerald"
-      ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+      ? {
+          chip:
+            "border-emerald-500/15 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+          line:
+            "from-transparent via-emerald-400/60 to-transparent",
+          glow:
+            "bg-emerald-500/10",
+        }
       : tone === "cyan"
-        ? "bg-cyan-500/10 text-cyan-700 dark:text-cyan-300"
+        ? {
+            chip:
+              "border-cyan-500/15 bg-cyan-500/10 text-cyan-700 dark:text-cyan-300",
+            line:
+              "from-transparent via-cyan-400/60 to-transparent",
+            glow:
+              "bg-cyan-500/10",
+          }
         : tone === "red"
-          ? "bg-red-500/10 text-red-600 dark:text-red-400"
-          : "bg-amber-500/10 text-amber-600 dark:text-amber-400";
+          ? {
+              chip:
+                "border-red-500/15 bg-red-500/10 text-red-600 dark:text-red-400",
+              line:
+                "from-transparent via-red-400/60 to-transparent",
+              glow:
+                "bg-red-500/10",
+            }
+          : {
+              chip:
+                "border-amber-500/15 bg-amber-500/10 text-amber-600 dark:text-amber-400",
+              line:
+                "from-transparent via-amber-400/60 to-transparent",
+              glow:
+                "bg-amber-500/10",
+            };
 
   return (
-    <motion.div
+    <motion.article
       initial={{
         opacity: 0,
         y: 8,
@@ -798,26 +838,38 @@ function LedgerStat({
       whileHover={{
         y: -2,
       }}
-      className="rounded-2xl border border-slate-200/80 bg-white/75 p-4 transition dark:border-white/10 dark:bg-black/10"
+      className="group relative flex min-h-[118px] flex-col justify-between overflow-hidden rounded-2xl border border-slate-200/80 bg-white/80 p-4 shadow-sm transition dark:border-white/10 dark:bg-black/10"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
-            {title}
-          </p>
+      <div
+        className={`pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r ${styles.line}`}
+      />
 
-          <p className="mt-2 text-xl font-black text-slate-950 dark:text-white">
-            {numberText(value)}
-          </p>
-        </div>
+      <div
+        className={`pointer-events-none absolute -right-8 -top-8 h-20 w-20 rounded-full blur-2xl ${styles.glow}`}
+      />
+
+      <div className="relative flex min-w-0 items-start justify-between gap-3">
+        <p className="min-h-[2rem] max-w-[calc(100%-3rem)] text-[9px] font-black uppercase leading-4 tracking-[0.14em] text-slate-500 dark:text-slate-400">
+          {title}
+        </p>
 
         <div
-          className={`flex h-9 w-9 items-center justify-center rounded-xl ${styles}`}
+          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${styles.chip}`}
         >
           <Icon className="h-4 w-4" />
         </div>
       </div>
-    </motion.div>
+
+      <div className="relative mt-4 flex items-end justify-between gap-3">
+        <p className="truncate text-[30px] font-black leading-none tracking-[-0.03em] text-slate-950 dark:text-white">
+          {numberText(value)}
+        </p>
+
+        <span className="rounded-full border border-slate-200/80 bg-slate-50/90 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-400">
+          Records
+        </span>
+      </div>
+    </motion.article>
   );
 }
 
@@ -996,6 +1048,32 @@ function PayoutLoading() {
 ========================================================= */
 
 export default function AnalystPayoutsPage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isAnalystRole =
+    user.role === "analyst";
+
+  useEffect(() => {
+    if (isAnalystRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isAnalystRole,
+    router,
+    user.role,
+  ]);
+
   const [range, setRange] =
     useState<AnalystRange>("30d");
 
@@ -1018,6 +1096,13 @@ export default function AnalystPayoutsPage() {
     useState(0);
 
   useEffect(() => {
+    if (!isAnalystRole) {
+      setLoading(false);
+      setData(null);
+      setError("");
+      return;
+    }
+
     const controller =
       new AbortController();
 
@@ -1065,6 +1150,7 @@ export default function AnalystPayoutsPage() {
       controller.abort();
     };
   }, [
+    isAnalystRole,
     range,
     status,
     currency,
@@ -1142,10 +1228,34 @@ export default function AnalystPayoutsPage() {
     );
 
   function resetFilters() {
+    if (!isAnalystRole) {
+      return;
+    }
+
     setRange("30d");
     setStatus("all");
     setCurrency("BDT");
     setError("");
+  }
+
+  if (!isAnalystRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center px-4">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-teal-500/15 bg-teal-500/10 text-teal-700 shadow-sm dark:text-teal-300">
+            <RefreshCcw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening analyst workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Payout analytics is available only to analyst accounts.
+          </p>
+        </div>
+      </main>
+    );
   }
 
   if (
@@ -1300,12 +1410,16 @@ export default function AnalystPayoutsPage() {
 
             <button
               type="button"
-              onClick={() =>
+              onClick={() => {
+                if (!isAnalystRole) {
+                  return;
+                }
+
                 setRefreshKey(
                   (value) =>
                     value + 1
-                )
-              }
+                );
+              }}
               disabled={loading}
               className="relative inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.08] px-4 py-3 text-xs font-black text-white shadow-lg backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/[0.12] disabled:cursor-not-allowed disabled:opacity-60"
             >
@@ -1400,7 +1514,13 @@ export default function AnalystPayoutsPage() {
             label="Range"
             value={range}
             options={RANGE_OPTIONS}
-            onChange={setRange}
+            onChange={(nextRange) => {
+              if (!isAnalystRole) {
+                return;
+              }
+
+              setRange(nextRange);
+            }}
             icon={Clock3}
           />
 
@@ -1408,7 +1528,13 @@ export default function AnalystPayoutsPage() {
             label="Status"
             value={status}
             options={STATUS_OPTIONS}
-            onChange={setStatus}
+            onChange={(nextStatus) => {
+              if (!isAnalystRole) {
+                return;
+              }
+
+              setStatus(nextStatus);
+            }}
             icon={Gauge}
           />
 
@@ -1422,7 +1548,11 @@ export default function AnalystPayoutsPage() {
 
               <input
                 value={currency}
-                onChange={(event) =>
+                onChange={(event) => {
+                  if (!isAnalystRole) {
+                    return;
+                  }
+
                   setCurrency(
                     event.target.value
                       .replace(
@@ -1434,8 +1564,8 @@ export default function AnalystPayoutsPage() {
                         3
                       )
                       .toUpperCase()
-                  )
-                }
+                  );
+                }}
                 maxLength={3}
                 aria-label="Currency"
                 className="h-12 w-full rounded-2xl border border-slate-200 bg-white/90 pl-10 pr-4 text-center text-xs font-black uppercase text-slate-900 shadow-sm outline-none transition focus:border-teal-500/60 focus:ring-4 focus:ring-teal-500/10 dark:border-white/10 dark:bg-slate-950/70 dark:text-white"
@@ -1763,8 +1893,8 @@ export default function AnalystPayoutsPage() {
               description="Coverage and balance status for payout ledger groups."
               icon={Landmark}
             >
-              <div className="grid gap-4 lg:grid-cols-[1fr_220px]">
-                <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_240px]">
+                <div className="grid auto-rows-fr gap-3 sm:grid-cols-2">
                   <LedgerStat
                     title="Completed"
                     value={
@@ -1818,7 +1948,7 @@ export default function AnalystPayoutsPage() {
                   />
                 </div>
 
-                <div className="relative min-h-[220px] rounded-2xl border border-slate-200/80 bg-slate-50/65 dark:border-white/10 dark:bg-white/[0.025]">
+                <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-50/65 dark:border-white/10 dark:bg-white/[0.025]">
                   {ledgerPie.length > 0 ? (
                     <>
                       <ResponsiveContainer

@@ -15,6 +15,10 @@ import {
 } from "framer-motion";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   Activity,
   AlertTriangle,
   ArrowDownRight,
@@ -59,6 +63,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   getAnalystPaymentAnalytics,
@@ -379,13 +391,13 @@ function OceanSelect<T extends string>({
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
-        className={`flex h-12 w-full items-center gap-3 rounded-2xl border bg-white/90 px-3.5 text-left shadow-sm outline-none transition duration-200 dark:bg-slate-950/70 ${
+        className={`group relative flex h-12 w-full items-center gap-3 overflow-hidden rounded-2xl border bg-white/95 px-3.5 text-left shadow-[0_12px_32px_-26px_rgba(15,118,110,0.55)] outline-none transition duration-200 dark:bg-slate-950/80 ${
           open
             ? "border-teal-500/60 ring-4 ring-teal-500/10"
-            : "border-slate-200 hover:border-teal-500/35 dark:border-white/10 dark:hover:border-teal-400/30"
+            : "border-slate-200 hover:-translate-y-0.5 hover:border-teal-500/35 hover:shadow-[0_16px_36px_-24px_rgba(15,118,110,0.42)] dark:border-white/10 dark:hover:border-teal-400/30"
         }`}
       >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-teal-500/10 text-teal-700 dark:text-teal-300">
+        <span className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-teal-500/15 bg-gradient-to-br from-teal-500/12 to-cyan-500/10 text-teal-700 shadow-sm dark:text-teal-300">
           <Icon className="h-4 w-4" />
         </span>
 
@@ -436,7 +448,7 @@ function OceanSelect<T extends string>({
               duration: 0.16,
             }}
             role="listbox"
-            className="absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-2xl border border-slate-200/90 bg-white/95 p-1.5 shadow-[0_24px_70px_-20px_rgba(15,23,42,0.35)] backdrop-blur-xl dark:border-white/10 dark:bg-[#091820]/95"
+            className="absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-2xl border border-teal-500/15 bg-white/98 p-1.5 shadow-[0_28px_80px_-24px_rgba(15,118,110,0.32)] backdrop-blur-2xl dark:border-teal-400/15 dark:bg-[#091820]/98"
           >
             {options.map((option) => {
               const active = option.value === value;
@@ -719,7 +731,7 @@ function Panel({
         duration: 0.45,
         ease: [0.22, 1, 0.36, 1],
       }}
-      className={`group relative overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/90 shadow-[0_18px_55px_-35px_rgba(15,118,110,0.40)] backdrop-blur-xl transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_24px_65px_-35px_rgba(15,118,110,0.50)] dark:border-white/10 dark:bg-slate-950/70 ${className}`}
+      className={`group relative h-fit overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/90 shadow-[0_18px_55px_-35px_rgba(15,118,110,0.40)] backdrop-blur-xl transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_24px_65px_-35px_rgba(15,118,110,0.50)] dark:border-white/10 dark:bg-slate-950/70 ${className}`}
     >
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-teal-400/70 to-transparent opacity-70" />
 
@@ -776,7 +788,7 @@ function Empty({ message }: { message: string }) {
         opacity: 1,
         scale: 1,
       }}
-      className="relative flex min-h-52 flex-col items-center justify-center overflow-hidden rounded-[22px] border border-dashed border-teal-500/20 bg-gradient-to-br from-teal-500/[0.04] via-white to-cyan-500/[0.04] px-6 text-center dark:via-slate-950"
+      className="relative flex flex-col items-center justify-center overflow-hidden rounded-[22px] border border-dashed border-teal-500/20 bg-gradient-to-br from-teal-500/[0.04] via-white to-cyan-500/[0.04] px-6 py-8 text-center dark:via-slate-950"
     >
       <div className="pointer-events-none absolute h-32 w-32 rounded-full bg-cyan-500/10 blur-3xl" />
 
@@ -1158,6 +1170,41 @@ function PaymentsLoading() {
 ========================================================= */
 
 export default function AnalystPaymentsPage() {
+  const router =
+    useRouter();
+
+  /*
+   * DashboardSessionContext is populated from the
+   * authenticated backend profile by the dashboard layout.
+   * The backend-confirmed role is the source of truth.
+   */
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isAnalystRole =
+    user.role === "analyst";
+
+  /* =======================================================
+     ANALYST-ONLY PAGE GUARD
+  ======================================================= */
+
+  useEffect(() => {
+    if (isAnalystRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isAnalystRole,
+    router,
+    user.role,
+  ]);
+
   const [range, setRange] = useState<AnalystRange>("30d");
   const [mode, setMode] = useState<AnalystMode>("all");
   const [status, setStatus] = useState<AnalystPaymentStatus>("all");
@@ -1175,6 +1222,15 @@ export default function AnalystPaymentsPage() {
   const hasLoadedRef = useRef(false);
 
   useEffect(() => {
+    if (!isAnalystRole) {
+      setLoading(false);
+      setRefreshing(false);
+      setData(null);
+      setError("");
+
+      return;
+    }
+
     const controller = new AbortController();
     let active = true;
 
@@ -1227,6 +1283,7 @@ export default function AnalystPaymentsPage() {
       controller.abort();
     };
   }, [
+    isAnalystRole,
     range,
     mode,
     currency,
@@ -1268,6 +1325,10 @@ export default function AnalystPaymentsPage() {
   const applyTextFilters = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
+    if (!isAnalystRole) {
+      return;
+    }
+
     const nextCurrency = currencyDraft.trim().toUpperCase();
     const nextProvider = providerDraft.trim().toLowerCase();
 
@@ -1292,6 +1353,10 @@ export default function AnalystPaymentsPage() {
   };
 
   const resetFilters = () => {
+    if (!isAnalystRole) {
+      return;
+    }
+
     setRange("30d");
     setMode("all");
     setStatus("all");
@@ -1302,6 +1367,26 @@ export default function AnalystPaymentsPage() {
     setProviderDraft("");
     setError("");
   };
+
+  if (!isAnalystRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center px-4">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-teal-500/15 bg-teal-500/10 text-teal-700 shadow-sm dark:text-teal-300">
+            <RefreshCcw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening analyst workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Payment Analytics is available only to analyst accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <div className="min-h-full bg-background">
@@ -1435,9 +1520,16 @@ export default function AnalystPaymentsPage() {
 
               <button
                 type="button"
-                onClick={() =>
-                  setRefreshKey((value) => value + 1)
-                }
+                onClick={() => {
+                  if (!isAnalystRole) {
+                    return;
+                  }
+
+                  setRefreshKey(
+                    (value) =>
+                      value + 1
+                  );
+                }}
                 disabled={refreshing}
                 className="relative inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.08] px-4 py-3 text-xs font-black text-white shadow-lg backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/[0.12] disabled:cursor-not-allowed disabled:opacity-60"
               >
@@ -1528,7 +1620,13 @@ export default function AnalystPaymentsPage() {
               label="Range"
               value={range}
               options={RANGE_OPTIONS}
-              onChange={setRange}
+              onChange={(nextRange) => {
+                if (!isAnalystRole) {
+                  return;
+                }
+
+                setRange(nextRange);
+              }}
               icon={Clock3}
             />
 
@@ -1536,7 +1634,13 @@ export default function AnalystPaymentsPage() {
               label="Mode"
               value={mode}
               options={MODE_OPTIONS}
-              onChange={setMode}
+              onChange={(nextMode) => {
+                if (!isAnalystRole) {
+                  return;
+                }
+
+                setMode(nextMode);
+              }}
               icon={Layers3}
             />
 
@@ -1544,7 +1648,13 @@ export default function AnalystPaymentsPage() {
               label="Status"
               value={status}
               options={STATUS_OPTIONS}
-              onChange={setStatus}
+              onChange={(nextStatus) => {
+                if (!isAnalystRole) {
+                  return;
+                }
+
+                setStatus(nextStatus);
+              }}
               icon={Gauge}
             />
 
@@ -1552,7 +1662,13 @@ export default function AnalystPaymentsPage() {
               label="Source"
               value={source}
               options={SOURCE_OPTIONS}
-              onChange={setSource}
+              onChange={(nextSource) => {
+                if (!isAnalystRole) {
+                  return;
+                }
+
+                setSource(nextSource);
+              }}
               icon={CreditCard}
             />
 
@@ -1947,266 +2063,262 @@ export default function AnalystPaymentsPage() {
             </Panel>
 
             {/* =================================================
-                PROVIDERS + STATUS
+                DYNAMIC CONTENT FLOW
+                Independent columns prevent tall neighboring cards
+                from creating large blank gaps under shorter cards.
             ================================================= */}
 
-            <div className="grid items-start gap-6 xl:grid-cols-[1.35fr_1fr]">
-              <Panel
-                title="Provider Performance"
-                description="Read-only provider success, volume, fees, and completion latency."
-                icon={Gauge}
-              >
-                {data.providers.length ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[760px] text-xs">
-                      <thead>
-                        <tr className="text-left text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                          <th className="border-b border-slate-200 px-3 py-3 dark:border-white/10">
-                            Provider
-                          </th>
+            <div className="grid items-start gap-6 xl:grid-cols-[1.3fr_1fr]">
+              <div className="min-w-0 space-y-6">
+                <Panel
+                                title="Provider Performance"
+                                description="Read-only provider success, volume, fees, and completion latency."
+                                icon={Gauge}
+                              >
+                                {data.providers.length ? (
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full min-w-[760px] text-xs">
+                                      <thead>
+                                        <tr className="text-left text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                                          <th className="border-b border-slate-200 px-3 py-3 dark:border-white/10">
+                                            Provider
+                                          </th>
 
-                          <th className="border-b border-slate-200 px-3 py-3 text-right dark:border-white/10">
-                            Attempts
-                          </th>
+                                          <th className="border-b border-slate-200 px-3 py-3 text-right dark:border-white/10">
+                                            Attempts
+                                          </th>
 
-                          <th className="border-b border-slate-200 px-3 py-3 text-right dark:border-white/10">
-                            Success
-                          </th>
+                                          <th className="border-b border-slate-200 px-3 py-3 text-right dark:border-white/10">
+                                            Success
+                                          </th>
 
-                          <th className="border-b border-slate-200 px-3 py-3 text-right dark:border-white/10">
-                            Failed
-                          </th>
+                                          <th className="border-b border-slate-200 px-3 py-3 text-right dark:border-white/10">
+                                            Failed
+                                          </th>
 
-                          <th className="border-b border-slate-200 px-3 py-3 text-right dark:border-white/10">
-                            Volume
-                          </th>
+                                          <th className="border-b border-slate-200 px-3 py-3 text-right dark:border-white/10">
+                                            Volume
+                                          </th>
 
-                          <th className="border-b border-slate-200 px-3 py-3 text-right dark:border-white/10">
-                            Latency
-                          </th>
-                        </tr>
-                      </thead>
+                                          <th className="border-b border-slate-200 px-3 py-3 text-right dark:border-white/10">
+                                            Latency
+                                          </th>
+                                        </tr>
+                                      </thead>
 
-                      <tbody>
-                        {data.providers.map((item, index) => (
-                          <motion.tr
-                            key={item.provider}
-                            initial={{
-                              opacity: 0,
-                              y: 5,
-                            }}
-                            whileInView={{
-                              opacity: 1,
-                              y: 0,
-                            }}
-                            viewport={{
-                              once: true,
-                            }}
-                            transition={{
-                              delay: Math.min(index * 0.025, 0.18),
-                            }}
-                            className="transition hover:bg-teal-500/[0.035]"
-                          >
-                            <td className="border-b border-slate-200/70 px-3 py-3.5 dark:border-white/5">
-                              <div className="flex items-center gap-2">
-                                <Health health={item.health} />
+                                      <tbody>
+                                        {data.providers.map((item, index) => (
+                                          <motion.tr
+                                            key={item.provider}
+                                            initial={{
+                                              opacity: 0,
+                                              y: 5,
+                                            }}
+                                            whileInView={{
+                                              opacity: 1,
+                                              y: 0,
+                                            }}
+                                            viewport={{
+                                              once: true,
+                                            }}
+                                            transition={{
+                                              delay: Math.min(index * 0.025, 0.18),
+                                            }}
+                                            className="transition hover:bg-teal-500/[0.035]"
+                                          >
+                                            <td className="border-b border-slate-200/70 px-3 py-3.5 dark:border-white/5">
+                                              <div className="flex items-center gap-2">
+                                                <Health health={item.health} />
 
-                                <span className="font-black text-slate-900 dark:text-white">
-                                  {humanize(item.provider)}
-                                </span>
-                              </div>
-                            </td>
+                                                <span className="font-black text-slate-900 dark:text-white">
+                                                  {humanize(item.provider)}
+                                                </span>
+                                              </div>
+                                            </td>
 
-                            <td className="border-b border-slate-200/70 px-3 py-3.5 text-right font-bold dark:border-white/5">
-                              {numberText(item.attemptCount)}
-                            </td>
+                                            <td className="border-b border-slate-200/70 px-3 py-3.5 text-right font-bold dark:border-white/5">
+                                              {numberText(item.attemptCount)}
+                                            </td>
 
-                            <td className="border-b border-slate-200/70 px-3 py-3.5 text-right font-bold text-emerald-600 dark:border-white/5 dark:text-emerald-400">
-                              {item.successRate.toFixed(2)}%
-                            </td>
+                                            <td className="border-b border-slate-200/70 px-3 py-3.5 text-right font-bold text-emerald-600 dark:border-white/5 dark:text-emerald-400">
+                                              {item.successRate.toFixed(2)}%
+                                            </td>
 
-                            <td className="border-b border-slate-200/70 px-3 py-3.5 text-right font-bold text-red-600 dark:border-white/5 dark:text-red-400">
-                              {numberText(item.failedCount)}
-                            </td>
+                                            <td className="border-b border-slate-200/70 px-3 py-3.5 text-right font-bold text-red-600 dark:border-white/5 dark:text-red-400">
+                                              {numberText(item.failedCount)}
+                                            </td>
 
-                            <td className="border-b border-slate-200/70 px-3 py-3.5 text-right font-bold dark:border-white/5">
-                              {moneyText(
-                                item.volumeMinor,
-                                data.filters.currency,
-                                true
-                              )}
-                            </td>
+                                            <td className="border-b border-slate-200/70 px-3 py-3.5 text-right font-bold dark:border-white/5">
+                                              {moneyText(
+                                                item.volumeMinor,
+                                                data.filters.currency,
+                                                true
+                                              )}
+                                            </td>
 
-                            <td className="border-b border-slate-200/70 px-3 py-3.5 text-right font-bold dark:border-white/5">
-                              {item.averageCompletionSeconds.toFixed(2)}s
-                            </td>
-                          </motion.tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <Empty message="No provider performance record matches the filters." />
-                )}
-              </Panel>
+                                            <td className="border-b border-slate-200/70 px-3 py-3.5 text-right font-bold dark:border-white/5">
+                                              {item.averageCompletionSeconds.toFixed(2)}s
+                                            </td>
+                                          </motion.tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                ) : (
+                                  <Empty message="No provider performance record matches the filters." />
+                                )}
+                              </Panel>
 
-              <Panel
-                title="Payment Status"
-                description="Lifecycle distribution across all matching attempts."
-                icon={BarChart3}
-              >
-                {statusPie.length ? (
-                  <div className="space-y-5">
-                    <div className="relative mx-auto h-[230px] max-w-[310px]">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Tooltip content={<OceanTooltip />} />
+                <div className="grid items-start gap-6 md:grid-cols-2">
+                  <Panel
+                                  title="Payment Sources"
+                                  description="Wallet, card, PayPal, and local provider usage."
+                                  icon={CreditCard}
+                                >
+                                  <Breakdown
+                                    rows={data.sources.map((item) => ({
+                                      key: item.source,
+                                      count: item.count,
+                                      percentage: item.percentage,
+                                    }))}
+                                  />
+                                </Panel>
 
-                          <Pie
-                            data={statusPie}
-                            dataKey="count"
-                            nameKey="status"
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={60}
-                            outerRadius={88}
-                            paddingAngle={3}
-                            stroke="transparent"
-                            isAnimationActive
-                            animationDuration={900}
-                          >
-                            {statusPie.map((item) => (
-                              <Cell
-                                key={item.status}
-                                fill={COLORS[item.status] ?? OCEAN.sky}
-                              />
-                            ))}
-                          </Pie>
-                        </PieChart>
-                      </ResponsiveContainer>
+                  <Panel
+                                  title="Environment Mix"
+                                  description="Test and live request distribution."
+                                  icon={Layers3}
+                                >
+                                  <Breakdown
+                                    rows={data.modes.map((item) => ({
+                                      key: item.mode,
+                                      count: item.count,
+                                      percentage: item.percentage,
+                                    }))}
+                                  />
+                                </Panel>
+                </div>
 
-                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                        <div className="text-center">
-                          <p className="text-2xl font-black text-slate-950 dark:text-white">
-                            {numberText(data.metrics.attemptCount.value)}
-                          </p>
+                <Panel
+                                title="Failure Reasons"
+                                description="Recorded failure codes; sensitive failure messages are not exposed."
+                                icon={ShieldAlert}
+                              >
+                                {data.failureReasons.length ? (
+                                  <Breakdown
+                                    rows={data.failureReasons.map((item) => ({
+                                      key: item.code,
+                                      count: item.count,
+                                      percentage: item.percentage,
+                                    }))}
+                                  />
+                                ) : (
+                                  <Empty message="No failed payment exists in the selected period." />
+                                )}
+                              </Panel>
+              </div>
 
-                          <p className="mt-0.5 text-[9px] font-black uppercase tracking-[0.13em] text-slate-500 dark:text-slate-400">
-                            Attempts
-                          </p>
-                        </div>
-                      </div>
-                    </div>
+              <div className="min-w-0 space-y-6">
+                <Panel
+                                title="Payment Status"
+                                description="Lifecycle distribution across all matching attempts."
+                                icon={BarChart3}
+                              >
+                                {statusPie.length ? (
+                                  <div className="space-y-5">
+                                    <div className="relative mx-auto h-[230px] max-w-[310px]">
+                                      <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                          <Tooltip content={<OceanTooltip />} />
 
-                    <Breakdown
-                      rows={data.statuses.map((item) => ({
-                        key: item.status,
-                        count: item.count,
-                        percentage: item.percentage,
-                      }))}
-                    />
-                  </div>
-                ) : (
-                  <Empty message="No status distribution matches the selected filters." />
-                )}
-              </Panel>
-            </div>
+                                          <Pie
+                                            data={statusPie}
+                                            dataKey="count"
+                                            nameKey="status"
+                                            cx="50%"
+                                            cy="50%"
+                                            innerRadius={60}
+                                            outerRadius={88}
+                                            paddingAngle={3}
+                                            stroke="transparent"
+                                            isAnimationActive
+                                            animationDuration={900}
+                                          >
+                                            {statusPie.map((item) => (
+                                              <Cell
+                                                key={item.status}
+                                                fill={COLORS[item.status] ?? OCEAN.sky}
+                                              />
+                                            ))}
+                                          </Pie>
+                                        </PieChart>
+                                      </ResponsiveContainer>
 
-            {/* =================================================
-                SOURCE / MODE / LATENCY
-            ================================================= */}
+                                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                                        <div className="text-center">
+                                          <p className="text-2xl font-black text-slate-950 dark:text-white">
+                                            {numberText(data.metrics.attemptCount.value)}
+                                          </p>
 
-            <div className="grid items-start gap-6 xl:grid-cols-3">
-              <Panel
-                title="Payment Sources"
-                description="Wallet, card, PayPal, and local provider usage."
-                icon={CreditCard}
-              >
-                <Breakdown
-                  rows={data.sources.map((item) => ({
-                    key: item.source,
-                    count: item.count,
-                    percentage: item.percentage,
-                  }))}
-                />
-              </Panel>
+                                          <p className="mt-0.5 text-[9px] font-black uppercase tracking-[0.13em] text-slate-500 dark:text-slate-400">
+                                            Attempts
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </div>
 
-              <Panel
-                title="Environment Mix"
-                description="Test and live request distribution."
-                icon={Layers3}
-              >
-                <Breakdown
-                  rows={data.modes.map((item) => ({
-                    key: item.mode,
-                    count: item.count,
-                    percentage: item.percentage,
-                  }))}
-                />
-              </Panel>
+                                    <Breakdown
+                                      rows={data.statuses.map((item) => ({
+                                        key: item.status,
+                                        count: item.count,
+                                        percentage: item.percentage,
+                                      }))}
+                                    />
+                                  </div>
+                                ) : (
+                                  <Empty message="No status distribution matches the selected filters." />
+                                )}
+                              </Panel>
 
-              <Panel
-                title="Completion Latency"
-                description="Completed payments grouped by processing duration."
-                icon={TimerReset}
-              >
-                <Breakdown
-                  rows={data.latency.map((item) => ({
-                    key: item.label,
-                    count: item.count,
-                    percentage: item.percentage,
-                  }))}
-                />
-              </Panel>
-            </div>
+                <Panel
+                                title="Completion Latency"
+                                description="Completed payments grouped by processing duration."
+                                icon={TimerReset}
+                              >
+                                <Breakdown
+                                  rows={data.latency.map((item) => ({
+                                    key: item.label,
+                                    count: item.count,
+                                    percentage: item.percentage,
+                                  }))}
+                                />
+                              </Panel>
 
-            {/* =================================================
-                FAILURES + INSIGHTS
-            ================================================= */}
-
-            <div className="grid items-start gap-6 xl:grid-cols-2">
-              <Panel
-                title="Failure Reasons"
-                description="Recorded failure codes; sensitive failure messages are not exposed."
-                icon={ShieldAlert}
-              >
-                {data.failureReasons.length ? (
-                  <Breakdown
-                    rows={data.failureReasons.map((item) => ({
-                      key: item.code,
-                      count: item.count,
-                      percentage: item.percentage,
-                    }))}
-                  />
-                ) : (
-                  <Empty message="No failed payment exists in the selected period." />
-                )}
-              </Panel>
-
-              <Panel
-                title="Deterministic Insights"
-                description="Transparent threshold-based findings; no paid AI provider is used."
-                icon={Sparkles}
-                action={
-                  <span className="rounded-full border border-cyan-500/15 bg-cyan-500/[0.06] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-cyan-700 dark:text-cyan-300">
-                    {data.insights.length} signals
-                  </span>
-                }
-              >
-                {data.insights.length ? (
-                  <div className="space-y-3">
-                    {data.insights.map((item, index) => (
-                      <Insight
-                        key={item.id}
-                        insight={item}
-                        index={index}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <Empty message="No deterministic payment insight is available for the current filters." />
-                )}
-              </Panel>
+                <Panel
+                                title="Deterministic Insights"
+                                description="Transparent threshold-based findings; no paid AI provider is used."
+                                icon={Sparkles}
+                                action={
+                                  <span className="rounded-full border border-cyan-500/15 bg-cyan-500/[0.06] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-cyan-700 dark:text-cyan-300">
+                                    {data.insights.length} signals
+                                  </span>
+                                }
+                              >
+                                {data.insights.length ? (
+                                  <div className="space-y-3">
+                                    {data.insights.map((item, index) => (
+                                      <Insight
+                                        key={item.id}
+                                        insight={item}
+                                        index={index}
+                                      />
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <Empty message="No deterministic payment insight is available for the current filters." />
+                                )}
+                              </Panel>
+              </div>
             </div>
 
             {/* =================================================
@@ -2268,7 +2380,7 @@ export default function AnalystPaymentsPage() {
                       whileHover={{
                         y: -2,
                       }}
-                      className="rounded-2xl border border-slate-200/80 bg-white/75 p-4 dark:border-white/10 dark:bg-black/10"
+                      className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white/80 p-4 shadow-sm transition hover:border-teal-500/20 dark:border-white/10 dark:bg-black/10"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
