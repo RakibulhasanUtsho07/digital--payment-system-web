@@ -10,6 +10,10 @@ import {
 } from "react";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   AnimatePresence,
   motion,
 } from "framer-motion";
@@ -33,6 +37,14 @@ import {
   Star,
   Trash2,
 } from "lucide-react";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   createAnalystSavedView,
@@ -386,6 +398,32 @@ function EmptyState() {
 ========================================================= */
 
 export default function AnalystSavedViewsPage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isAnalystRole =
+    user.role === "analyst";
+
+  useEffect(() => {
+    if (isAnalystRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isAnalystRole,
+    router,
+    user.role,
+  ]);
+
   const [views, setViews] = useState<AnalystSavedView[]>([]);
   const [name, setName] = useState("");
   const [route, setRoute] = useState<string>(routes[0]);
@@ -434,6 +472,13 @@ export default function AnalystSavedViewsPage() {
   }, [filtersText]);
 
   const load = useCallback(async (showRefresh = false) => {
+    if (!isAnalystRole) {
+      setLoading(false);
+      setRefreshing(false);
+
+      return;
+    }
+
     try {
       if (showRefresh) {
         setRefreshing(true);
@@ -453,15 +498,24 @@ export default function AnalystSavedViewsPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [isAnalystRole]);
 
   useEffect(() => {
+    if (!isAnalystRole) {
+      setLoading(false);
+
+      return;
+    }
+
     const timerId = window.setTimeout(() => {
       void load();
     }, 0);
 
     return () => window.clearTimeout(timerId);
-  }, [load]);
+  }, [
+    isAnalystRole,
+    load,
+  ]);
 
   const filteredViews = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -490,6 +544,10 @@ export default function AnalystSavedViewsPage() {
   );
 
   async function save() {
+    if (!isAnalystRole) {
+      return;
+    }
+
     try {
       setError("");
 
@@ -529,6 +587,10 @@ export default function AnalystSavedViewsPage() {
   }
 
   async function remove(view: AnalystSavedView) {
+    if (!isAnalystRole) {
+      return;
+    }
+
     try {
       setError("");
       setBusyId(view.id);
@@ -547,6 +609,10 @@ export default function AnalystSavedViewsPage() {
   }
 
   async function makeDefault(view: AnalystSavedView) {
+    if (!isAnalystRole) {
+      return;
+    }
+
     try {
       setError("");
       setBusyId(view.id);
@@ -565,6 +631,26 @@ export default function AnalystSavedViewsPage() {
     } finally {
       setBusyId(null);
     }
+  }
+
+  if (!isAnalystRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center px-4">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-teal-500/15 bg-teal-500/10 text-teal-700 shadow-sm dark:text-teal-300">
+            <RefreshCcw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening analyst workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Saved Views is available only to analyst accounts.
+          </p>
+        </div>
+      </main>
+    );
   }
 
   return (
@@ -815,7 +901,13 @@ export default function AnalystSavedViewsPage() {
 
               <input
                 value={name}
-                onChange={(event) => setName(event.target.value)}
+                onChange={(event) => {
+                  if (!isAnalystRole) {
+                    return;
+                  }
+
+                  setName(event.target.value);
+                }}
                 placeholder="e.g. High-risk BDT payments"
                 className="h-12 w-full rounded-xl border border-border bg-background pl-10 pr-3 text-xs font-semibold outline-none transition placeholder:text-muted-foreground/70 focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
               />
@@ -829,7 +921,13 @@ export default function AnalystSavedViewsPage() {
 
             <RouteDropdown
               value={route}
-              onChange={setRoute}
+              onChange={(nextRoute) => {
+                if (!isAnalystRole) {
+                  return;
+                }
+
+                setRoute(nextRoute);
+              }}
             />
           </label>
 
@@ -896,7 +994,13 @@ export default function AnalystSavedViewsPage() {
 
             <textarea
               value={filtersText}
-              onChange={(event) => setFiltersText(event.target.value)}
+              onChange={(event) => {
+                if (!isAnalystRole) {
+                  return;
+                }
+
+                setFiltersText(event.target.value);
+              }}
               spellCheck={false}
               className="min-h-48 w-full resize-y bg-background p-4 font-mono text-xs leading-6 text-foreground outline-none"
             />
