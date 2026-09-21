@@ -11,6 +11,10 @@ import {
 import Link from "next/link";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   AnimatePresence,
   motion,
 } from "framer-motion";
@@ -42,6 +46,14 @@ import {
   WalletCards,
   Sparkles,
 } from "lucide-react";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   apiClient,
@@ -174,6 +186,45 @@ const MAX_NOTE_LENGTH =
 ========================================================= */
 
 export default function ReceiveMoneyPage() {
+  const router =
+    useRouter();
+
+  /*
+   * DashboardSessionContext is populated from the
+   * authenticated backend profile by the dashboard layout.
+   * The backend-confirmed role is the source of truth.
+   */
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isUserRole =
+    user.role === "user";
+
+  /* =========================================================
+     USER-ONLY PAGE GUARD
+
+     Only role=user can stay on Receive Money.
+     Merchant / Analyst / Support / Admin / Super Admin
+     are redirected to their own dashboard home.
+  ========================================================== */
+
+  useEffect(() => {
+    if (isUserRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isUserRole,
+    router,
+    user.role,
+  ]);
+
   const [wallet, setWallet] =
     useState<WalletData | null>(
       null
@@ -264,6 +315,17 @@ export default function ReceiveMoneyPage() {
       async (
         silent = false
       ) => {
+        /*
+         * A non-user role must not start personal wallet
+         * or transaction requests from this page.
+         */
+        if (!isUserRole) {
+          setLoading(false);
+          setRefreshing(false);
+
+          return;
+        }
+
         if (
           requestInFlightRef.current
         ) {
@@ -436,10 +498,27 @@ export default function ReceiveMoneyPage() {
             false;
         }
       },
-      []
+      [
+        isUserRole,
+      ]
     );
 
   useEffect(() => {
+    if (!isUserRole) {
+      setLoading(false);
+      setRefreshing(false);
+
+      if (
+        copiedTimerRef.current
+      ) {
+        window.clearTimeout(
+          copiedTimerRef.current
+        );
+      }
+
+      return;
+    }
+
     void loadReceiveData(
       false
     );
@@ -495,6 +574,7 @@ export default function ReceiveMoneyPage() {
       }
     };
   }, [
+    isUserRole,
     loadReceiveData,
   ]);
 
@@ -719,6 +799,16 @@ export default function ReceiveMoneyPage() {
       key: CopiedKey,
       text: string
     ) => {
+      if (!isUserRole) {
+        router.replace(
+          getDashboardHome(
+            user.role
+          )
+        );
+
+        return;
+      }
+
       if (!text) {
         return;
       }
@@ -765,6 +855,16 @@ export default function ReceiveMoneyPage() {
 
   const handleShare =
     async () => {
+      if (!isUserRole) {
+        router.replace(
+          getDashboardHome(
+            user.role
+          )
+        );
+
+        return;
+      }
+
       if (
         !actionsEnabled ||
         !receiveLink
@@ -821,6 +921,16 @@ export default function ReceiveMoneyPage() {
 
   const handleDownloadQr =
     () => {
+      if (!isUserRole) {
+        router.replace(
+          getDashboardHome(
+            user.role
+          )
+        );
+
+        return;
+      }
+
       if (
         !actionsEnabled
       ) {
@@ -858,6 +968,32 @@ export default function ReceiveMoneyPage() {
 
       link.click();
     };
+
+  /* =========================================================
+     USER-ONLY REDIRECTING
+  ========================================================== */
+
+  if (!isUserRole) {
+    return (
+      <div className="flex min-h-[70vh] items-center justify-center bg-background px-4 text-foreground">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-200/50 bg-violet-50 text-violet-700 shadow-sm dark:border-violet-900/60 dark:bg-violet-950/30 dark:text-violet-200">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+
+          <div>
+            <p className="text-sm font-black text-foreground">
+              Opening your workspace
+            </p>
+
+            <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">
+              Receive Money is available only to personal user accounts.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   /* =========================================================
      LOADING

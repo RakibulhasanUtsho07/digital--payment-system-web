@@ -10,6 +10,10 @@ import {
 } from "react";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   ArrowDownLeft,
   ArrowUpRight,
   CheckCircle2,
@@ -30,6 +34,14 @@ import {
   X,
   XCircle,
 } from "lucide-react";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import { apiClient } from "@/lib/api/client";
 
@@ -136,6 +148,45 @@ const ITEMS_PER_PAGE = 8;
 ========================================================= */
 
 export default function TransactionsPage() {
+  const router =
+    useRouter();
+
+  /*
+   * DashboardSessionContext is populated from the
+   * authenticated backend profile by the dashboard layout.
+   * The backend-confirmed role is the source of truth.
+   */
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isUserRole =
+    user.role === "user";
+
+  /* =======================================================
+     USER-ONLY PAGE GUARD
+
+     Only personal role=user accounts may use Transactions.
+     Merchant / Analyst / Support / Admin / Super Admin
+     are redirected to their own dashboard home.
+  ======================================================== */
+
+  useEffect(() => {
+    if (isUserRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isUserRole,
+    router,
+    user.role,
+  ]);
+
   /* =======================================================
      DATA
   ======================================================== */
@@ -209,6 +260,13 @@ export default function TransactionsPage() {
       async (
         showFullLoader = true
       ) => {
+        if (!isUserRole) {
+          setLoading(false);
+          setRefreshing(false);
+
+          return;
+        }
+
         try {
           if (showFullLoader) {
             setLoading(true);
@@ -255,7 +313,9 @@ export default function TransactionsPage() {
           setRefreshing(false);
         }
       },
-      []
+      [
+        isUserRole,
+      ]
     );
 
   /* =========================================================
@@ -263,8 +323,18 @@ export default function TransactionsPage() {
   ========================================================== */
 
   useEffect(() => {
+    if (!isUserRole) {
+      setLoading(false);
+      setRefreshing(false);
+
+      return;
+    }
+
     void loadTransactions(true);
-  }, [loadTransactions]);
+  }, [
+    isUserRole,
+    loadTransactions,
+  ]);
 
   /* =========================================================
      OUTSIDE CLICK
@@ -318,6 +388,10 @@ export default function TransactionsPage() {
       async (
         transactionId: string
       ) => {
+        if (!isUserRole) {
+          return;
+        }
+
         try {
           setLoadingTransactionId(
             transactionId
@@ -363,7 +437,9 @@ export default function TransactionsPage() {
           );
         }
       },
-      []
+      [
+        isUserRole,
+      ]
     );
 
   /* =========================================================
@@ -623,6 +699,32 @@ export default function TransactionsPage() {
     search.trim().length > 0 ||
     typeFilter !== "ALL" ||
     statusFilter !== "ALL";
+
+  /* =========================================================
+     USER-ONLY REDIRECTING
+  ========================================================== */
+
+  if (!isUserRole) {
+    return (
+      <main className="flex min-h-[70vh] items-center justify-center bg-background px-4 text-foreground">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <div className="relative flex h-14 w-14 items-center justify-center overflow-hidden rounded-[18px] border border-violet-200/50 bg-violet-50 text-violet-700 shadow-sm dark:border-violet-900/60 dark:bg-violet-950/30 dark:text-violet-200">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+
+          <div>
+            <p className="text-sm font-black text-foreground">
+              Opening your workspace
+            </p>
+
+            <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">
+              Transactions is available only to personal user accounts.
+            </p>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   /* =========================================================
      LOADING

@@ -13,6 +13,10 @@ import {
 import Link from "next/link";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   AnimatePresence,
   motion,
 } from "framer-motion";
@@ -52,6 +56,14 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   apiClient,
@@ -393,6 +405,45 @@ function parseCofferQR(
 ========================================================= */
 
 export default function SendMoneyPage() {
+  const router =
+    useRouter();
+
+  /*
+   * DashboardSessionContext is populated from the
+   * authenticated backend profile by the dashboard layout.
+   * The backend-confirmed role is the source of truth.
+   */
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isUserRole =
+    user.role === "user";
+
+  /* =====================================================
+     USER-ONLY PAGE GUARD
+
+     Only personal role=user accounts may use Send Money.
+     Merchant / Analyst / Support / Admin / Super Admin
+     are redirected to their own dashboard home.
+  ===================================================== */
+
+  useEffect(() => {
+    if (isUserRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isUserRole,
+    router,
+    user.role,
+  ]);
+
   const [
     step,
     setStep,
@@ -548,6 +599,12 @@ export default function SendMoneyPage() {
   const loadBalance =
     useCallback(
       async () => {
+        if (!isUserRole) {
+          setBalanceLoading(false);
+
+          return;
+        }
+
         try {
           setBalanceLoading(
             true
@@ -579,12 +636,23 @@ export default function SendMoneyPage() {
           );
         }
       },
-      []
+      [
+        isUserRole,
+      ]
     );
 
   useEffect(() => {
+    if (!isUserRole) {
+      setBalanceLoading(false);
+
+      return;
+    }
+
     void loadBalance();
-  }, [loadBalance]);
+  }, [
+    isUserRole,
+    loadBalance,
+  ]);
 
   /* =====================================================
      KYC
@@ -593,6 +661,12 @@ export default function SendMoneyPage() {
   const loadKYCStatus =
     useCallback(
       async () => {
+        if (!isUserRole) {
+          setKycLoading(false);
+
+          return;
+        }
+
         try {
           setKycLoading(
             true
@@ -645,16 +719,34 @@ export default function SendMoneyPage() {
           );
         }
       },
-      []
+      [
+        isUserRole,
+      ]
     );
 
   useEffect(() => {
+    if (!isUserRole) {
+      setKycLoading(false);
+
+      return;
+    }
+
     void loadKYCStatus();
-  }, [loadKYCStatus]);
+  }, [
+    isUserRole,
+    loadKYCStatus,
+  ]);
 
   const loadPasskeys =
     useCallback(
       async () => {
+        if (!isUserRole) {
+          setPasskeyLoading(false);
+          setPasskeyAvailable(false);
+
+          return;
+        }
+
         try {
           setPasskeyLoading(true);
           const passkeys =
@@ -668,14 +760,27 @@ export default function SendMoneyPage() {
           setPasskeyLoading(false);
         }
       },
-      []
+      [
+        isUserRole,
+      ]
     );
 
   useEffect(() => {
+    if (!isUserRole) {
+      setPasskeyLoading(false);
+      setPasskeyAvailable(false);
+
+      return;
+    }
+
     if (kycStatus === "verified") {
       void loadPasskeys();
     }
-  }, [kycStatus, loadPasskeys]);
+  }, [
+    isUserRole,
+    kycStatus,
+    loadPasskeys,
+  ]);
 
   /* =====================================================
      QR CLEANUP
@@ -744,6 +849,10 @@ export default function SendMoneyPage() {
       async (
         decodedText: string
       ) => {
+        if (!isUserRole) {
+          return;
+        }
+
         const parsed =
           parseCofferQR(
             decodedText
@@ -791,7 +900,10 @@ export default function SendMoneyPage() {
 
         setStep(1);
       },
-      [closeQRScanner]
+      [
+        closeQRScanner,
+        isUserRole,
+      ]
     );
 
   /* =====================================================
@@ -801,6 +913,10 @@ export default function SendMoneyPage() {
   const startQRScanner =
     useCallback(
       async () => {
+        if (!isUserRole) {
+          return;
+        }
+
         if (
           qrStartingRef.current
         ) {
@@ -924,6 +1040,7 @@ export default function SendMoneyPage() {
       },
       [
         handleQRDecoded,
+        isUserRole,
         stopQRScanner,
       ]
     );
@@ -934,6 +1051,10 @@ export default function SendMoneyPage() {
 
   const openQRScanner =
     () => {
+      if (!isUserRole) {
+        return;
+      }
+
       setQrScannerError("");
 
       setScannedRecipient(
@@ -947,6 +1068,7 @@ export default function SendMoneyPage() {
 
   useEffect(() => {
     if (
+      !isUserRole ||
       !qrScannerOpen
     ) {
       return;
@@ -976,6 +1098,7 @@ export default function SendMoneyPage() {
       );
     };
   }, [
+    isUserRole,
     qrScannerOpen,
     startQRScanner,
   ]);
@@ -1090,6 +1213,10 @@ export default function SendMoneyPage() {
 
   const handleNext =
     () => {
+      if (!isUserRole) {
+        return;
+      }
+
       setErrorMessage("");
 
       if (
@@ -1189,6 +1316,10 @@ export default function SendMoneyPage() {
     async (
       paymentAuthorization?: string
     ) => {
+      if (!isUserRole) {
+        return;
+      }
+
       if (
         isLoading
       ) {
@@ -1402,6 +1533,10 @@ export default function SendMoneyPage() {
 
   const handleRegisterPasskey =
     async () => {
+      if (!isUserRole) {
+        return;
+      }
+
       if (passkeyLoading) return;
 
       try {
@@ -1424,6 +1559,10 @@ export default function SendMoneyPage() {
 
   const handleBiometricSend =
     async () => {
+      if (!isUserRole) {
+        return;
+      }
+
       if (
         passkeyLoading ||
         isLoading
@@ -1466,6 +1605,10 @@ export default function SendMoneyPage() {
 
   const handleReset =
     () => {
+      if (!isUserRole) {
+        return;
+      }
+
       goToStep(1);
 
       setAmount("");
@@ -1492,6 +1635,30 @@ export default function SendMoneyPage() {
       transferFingerprintRef.current =
         null;
     };
+
+  /* =====================================================
+     USER-ONLY REDIRECTING
+  ===================================================== */
+
+  if (!isUserRole) {
+    return (
+      <main className="flex min-h-[70vh] items-center justify-center bg-background px-4 text-foreground">
+        <div className="flex flex-col items-center text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-200/50 bg-violet-50 text-violet-700 shadow-sm dark:border-violet-900/60 dark:bg-violet-950/30 dark:text-violet-200">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-foreground">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">
+            Send Money is available only to personal user accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   /* =====================================================
      KYC STATES
