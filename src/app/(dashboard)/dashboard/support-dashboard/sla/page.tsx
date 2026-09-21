@@ -7,6 +7,8 @@ import React, {
   useState,
 } from "react";
 
+import { motion } from "framer-motion";
+
 import {
   AlertCircle,
   CheckCircle2,
@@ -77,19 +79,19 @@ const statusClasses: Record<
   string
 > = {
   Open:
-    "border-sky-200 bg-sky-50 text-sky-700",
+    "border-sky-500/20 bg-sky-500/10 text-sky-700 dark:text-sky-300",
 
   "Waiting for Customer":
-    "border-amber-200 bg-amber-50 text-amber-700",
+    "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300",
 
   "In Progress":
-    "border-violet-200 bg-violet-50 text-violet-700",
+    "border-violet-500/20 bg-violet-500/10 text-violet-700 dark:text-violet-300",
 
   Escalated:
-    "border-rose-200 bg-rose-50 text-rose-700",
+    "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300",
 
   Resolved:
-    "border-emerald-200 bg-emerald-50 text-emerald-700",
+    "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
 };
 
 const priorityClasses: Record<
@@ -97,16 +99,16 @@ const priorityClasses: Record<
   string
 > = {
   Urgent:
-    "border-rose-200 bg-rose-50 text-rose-700",
+    "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300",
 
   High:
-    "border-orange-200 bg-orange-50 text-orange-700",
+    "border-orange-500/20 bg-orange-500/10 text-orange-700 dark:text-orange-300",
 
   Normal:
-    "border-sky-200 bg-sky-50 text-sky-700",
+    "border-sky-500/20 bg-sky-500/10 text-sky-700 dark:text-sky-300",
 
   Low:
-    "border-slate-200 bg-slate-50 text-slate-600",
+    "border-border bg-muted text-muted-foreground",
 };
 
 const slaClasses: Record<
@@ -114,16 +116,16 @@ const slaClasses: Record<
   string
 > = {
   Healthy:
-    "border-emerald-200 bg-emerald-50 text-emerald-700",
+    "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
 
   "Due Soon":
-    "border-amber-200 bg-amber-50 text-amber-700",
+    "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300",
 
   Breached:
-    "border-rose-200 bg-rose-50 text-rose-700",
+    "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300",
 
   Resolved:
-    "border-slate-200 bg-slate-100 text-slate-600",
+    "border-border bg-muted text-muted-foreground",
 };
 
 const formatDateTime = (
@@ -479,7 +481,7 @@ export default function SupportSlaPage() {
             <Clock3 className="h-4 w-4" />
           ),
           className:
-            "border-sky-200 bg-sky-50 text-sky-700",
+            "border-sky-500/20 bg-sky-500/10 text-sky-700 dark:text-sky-300",
         },
         {
           key: "healthy",
@@ -490,7 +492,7 @@ export default function SupportSlaPage() {
             <CheckCircle2 className="h-4 w-4" />
           ),
           className:
-            "border-emerald-200 bg-emerald-50 text-emerald-700",
+            "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
         },
         {
           key: "dueSoon",
@@ -501,7 +503,7 @@ export default function SupportSlaPage() {
             <Clock3 className="h-4 w-4" />
           ),
           className:
-            "border-amber-200 bg-amber-50 text-amber-700",
+            "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-300",
         },
         {
           key: "breached",
@@ -512,7 +514,7 @@ export default function SupportSlaPage() {
             <ShieldAlert className="h-4 w-4" />
           ),
           className:
-            "border-rose-200 bg-rose-50 text-rose-700",
+            "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-300",
         },
         {
           key: "resolved",
@@ -523,7 +525,7 @@ export default function SupportSlaPage() {
             <CheckCircle2 className="h-4 w-4" />
           ),
           className:
-            "border-slate-200 bg-slate-100 text-slate-600",
+            "border-border bg-muted text-muted-foreground",
         },
       ],
       [summary]
@@ -578,94 +580,276 @@ export default function SupportSlaPage() {
     };
 
   return (
-    <main className="min-h-screen bg-[#F6FBF8] p-4 md:p-6">
-      <div className="mx-auto max-w-[1500px]">
+    <main className="min-h-screen bg-transparent p-3 sm:p-4 md:p-6">
+      <div className="mx-auto max-w-[1500px] space-y-5">
         {/* =================================================
-            HEADER
+            PREMIUM SUPPORT HERO
         ================================================== */}
+        <motion.section
+          initial={{
+            opacity: 0,
+            y: -14,
+          }}
+          animate={{
+            opacity: 1,
+            y: 0,
+          }}
+          transition={{
+            duration: 0.58,
+            ease: [0.22, 1, 0.36, 1],
+          }}
+          className="support-sla-hero relative overflow-hidden rounded-[30px] border border-emerald-400/25 bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700 shadow-[0_22px_65px_rgba(16,185,129,0.22)]"
+        >
+          <div className="pointer-events-none absolute inset-0 overflow-hidden">
+            <div className="support-sla-grid absolute inset-0 opacity-40" />
+            <div className="support-sla-stars absolute inset-0 opacity-50" />
 
-        <section className="mb-5 rounded-[28px] border border-emerald-100 bg-white p-5 shadow-[0_14px_45px_rgba(16,185,129,0.06)] md:p-6">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600">
-                  <Clock3 className="h-5 w-5" />
-                </div>
+            <div className="support-sla-orb absolute -right-24 -top-28 h-80 w-80 rounded-full bg-emerald-200/25 blur-3xl" />
+            <div className="support-sla-orb-delayed absolute -bottom-32 left-[30%] h-80 w-80 rounded-full bg-cyan-200/15 blur-3xl" />
+            <div className="support-sla-beam absolute -left-48 top-1/2 h-28 w-[520px] -translate-y-1/2 rounded-full bg-white/10 blur-3xl" />
 
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-500">
-                    Support Operations
-                  </p>
+            <div className="support-sla-ring support-sla-ring-one absolute -right-20 top-1/2 hidden h-[380px] w-[380px] -translate-y-1/2 rounded-full border border-white/10 xl:block" />
+            <div className="support-sla-ring support-sla-ring-two absolute right-0 top-1/2 hidden h-[250px] w-[250px] -translate-y-1/2 rounded-full border border-white/10 xl:block" />
+          </div>
 
-                  <h1 className="mt-1 text-xl font-black tracking-tight text-slate-900 md:text-2xl">
+          <div className="relative z-10 grid min-h-[300px] gap-8 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-center lg:p-7 xl:grid-cols-[minmax(0,1fr)_430px] xl:p-8">
+            <div className="max-w-3xl">
+              <div className="inline-flex flex-wrap items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3.5 py-2 text-[9px] font-black uppercase tracking-[0.18em] text-emerald-50 backdrop-blur-md sm:text-[10px]">
+                <span className="support-sla-live-dot h-2 w-2 rounded-full bg-emerald-200" />
+                Support Operations
+                <span className="h-1 w-1 rounded-full bg-white/40" />
+                SLA Control Center
+              </div>
+
+              <div className="mt-5 flex items-start gap-4">
+                <motion.div
+                  animate={{
+                    y: [0, -6, 0],
+                    rotate: [0, 1.5, 0, -1.5, 0],
+                  }}
+                  transition={{
+                    duration: 6.5,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                  }}
+                  className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] border border-white/15 bg-white/10 text-white shadow-[0_14px_34px_rgba(6,78,59,0.22)] backdrop-blur-md sm:h-16 sm:w-16"
+                >
+                  <Clock3 className="h-6 w-6 sm:h-7 sm:w-7" />
+                  <span className="support-sla-icon-pulse absolute inset-0 rounded-[20px] border border-white/20" />
+                </motion.div>
+
+                <div className="min-w-0">
+                  <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl lg:text-[36px] lg:leading-[1.08]">
                     SLA Monitoring
                   </h1>
+
+                  <p className="mt-3 max-w-2xl text-[11px] leading-5 text-emerald-50/80 sm:text-xs sm:leading-6">
+                    Monitor active support cases, spot approaching deadlines
+                    and prioritize breached tickets from one live operational
+                    workspace.
+                  </p>
                 </div>
               </div>
 
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
-                Monitor active support cases,
-                identify approaching SLA deadlines
-                and prioritize breached cases.
-              </p>
+              <div className="mt-6 grid gap-2.5 min-[520px]:grid-cols-3">
+                {[
+                  {
+                    label: "Active cases",
+                    value: String(summary.active),
+                    icon: Ticket,
+                  },
+                  {
+                    label: "Healthy",
+                    value: String(summary.healthy),
+                    icon: CheckCircle2,
+                  },
+                  {
+                    label: "Breached",
+                    value: String(summary.breached),
+                    icon: ShieldAlert,
+                  },
+                ].map((item, index) => {
+                  const Icon = item.icon;
+
+                  return (
+                    <motion.div
+                      key={item.label}
+                      initial={{
+                        opacity: 0,
+                        y: 10,
+                      }}
+                      animate={{
+                        opacity: 1,
+                        y: 0,
+                      }}
+                      transition={{
+                        delay: 0.15 + index * 0.06,
+                      }}
+                      className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.08] px-3.5 py-3 backdrop-blur-md"
+                    >
+                      <div className="support-sla-card-shine absolute inset-y-0 -left-1/2 w-1/3 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+
+                      <div className="relative flex items-center gap-3">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-white">
+                          <Icon className="h-4 w-4" />
+                        </span>
+
+                        <div className="min-w-0">
+                          <p className="truncate text-[8px] font-black uppercase tracking-[0.14em] text-white/55">
+                            {item.label}
+                          </p>
+
+                          <p className="mt-0.5 truncate text-sm font-black text-white">
+                            {summaryLoading ? "…" : item.value}
+                          </p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <motion.button
+                  type="button"
+                  whileHover={{
+                    y: -2,
+                  }}
+                  whileTap={{
+                    scale: 0.98,
+                  }}
+                  onClick={() =>
+                    void refreshAll()
+                  }
+                  disabled={refreshing}
+                  className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 text-[10px] font-black text-emerald-700 shadow-[0_12px_28px_rgba(6,78,59,0.20)] transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                >
+                  {refreshing ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4" />
+                  )}
+
+                  {refreshing
+                    ? "Refreshing SLA data…"
+                    : "Refresh SLA data"}
+                </motion.button>
+
+                <span className="inline-flex items-center justify-center gap-2 text-[9px] font-bold text-white/65 sm:justify-start">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-200 shadow-[0_0_12px_rgba(167,243,208,0.85)]" />
+                  Live backend-calculated SLA status
+                </span>
+              </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() =>
-                void refreshAll()
-              }
-              disabled={
-                refreshing
-              }
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-xs font-black text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {refreshing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4" />
-              )}
+            {/* Animated SLA visual */}
+            <div className="relative mx-auto hidden h-[260px] w-full max-w-[430px] lg:block">
+              <div className="absolute left-1/2 top-1/2 h-[238px] w-[238px] -translate-x-1/2 -translate-y-1/2">
+                <div className="support-sla-core absolute left-1/2 top-1/2 flex h-[108px] w-[108px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-white/10 shadow-[0_28px_65px_rgba(6,78,59,0.30)] backdrop-blur-xl">
+                  <div className="relative flex h-[76px] w-[76px] items-center justify-center rounded-full border border-white/15 bg-white/10 text-white">
+                    <Clock3 className="h-8 w-8" />
+                    <span className="support-sla-clock-hand absolute left-1/2 top-1/2 h-[2px] w-6 origin-left rounded-full bg-white/80" />
+                  </div>
 
-              Refresh
-            </button>
+                  <span className="support-sla-core-ring absolute -inset-3 rounded-full border border-white/15" />
+                  <span className="support-sla-core-ring support-sla-core-ring-delay absolute -inset-7 rounded-full border border-white/10" />
+                </div>
+
+                <div className="support-sla-orbit support-sla-orbit-one absolute left-1/2 top-1/2 h-[190px] w-[190px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-white/20">
+                  <div className="support-sla-orbit-item support-sla-orbit-item-one absolute left-1/2 top-0 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-2xl border border-white/15 bg-emerald-950/25 text-white shadow-lg backdrop-blur">
+                    <CheckCircle2 className="h-4 w-4" />
+                  </div>
+                </div>
+
+                <div className="support-sla-orbit support-sla-orbit-two absolute left-1/2 top-1/2 h-[246px] w-[246px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10">
+                  <div className="support-sla-orbit-item support-sla-orbit-item-two absolute left-1/2 top-0 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-2xl border border-white/15 bg-emerald-950/25 text-white shadow-lg backdrop-blur">
+                    <ShieldAlert className="h-4 w-4" />
+                  </div>
+                </div>
+
+                <div className="support-sla-float-card support-sla-float-card-one absolute -left-14 top-8 rounded-2xl border border-white/15 bg-white/10 px-3 py-2.5 shadow-xl backdrop-blur-xl">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-white">
+                      <Clock3 className="h-3.5 w-3.5" />
+                    </span>
+
+                    <div>
+                      <p className="text-[7px] font-black uppercase tracking-[0.14em] text-white/45">
+                        Due soon
+                      </p>
+                      <p className="mt-0.5 text-[9px] font-black text-white">
+                        {summaryLoading ? "…" : summary.dueSoon}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="support-sla-float-card support-sla-float-card-two absolute -right-16 bottom-7 rounded-2xl border border-white/15 bg-white/10 px-3 py-2.5 shadow-xl backdrop-blur-xl">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-white">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                    </span>
+
+                    <div>
+                      <p className="text-[7px] font-black uppercase tracking-[0.14em] text-white/45">
+                        Resolved
+                      </p>
+                      <p className="mt-0.5 text-[9px] font-black text-white">
+                        {summaryLoading ? "…" : summary.resolved}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="support-sla-scan absolute left-1/2 top-1/2 h-[1px] w-[315px] -translate-x-1/2 bg-gradient-to-r from-transparent via-emerald-100/70 to-transparent" />
+            </div>
           </div>
-        </section>
+        </motion.section>
 
         {/* =================================================
             SUMMARY CARDS
         ================================================== */}
-
-        <section className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
           {summaryCards.map(
-            (card) => (
-              <div
-                key={
-                  card.key
-                }
-                className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_12px_38px_rgba(15,23,42,0.04)]"
+            (card, index) => (
+              <motion.div
+                key={card.key}
+                initial={{
+                  opacity: 0,
+                  y: 10,
+                }}
+                animate={{
+                  opacity: 1,
+                  y: 0,
+                }}
+                transition={{
+                  delay: index * 0.045,
+                }}
+                className="rounded-[24px] border border-border bg-card p-4 shadow-sm"
               >
                 <div className="flex items-center justify-between gap-3">
                   <span
-                    className={`flex h-9 w-9 items-center justify-center rounded-xl ${card.className}`}
+                    className={`flex h-9 w-9 items-center justify-center rounded-xl border ${card.className}`}
                   >
                     {card.icon}
                   </span>
 
-                  <span className="text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
+                  <span className="text-[9px] font-black uppercase tracking-[0.12em] text-muted-foreground">
                     {card.label}
                   </span>
                 </div>
 
                 <div className="mt-4">
                   {summaryLoading ? (
-                    <div className="h-7 w-16 animate-pulse rounded-lg bg-slate-100" />
+                    <div className="h-7 w-16 animate-pulse rounded-lg bg-muted" />
                   ) : (
-                    <p className="text-2xl font-black text-slate-900">
+                    <p className="text-2xl font-black text-foreground">
                       {card.value}
                     </p>
                   )}
                 </div>
-              </div>
+              </motion.div>
             )
           )}
         </section>
@@ -673,116 +857,75 @@ export default function SupportSlaPage() {
         {/* =================================================
             FILTERS
         ================================================== */}
-
-        <section className="mb-5 rounded-[26px] border border-slate-200 bg-white p-4 shadow-[0_12px_38px_rgba(15,23,42,0.04)]">
-          <div className="grid gap-3 xl:grid-cols-[minmax(260px,1fr)_180px_180px_180px]">
-            {/* SEARCH */}
-
-            <div className="relative min-w-0">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <section className="rounded-[26px] border border-border bg-card p-4 shadow-sm">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_180px_180px_180px]">
+            <div className="relative min-w-0 sm:col-span-2 xl:col-span-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 
               <input
                 type="text"
-                value={
-                  search
-                }
-                onChange={(
-                  event
-                ) => {
+                value={search}
+                onChange={(event) => {
                   setSearch(
-                    event.target
-                      .value
+                    event.target.value
                   );
 
-                  if (
-                    page !==
-                    1
-                  ) {
-                    setPage(
-                      1
-                    );
+                  if (page !== 1) {
+                    setPage(1);
                   }
                 }}
                 placeholder="Search ticket, subject, reference..."
-                className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-4 text-xs font-medium text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-300 focus:bg-white"
+                className="h-11 w-full rounded-xl border border-border bg-muted/60 pl-10 pr-4 text-xs font-medium text-foreground outline-none transition placeholder:text-muted-foreground focus:border-emerald-400 focus:bg-background focus:ring-4 focus:ring-emerald-500/10"
               />
             </div>
 
-            {/* STATUS */}
-
             <SelectField
-              value={
-                status
-              }
-              onChange={(
-                value
-              ) =>
+              value={status}
+              onChange={(value) =>
                 setStatus(
                   value as
                     | TicketStatus
                     | "All"
                 )
               }
-              options={
-                STATUS_OPTIONS
-              }
+              options={STATUS_OPTIONS}
               label="Status"
             />
 
-            {/* PRIORITY */}
-
             <SelectField
-              value={
-                priority
-              }
-              onChange={(
-                value
-              ) =>
+              value={priority}
+              onChange={(value) =>
                 setPriority(
                   value as
                     | TicketPriority
                     | "All"
                 )
               }
-              options={
-                PRIORITY_OPTIONS
-              }
+              options={PRIORITY_OPTIONS}
               label="Priority"
             />
 
-            {/* SLA STATUS */}
-
             <SelectField
-              value={
-                slaStatus
-              }
-              onChange={(
-                value
-              ) =>
+              value={slaStatus}
+              onChange={(value) =>
                 setSlaStatus(
                   value as
                     | SupportSlaStatus
                     | "All"
                 )
               }
-              options={
-                SLA_STATUS_OPTIONS
-              }
+              options={SLA_STATUS_OPTIONS}
               label="SLA"
             />
           </div>
         </section>
 
-        {/* =================================================
-            ERROR
-        ================================================== */}
-
         {error ? (
-          <div className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 p-4">
+          <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4">
             <div className="flex items-start gap-3">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600" />
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
 
-              <p className="text-xs font-bold leading-5 text-rose-700">
+              <p className="text-xs font-bold leading-5 text-rose-700 dark:text-rose-300">
                 {error}
               </p>
             </div>
@@ -790,82 +933,102 @@ export default function SupportSlaPage() {
         ) : null}
 
         {/* =================================================
-            TABLE
+            MOBILE / TABLET CARDS
         ================================================== */}
+        <section className="space-y-3 lg:hidden">
+          {loading ? (
+            <div className="space-y-3">
+              {Array.from({
+                length: 5,
+              }).map(
+                (_, index) => (
+                  <div
+                    key={index}
+                    className="h-[190px] animate-pulse rounded-[24px] border border-border bg-card"
+                  />
+                )
+              )}
+            </div>
+          ) : tickets.length === 0 ? (
+            <div className="rounded-[28px] border border-border bg-card px-6 py-14 text-center">
+              <Clock3 className="mx-auto h-8 w-8 text-muted-foreground/40" />
 
-        <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_12px_38px_rgba(15,23,42,0.04)]">
+              <p className="mt-3 text-sm font-black text-foreground">
+                No SLA cases found
+              </p>
+
+              <p className="mt-1 text-xs text-muted-foreground">
+                Try changing your filters.
+              </p>
+            </div>
+          ) : (
+            tickets.map(
+              (ticket) => (
+                <SlaMobileCard
+                  key={ticket.id}
+                  ticket={ticket}
+                />
+              )
+            )
+          )}
+        </section>
+
+        {/* =================================================
+            DESKTOP TABLE
+        ================================================== */}
+        <section className="hidden overflow-hidden rounded-[28px] border border-border bg-card shadow-sm lg:block">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1250px]">
+            <table className="w-full min-w-[1180px]">
               <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/80">
-                  <th className="px-5 py-4 text-left text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
-                    Ticket
-                  </th>
-
-                  <th className="px-5 py-4 text-left text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
-                    Customer
-                  </th>
-
-                  <th className="px-5 py-4 text-left text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
-                    Priority
-                  </th>
-
-                  <th className="px-5 py-4 text-left text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
-                    Status
-                  </th>
-
-                  <th className="px-5 py-4 text-left text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
-                    Assignee
-                  </th>
-
-                  <th className="px-5 py-4 text-left text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
-                    SLA Status
-                  </th>
-
-                  <th className="px-5 py-4 text-left text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
-                    Time
-                  </th>
-
-                  <th className="px-5 py-4 text-left text-[9px] font-black uppercase tracking-[0.12em] text-slate-400">
-                    Due At
-                  </th>
+                <tr className="border-b border-border bg-muted/60">
+                  {[
+                    "Ticket",
+                    "Customer",
+                    "Priority",
+                    "Status",
+                    "Assignee",
+                    "SLA Status",
+                    "Time",
+                    "Due At",
+                  ].map(
+                    (heading) => (
+                      <th
+                        key={heading}
+                        className="px-5 py-4 text-left text-[9px] font-black uppercase tracking-[0.12em] text-muted-foreground"
+                      >
+                        {heading}
+                      </th>
+                    )
+                  )}
                 </tr>
               </thead>
 
               <tbody>
                 {loading ? (
                   <TableSkeleton />
-                ) : tickets.length ===
-                  0 ? (
+                ) : tickets.length === 0 ? (
                   <tr>
                     <td
                       colSpan={8}
                       className="px-5 py-16 text-center"
                     >
-                      <Clock3 className="mx-auto h-8 w-8 text-slate-300" />
+                      <Clock3 className="mx-auto h-8 w-8 text-muted-foreground/40" />
 
-                      <p className="mt-3 text-sm font-black text-slate-600">
+                      <p className="mt-3 text-sm font-black text-foreground">
                         No SLA cases found
                       </p>
 
-                      <p className="mt-1 text-xs text-slate-400">
-                        Try changing your
-                        filters.
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Try changing your filters.
                       </p>
                     </td>
                   </tr>
                 ) : (
                   tickets.map(
-                    (
-                      ticket
-                    ) => (
+                    (ticket) => (
                       <SlaRow
-                        key={
-                          ticket.id
-                        }
-                        ticket={
-                          ticket
-                        }
+                        key={ticket.id}
+                        ticket={ticket}
                       />
                     )
                   )
@@ -873,75 +1036,377 @@ export default function SupportSlaPage() {
               </tbody>
             </table>
           </div>
+        </section>
 
-          {/* =================================================
-              PAGINATION
-          ================================================== */}
+        {/* =================================================
+            PAGINATION
+        ================================================== */}
+        <section className="flex flex-col gap-3 rounded-[22px] border border-border bg-card px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-[10px] font-bold text-muted-foreground">
+            {paginationText}
+          </p>
 
-          <div className="flex flex-col gap-3 border-t border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-[10px] font-bold text-slate-400">
-              {paginationText}
-            </p>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              aria-label="Previous page"
+              disabled={
+                page <= 1 ||
+                loading
+              }
+              onClick={() =>
+                setPage(
+                  (current) =>
+                    Math.max(
+                      1,
+                      current - 1
+                    )
+                )
+              }
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-background text-muted-foreground transition hover:border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:text-emerald-400"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={
-                  page <=
-                    1 ||
-                  loading
-                }
-                onClick={() =>
-                  setPage(
-                    (
-                      current
-                    ) =>
-                      Math.max(
-                        1,
-                        current -
-                          1
-                      )
-                  )
-                }
-                className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-
-              <div className="min-w-[75px] rounded-xl bg-slate-50 px-3 py-2 text-center text-[10px] font-black text-slate-600">
-                {page} /{" "}
-                {
-                  totalPages
-                }
-              </div>
-
-              <button
-                type="button"
-                disabled={
-                  page >=
-                    totalPages ||
-                  loading
-                }
-                onClick={() =>
-                  setPage(
-                    (
-                      current
-                    ) =>
-                      Math.min(
-                        totalPages,
-                        current +
-                          1
-                      )
-                  )
-                }
-                className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
+            <div className="min-w-[75px] rounded-xl bg-muted px-3 py-2 text-center text-[10px] font-black text-foreground">
+              {page} / {totalPages}
             </div>
+
+            <button
+              type="button"
+              aria-label="Next page"
+              disabled={
+                page >= totalPages ||
+                loading
+              }
+              onClick={() =>
+                setPage(
+                  (current) =>
+                    Math.min(
+                      totalPages,
+                      current + 1
+                    )
+                )
+              }
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-background text-muted-foreground transition hover:border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:text-emerald-400"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
           </div>
         </section>
       </div>
+
+      <style>{`
+        .support-sla-hero {
+          isolation: isolate;
+        }
+
+        .support-sla-grid {
+          background-image:
+            linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+            linear-gradient(
+              90deg,
+              rgba(255, 255, 255, 0.055) 1px,
+              transparent 1px
+            );
+          background-size: 28px 28px;
+          mask-image: radial-gradient(
+            circle at 56% 45%,
+            rgba(0, 0, 0, 0.98),
+            rgba(0, 0, 0, 0.3) 65%,
+            transparent 100%
+          );
+          animation: supportSlaGridMove 20s linear infinite;
+        }
+
+        .support-sla-stars {
+          background-image:
+            radial-gradient(circle at 18% 22%, rgba(255,255,255,0.20) 0 1px, transparent 1px),
+            radial-gradient(circle at 82% 28%, rgba(255,255,255,0.12) 0 1px, transparent 1px),
+            radial-gradient(circle at 36% 82%, rgba(255,255,255,0.14) 0 1px, transparent 1px);
+          background-size: 82px 82px, 104px 104px, 126px 126px;
+          animation: supportSlaStars 28s linear infinite;
+        }
+
+        .support-sla-orb {
+          animation: supportSlaOrb 7.5s ease-in-out infinite;
+        }
+
+        .support-sla-orb-delayed {
+          animation: supportSlaOrb 9.5s ease-in-out 1.2s infinite reverse;
+        }
+
+        .support-sla-beam {
+          animation: supportSlaBeam 8s ease-in-out infinite;
+        }
+
+        .support-sla-ring-one {
+          animation: supportSlaRing 12s linear infinite;
+        }
+
+        .support-sla-ring-two {
+          animation: supportSlaRing 8.5s linear infinite reverse;
+        }
+
+        .support-sla-live-dot {
+          box-shadow: 0 0 0 0 rgba(167, 243, 208, 0.65);
+          animation: supportSlaLiveDot 2s ease-out infinite;
+        }
+
+        .support-sla-icon-pulse {
+          animation: supportSlaIconPulse 3.2s ease-out infinite;
+        }
+
+        .support-sla-card-shine {
+          animation: supportSlaCardShine 6.5s ease-in-out infinite;
+        }
+
+        .support-sla-core {
+          animation: supportSlaCoreFloat 5.3s ease-in-out infinite;
+        }
+
+        .support-sla-core-ring {
+          animation: supportSlaCoreRing 3.5s ease-out infinite;
+        }
+
+        .support-sla-core-ring-delay {
+          animation-delay: 1.75s;
+        }
+
+        .support-sla-clock-hand {
+          transform: translateY(-50%) rotate(-90deg);
+          animation: supportSlaClockHand 8s linear infinite;
+        }
+
+        .support-sla-orbit-one {
+          animation: supportSlaOrbit 13s linear infinite;
+        }
+
+        .support-sla-orbit-two {
+          animation: supportSlaOrbit 18s linear infinite reverse;
+        }
+
+        .support-sla-orbit-item-one {
+          animation: supportSlaCounterOrbit 13s linear infinite reverse;
+        }
+
+        .support-sla-orbit-item-two {
+          animation: supportSlaCounterOrbit 18s linear infinite;
+        }
+
+        .support-sla-float-card-one {
+          animation: supportSlaFloatCard 5.4s ease-in-out infinite;
+        }
+
+        .support-sla-float-card-two {
+          animation: supportSlaFloatCard 6.3s ease-in-out 0.8s infinite reverse;
+        }
+
+        .support-sla-scan {
+          animation: supportSlaScan 4.4s ease-in-out infinite;
+          filter: drop-shadow(0 0 7px rgba(209, 250, 229, 0.6));
+        }
+
+        @keyframes supportSlaGridMove {
+          from {
+            transform: translate3d(0, 0, 0);
+          }
+          to {
+            transform: translate3d(28px, 28px, 0);
+          }
+        }
+
+        @keyframes supportSlaStars {
+          from {
+            transform: translate3d(0, 0, 0);
+          }
+          to {
+            transform: translate3d(-46px, 30px, 0);
+          }
+        }
+
+        @keyframes supportSlaOrb {
+          0%,
+          100% {
+            transform: translate3d(0, 0, 0) scale(1);
+            opacity: 0.72;
+          }
+          50% {
+            transform: translate3d(0, -15px, 0) scale(1.08);
+            opacity: 1;
+          }
+        }
+
+        @keyframes supportSlaBeam {
+          0%,
+          100% {
+            transform: translate3d(0, -50%, 0);
+            opacity: 0.2;
+          }
+          50% {
+            transform: translate3d(105px, -50%, 0);
+            opacity: 0.5;
+          }
+        }
+
+        @keyframes supportSlaRing {
+          from {
+            transform: translateY(-50%) rotate(0deg);
+          }
+          to {
+            transform: translateY(-50%) rotate(360deg);
+          }
+        }
+
+        @keyframes supportSlaLiveDot {
+          0% {
+            box-shadow: 0 0 0 0 rgba(167, 243, 208, 0.58);
+          }
+          75%,
+          100% {
+            box-shadow: 0 0 0 8px rgba(167, 243, 208, 0);
+          }
+        }
+
+        @keyframes supportSlaIconPulse {
+          0% {
+            transform: scale(0.92);
+            opacity: 0.45;
+          }
+          70%,
+          100% {
+            transform: scale(1.22);
+            opacity: 0;
+          }
+        }
+
+        @keyframes supportSlaCardShine {
+          0%,
+          25% {
+            transform: translateX(-180%);
+            opacity: 0;
+          }
+          40% {
+            opacity: 1;
+          }
+          70%,
+          100% {
+            transform: translateX(460%);
+            opacity: 0;
+          }
+        }
+
+        @keyframes supportSlaCoreFloat {
+          0%,
+          100% {
+            transform: translate(-50%, -50%) translateY(0);
+          }
+          50% {
+            transform: translate(-50%, -50%) translateY(-7px);
+          }
+        }
+
+        @keyframes supportSlaCoreRing {
+          0% {
+            transform: scale(0.88);
+            opacity: 0.5;
+          }
+          100% {
+            transform: scale(1.25);
+            opacity: 0;
+          }
+        }
+
+        @keyframes supportSlaClockHand {
+          from {
+            transform: translateY(-50%) rotate(-90deg);
+          }
+          to {
+            transform: translateY(-50%) rotate(270deg);
+          }
+        }
+
+        @keyframes supportSlaOrbit {
+          from {
+            transform: translate(-50%, -50%) rotate(0deg);
+          }
+          to {
+            transform: translate(-50%, -50%) rotate(360deg);
+          }
+        }
+
+        @keyframes supportSlaCounterOrbit {
+          from {
+            transform: translate(-50%, -50%) rotate(0deg);
+          }
+          to {
+            transform: translate(-50%, -50%) rotate(-360deg);
+          }
+        }
+
+        @keyframes supportSlaFloatCard {
+          0%,
+          100% {
+            transform: translate3d(0, 0, 0);
+          }
+          50% {
+            transform: translate3d(0, -9px, 0);
+          }
+        }
+
+        @keyframes supportSlaScan {
+          0%,
+          100% {
+            transform: translate(-50%, -98px) scaleX(0.75);
+            opacity: 0;
+          }
+          15% {
+            opacity: 0.85;
+          }
+          50% {
+            transform: translate(-50%, 0) scaleX(1);
+            opacity: 0.98;
+          }
+          85% {
+            opacity: 0.72;
+          }
+          100% {
+            transform: translate(-50%, 98px) scaleX(0.75);
+            opacity: 0;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .support-sla-grid {
+            background-size: 24px 24px;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .support-sla-grid,
+          .support-sla-stars,
+          .support-sla-orb,
+          .support-sla-orb-delayed,
+          .support-sla-beam,
+          .support-sla-ring-one,
+          .support-sla-ring-two,
+          .support-sla-live-dot,
+          .support-sla-icon-pulse,
+          .support-sla-card-shine,
+          .support-sla-core,
+          .support-sla-core-ring,
+          .support-sla-clock-hand,
+          .support-sla-orbit-one,
+          .support-sla-orbit-two,
+          .support-sla-orbit-item-one,
+          .support-sla-orbit-item-two,
+          .support-sla-float-card-one,
+          .support-sla-float-card-two,
+          .support-sla-scan {
+            animation: none !important;
+          }
+        }
+      `}</style>
     </main>
   );
 }
@@ -970,70 +1435,52 @@ function SlaRow({
     ticket.sla.minutesOverdue;
 
   return (
-    <tr className="border-b border-slate-100 last:border-b-0">
-      {/* TICKET */}
-
+    <tr className="border-b border-border transition hover:bg-muted/40 last:border-b-0">
       <td className="px-5 py-4">
         <div className="flex items-start gap-3">
           <div
             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
               isBreached
-                ? "bg-rose-50 text-rose-600"
+                ? "bg-rose-500/10 text-rose-600 dark:text-rose-400"
                 : isDueSoon
-                  ? "bg-amber-50 text-amber-600"
-                  : "bg-emerald-50 text-emerald-600"
+                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400"
+                  : "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
             }`}
           >
             <Ticket className="h-4 w-4" />
           </div>
 
           <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[0.08em] text-emerald-600">
-              {
-                ticket.ticketNumber
-              }
+            <p className="text-[10px] font-black uppercase tracking-[0.08em] text-emerald-700 dark:text-emerald-400">
+              {ticket.ticketNumber}
             </p>
 
-            <p className="mt-1 max-w-[280px] truncate text-xs font-black text-slate-800">
-              {
-                ticket.subject
-              }
+            <p className="mt-1 max-w-[280px] truncate text-xs font-black text-foreground">
+              {ticket.subject}
             </p>
 
-            <p className="mt-1 text-[9px] font-semibold text-slate-400">
+            <p className="mt-1 text-[9px] font-semibold text-muted-foreground">
               {ticket.category}
             </p>
           </div>
         </div>
       </td>
 
-      {/* CUSTOMER */}
-
       <td className="px-5 py-4">
         <div className="flex items-start gap-2">
-          <UserRound className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
+          <UserRound className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
 
           <div className="min-w-0">
-            <p className="text-xs font-bold text-slate-800">
-              {
-                ticket
-                  .customer
-                  .name
-              }
+            <p className="text-xs font-bold text-foreground">
+              {ticket.customer.name}
             </p>
 
-            <p className="mt-1 max-w-[220px] truncate text-[9px] text-slate-400">
-              {
-                ticket
-                  .customer
-                  .email
-              }
+            <p className="mt-1 max-w-[220px] truncate text-[9px] text-muted-foreground">
+              {ticket.customer.email}
             </p>
           </div>
         </div>
       </td>
-
-      {/* PRIORITY */}
 
       <td className="px-5 py-4">
         <span
@@ -1044,13 +1491,9 @@ function SlaRow({
             priorityClasses.Normal
           }`}
         >
-          {
-            ticket.priority
-          }
+          {ticket.priority}
         </span>
       </td>
-
-      {/* STATUS */}
 
       <td className="px-5 py-4">
         <span
@@ -1058,87 +1501,63 @@ function SlaRow({
             statusClasses[
               ticket.status
             ] ??
-            "border-slate-200 bg-slate-50 text-slate-600"
+            "border-border bg-muted text-muted-foreground"
           }`}
         >
-          {
-            ticket.status
-          }
+          {ticket.status}
         </span>
 
-        <p className="mt-2 text-[9px] font-semibold text-slate-400">
-          Waiting:{" "}
-          {
-            ticket.waitingOn
-          }
+        <p className="mt-2 text-[9px] font-semibold text-muted-foreground">
+          Waiting: {ticket.waitingOn}
         </p>
       </td>
-
-      {/* ASSIGNEE */}
 
       <td className="px-5 py-4">
         {ticket.assignee ? (
           <div>
-            <p className="text-xs font-bold text-slate-800">
-              {
-                ticket
-                  .assignee
-                  .name
-              }
+            <p className="text-xs font-bold text-foreground">
+              {ticket.assignee.name}
             </p>
 
-            <p className="mt-1 text-[9px] font-black uppercase tracking-[0.08em] text-slate-400">
-              {
-                ticket
-                  .assignee
-                  .role
-              }
+            <p className="mt-1 text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground">
+              {ticket.assignee.role}
             </p>
           </div>
         ) : (
-          <span className="text-[10px] font-bold text-slate-400">
+          <span className="text-[10px] font-bold text-muted-foreground">
             Unassigned
           </span>
         )}
       </td>
 
-      {/* SLA STATUS */}
-
       <td className="px-5 py-4">
         <span
           className={`inline-flex rounded-full border px-2.5 py-1 text-[9px] font-black ${
             slaClasses[
-              ticket.sla
-                .status
+              ticket.sla.status
             ]
           }`}
         >
-          {
-            ticket.sla
-              .status
-          }
+          {ticket.sla.status}
         </span>
       </td>
 
-      {/* TIME */}
-
       <td className="px-5 py-4">
-        {ticket.sla
-          .status ===
+        {ticket.sla.status ===
         "Resolved" ? (
-          <span className="text-[10px] font-black text-slate-500">
+          <span className="text-[10px] font-black text-muted-foreground">
             Resolved
           </span>
         ) : isBreached ? (
           <div>
-            <p className="text-xs font-black text-rose-600">
+            <p className="text-xs font-black text-rose-600 dark:text-rose-400">
               {formatMinutes(
                 overdue
               )}{" "}
               overdue
             </p>
 
-            <p className="mt-1 text-[9px] text-slate-400">
+            <p className="mt-1 text-[9px] text-muted-foreground">
               SLA breached
             </p>
           </div>
@@ -1147,8 +1566,8 @@ function SlaRow({
             <p
               className={`text-xs font-black ${
                 isDueSoon
-                  ? "text-amber-600"
-                  : "text-emerald-600"
+                  ? "text-amber-600 dark:text-amber-400"
+                  : "text-emerald-700 dark:text-emerald-400"
               }`}
             >
               {formatMinutes(
@@ -1157,30 +1576,26 @@ function SlaRow({
               remaining
             </p>
 
-            <p className="mt-1 text-[9px] text-slate-400">
+            <p className="mt-1 text-[9px] text-muted-foreground">
               Until SLA deadline
             </p>
           </div>
         )}
       </td>
 
-      {/* DUE AT */}
-
       <td className="px-5 py-4">
         <div className="flex items-start gap-2">
-          <Clock3 className="mt-0.5 h-3.5 w-3.5 text-slate-400" />
+          <Clock3 className="mt-0.5 h-3.5 w-3.5 text-muted-foreground" />
 
           <div>
-            <p className="text-[10px] font-bold text-slate-700">
+            <p className="text-[10px] font-bold text-foreground">
               {formatDateTime(
-                ticket.sla
-                  .dueAt
+                ticket.sla.dueAt
               )}
             </p>
 
-            {ticket.sla
-              .breached ? (
-              <p className="mt-1 text-[9px] font-black text-rose-600">
+            {ticket.sla.breached ? (
+              <p className="mt-1 text-[9px] font-black text-rose-600 dark:text-rose-400">
                 Breached
               </p>
             ) : null}
@@ -1188,6 +1603,140 @@ function SlaRow({
         </div>
       </td>
     </tr>
+  );
+}
+
+/* =========================================================
+   MOBILE SLA CARD
+========================================================= */
+
+function SlaMobileCard({
+  ticket,
+}: {
+  ticket: SupportSlaTicket;
+}) {
+  const isBreached =
+    ticket.sla.status ===
+    "Breached";
+
+  const isDueSoon =
+    ticket.sla.status ===
+    "Due Soon";
+
+  return (
+    <article className="rounded-[24px] border border-border bg-card p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[9px] font-black uppercase tracking-[0.1em] text-emerald-700 dark:text-emerald-400">
+            {ticket.ticketNumber}
+          </p>
+
+          <h2 className="mt-1 line-clamp-2 text-sm font-black leading-5 text-foreground">
+            {ticket.subject}
+          </h2>
+
+          <p className="mt-1 text-[9px] font-semibold text-muted-foreground">
+            {ticket.category}
+          </p>
+        </div>
+
+        <span
+          className={`shrink-0 rounded-full border px-2.5 py-1 text-[8px] font-black ${
+            slaClasses[
+              ticket.sla.status
+            ]
+          }`}
+        >
+          {ticket.sla.status}
+        </span>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <MobileInfo
+          label="Customer"
+          value={ticket.customer.name}
+        />
+
+        <MobileInfo
+          label="Priority"
+          value={ticket.priority}
+        />
+
+        <MobileInfo
+          label="Status"
+          value={ticket.status}
+        />
+
+        <MobileInfo
+          label="Assignee"
+          value={
+            ticket.assignee
+              ? ticket.assignee.name
+              : "Unassigned"
+          }
+        />
+      </div>
+
+      <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-border bg-muted/55 p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-[8px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+            SLA time
+          </p>
+
+          <p
+            className={`mt-1 text-xs font-black ${
+              isBreached
+                ? "text-rose-600 dark:text-rose-400"
+                : isDueSoon
+                  ? "text-amber-600 dark:text-amber-400"
+                  : "text-emerald-700 dark:text-emerald-400"
+            }`}
+          >
+            {ticket.sla.status === "Resolved"
+              ? "Resolved"
+              : isBreached
+                ? `${formatMinutes(
+                    ticket.sla.minutesOverdue
+                  )} overdue`
+                : `${formatMinutes(
+                    ticket.sla.minutesRemaining
+                  )} remaining`}
+          </p>
+        </div>
+
+        <div className="sm:text-right">
+          <p className="text-[8px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+            Due at
+          </p>
+
+          <p className="mt-1 text-[10px] font-bold text-foreground">
+            {formatDateTime(
+              ticket.sla.dueAt
+            )}
+          </p>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function MobileInfo({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-muted/60 p-3">
+      <p className="text-[8px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+        {label}
+      </p>
+
+      <p className="mt-1 break-words text-[10px] font-bold text-foreground">
+        {value || "—"}
+      </p>
+    </div>
   );
 }
 
@@ -1214,32 +1763,24 @@ function SelectField({
         value={value}
         onChange={(event) =>
           onChange(
-            event.target
-              .value
+            event.target.value
           )
         }
-        className="h-11 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50 px-4 pr-10 text-xs font-bold text-slate-700 outline-none transition focus:border-emerald-300 focus:bg-white"
+        className="h-11 w-full appearance-none rounded-xl border border-border bg-muted/60 px-4 pr-10 text-xs font-bold text-foreground outline-none transition focus:border-emerald-400 focus:bg-background focus:ring-4 focus:ring-emerald-500/10"
       >
         {options.map(
-          (
-            option
-          ) => (
+          (option) => (
             <option
-              key={
-                option
-              }
-              value={
-                option
-              }
+              key={option}
+              value={option}
             >
-              {label}:{" "}
-              {option}
+              {label}: {option}
             </option>
           )
         )}
       </select>
 
-      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
     </div>
   );
 }
@@ -1256,10 +1797,8 @@ function TableSkeleton() {
       }).map(
         (_, index) => (
           <tr
-            key={
-              index
-            }
-            className="border-b border-slate-100"
+            key={index}
+            className="border-b border-border"
           >
             {Array.from({
               length: 8,
@@ -1269,12 +1808,10 @@ function TableSkeleton() {
                 cellIndex
               ) => (
                 <td
-                  key={
-                    cellIndex
-                  }
+                  key={cellIndex}
                   className="px-5 py-5"
                 >
-                  <div className="h-9 animate-pulse rounded-xl bg-slate-100" />
+                  <div className="h-9 animate-pulse rounded-xl bg-muted" />
                 </td>
               )
             )}

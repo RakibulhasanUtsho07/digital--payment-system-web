@@ -16,6 +16,7 @@ import {
 import {
   AlertTriangle,
   BadgeCheck,
+  BarChart3,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -42,6 +43,16 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
+
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 import {
   supportDashboardApi,
@@ -328,8 +339,11 @@ function SupportSelect<T extends string>({
   }, []);
 
   return (
-    <div ref={rootRef} className="relative">
-      <p className="mb-1.5 px-1 text-[9px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+    <div
+      ref={rootRef}
+      className={`relative ${open ? "z-[90]" : "z-10"}`}
+    >
+      <p className="mb-1.5 px-1 text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
         {label}
       </p>
 
@@ -338,10 +352,10 @@ function SupportSelect<T extends string>({
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
-        className={`flex h-12 w-full items-center gap-3 rounded-2xl border bg-white px-3.5 text-left shadow-sm outline-none transition duration-200 dark:bg-slate-950/70 ${
+        className={`flex h-12 w-full items-center gap-3 rounded-2xl border bg-background px-3.5 text-left shadow-sm outline-none transition duration-200 ${
           open
             ? "border-emerald-500/60 ring-4 ring-emerald-500/10"
-            : "border-emerald-100 hover:border-emerald-300 dark:border-white/10"
+            : "border-border hover:border-emerald-500/35"
         }`}
       >
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
@@ -349,11 +363,11 @@ function SupportSelect<T extends string>({
         </span>
 
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-xs font-black text-slate-900 dark:text-white">
+          <span className="block truncate text-xs font-black text-foreground">
             {selected?.label}
           </span>
           {selected?.description && (
-            <span className="mt-0.5 block truncate text-[9px] text-slate-500 dark:text-slate-400">
+            <span className="mt-0.5 block truncate text-[9px] text-muted-foreground">
               {selected.description}
             </span>
           )}
@@ -362,7 +376,7 @@ function SupportSelect<T extends string>({
         <motion.span
           animate={{ rotate: open ? 180 : 0 }}
           transition={{ duration: 0.2 }}
-          className="text-slate-400"
+          className="text-muted-foreground"
         >
           <ChevronDown className="h-4 w-4" />
         </motion.span>
@@ -376,7 +390,7 @@ function SupportSelect<T extends string>({
             exit={{ opacity: 0, y: -5, scale: 0.98 }}
             transition={{ duration: 0.16 }}
             role="listbox"
-            className="absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-2xl border border-emerald-100 bg-white/95 p-1.5 shadow-[0_24px_70px_-20px_rgba(5,150,105,.28)] backdrop-blur-xl dark:border-white/10 dark:bg-[#071b16]/95"
+            className="support-scroll-hidden absolute left-0 right-0 top-[calc(100%+8px)] z-[100] max-h-72 overflow-y-auto rounded-2xl border border-border bg-card p-1.5 shadow-[0_24px_70px_-20px_rgba(5,150,105,.28)]"
           >
             {options.map((option) => {
               const active = option.value === value;
@@ -412,11 +426,11 @@ function SupportSelect<T extends string>({
                   </span>
 
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs font-extrabold text-slate-900 dark:text-white">
+                    <span className="block truncate text-xs font-extrabold text-foreground">
                       {option.label}
                     </span>
                     {option.description && (
-                      <span className="mt-0.5 block truncate text-[9px] text-slate-500 dark:text-slate-400">
+                      <span className="mt-0.5 block truncate text-[9px] text-muted-foreground">
                         {option.description}
                       </span>
                     )}
@@ -504,7 +518,7 @@ function MetricCard({
       variants={reveal}
       whileHover={{ y: -4, scale: 1.006 }}
       transition={{ type: "spring", stiffness: 280, damping: 22 }}
-      className="group relative overflow-hidden rounded-[24px] border border-emerald-100/90 bg-white p-5 shadow-[0_18px_50px_-40px_rgba(5,150,105,.48)] dark:border-white/10 dark:bg-slate-950/70"
+      className="group relative overflow-hidden rounded-[24px] border border-border bg-card p-5 shadow-[0_18px_50px_-40px_rgba(5,150,105,.35)]"
     >
       <div
         className={`pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full blur-3xl ${styles.glow}`}
@@ -512,13 +526,13 @@ function MetricCard({
 
       <div className="relative flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">
+          <p className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground">
             {label}
           </p>
-          <p className="mt-3 break-words text-2xl font-black tracking-tight text-slate-950 dark:text-white">
+          <p className="mt-3 break-words text-2xl font-black tracking-tight text-foreground">
             {value}
           </p>
-          <p className="mt-1 text-[10px] leading-4 text-slate-500 dark:text-slate-400">
+          <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
             {description}
           </p>
         </div>
@@ -531,7 +545,7 @@ function MetricCard({
         </motion.div>
       </div>
 
-      <div className="relative mt-4 h-1.5 overflow-hidden rounded-full bg-slate-100 dark:bg-white/5">
+      <div className="relative mt-4 h-1.5 overflow-hidden rounded-full bg-muted">
         <motion.div
           initial={{ width: "24%" }}
           animate={{ width: ["24%", "78%", "54%"] }}
@@ -566,9 +580,9 @@ function Panel({
       initial="hidden"
       whileInView="show"
       viewport={{ once: true, amount: 0.08 }}
-      className="overflow-hidden rounded-[26px] border border-emerald-100 bg-white shadow-[0_20px_60px_-45px_rgba(5,150,105,.42)] dark:border-white/10 dark:bg-slate-950/70"
+      className="overflow-hidden rounded-[26px] border border-border bg-card shadow-[0_20px_60px_-45px_rgba(5,150,105,.30)]"
     >
-      <div className="flex flex-col gap-3 border-b border-emerald-100/80 px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/10">
+      <div className="flex flex-col gap-3 border-b border-border bg-emerald-500/[0.055] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
           <motion.div
             whileHover={{ rotate: 8, scale: 1.06 }}
@@ -578,10 +592,10 @@ function Panel({
           </motion.div>
 
           <div>
-            <h2 className="text-sm font-black text-slate-950 dark:text-white">
+            <h2 className="text-sm font-black text-foreground">
               {title}
             </h2>
-            <p className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-xs leading-5 text-muted-foreground">
               {description}
             </p>
           </div>
@@ -626,7 +640,7 @@ function CopyField({
   return (
     <motion.div
       whileHover={{ y: -2 }}
-      className="rounded-2xl border border-emerald-100 bg-emerald-50/30 p-4 dark:border-white/10 dark:bg-white/[0.025]"
+      className="rounded-2xl border border-border bg-muted/25 p-4"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -634,7 +648,7 @@ function CopyField({
           <p className="mt-3 text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
             {label}
           </p>
-          <p className="mt-1 break-all text-xs font-black text-slate-800 dark:text-slate-100">
+          <p className="mt-1 break-all text-xs font-black text-foreground">
             {display}
           </p>
         </div>
@@ -643,7 +657,7 @@ function CopyField({
           <button
             type="button"
             onClick={() => void copyValue()}
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white text-slate-400 transition hover:bg-emerald-100 hover:text-emerald-700 dark:bg-white/5"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-background text-muted-foreground transition hover:bg-emerald-500/10 hover:text-emerald-700"
             aria-label={`Copy ${label}`}
           >
             {copied ? (
@@ -790,6 +804,42 @@ export default function SupportRefundRequestsPage() {
     [requests]
   );
 
+  const statusChartData = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    for (const request of requests) {
+      counts.set(
+        request.status,
+        (counts.get(request.status) ?? 0) + 1
+      );
+    }
+
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({
+        name,
+        count,
+      }))
+      .sort((a, b) => b.count - a.count);
+  }, [requests]);
+
+  const priorityChartData = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    for (const request of requests) {
+      counts.set(
+        request.priority,
+        (counts.get(request.priority) ?? 0) + 1
+      );
+    }
+
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({
+        name,
+        count,
+      }))
+      .sort((a, b) => b.count - a.count);
+  }, [requests]);
+
   const activeFilterCount = useMemo(
     () => [
       Boolean(search.trim()),
@@ -808,13 +858,13 @@ export default function SupportRefundRequestsPage() {
   }
 
   return (
-    <main className="space-y-6">
+    <main className="support-refunds-page space-y-6 bg-transparent pb-8">
       {/* HERO */}
       <motion.section
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-        className="relative isolate overflow-hidden rounded-[30px] border border-emerald-300/10 bg-[linear-gradient(135deg,#052E2B_0%,#064E3B_48%,#065F46_100%)] p-6 text-white shadow-[0_28px_80px_-42px_rgba(5,150,105,.58)] md:p-7 lg:p-8"
+        className="relative isolate overflow-hidden rounded-[30px] border border-emerald-300/25 bg-[linear-gradient(135deg,#10B981_0%,#059669_48%,#047857_100%)] p-6 text-white shadow-[0_28px_80px_-38px_rgba(5,150,105,.70)] md:p-7 lg:p-8"
       >
         <motion.div
           animate={{
@@ -823,16 +873,40 @@ export default function SupportRefundRequestsPage() {
             scale: [1, 1.12, 0.96, 1],
           }}
           transition={{ duration: 13, repeat: Infinity, ease: "easeInOut" }}
-          className="pointer-events-none absolute -right-20 -top-24 h-80 w-80 rounded-full bg-emerald-300/15 blur-[90px]"
+          className="pointer-events-none absolute -right-24 -top-28 h-96 w-96 rounded-full bg-emerald-100/30 blur-[95px]"
         />
 
         <motion.div
           animate={{ x: [0, -22, 16, 0], y: [0, 17, -9, 0] }}
           transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
-          className="pointer-events-none absolute -bottom-28 left-[20%] h-72 w-72 rounded-full bg-cyan-300/10 blur-[100px]"
+          className="pointer-events-none absolute -bottom-32 left-[18%] h-80 w-80 rounded-full bg-cyan-100/20 blur-[105px]"
         />
 
         <div className="pointer-events-none absolute inset-0 opacity-[0.07] [background-image:radial-gradient(circle_at_center,white_1px,transparent_1px)] [background-size:23px_23px]" />
+
+        <motion.div
+          aria-hidden
+          animate={{ rotate: 360 }}
+          transition={{ duration: 24, repeat: Infinity, ease: "linear" }}
+          className="pointer-events-none absolute right-[15%] top-1/2 hidden h-44 w-44 -translate-y-1/2 rounded-full border border-dashed border-white/20 xl:block"
+        >
+          <span className="absolute left-1/2 top-[-5px] h-2.5 w-2.5 -translate-x-1/2 rounded-full bg-white shadow-[0_0_24px_rgba(255,255,255,.90)]" />
+        </motion.div>
+
+        <motion.div
+          aria-hidden
+          animate={{
+            x: ["-25%", "125%"],
+            opacity: [0, 0.34, 0],
+          }}
+          transition={{
+            duration: 7.2,
+            repeat: Infinity,
+            repeatDelay: 1.4,
+            ease: "easeInOut",
+          }}
+          className="pointer-events-none absolute inset-y-0 w-28 rotate-12 bg-gradient-to-r from-transparent via-white/15 to-transparent blur-xl"
+        />
 
         {HERO_PARTICLES.map((particle, index) => (
           <motion.span
@@ -951,14 +1025,14 @@ export default function SupportRefundRequestsPage() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.08, duration: 0.45 }}
-        className="relative z-30 rounded-[26px] border border-emerald-100 bg-white p-4 shadow-[0_18px_55px_-42px_rgba(5,150,105,.45)] dark:border-white/10 dark:bg-slate-950/70"
+        className="relative z-30 overflow-visible rounded-[26px] border border-emerald-500/15 bg-emerald-500/[0.055] p-4 shadow-[0_18px_55px_-42px_rgba(5,150,105,.32)]"
       >
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-700 dark:text-slate-200">
+            <p className="text-xs font-black uppercase tracking-[0.14em] text-foreground">
               Refund case filters
             </p>
-            <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-[10px] text-muted-foreground">
               Server-side ticket filters · {activeFilterCount} active
             </p>
           </div>
@@ -967,7 +1041,7 @@ export default function SupportRefundRequestsPage() {
             type="button"
             onClick={resetFilters}
             disabled={activeFilterCount === 0}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-100 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-wide text-slate-600 transition hover:border-emerald-300 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-40 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-[10px] font-black uppercase tracking-wide text-muted-foreground transition hover:border-emerald-500/35 hover:bg-emerald-500/10 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             Reset
@@ -976,11 +1050,11 @@ export default function SupportRefundRequestsPage() {
 
         <div className="grid gap-3 xl:grid-cols-[1.6fr_1fr_1fr]">
           <div>
-            <p className="mb-1.5 px-1 text-[9px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+            <p className="mb-1.5 px-1 text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
               Search refund case
             </p>
 
-            <label className="flex h-12 items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/40 px-4 transition focus-within:border-emerald-400 focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald-500/10 dark:border-white/10 dark:bg-white/[0.035]">
+            <label className="flex h-12 items-center gap-3 rounded-2xl border border-border bg-background px-4 transition focus-within:border-emerald-500/60 focus-within:ring-4 focus-within:ring-emerald-500/10">
               <Search className="h-4 w-4 shrink-0 text-emerald-600" />
 
               <input
@@ -989,7 +1063,7 @@ export default function SupportRefundRequestsPage() {
                   setSearch(event.target.value);
                   setPage(1);
                 }}
-                className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-slate-900 outline-none placeholder:text-slate-400 dark:text-white"
+                className="min-w-0 flex-1 bg-transparent text-xs font-semibold text-foreground outline-none placeholder:text-muted-foreground/60"
                 placeholder="Ticket number, subject, related reference"
               />
 
@@ -1000,7 +1074,7 @@ export default function SupportRefundRequestsPage() {
                     setSearch("");
                     setPage(1);
                   }}
-                  className="rounded-lg p-1 text-slate-400 transition hover:bg-emerald-100 hover:text-emerald-700"
+                  className="rounded-lg p-1 text-muted-foreground transition hover:bg-emerald-500/10 hover:text-emerald-700"
                   aria-label="Clear refund search"
                 >
                   <X className="h-3.5 w-3.5" />
@@ -1094,6 +1168,227 @@ export default function SupportRefundRequestsPage() {
         />
       </motion.section>
 
+      {/* REAL VISIBLE CHARTS */}
+      <section className="grid gap-5 xl:grid-cols-2">
+        <motion.article
+          variants={reveal}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, amount: 0.08 }}
+          className="overflow-hidden rounded-[26px] border border-border bg-card shadow-sm"
+        >
+          <div className="flex items-start gap-3 border-b border-border bg-emerald-500/[0.055] px-5 py-4">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
+              <BarChart3 className="h-5 w-5" />
+            </span>
+
+            <div>
+              <p className="text-[8px] font-black uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
+                Real visible data
+              </p>
+
+              <h2 className="mt-0.5 text-sm font-black text-foreground">
+                Refund case status distribution
+              </h2>
+
+              <p className="mt-1 text-[10px] leading-5 text-muted-foreground">
+                Status counts from the refund cases returned on the current API page.
+              </p>
+            </div>
+          </div>
+
+          <div className="h-[310px] p-4 sm:p-5">
+            {statusChartData.length === 0 ? (
+              <div className="grid h-full place-items-center rounded-2xl border border-dashed border-border bg-muted/20 text-center">
+                <div>
+                  <BarChart3 className="mx-auto h-6 w-6 text-muted-foreground/50" />
+                  <p className="mt-3 text-xs font-black text-foreground">
+                    No status chart data
+                  </p>
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    The chart will appear when refund cases are loaded.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={statusChartData}
+                  margin={{
+                    top: 12,
+                    right: 10,
+                    left: -20,
+                    bottom: 0,
+                  }}
+                >
+                  <CartesianGrid
+                    vertical={false}
+                    stroke="rgba(148,163,184,.18)"
+                    strokeDasharray="4 6"
+                  />
+
+                  <XAxis
+                    dataKey="name"
+                    axisLine={false}
+                    tickLine={false}
+                    minTickGap={12}
+                    tick={{
+                      fontSize: 9,
+                      fill: "#94A3B8",
+                    }}
+                  />
+
+                  <YAxis
+                    allowDecimals={false}
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{
+                      fontSize: 9,
+                      fill: "#94A3B8",
+                    }}
+                  />
+
+                  <Tooltip
+                    cursor={{
+                      fill: "rgba(16,185,129,.06)",
+                    }}
+                    contentStyle={{
+                      borderRadius: 14,
+                      border: "1px solid rgba(148,163,184,.22)",
+                      background: "rgba(15,23,42,.96)",
+                      color: "#FFFFFF",
+                      fontSize: 11,
+                      fontWeight: 700,
+                      boxShadow: "0 18px 45px rgba(15,23,42,.18)",
+                    }}
+                  />
+
+                  <Bar
+                    dataKey="count"
+                    name="Cases"
+                    fill="#10B981"
+                    radius={[9, 9, 3, 3]}
+                    animationDuration={1200}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </motion.article>
+
+        <motion.article
+          variants={reveal}
+          initial="hidden"
+          whileInView="show"
+          viewport={{ once: true, amount: 0.08 }}
+          className="relative isolate overflow-hidden rounded-[26px] border border-emerald-400/20 bg-[linear-gradient(145deg,#10B981_0%,#059669_58%,#047857_100%)] p-5 text-white shadow-[0_22px_65px_-38px_rgba(5,150,105,.65)]"
+        >
+          <motion.div
+            aria-hidden
+            animate={{
+              scale: [1, 1.12, 1],
+              x: [0, 18, 0],
+              opacity: [0.26, 0.50, 0.26],
+            }}
+            transition={{
+              duration: 9,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+            className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-white/20 blur-3xl"
+          />
+
+          <div className="pointer-events-none absolute inset-0 opacity-[0.08] [background-image:radial-gradient(circle_at_center,white_1px,transparent_1px)] [background-size:22px_22px]" />
+
+          <div className="relative">
+            <span className="grid h-11 w-11 place-items-center rounded-2xl border border-white/15 bg-white/10">
+              <Gauge className="h-5 w-5" />
+            </span>
+
+            <p className="mt-5 text-[9px] font-black uppercase tracking-[0.17em] text-emerald-100">
+              Visible refund-case pulse
+            </p>
+
+            <p className="mt-2 text-3xl font-black tracking-[-0.04em]">
+              {requests.length.toLocaleString("en-BD")}
+            </p>
+
+            <p className="mt-1 text-xs leading-5 text-emerald-50/75">
+              Real refund-support records on the current page, summarized without mock data.
+            </p>
+
+            <div className="mt-6 space-y-2.5">
+              {priorityChartData.length === 0 ? (
+                <div className="rounded-2xl border border-white/12 bg-white/[0.08] p-4 text-xs text-emerald-50/75">
+                  Priority distribution will appear when requests are loaded.
+                </div>
+              ) : (
+                priorityChartData.map((item, index) => {
+                  const max = Math.max(
+                    1,
+                    ...priorityChartData.map((entry) => entry.count)
+                  );
+
+                  return (
+                    <motion.div
+                      key={item.name}
+                      initial={{
+                        opacity: 0,
+                        x: -8,
+                      }}
+                      whileInView={{
+                        opacity: 1,
+                        x: 0,
+                      }}
+                      viewport={{
+                        once: true,
+                      }}
+                      transition={{
+                        delay: index * 0.05,
+                      }}
+                      className="rounded-2xl border border-white/12 bg-white/[0.08] p-3 backdrop-blur"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-[9px] font-black text-white">
+                          {item.name}
+                        </span>
+
+                        <span className="text-[9px] font-black tabular-nums text-emerald-50/80">
+                          {item.count}
+                        </span>
+                      </div>
+
+                      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+                        <motion.div
+                          initial={{
+                            width: 0,
+                          }}
+                          whileInView={{
+                            width: `${Math.max(
+                              8,
+                              (item.count / max) * 100
+                            )}%`,
+                          }}
+                          viewport={{
+                            once: true,
+                          }}
+                          transition={{
+                            duration: 0.85,
+                            delay: index * 0.06,
+                            ease: [0.22, 1, 0.36, 1],
+                          }}
+                          className="h-full rounded-full bg-white"
+                        />
+                      </div>
+                    </motion.div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </motion.article>
+      </section>
+
       {/* RESULTS */}
       <Panel
         title="Refund Support Cases"
@@ -1116,10 +1411,10 @@ export default function SupportRefundRequestsPage() {
                 />
                 <Loader2 className="absolute inset-0 m-auto h-7 w-7 animate-spin text-emerald-600" />
               </div>
-              <p className="mt-4 text-sm font-black text-slate-900 dark:text-white">
+              <p className="mt-4 text-sm font-black text-foreground">
                 Loading refund-support cases
               </p>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              <p className="mt-1 text-xs text-muted-foreground">
                 Reading refund-related tickets, customer context and SLA state...
               </p>
             </div>
@@ -1130,10 +1425,10 @@ export default function SupportRefundRequestsPage() {
               <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
                 <Search className="h-6 w-6" />
               </div>
-              <p className="mt-4 text-sm font-black text-slate-900 dark:text-white">
+              <p className="mt-4 text-sm font-black text-foreground">
                 No refund cases match
               </p>
-              <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+              <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">
                 Try another ticket number, subject, related reference, status or priority.
               </p>
             </div>
@@ -1147,14 +1442,14 @@ export default function SupportRefundRequestsPage() {
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: Math.min(index * 0.025, 0.18) }}
-                  className="rounded-[20px] border border-emerald-100 bg-emerald-50/20 p-4 dark:border-white/10 dark:bg-white/[0.025]"
+                  className="rounded-[20px] border border-border bg-card p-4"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-[9px] font-black uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
                         {request.ticketNumber}
                       </p>
-                      <p className="mt-1 line-clamp-2 text-sm font-black text-slate-950 dark:text-white">
+                      <p className="mt-1 line-clamp-2 text-sm font-black text-foreground">
                         {request.subject}
                       </p>
                     </div>
@@ -1168,13 +1463,13 @@ export default function SupportRefundRequestsPage() {
                     <span className={`rounded-full border px-2.5 py-1 text-[9px] font-black ${statusTone(request.status)}`}>
                       {request.status}
                     </span>
-                    <span className={`rounded-full bg-white px-2.5 py-1 text-[9px] font-black dark:bg-white/5 ${slaTone(request.sla.minutesRemaining, request.sla.breached)}`}>
+                    <span className={`rounded-full bg-muted px-2.5 py-1 text-[9px] font-black ${slaTone(request.sla.minutesRemaining, request.sla.breached)}`}>
                       {slaLabel(request.sla.minutesRemaining, request.sla.breached)}
                     </span>
                   </div>
 
-                  <div className="mt-4 rounded-2xl bg-white p-3 dark:bg-white/5">
-                    <p className="truncate text-xs font-black text-slate-800 dark:text-slate-100">
+                  <div className="mt-4 rounded-2xl bg-muted/40 p-3">
+                    <p className="truncate text-xs font-black text-foreground">
                       {request.customer.name}
                     </p>
                     <p className="mt-1 truncate text-[10px] text-slate-400">
@@ -1197,7 +1492,7 @@ export default function SupportRefundRequestsPage() {
             <div className="support-scroll-hidden hidden overflow-x-auto lg:block">
               <table className="w-full min-w-[1100px] text-left">
                 <thead>
-                  <tr className="border-b border-emerald-100 bg-emerald-50/60 text-[9px] font-black uppercase tracking-[0.13em] text-slate-500 dark:border-white/10 dark:bg-white/[0.035] dark:text-slate-400">
+                  <tr className="border-b border-border bg-emerald-500/[0.055] text-[9px] font-black uppercase tracking-[0.13em] text-muted-foreground">
                     <th className="px-4 py-3.5">Case</th>
                     <th className="px-4 py-3.5">Status / priority</th>
                     <th className="px-4 py-3.5">Customer</th>
@@ -1215,13 +1510,13 @@ export default function SupportRefundRequestsPage() {
                       initial={{ opacity: 0, y: 4 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: Math.min(index * 0.02, 0.16) }}
-                      className="border-b border-emerald-100/70 text-xs transition hover:bg-emerald-50/60 dark:border-white/5 dark:hover:bg-emerald-500/[0.04]"
+                      className="border-b border-border text-xs transition hover:bg-emerald-500/[0.045]"
                     >
                       <td className="px-4 py-4">
                         <p className="font-black text-emerald-700 dark:text-emerald-300">
                           {request.ticketNumber}
                         </p>
-                        <p className="mt-1 max-w-[260px] truncate font-bold text-slate-800 dark:text-slate-100">
+                        <p className="mt-1 max-w-[260px] truncate font-bold text-foreground">
                           {request.subject}
                         </p>
                       </td>
@@ -1238,7 +1533,7 @@ export default function SupportRefundRequestsPage() {
                       </td>
 
                       <td className="px-4 py-4">
-                        <p className="max-w-[190px] truncate font-black text-slate-700 dark:text-slate-200">
+                        <p className="max-w-[190px] truncate font-black text-foreground">
                           {request.customer.name}
                         </p>
                         <p className="mt-1 max-w-[190px] truncate text-[9px] text-slate-400">
@@ -1247,7 +1542,7 @@ export default function SupportRefundRequestsPage() {
                       </td>
 
                       <td className="px-4 py-4">
-                        <p className="max-w-[200px] truncate font-bold text-slate-700 dark:text-slate-200">
+                        <p className="max-w-[200px] truncate font-bold text-foreground">
                           {request.relatedReference || "Not available"}
                         </p>
                         <p className="mt-1 text-[9px] text-slate-400">
@@ -1264,7 +1559,7 @@ export default function SupportRefundRequestsPage() {
                         </p>
                       </td>
 
-                      <td className="px-4 py-4 text-[10px] text-slate-500 dark:text-slate-400">
+                      <td className="px-4 py-4 text-[10px] text-muted-foreground">
                         {formatDateTime(request.lastActivityAt)}
                       </td>
 
@@ -1286,10 +1581,10 @@ export default function SupportRefundRequestsPage() {
               </table>
             </div>
 
-            <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/30 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-white/[0.02]">
-              <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
-                Page <span className="font-black text-slate-900 dark:text-white">{page}</span> of{" "}
-                <span className="font-black text-slate-900 dark:text-white">{totalPages}</span>{" "}
+            <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-emerald-500/15 bg-emerald-500/[0.055] p-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-[10px] font-bold text-muted-foreground">
+                Page <span className="font-black text-foreground">{page}</span> of{" "}
+                <span className="font-black text-foreground">{totalPages}</span>{" "}
                 · {total.toLocaleString("en-BD")} matches
               </p>
 
@@ -1298,7 +1593,7 @@ export default function SupportRefundRequestsPage() {
                   type="button"
                   disabled={page <= 1}
                   onClick={() => setPage((value) => value - 1)}
-                  className="grid h-9 w-9 place-items-center rounded-xl border border-emerald-100 bg-white text-slate-500 transition hover:border-emerald-300 hover:text-emerald-700 disabled:opacity-30 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
+                  className="grid h-9 w-9 place-items-center rounded-xl border border-border bg-card text-muted-foreground transition hover:border-emerald-500/35 hover:bg-emerald-500/10 hover:text-emerald-700 disabled:opacity-30"
                   aria-label="Previous refund page"
                 >
                   <ChevronLeft className="h-4 w-4" />
@@ -1308,7 +1603,7 @@ export default function SupportRefundRequestsPage() {
                   type="button"
                   disabled={page >= totalPages}
                   onClick={() => setPage((value) => value + 1)}
-                  className="grid h-9 w-9 place-items-center rounded-xl border border-emerald-100 bg-white text-slate-500 transition hover:border-emerald-300 hover:text-emerald-700 disabled:opacity-30 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
+                  className="grid h-9 w-9 place-items-center rounded-xl border border-border bg-card text-muted-foreground transition hover:border-emerald-500/35 hover:bg-emerald-500/10 hover:text-emerald-700 disabled:opacity-30"
                   aria-label="Next refund page"
                 >
                   <ChevronRight className="h-4 w-4" />
@@ -1339,9 +1634,9 @@ export default function SupportRefundRequestsPage() {
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "spring", stiffness: 260, damping: 30 }}
-              className="support-scroll-hidden absolute inset-y-0 right-0 w-full max-w-2xl overflow-y-auto bg-white text-slate-900 shadow-[-24px_0_80px_rgba(15,23,42,.32)] dark:bg-slate-950 dark:text-white"
+              className="support-scroll-hidden absolute inset-y-0 right-0 w-full max-w-2xl overflow-y-auto bg-background text-foreground shadow-[-24px_0_80px_rgba(15,23,42,.32)]"
             >
-              <div className="sticky top-0 z-20 overflow-hidden border-b border-white/10 bg-[linear-gradient(135deg,#052E2B_0%,#064E3B_52%,#065F46_100%)] p-5 text-white shadow-lg">
+              <div className="sticky top-0 z-20 overflow-hidden border-b border-white/15 bg-[linear-gradient(135deg,#10B981_0%,#059669_52%,#047857_100%)] p-5 text-white shadow-lg">
                 <motion.div
                   animate={{ x: [0, 18, -7, 0], y: [0, -9, 6, 0] }}
                   transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
@@ -1383,7 +1678,7 @@ export default function SupportRefundRequestsPage() {
                       />
                       <Loader2 className="absolute inset-0 m-auto h-7 w-7 animate-spin text-emerald-600" />
                     </div>
-                    <p className="mt-3 text-xs font-bold text-slate-500 dark:text-slate-400">
+                    <p className="mt-3 text-xs font-bold text-muted-foreground">
                       Loading refund case evidence...
                     </p>
                   </div>
@@ -1411,11 +1706,11 @@ export default function SupportRefundRequestsPage() {
                         </span>
                       </div>
 
-                      <h3 className="mt-4 text-lg font-black text-slate-950 dark:text-white">
+                      <h3 className="mt-4 text-lg font-black text-foreground">
                         {detail.subject}
                       </h3>
 
-                      <p className="mt-2 whitespace-pre-wrap text-xs leading-6 text-slate-600 dark:text-slate-300">
+                      <p className="mt-2 whitespace-pre-wrap text-xs leading-6 text-muted-foreground">
                         {detail.description || "No decrypted description is available."}
                       </p>
                     </div>
@@ -1445,26 +1740,26 @@ export default function SupportRefundRequestsPage() {
 
                       <motion.div
                         whileHover={{ y: -2 }}
-                        className="rounded-2xl border border-emerald-100 bg-emerald-50/30 p-4 dark:border-white/10 dark:bg-white/[0.025]"
+                        className="rounded-2xl border border-border bg-muted/25 p-4"
                       >
                         <BadgeCheck className="h-4 w-4 text-emerald-600" />
                         <p className="mt-3 text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
                           KYC status
                         </p>
-                        <p className="mt-1 text-xs font-black text-slate-800 dark:text-slate-100">
+                        <p className="mt-1 text-xs font-black text-foreground">
                           {humanize(detail.customer.kycStatus)}
                         </p>
                       </motion.div>
 
                       <motion.div
                         whileHover={{ y: -2 }}
-                        className="rounded-2xl border border-emerald-100 bg-emerald-50/30 p-4 dark:border-white/10 dark:bg-white/[0.025]"
+                        className="rounded-2xl border border-border bg-muted/25 p-4"
                       >
                         <WalletCards className="h-4 w-4 text-emerald-600" />
                         <p className="mt-3 text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
                           Wallet
                         </p>
-                        <p className="mt-1 text-xs font-black text-slate-800 dark:text-slate-100">
+                        <p className="mt-1 text-xs font-black text-foreground">
                           {detail.customer.walletLinked ? "Linked" : "Not linked"}
                         </p>
                       </motion.div>
@@ -1479,7 +1774,7 @@ export default function SupportRefundRequestsPage() {
                     <div className="grid gap-3 sm:grid-cols-2">
                       <motion.div
                         whileHover={{ y: -2 }}
-                        className="rounded-2xl border border-emerald-100 bg-emerald-50/30 p-4 dark:border-white/10 dark:bg-white/[0.025]"
+                        className="rounded-2xl border border-border bg-muted/25 p-4"
                       >
                         <Clock3 className={`h-4 w-4 ${detail.slaBreached ? "text-rose-600" : "text-emerald-600"}`} />
                         <p className="mt-3 text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
@@ -1492,13 +1787,13 @@ export default function SupportRefundRequestsPage() {
 
                       <motion.div
                         whileHover={{ y: -2 }}
-                        className="rounded-2xl border border-emerald-100 bg-emerald-50/30 p-4 dark:border-white/10 dark:bg-white/[0.025]"
+                        className="rounded-2xl border border-border bg-muted/25 p-4"
                       >
                         <UserRound className="h-4 w-4 text-emerald-600" />
                         <p className="mt-3 text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
                           Assignee
                         </p>
-                        <p className="mt-1 text-xs font-black text-slate-800 dark:text-slate-100">
+                        <p className="mt-1 text-xs font-black text-foreground">
                           {detail.assignee.name || "Unassigned"}
                         </p>
                       </motion.div>
@@ -1526,7 +1821,7 @@ export default function SupportRefundRequestsPage() {
                           >
                             <div className="flex flex-wrap items-center justify-between gap-2">
                               <div className="flex items-center gap-2">
-                                <span className="text-xs font-black text-slate-900 dark:text-white">
+                                <span className="text-xs font-black text-foreground">
                                   {message.authorName}
                                 </span>
                                 <span className="rounded-full bg-white px-2 py-0.5 text-[8px] font-black uppercase tracking-wide text-slate-500 dark:bg-white/5 dark:text-slate-300">
@@ -1539,7 +1834,7 @@ export default function SupportRefundRequestsPage() {
                               </span>
                             </div>
 
-                            <p className="mt-3 whitespace-pre-wrap text-xs leading-5 text-slate-600 dark:text-slate-300">
+                            <p className="mt-3 whitespace-pre-wrap text-xs leading-5 text-muted-foreground">
                               {message.body}
                             </p>
                           </motion.article>
@@ -1574,7 +1869,7 @@ export default function SupportRefundRequestsPage() {
                             <span className="absolute -left-[23px] top-4 h-3 w-3 rounded-full border-2 border-white bg-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,.10)] dark:border-slate-950" />
 
                             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                              <p className="text-xs font-black text-slate-900 dark:text-white">
+                              <p className="text-xs font-black text-foreground">
                                 {humanize(item.eventType)}
                               </p>
                               <span className="text-[9px] text-slate-400">
@@ -1582,7 +1877,7 @@ export default function SupportRefundRequestsPage() {
                               </span>
                             </div>
 
-                            <p className="mt-2 text-xs leading-5 text-slate-600 dark:text-slate-300">
+                            <p className="mt-2 text-xs leading-5 text-muted-foreground">
                               {item.summary}
                             </p>
                             <p className="mt-1 text-[9px] font-bold text-slate-400">
@@ -1592,7 +1887,7 @@ export default function SupportRefundRequestsPage() {
                         ))}
                       </div>
                     ) : (
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                      <p className="text-xs text-muted-foreground">
                         No activity events are available for this ticket.
                       </p>
                     )}
@@ -1608,10 +1903,10 @@ export default function SupportRefundRequestsPage() {
                       </div>
 
                       <div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-700 dark:text-slate-200">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-foreground">
                           Refund execution boundary
                         </p>
-                        <p className="mt-1 text-[10px] leading-5 text-slate-500 dark:text-slate-400">
+                        <p className="mt-1 text-[10px] leading-5 text-muted-foreground">
                           This route investigates refund-related support tickets only.
                           It does not create, approve, issue, retry, or settle a refund.
                           Financial actions remain outside this support view.
@@ -1625,7 +1920,7 @@ export default function SupportRefundRequestsPage() {
                   <div>
                     <AlertTriangle className="mx-auto h-8 w-8 text-amber-500" />
                     <p className="mt-3 text-sm font-black">Refund case unavailable</p>
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       Close the drawer and try opening the support case again.
                     </p>
                   </div>
@@ -1637,15 +1932,19 @@ export default function SupportRefundRequestsPage() {
       </AnimatePresence>
 
       <style jsx global>{`
+        .support-refunds-page,
+        .support-refunds-page *,
         .support-scroll-hidden {
           -ms-overflow-style: none;
           scrollbar-width: none;
         }
 
+        .support-refunds-page::-webkit-scrollbar,
+        .support-refunds-page *::-webkit-scrollbar,
         .support-scroll-hidden::-webkit-scrollbar {
-          width: 0;
-          height: 0;
-          display: none;
+          width: 0 !important;
+          height: 0 !important;
+          display: none !important;
         }
       `}</style>
     </main>

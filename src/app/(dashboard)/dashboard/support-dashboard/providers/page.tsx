@@ -1158,246 +1158,276 @@ export default function AnalystProvidersPage() {
   return (
     <div className="space-y-6 pb-8">
       {/* ===================================================
-          HEADER
+          PREMIUM SUPPORT-DASHBOARD HERO
       ==================================================== */}
 
-      <section className="relative overflow-hidden rounded-3xl border border-border bg-card p-6 shadow-sm sm:p-7">
-        <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-cyan-500/10 blur-3xl" />
+      <motion.section
+        initial={{
+          opacity: 0,
+          y: -14,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        transition={{
+          duration: 0.58,
+          ease: [0.22, 1, 0.36, 1],
+        }}
+        className="provider-hero relative overflow-hidden rounded-[30px] border border-emerald-400/25 bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700 shadow-[0_22px_65px_rgba(16,185,129,0.22)]"
+      >
+        {/* Animated background */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="provider-hero-grid absolute inset-0 opacity-40" />
+          <div className="provider-hero-stars absolute inset-0 opacity-50" />
 
-        <div className="pointer-events-none absolute bottom-0 right-1/3 h-48 w-48 rounded-full bg-violet-500/10 blur-3xl" />
+          <div className="provider-hero-orb absolute -right-24 -top-28 h-80 w-80 rounded-full bg-emerald-200/25 blur-3xl" />
+          <div className="provider-hero-orb-delayed absolute -bottom-32 left-[30%] h-80 w-80 rounded-full bg-cyan-200/15 blur-3xl" />
 
-        <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-          <div>
+          <div className="provider-hero-beam absolute -left-48 top-1/2 h-28 w-[520px] -translate-y-1/2 rounded-full bg-white/10 blur-3xl" />
+
+          <div className="provider-hero-ring provider-hero-ring-one absolute -right-20 top-1/2 hidden h-[390px] w-[390px] -translate-y-1/2 rounded-full border border-white/10 xl:block" />
+          <div className="provider-hero-ring provider-hero-ring-two absolute right-1 top-1/2 hidden h-[255px] w-[255px] -translate-y-1/2 rounded-full border border-white/10 xl:block" />
+        </div>
+
+        <div className="relative z-10 grid min-h-[315px] gap-8 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_370px] lg:items-center lg:p-7 xl:grid-cols-[minmax(0,1fr)_440px] xl:p-8">
+          {/* Copy + live metrics */}
+          <div className="max-w-4xl">
             <div className="flex flex-wrap items-center gap-2">
               <span
-                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] ${statusStyle}`}
+                className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-[9px] font-black uppercase tracking-[0.16em] backdrop-blur-md ${
+                  data.status === "healthy"
+                    ? "border-emerald-200/25 bg-emerald-950/15 text-emerald-50"
+                    : data.status === "attention"
+                      ? "border-amber-200/25 bg-amber-950/15 text-amber-50"
+                      : "border-rose-200/25 bg-rose-950/15 text-rose-50"
+                }`}
               >
-                <span className="h-2 w-2 rounded-full bg-current" />
-
-                Provider health{" "}
-                {data.status}
+                <span className="provider-live-dot h-2 w-2 rounded-full bg-current" />
+                Provider health {data.status}
               </span>
 
-              <span className="inline-flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-blue-600 dark:text-blue-400">
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3.5 py-2 text-[9px] font-black uppercase tracking-[0.16em] text-emerald-50 backdrop-blur-md">
                 <Server className="h-3.5 w-3.5" />
-
-                Gateway providers
+                Gateway Providers
               </span>
             </div>
 
-            <h1 className="mt-4 text-2xl font-black tracking-tight text-card-foreground sm:text-3xl">
-              Provider Analytics
-            </h1>
-
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-              Compare payment provider reliability,
-              success rate, failures, payment volume and
-              completion latency across Coffer gateway traffic.
-            </p>
-          </div>
-
-          {/* FILTERS */}
-
-          <div className="flex flex-wrap items-end gap-3">
-            <label>
-              <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                Period
-              </span>
-
-              <select
-                value={
-                  range
-                }
-                onChange={(
-                  event
-                ) =>
-                  setRange(
-                    event.target
-                      .value as AnalystRange
-                  )
-                }
-                className="h-11 min-w-40 rounded-xl border border-border bg-background px-3 text-xs font-bold text-foreground outline-none transition focus:border-primary"
+            <div className="mt-5 flex items-start gap-4">
+              <motion.div
+                animate={{
+                  y: [0, -6, 0],
+                  rotate: [0, 1.5, 0, -1.5, 0],
+                }}
+                transition={{
+                  duration: 6.5,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+                className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] border border-white/15 bg-white/10 text-white shadow-[0_14px_34px_rgba(6,78,59,0.22)] backdrop-blur-md sm:h-16 sm:w-16"
               >
-                {RANGE_OPTIONS.map(
-                  (
-                    option
-                  ) => (
-                    <option
-                      key={
-                        option.value
-                      }
-                      value={
-                        option.value
-                      }
-                    >
-                      {option.label}
-                    </option>
-                  )
-                )}
-              </select>
-            </label>
+                <Server className="h-6 w-6 sm:h-7 sm:w-7" />
+                <span className="provider-icon-pulse absolute inset-0 rounded-[20px] border border-white/20" />
+              </motion.div>
 
-            <label>
-              <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                Environment
-              </span>
+              <div className="min-w-0">
+                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-emerald-100">
+                  Analyst Operations
+                </p>
 
-              <select
-                value={
-                  mode
-                }
-                onChange={(
-                  event
-                ) =>
-                  setMode(
-                    event.target
-                      .value as AnalystMode
+                <h1 className="mt-1 text-2xl font-black tracking-tight text-white sm:text-3xl lg:text-[36px] lg:leading-[1.08]">
+                  Provider Analytics
+                </h1>
+
+                <p className="mt-3 max-w-3xl text-[11px] leading-5 text-emerald-50/80 sm:text-xs sm:leading-6">
+                  Compare payment-provider reliability, success rate, failures,
+                  payment volume and completion latency across live Coffer
+                  gateway traffic.
+                </p>
+              </div>
+            </div>
+
+            {/* Real API-backed hero metrics */}
+            <div className="mt-6 grid gap-2.5 min-[520px]:grid-cols-2 lg:grid-cols-4">
+              {[
+                {
+                  label: "Providers",
+                  value: formatNumber(
+                    data.summary.totalProviders
+                  ),
+                  icon: Server,
+                },
+                {
+                  label: "Attempts",
+                  value: formatNumber(
+                    data.summary.totalAttempts
+                  ),
+                  icon: Activity,
+                },
+                {
+                  label: "Success",
+                  value: formatPercent(
+                    data.summary.overallSuccessRate
+                  ),
+                  icon: TrendingUp,
+                },
+                {
+                  label: "Avg completion",
+                  value: formatSeconds(
+                    data.summary.averageCompletionSeconds
+                  ),
+                  icon: Timer,
+                },
+              ].map((item, index) => {
+                const Icon = item.icon;
+
+                return (
+                  <motion.div
+                    key={item.label}
+                    initial={{
+                      opacity: 0,
+                      y: 10,
+                    }}
+                    animate={{
+                      opacity: 1,
+                      y: 0,
+                    }}
+                    transition={{
+                      delay: 0.14 + index * 0.055,
+                    }}
+                    className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.08] px-3.5 py-3 backdrop-blur-md"
+                  >
+                    <div className="provider-card-shine absolute inset-y-0 -left-1/2 w-1/3 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+
+                    <div className="relative flex items-center gap-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-white">
+                        <Icon className="h-4 w-4" />
+                      </span>
+
+                      <div className="min-w-0">
+                        <p className="truncate text-[8px] font-black uppercase tracking-[0.14em] text-white/55">
+                          {item.label}
+                        </p>
+
+                        <p className="mt-0.5 truncate text-sm font-black text-white">
+                          {item.value}
+                        </p>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+              <motion.button
+                type="button"
+                whileHover={{
+                  y: -2,
+                }}
+                whileTap={{
+                  scale: 0.98,
+                }}
+                disabled={refreshing}
+                onClick={() =>
+                  setRefreshKey(
+                    (current) =>
+                      current + 1
                   )
                 }
-                className="h-11 min-w-36 rounded-xl border border-border bg-background px-3 text-xs font-bold text-foreground outline-none transition focus:border-primary"
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 text-[10px] font-black text-emerald-700 shadow-[0_12px_28px_rgba(6,78,59,0.20)] transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
               >
-                {MODE_OPTIONS.map(
-                  (
-                    option
-                  ) => (
-                    <option
-                      key={
-                        option.value
-                      }
-                      value={
-                        option.value
-                      }
-                    >
-                      {option.label}
-                    </option>
-                  )
-                )}
-              </select>
-            </label>
-
-            <label>
-              <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                Provider
-              </span>
-
-              <select
-                value={
-                  provider
-                }
-                onChange={(
-                  event
-                ) =>
-                  setProvider(
-                    event.target
-                      .value
-                  )
-                }
-                className="h-11 min-w-44 rounded-xl border border-border bg-background px-3 text-xs font-bold text-foreground outline-none transition focus:border-primary"
-              >
-                <option value="">
-                  All providers
-                </option>
-
-                {data.providerOptions.map(
-                  (
-                    item
-                  ) => (
-                    <option
-                      key={
-                        item
-                      }
-                      value={
-                        item
-                      }
-                    >
-                      {providerLabel(
-                        item
-                      )}
-                    </option>
-                  )
-                )}
-              </select>
-            </label>
-
-            <form
-              onSubmit={
-                applyCurrency
-              }
-            >
-              <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                Currency
-              </span>
-
-              <div className="flex">
-                <input
-                  value={
-                    currencyDraft
-                  }
-                  onChange={(
-                    event
-                  ) =>
-                    setCurrencyDraft(
-                      event.target.value
-                        .replace(
-                          /[^a-z]/gi,
-                          ""
-                        )
-                        .slice(
-                          0,
-                          3
-                        )
-                        .toUpperCase()
-                    )
-                  }
-                  maxLength={
-                    3
-                  }
-                  aria-label="Currency code"
-                  className="h-11 w-20 rounded-l-xl border border-r-0 border-border bg-background px-3 text-center text-xs font-black uppercase text-foreground outline-none focus:border-primary"
+                <RefreshCcw
+                  className={`h-4 w-4 ${
+                    refreshing
+                      ? "animate-spin"
+                      : ""
+                  }`}
                 />
 
-                <button
-                  type="submit"
-                  className="h-11 rounded-r-xl border border-border bg-muted px-3 text-[10px] font-black uppercase tracking-wider text-foreground transition hover:bg-muted/70"
-                >
-                  Apply
-                </button>
+                {refreshing
+                  ? "Refreshing analytics…"
+                  : "Refresh analytics"}
+              </motion.button>
+
+              <span className="inline-flex items-center justify-center gap-2 text-[9px] font-bold text-white/65 sm:justify-start">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-200 shadow-[0_0_12px_rgba(167,243,208,0.85)]" />
+                Aggregate · read-only · live API data
+              </span>
+            </div>
+          </div>
+
+          {/* Animated provider network visual */}
+          <div className="relative mx-auto hidden h-[270px] w-full max-w-[440px] lg:block">
+            <div className="absolute left-1/2 top-1/2 h-[245px] w-[245px] -translate-x-1/2 -translate-y-1/2">
+              <div className="provider-core absolute left-1/2 top-1/2 flex h-[112px] w-[112px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[34px] border border-white/20 bg-white/10 shadow-[0_28px_65px_rgba(6,78,59,0.30)] backdrop-blur-xl">
+                <div className="flex h-[78px] w-[78px] items-center justify-center rounded-[25px] border border-white/15 bg-white/10 text-white">
+                  <DatabaseZap className="h-8 w-8" />
+                </div>
+
+                <span className="provider-core-ring absolute -inset-3 rounded-[40px] border border-white/15" />
+                <span className="provider-core-ring provider-core-ring-delay absolute -inset-7 rounded-[50px] border border-white/10" />
               </div>
-            </form>
 
-            <button
-              type="button"
-              disabled={
-                refreshing
-              }
-              onClick={() =>
-                setRefreshKey(
-                  (
-                    current
-                  ) =>
-                    current +
-                    1
-                )
-              }
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-xs font-bold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <RefreshCcw
-                className={`h-4 w-4 ${
-                  refreshing
-                    ? "animate-spin"
-                    : ""
-                }`}
-              />
+              <div className="provider-orbit provider-orbit-one absolute left-1/2 top-1/2 h-[194px] w-[194px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-white/20">
+                <div className="provider-orbit-item provider-orbit-item-one absolute left-1/2 top-0 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-2xl border border-white/15 bg-emerald-950/25 text-white shadow-lg backdrop-blur">
+                  <Activity className="h-4 w-4" />
+                </div>
+              </div>
 
-              Refresh
-            </button>
+              <div className="provider-orbit provider-orbit-two absolute left-1/2 top-1/2 h-[252px] w-[252px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/10">
+                <div className="provider-orbit-item provider-orbit-item-two absolute left-1/2 top-0 flex h-10 w-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-2xl border border-white/15 bg-emerald-950/25 text-white shadow-lg backdrop-blur">
+                  <Gauge className="h-4 w-4" />
+                </div>
+              </div>
+
+              <div className="provider-float-card provider-float-card-one absolute -left-16 top-8 rounded-2xl border border-white/15 bg-white/10 px-3 py-2.5 shadow-xl backdrop-blur-xl">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-white">
+                    <TrendingUp className="h-3.5 w-3.5" />
+                  </span>
+
+                  <div>
+                    <p className="text-[7px] font-black uppercase tracking-[0.14em] text-white/45">
+                      Success
+                    </p>
+                    <p className="mt-0.5 text-[9px] font-black text-white">
+                      {formatPercent(
+                        data.summary.overallSuccessRate
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="provider-float-card provider-float-card-two absolute -right-16 bottom-7 rounded-2xl border border-white/15 bg-white/10 px-3 py-2.5 shadow-xl backdrop-blur-xl">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-white">
+                    <Timer className="h-3.5 w-3.5" />
+                  </span>
+
+                  <div>
+                    <p className="text-[7px] font-black uppercase tracking-[0.14em] text-white/45">
+                      Latency
+                    </p>
+                    <p className="mt-0.5 text-[9px] font-black text-white">
+                      {formatSeconds(
+                        data.summary.averageCompletionSeconds
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="provider-scan absolute left-1/2 top-1/2 h-[1px] w-[320px] -translate-x-1/2 bg-gradient-to-r from-transparent via-emerald-100/70 to-transparent" />
           </div>
         </div>
 
-        <div className="relative mt-5 flex flex-wrap gap-x-5 gap-y-2 border-t border-border/70 pt-4 text-[11px] text-muted-foreground">
+        {/* Hero metadata */}
+        <div className="relative z-10 flex flex-wrap gap-x-5 gap-y-2 border-t border-white/10 bg-black/[0.04] px-5 py-3 text-[9px] font-semibold text-white/60 backdrop-blur-sm sm:px-6 lg:px-7 xl:px-8">
           <span className="inline-flex items-center gap-1.5">
             <Clock3 className="h-3.5 w-3.5" />
-
             Updated{" "}
             {formatDateTime(
               data.generatedAt
@@ -1418,8 +1448,166 @@ export default function AnalystProvidersPage() {
           </span>
 
           <span>
-            Aggregate · read-only
+            Read-only analytics
           </span>
+        </div>
+      </motion.section>
+
+      {/* ===================================================
+          FILTER BAR
+      ==================================================== */}
+
+      <section className="rounded-[26px] border border-border bg-card p-4 shadow-sm">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_auto_auto] xl:items-end">
+          <label className="min-w-0">
+            <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+              Period
+            </span>
+
+            <select
+              value={range}
+              onChange={(event) =>
+                setRange(
+                  event.target
+                    .value as AnalystRange
+                )
+              }
+              className="h-11 w-full rounded-xl border border-border bg-muted/55 px-3 text-xs font-bold text-foreground outline-none transition focus:border-emerald-400 focus:bg-background focus:ring-4 focus:ring-emerald-500/10"
+            >
+              {RANGE_OPTIONS.map(
+                (option) => (
+                  <option
+                    key={option.value}
+                    value={option.value}
+                  >
+                    {option.label}
+                  </option>
+                )
+              )}
+            </select>
+          </label>
+
+          <label className="min-w-0">
+            <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+              Environment
+            </span>
+
+            <select
+              value={mode}
+              onChange={(event) =>
+                setMode(
+                  event.target
+                    .value as AnalystMode
+                )
+              }
+              className="h-11 w-full rounded-xl border border-border bg-muted/55 px-3 text-xs font-bold text-foreground outline-none transition focus:border-emerald-400 focus:bg-background focus:ring-4 focus:ring-emerald-500/10"
+            >
+              {MODE_OPTIONS.map(
+                (option) => (
+                  <option
+                    key={option.value}
+                    value={option.value}
+                  >
+                    {option.label}
+                  </option>
+                )
+              )}
+            </select>
+          </label>
+
+          <label className="min-w-0">
+            <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+              Provider
+            </span>
+
+            <select
+              value={provider}
+              onChange={(event) =>
+                setProvider(
+                  event.target.value
+                )
+              }
+              className="h-11 w-full rounded-xl border border-border bg-muted/55 px-3 text-xs font-bold text-foreground outline-none transition focus:border-emerald-400 focus:bg-background focus:ring-4 focus:ring-emerald-500/10"
+            >
+              <option value="">
+                All providers
+              </option>
+
+              {data.providerOptions.map(
+                (item) => (
+                  <option
+                    key={item}
+                    value={item}
+                  >
+                    {providerLabel(
+                      item
+                    )}
+                  </option>
+                )
+              )}
+            </select>
+          </label>
+
+          <form
+            onSubmit={applyCurrency}
+            className="min-w-0"
+          >
+            <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+              Currency
+            </span>
+
+            <div className="flex">
+              <input
+                value={currencyDraft}
+                onChange={(event) =>
+                  setCurrencyDraft(
+                    event.target.value
+                      .replace(
+                        /[^a-z]/gi,
+                        ""
+                      )
+                      .slice(
+                        0,
+                        3
+                      )
+                      .toUpperCase()
+                  )
+                }
+                maxLength={3}
+                aria-label="Currency code"
+                className="h-11 w-20 rounded-l-xl border border-r-0 border-border bg-muted/55 px-3 text-center text-xs font-black uppercase text-foreground outline-none transition focus:border-emerald-400 focus:bg-background"
+              />
+
+              <button
+                type="submit"
+                className="h-11 rounded-r-xl border border-border bg-muted px-3 text-[10px] font-black uppercase tracking-wider text-foreground transition hover:bg-emerald-500/10 hover:text-emerald-700 dark:hover:text-emerald-400"
+              >
+                Apply
+              </button>
+            </div>
+          </form>
+
+          <button
+            type="button"
+            disabled={refreshing}
+            onClick={() =>
+              setRefreshKey(
+                (current) =>
+                  current + 1
+              )
+            }
+            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-xs font-black text-white shadow-[0_10px_24px_rgba(16,185,129,0.18)] transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+          >
+            <RefreshCcw
+              className={`h-4 w-4 ${
+                refreshing
+                  ? "animate-spin"
+                  : ""
+              }`}
+            />
+
+            Refresh
+          </button>
         </div>
       </section>
 
@@ -1450,7 +1638,7 @@ export default function AnalystProvidersPage() {
           icon={
             Server
           }
-          iconClass="bg-blue-500/10 text-blue-600 dark:text-blue-400"
+          iconClass="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
         />
 
         <SummaryCard
@@ -1466,7 +1654,7 @@ export default function AnalystProvidersPage() {
           icon={
             Activity
           }
-          iconClass="bg-cyan-500/10 text-cyan-600 dark:text-cyan-400"
+          iconClass="bg-teal-500/10 text-teal-700 dark:text-teal-400"
         />
 
         <SummaryCard
@@ -1495,7 +1683,7 @@ export default function AnalystProvidersPage() {
           icon={
             Timer
           }
-          iconClass="bg-violet-500/10 text-violet-600 dark:text-violet-400"
+          iconClass="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
         />
       </section>
 
@@ -1520,7 +1708,7 @@ export default function AnalystProvidersPage() {
           icon={
             Zap
           }
-          iconClass="bg-blue-500/10 text-blue-600 dark:text-blue-400"
+          iconClass="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
         />
 
         <MetricCard
@@ -1578,7 +1766,7 @@ export default function AnalystProvidersPage() {
           icon={
             Gauge
           }
-          iconClass="bg-cyan-500/10 text-cyan-600 dark:text-cyan-400"
+          iconClass="bg-teal-500/10 text-teal-700 dark:text-teal-400"
         />
 
         <MetricCard
@@ -1600,7 +1788,7 @@ export default function AnalystProvidersPage() {
           icon={
             CircleDollarSign
           }
-          iconClass="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
+          iconClass="bg-teal-500/10 text-teal-700 dark:text-teal-400"
         />
 
         <MetricCard
@@ -1622,7 +1810,7 @@ export default function AnalystProvidersPage() {
           icon={
             CircleDollarSign
           }
-          iconClass="bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400"
+          iconClass="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
         />
 
         <MetricCard
@@ -1661,7 +1849,7 @@ export default function AnalystProvidersPage() {
           icon={
             Timer
           }
-          iconClass="bg-violet-500/10 text-violet-600 dark:text-violet-400"
+          iconClass="bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
           inverse
         />
       </section>
@@ -1721,7 +1909,7 @@ export default function AnalystProvidersPage() {
                       >
                         <stop
                           offset="5%"
-                          stopColor="#2563eb"
+                          stopColor="#10b981"
                           stopOpacity={
                             0.3
                           }
@@ -1729,7 +1917,7 @@ export default function AnalystProvidersPage() {
 
                         <stop
                           offset="95%"
-                          stopColor="#2563eb"
+                          stopColor="#10b981"
                           stopOpacity={
                             0.02
                           }
@@ -1819,7 +2007,7 @@ export default function AnalystProvidersPage() {
                       type="monotone"
                       dataKey="attempts"
                       name="Attempts"
-                      stroke="#2563eb"
+                      stroke="#10b981"
                       strokeWidth={
                         2.5
                       }
@@ -1830,7 +2018,7 @@ export default function AnalystProvidersPage() {
                       type="monotone"
                       dataKey="completed"
                       name="Completed"
-                      stroke="#10b981"
+                      stroke="#14b8a6"
                       strokeWidth={
                         2
                       }
@@ -2340,7 +2528,7 @@ export default function AnalystProvidersPage() {
 
                     <div className="h-2 overflow-hidden rounded-full bg-muted">
                       <div
-                        className="h-full rounded-full bg-blue-500 transition-all duration-500"
+                        className="h-full rounded-full bg-emerald-500 transition-all duration-500"
                         style={{
                           width:
                             `${Math.min(
@@ -2370,7 +2558,7 @@ export default function AnalystProvidersPage() {
         title="Provider intelligence"
         description="Deterministic reliability and latency signals generated from real payment-provider activity."
         action={
-          <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-500/10 px-2.5 py-1.5 text-[10px] font-bold text-blue-600 dark:text-blue-400">
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/10 px-2.5 py-1.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-400">
             <BrainCircuit className="h-3.5 w-3.5" />
 
             {
@@ -2424,6 +2612,304 @@ export default function AnalystProvidersPage() {
           </div>
         </div>
       </div>
+
+      <style>{`
+        .provider-hero {
+          isolation: isolate;
+        }
+
+        .provider-hero-grid {
+          background-image:
+            linear-gradient(rgba(255, 255, 255, 0.055) 1px, transparent 1px),
+            linear-gradient(
+              90deg,
+              rgba(255, 255, 255, 0.055) 1px,
+              transparent 1px
+            );
+          background-size: 28px 28px;
+          mask-image: radial-gradient(
+            circle at 56% 45%,
+            rgba(0, 0, 0, 0.98),
+            rgba(0, 0, 0, 0.3) 65%,
+            transparent 100%
+          );
+          animation: providerGridMove 20s linear infinite;
+        }
+
+        .provider-hero-stars {
+          background-image:
+            radial-gradient(circle at 18% 22%, rgba(255,255,255,0.20) 0 1px, transparent 1px),
+            radial-gradient(circle at 82% 28%, rgba(255,255,255,0.12) 0 1px, transparent 1px),
+            radial-gradient(circle at 36% 82%, rgba(255,255,255,0.14) 0 1px, transparent 1px);
+          background-size: 82px 82px, 104px 104px, 126px 126px;
+          animation: providerStars 28s linear infinite;
+        }
+
+        .provider-hero-orb {
+          animation: providerOrb 7.5s ease-in-out infinite;
+        }
+
+        .provider-hero-orb-delayed {
+          animation: providerOrb 9.5s ease-in-out 1.2s infinite reverse;
+        }
+
+        .provider-hero-beam {
+          animation: providerBeam 8s ease-in-out infinite;
+        }
+
+        .provider-hero-ring-one {
+          animation: providerRing 12s linear infinite;
+        }
+
+        .provider-hero-ring-two {
+          animation: providerRing 8.5s linear infinite reverse;
+        }
+
+        .provider-live-dot {
+          box-shadow: 0 0 0 0 rgba(209, 250, 229, 0.65);
+          animation: providerLiveDot 2s ease-out infinite;
+        }
+
+        .provider-icon-pulse {
+          animation: providerIconPulse 3.2s ease-out infinite;
+        }
+
+        .provider-card-shine {
+          animation: providerCardShine 6.5s ease-in-out infinite;
+        }
+
+        .provider-core {
+          animation: providerCoreFloat 5.3s ease-in-out infinite;
+        }
+
+        .provider-core-ring {
+          animation: providerCoreRing 3.5s ease-out infinite;
+        }
+
+        .provider-core-ring-delay {
+          animation-delay: 1.75s;
+        }
+
+        .provider-orbit-one {
+          animation: providerOrbit 13s linear infinite;
+        }
+
+        .provider-orbit-two {
+          animation: providerOrbit 18s linear infinite reverse;
+        }
+
+        .provider-orbit-item-one {
+          animation: providerCounterOrbit 13s linear infinite reverse;
+        }
+
+        .provider-orbit-item-two {
+          animation: providerCounterOrbit 18s linear infinite;
+        }
+
+        .provider-float-card-one {
+          animation: providerFloatCard 5.4s ease-in-out infinite;
+        }
+
+        .provider-float-card-two {
+          animation: providerFloatCard 6.3s ease-in-out 0.8s infinite reverse;
+        }
+
+        .provider-scan {
+          animation: providerScan 4.4s ease-in-out infinite;
+          filter: drop-shadow(0 0 7px rgba(209, 250, 229, 0.6));
+        }
+
+        @keyframes providerGridMove {
+          from {
+            transform: translate3d(0, 0, 0);
+          }
+          to {
+            transform: translate3d(28px, 28px, 0);
+          }
+        }
+
+        @keyframes providerStars {
+          from {
+            transform: translate3d(0, 0, 0);
+          }
+          to {
+            transform: translate3d(-46px, 30px, 0);
+          }
+        }
+
+        @keyframes providerOrb {
+          0%,
+          100% {
+            transform: translate3d(0, 0, 0) scale(1);
+            opacity: 0.72;
+          }
+          50% {
+            transform: translate3d(0, -15px, 0) scale(1.08);
+            opacity: 1;
+          }
+        }
+
+        @keyframes providerBeam {
+          0%,
+          100% {
+            transform: translate3d(0, -50%, 0);
+            opacity: 0.2;
+          }
+          50% {
+            transform: translate3d(105px, -50%, 0);
+            opacity: 0.5;
+          }
+        }
+
+        @keyframes providerRing {
+          from {
+            transform: translateY(-50%) rotate(0deg);
+          }
+          to {
+            transform: translateY(-50%) rotate(360deg);
+          }
+        }
+
+        @keyframes providerLiveDot {
+          0% {
+            box-shadow: 0 0 0 0 rgba(209, 250, 229, 0.58);
+          }
+          75%,
+          100% {
+            box-shadow: 0 0 0 8px rgba(209, 250, 229, 0);
+          }
+        }
+
+        @keyframes providerIconPulse {
+          0% {
+            transform: scale(0.92);
+            opacity: 0.45;
+          }
+          70%,
+          100% {
+            transform: scale(1.22);
+            opacity: 0;
+          }
+        }
+
+        @keyframes providerCardShine {
+          0%,
+          25% {
+            transform: translateX(-180%);
+            opacity: 0;
+          }
+          40% {
+            opacity: 1;
+          }
+          70%,
+          100% {
+            transform: translateX(460%);
+            opacity: 0;
+          }
+        }
+
+        @keyframes providerCoreFloat {
+          0%,
+          100% {
+            transform: translate(-50%, -50%) translateY(0) rotate(0deg);
+          }
+          50% {
+            transform: translate(-50%, -50%) translateY(-7px) rotate(1.6deg);
+          }
+        }
+
+        @keyframes providerCoreRing {
+          0% {
+            transform: scale(0.88);
+            opacity: 0.5;
+          }
+          100% {
+            transform: scale(1.25);
+            opacity: 0;
+          }
+        }
+
+        @keyframes providerOrbit {
+          from {
+            transform: translate(-50%, -50%) rotate(0deg);
+          }
+          to {
+            transform: translate(-50%, -50%) rotate(360deg);
+          }
+        }
+
+        @keyframes providerCounterOrbit {
+          from {
+            transform: translate(-50%, -50%) rotate(0deg);
+          }
+          to {
+            transform: translate(-50%, -50%) rotate(-360deg);
+          }
+        }
+
+        @keyframes providerFloatCard {
+          0%,
+          100% {
+            transform: translate3d(0, 0, 0);
+          }
+          50% {
+            transform: translate3d(0, -9px, 0);
+          }
+        }
+
+        @keyframes providerScan {
+          0%,
+          100% {
+            transform: translate(-50%, -100px) scaleX(0.75);
+            opacity: 0;
+          }
+          15% {
+            opacity: 0.85;
+          }
+          50% {
+            transform: translate(-50%, 0) scaleX(1);
+            opacity: 0.98;
+          }
+          85% {
+            opacity: 0.72;
+          }
+          100% {
+            transform: translate(-50%, 100px) scaleX(0.75);
+            opacity: 0;
+          }
+        }
+
+        @media (max-width: 640px) {
+          .provider-hero-grid {
+            background-size: 24px 24px;
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .provider-hero-grid,
+          .provider-hero-stars,
+          .provider-hero-orb,
+          .provider-hero-orb-delayed,
+          .provider-hero-beam,
+          .provider-hero-ring-one,
+          .provider-hero-ring-two,
+          .provider-live-dot,
+          .provider-icon-pulse,
+          .provider-card-shine,
+          .provider-core,
+          .provider-core-ring,
+          .provider-orbit-one,
+          .provider-orbit-two,
+          .provider-orbit-item-one,
+          .provider-orbit-item-two,
+          .provider-float-card-one,
+          .provider-float-card-two,
+          .provider-scan {
+            animation: none !important;
+          }
+        }
+      `}</style>
+
     </div>
   );
 }
