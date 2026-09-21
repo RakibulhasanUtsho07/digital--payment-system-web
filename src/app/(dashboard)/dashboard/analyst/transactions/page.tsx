@@ -9,6 +9,10 @@ import {
   type ReactNode,
 } from "react";
 
+import {
+  useRouter,
+} from "next/navigation";
+
 import { motion } from "framer-motion";
 
 import {
@@ -41,6 +45,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   getAnalystTransactionAnalytics,
@@ -315,7 +327,7 @@ function FilterSelect<T extends string>({
   }, []);
 
   return (
-    <div ref={rootRef} className="relative">
+    <div ref={rootRef} className={`relative min-w-0 ${open ? "z-[120]" : "z-20"}`}>
       <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">
         {label}
       </span>
@@ -332,7 +344,7 @@ function FilterSelect<T extends string>({
         }`}
       >
         <span className="truncate text-foreground">
-          {selected?.label ?? value}
+          {selected?.label ?? "Select"}
         </span>
 
         <motion.span
@@ -350,7 +362,7 @@ function FilterSelect<T extends string>({
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ duration: 0.16, ease: easeOut }}
           role="listbox"
-          className="absolute left-0 right-0 top-[calc(100%+8px)] z-[80] overflow-hidden rounded-2xl border border-teal-500/15 bg-card/95 p-1.5 shadow-[0_22px_60px_rgba(15,23,42,0.18)] backdrop-blur-xl"
+          className="absolute left-0 right-0 top-[calc(100%+8px)] z-[130] max-h-72 overflow-y-auto rounded-2xl border border-teal-500/15 bg-card/95 p-1.5 shadow-[0_22px_60px_rgba(15,23,42,0.18)] backdrop-blur-xl"
         >
           {options.map((option) => {
             const active = option.value === value;
@@ -649,21 +661,21 @@ function MetricCard({
       viewport={{ once: true, amount: 0.2 }}
       whileHover={{ y: -4 }}
       transition={{ duration: 0.35, delay: index * 0.06, ease: easeOut }}
-      className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm transition-shadow hover:shadow-lg"
+      className="group relative isolate flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-border bg-card p-5 shadow-sm transition-shadow hover:shadow-lg"
     >
       <div className={`absolute inset-x-0 top-0 h-1 ${accentClass}`} />
 
-      <div className="flex items-start justify-between gap-3">
+      <div className="relative z-10 flex min-w-0 items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="line-clamp-2 text-[10px] font-black uppercase leading-4 tracking-[0.14em] text-muted-foreground">
             {label}
           </p>
 
-          <p className="mt-3 break-words text-2xl font-black tabular-nums tracking-tight text-foreground">
+          <p className="mt-3 break-words text-2xl font-black [overflow-wrap:anywhere] tabular-nums tracking-tight text-foreground">
             {value}
           </p>
 
-          <p className="mt-1 line-clamp-2 text-[11px] leading-5 text-muted-foreground">
+          <p className="mt-1 break-words text-[11px] leading-5 text-muted-foreground [overflow-wrap:anywhere]">
             {description}
           </p>
         </div>
@@ -744,7 +756,7 @@ function Panel({
       >
         <div className="min-w-0">
           <h2
-            className={`text-base font-extrabold ${
+            className={`break-words text-base font-extrabold [overflow-wrap:anywhere] ${
               dark ? "text-white" : "text-foreground"
             }`}
           >
@@ -752,7 +764,7 @@ function Panel({
           </h2>
 
           <p
-            className={`mt-1 text-xs leading-5 ${
+            className={`mt-1 break-words text-xs leading-5 [overflow-wrap:anywhere] ${
               dark ? "text-slate-300" : "text-muted-foreground"
             }`}
           >
@@ -933,6 +945,32 @@ function InsightCard({
 ========================================================= */
 
 export default function AnalystTransactionsPage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isAnalystRole =
+    user.role === "analyst";
+
+  useEffect(() => {
+    if (isAnalystRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isAnalystRole,
+    router,
+    user.role,
+  ]);
+
   const [range, setRange] = useState<AnalystRange>("30d");
   const [status, setStatus] = useState<AnalystTransactionStatus>("all");
   const [type, setType] = useState<AnalystTransactionType>("all");
@@ -948,6 +986,14 @@ export default function AnalystTransactionsPage() {
   const hasLoadedRef = useRef(false);
 
   useEffect(() => {
+    if (!isAnalystRole) {
+      setLoading(false);
+      setRefreshing(false);
+      setData(null);
+      setError("");
+      return;
+    }
+
     const controller = new AbortController();
     let active = true;
 
@@ -992,7 +1038,7 @@ export default function AnalystTransactionsPage() {
       active = false;
       controller.abort();
     };
-  }, [range, currency, status, type, risk, refreshKey]);
+  }, [isAnalystRole, range, currency, status, type, risk, refreshKey]);
 
   const chartData = useMemo(
     () =>
@@ -1006,6 +1052,10 @@ export default function AnalystTransactionsPage() {
   function applyCurrency(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    if (!isAnalystRole) {
+      return;
+    }
+
     const next = currencyDraft.trim().toUpperCase();
 
     if (!/^[A-Z]{3}$/.test(next)) {
@@ -1014,6 +1064,26 @@ export default function AnalystTransactionsPage() {
     }
 
     setCurrency(next);
+  }
+
+  if (!isAnalystRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center px-4">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-teal-500/15 bg-teal-500/10 text-teal-700 shadow-sm dark:text-teal-300">
+            <RefreshCcw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening analyst workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Transaction Analytics is available only to analyst accounts.
+          </p>
+        </div>
+      </main>
+    );
   }
 
   if (loading && !data) {
@@ -1100,7 +1170,13 @@ export default function AnalystTransactionsPage() {
             disabled={refreshing}
             whileHover={{ y: -1 }}
             whileTap={{ scale: 0.97 }}
-            onClick={() => setRefreshKey((current) => current + 1)}
+            onClick={() => {
+              if (!isAnalystRole) {
+                return;
+              }
+
+              setRefreshKey((current) => current + 1);
+            }}
             className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-xs font-extrabold text-white backdrop-blur transition hover:bg-white/20 disabled:opacity-50"
           >
             <RefreshCcw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
@@ -1128,35 +1204,59 @@ export default function AnalystTransactionsPage() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.08, ease: easeOut }}
-        className="relative z-30 rounded-[22px] border border-border bg-card/95 p-4 shadow-[0_14px_38px_rgba(15,23,42,0.05)] backdrop-blur"
+        className="relative z-40 overflow-visible rounded-[22px] border border-border bg-card/95 p-4 shadow-[0_14px_38px_rgba(15,23,42,0.05)] backdrop-blur"
       >
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
           <FilterSelect
             label="Period"
             value={range}
             options={RANGE_OPTIONS}
-            onChange={setRange}
+            onChange={(nextRange) => {
+              if (!isAnalystRole) {
+                return;
+              }
+
+              setRange(nextRange);
+            }}
           />
 
           <FilterSelect
             label="Status"
             value={status}
             options={STATUS_OPTIONS}
-            onChange={setStatus}
+            onChange={(nextStatus) => {
+              if (!isAnalystRole) {
+                return;
+              }
+
+              setStatus(nextStatus);
+            }}
           />
 
           <FilterSelect
             label="Transaction type"
             value={type}
             options={TYPE_OPTIONS}
-            onChange={setType}
+            onChange={(nextType) => {
+              if (!isAnalystRole) {
+                return;
+              }
+
+              setType(nextType);
+            }}
           />
 
           <FilterSelect
             label="Risk level"
             value={risk}
             options={RISK_OPTIONS}
-            onChange={setRisk}
+            onChange={(nextRisk) => {
+              if (!isAnalystRole) {
+                return;
+              }
+
+              setRisk(nextRisk);
+            }}
           />
 
           <form onSubmit={applyCurrency}>
@@ -1167,14 +1267,18 @@ export default function AnalystTransactionsPage() {
             <div className="flex h-11 overflow-hidden rounded-xl border border-border bg-background transition focus-within:border-teal-500 focus-within:ring-4 focus-within:ring-teal-500/10">
               <input
                 value={currencyDraft}
-                onChange={(event) =>
+                onChange={(event) => {
+                  if (!isAnalystRole) {
+                    return;
+                  }
+
                   setCurrencyDraft(
                     event.target.value
                       .replace(/[^a-z]/gi, "")
                       .slice(0, 3)
                       .toUpperCase()
-                  )
-                }
+                  );
+                }}
                 maxLength={3}
                 aria-label="Currency code"
                 className="min-w-0 flex-1 bg-transparent px-3 text-center text-xs font-black uppercase outline-none"

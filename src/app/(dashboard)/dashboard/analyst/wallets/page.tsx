@@ -10,6 +10,11 @@ import {
 } from "react";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
+  AnimatePresence,
   animate,
   motion,
   useInView,
@@ -25,6 +30,8 @@ import {
   Banknote,
   BarChart3,
   BrainCircuit,
+  Check,
+  ChevronDown,
   CreditCard,
   DatabaseZap,
   LockKeyhole,
@@ -55,6 +62,14 @@ import {
 } from "recharts";
 
 import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
+
+import {
   getAnalystWalletAnalytics,
   type AnalystMetric,
   type AnalystRange,
@@ -77,18 +92,118 @@ const RANGE_OPTIONS: Array<{ value: AnalystRange; label: string }> = [
   { value: "90d", label: "Last 90 days" },
 ];
 
+
+type RangeOption = (typeof RANGE_OPTIONS)[number];
+
+function AnalystRangeSelect({
+  value,
+  onChange,
+}: {
+  value: AnalystRange;
+  onChange: (value: AnalystRange) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const selected = RANGE_OPTIONS.find((option) => option.value === value) ?? RANGE_OPTIONS[2];
+
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node | null;
+      if (target && rootRef.current && !rootRef.current.contains(target)) {
+        setOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
+  return (
+    <div ref={rootRef} className={`relative min-w-[170px] ${open ? "z-[120]" : "z-20"}`}>
+      <span className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+        Period
+      </span>
+
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+        className={`flex h-11 w-full items-center justify-between gap-3 rounded-xl border bg-white/90 px-3 text-left text-xs font-black text-[#17324D] shadow-sm outline-none transition-all dark:bg-slate-950/80 dark:text-white ${
+          open
+            ? "border-[#0B4F52] ring-4 ring-[#0B4F52]/10"
+            : "border-[#D4E4E1] hover:border-[#0B4F52]/40"
+        }`}
+      >
+        <span className="min-w-0 flex-1 truncate">{selected?.label ?? "Last 30 days"}</span>
+        <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.18 }}>
+          <ChevronDown className="h-4 w-4 text-[#0B4F52] dark:text-cyan-300" />
+        </motion.span>
+      </button>
+
+      <AnimatePresence>
+        {open ? (
+          <motion.div
+            initial={{ opacity: 0, y: -6, scale: 0.985 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -5, scale: 0.985 }}
+            transition={{ duration: 0.16 }}
+            role="listbox"
+            className="absolute left-0 right-0 top-[calc(100%+8px)] z-[130] overflow-hidden rounded-2xl border border-[#0B4F52]/15 bg-white/95 p-1.5 shadow-[0_24px_70px_-20px_rgba(11,79,82,0.35)] backdrop-blur-xl dark:border-white/10 dark:bg-[#091820]/95"
+          >
+            {RANGE_OPTIONS.map((option) => {
+              const active = option.value === value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="option"
+                  aria-selected={active}
+                  onClick={() => {
+                    onChange(option.value);
+                    setOpen(false);
+                  }}
+                  className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-bold transition ${
+                    active
+                      ? "bg-[#0B4F52]/10 text-[#0B4F52] dark:text-cyan-300"
+                      : "text-slate-700 hover:bg-slate-100/80 dark:text-slate-200 dark:hover:bg-white/5"
+                  }`}
+                >
+                  <span>{option.label}</span>
+                  {active ? <Check className="h-4 w-4 shrink-0" /> : null}
+                </button>
+              );
+            })}
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 /* =========================================================
    OPAL GLOW THEME
 ========================================================= */
 
 const OPAL_GLOW = {
-  ink: "#33415C",
-  primary: "#6D7CFF",
-  primaryStrong: "#5566F2",
-  mint: "#55E6C1",
-  rose: "#FF8BCB",
-  sky: "#8AD8FF",
-  canvas: "#F8FAFF",
+  ink: "#17324D",
+  primary: "#0B4F52",
+  primaryStrong: "#0F766E",
+  mint: "#22C7B8",
+  rose: "#38BDF8",
+  sky: "#7DD3FC",
+  canvas: "#F4F8F7",
 } as const;
 
 /* Trend series config — drives both the chart and the
@@ -241,10 +356,10 @@ function GlowTooltip({
       initial={{ opacity: 0, scale: 0.96, y: 4 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       transition={{ duration: 0.16 }}
-      className="min-w-[180px] rounded-2xl border border-[#6D7CFF]/20 bg-white/95 p-3 shadow-[0_18px_50px_rgba(91,108,220,0.18)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95"
+      className="min-w-[180px] rounded-2xl border border-[#0B4F52]/20 bg-white/95 p-3 shadow-[0_18px_50px_rgba(91,108,220,0.18)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/95"
     >
       {label ? (
-        <p className="mb-2 text-[11px] font-black uppercase tracking-[0.1em] text-[#5B68E8] dark:text-[#AEB7FF]">
+        <p className="mb-2 text-[11px] font-black uppercase tracking-[0.1em] text-[#0F766E] dark:text-[#99F6E4]">
           {label}
         </p>
       ) : null}
@@ -263,7 +378,7 @@ function GlowTooltip({
               <span className="truncate">{entry.name}</span>
             </span>
 
-            <span className="shrink-0 font-black tabular-nums text-[#33415C] dark:text-slate-100">
+            <span className="shrink-0 font-black tabular-nums text-[#17324D] dark:text-slate-100">
               {formatNumber(Number(entry.value ?? 0))}
             </span>
           </div>
@@ -295,21 +410,21 @@ function Panel({
       viewport={{ once: true, amount: 0.12 }}
       transition={{ duration: 0.42, ease: easeOut }}
       whileHover={{ y: -2 }}
-      className="group relative overflow-hidden rounded-[28px] border border-[#6D7CFF]/10 bg-white/[0.82] shadow-[0_20px_65px_-40px_rgba(85,102,242,0.55)] backdrop-blur-xl transition-shadow duration-300 hover:shadow-[0_24px_75px_-38px_rgba(85,102,242,0.7)] dark:border-white/10 dark:bg-slate-950/[0.72]"
+      className="group relative overflow-hidden rounded-[28px] border border-[#0B4F52]/10 bg-white/[0.82] shadow-[0_20px_65px_-40px_rgba(85,102,242,0.55)] backdrop-blur-xl transition-shadow duration-300 hover:shadow-[0_24px_75px_-38px_rgba(85,102,242,0.7)] dark:border-white/10 dark:bg-slate-950/[0.72]"
     >
-      <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[#6D7CFF]/70 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[#0B4F52]/70 to-transparent" />
 
       {/* slow drifting bloom instead of a static blur blob */}
       <motion.div
         aria-hidden
         animate={{ opacity: [0.5, 0.95, 0.5], scale: [1, 1.12, 1] }}
         transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
-        className="pointer-events-none absolute -right-14 -top-16 h-40 w-40 rounded-full bg-[#FF8BCB]/10 blur-3xl"
+        className="pointer-events-none absolute -right-14 -top-16 h-40 w-40 rounded-full bg-[#38BDF8]/10 blur-3xl"
       />
 
-      <div className="relative flex flex-col gap-3 border-b border-[#6D7CFF]/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="relative flex flex-col gap-3 border-b border-[#0B4F52]/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <h2 className="text-base font-extrabold tracking-tight text-[#33415C] dark:text-slate-100">
+          <h2 className="text-base font-extrabold tracking-tight text-[#17324D] dark:text-slate-100">
             {title}
           </h2>
 
@@ -391,10 +506,10 @@ function MetricCard({
       viewport={{ once: true, amount: 0.15 }}
       whileHover={{ y: -5, scale: 1.012 }}
       transition={{ type: "spring", stiffness: 240, damping: 24 }}
-      className="group relative flex h-full flex-col overflow-hidden rounded-[24px] border border-[#6D7CFF]/10 bg-white/[0.86] p-5 shadow-[0_18px_55px_-38px_rgba(85,102,242,0.55)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/[0.75]"
+      className="group relative isolate flex h-full min-w-0 flex-col overflow-hidden rounded-[24px] border border-[#0B4F52]/10 bg-white/[0.86] p-5 shadow-[0_18px_55px_-38px_rgba(85,102,242,0.55)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/[0.75]"
     >
-      <div className="pointer-events-none absolute -right-10 -top-12 h-28 w-28 rounded-full bg-[#6D7CFF]/10 blur-3xl transition-transform duration-500 group-hover:scale-125" />
-      <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-[#55E6C1]/70 to-transparent" />
+      <div className="pointer-events-none absolute -right-10 -top-12 h-28 w-28 rounded-full bg-[#0B4F52]/10 blur-3xl transition-transform duration-500 group-hover:scale-125" />
+      <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-[#22C7B8]/70 to-transparent" />
 
       {/* sheen sweep on hover */}
       <motion.div
@@ -405,7 +520,7 @@ function MetricCard({
         className="pointer-events-none absolute inset-y-0 w-24 -skew-x-12 bg-gradient-to-r from-transparent via-white/45 to-transparent dark:via-white/10"
       />
 
-      <div className="relative flex items-start justify-between gap-4">
+      <div className="relative z-10 flex min-w-0 items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <p className="line-clamp-2 text-[11px] font-black uppercase leading-4 tracking-[0.13em] text-slate-500 dark:text-slate-400">
             {label}
@@ -413,7 +528,7 @@ function MetricCard({
 
           <AnimatedNumber
             value={value}
-            className="mt-3 block truncate text-2xl font-black tabular-nums tracking-tight text-[#33415C] dark:text-slate-50"
+            className="mt-3 block break-words text-2xl font-black [overflow-wrap:anywhere] tabular-nums tracking-tight text-[#17324D] dark:text-slate-50"
           />
         </div>
 
@@ -426,7 +541,7 @@ function MetricCard({
         </motion.div>
       </div>
 
-      <div className="relative mt-auto border-t border-[#6D7CFF]/10 pt-3">
+      <div className="relative mt-auto border-t border-[#0B4F52]/10 pt-3">
         <ChangeBadge metric={metric} />
       </div>
     </motion.div>
@@ -457,9 +572,9 @@ function SummaryCard({
       viewport={{ once: true, amount: 0.15 }}
       whileHover={{ y: -4 }}
       transition={{ duration: 0.34, ease: easeOut }}
-      className="group relative flex h-full overflow-hidden rounded-[24px] border border-[#6D7CFF]/10 bg-white/[0.86] p-5 shadow-[0_18px_50px_-38px_rgba(85,102,242,0.5)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/[0.75]"
+      className="group relative isolate flex h-full min-w-0 overflow-hidden rounded-[24px] border border-[#0B4F52]/10 bg-white/[0.86] p-5 shadow-[0_18px_50px_-38px_rgba(85,102,242,0.5)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/[0.75]"
     >
-      <div className="pointer-events-none absolute -bottom-10 -right-10 h-28 w-28 rounded-full bg-[#55E6C1]/10 blur-3xl transition-transform duration-500 group-hover:scale-125" />
+      <div className="pointer-events-none absolute -bottom-10 -right-10 h-28 w-28 rounded-full bg-[#22C7B8]/10 blur-3xl transition-transform duration-500 group-hover:scale-125" />
 
       <div className="relative flex w-full justify-between gap-4">
         <div className="min-w-0">
@@ -467,7 +582,7 @@ function SummaryCard({
             {title}
           </p>
 
-          <p className="mt-3 break-words text-2xl font-black tabular-nums tracking-tight text-[#33415C] dark:text-slate-50">
+          <p className="mt-3 break-words text-2xl font-black tabular-nums tracking-tight text-[#17324D] dark:text-slate-50">
             {value}
           </p>
 
@@ -514,7 +629,7 @@ function RadialRate({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.3 }}
       whileHover={{ y: -4 }}
-      className="flex h-full flex-col items-center justify-center gap-3 rounded-2xl border border-[#6D7CFF]/10 bg-gradient-to-br from-white/90 to-[#6D7CFF]/[0.035] p-4 text-center shadow-sm transition hover:border-[#6D7CFF]/25 dark:from-slate-950/80 dark:to-[#6D7CFF]/[0.04]"
+      className="flex h-full flex-col items-center justify-center gap-3 rounded-2xl border border-[#0B4F52]/10 bg-gradient-to-br from-white/90 to-[#0B4F52]/[0.035] p-4 text-center shadow-sm transition hover:border-[#0B4F52]/25 dark:from-slate-950/80 dark:to-[#0B4F52]/[0.04]"
     >
       <div className="relative flex h-[92px] w-[92px] items-center justify-center">
         <svg viewBox="0 0 80 80" className="absolute inset-0 h-full w-full -rotate-90">
@@ -524,7 +639,7 @@ function RadialRate({
             r="34"
             fill="none"
             strokeWidth="7"
-            className="stroke-[#6D7CFF]/10"
+            className="stroke-[#0B4F52]/10"
           />
 
           <motion.circle
@@ -548,7 +663,7 @@ function RadialRate({
         <AnimatedNumber
           value={safe}
           format={(current) => `${current.toFixed(1)}%`}
-          className="relative text-sm font-black tabular-nums text-[#33415C] dark:text-slate-100"
+          className="relative text-sm font-black tabular-nums text-[#17324D] dark:text-slate-100"
         />
       </div>
 
@@ -573,23 +688,23 @@ function RadialRate({
 
 function EmptyData({ text }: { text: string }) {
   return (
-    <div className="relative flex min-h-[240px] flex-col items-center justify-center overflow-hidden rounded-[24px] border border-dashed border-[#6D7CFF]/20 bg-gradient-to-br from-[#6D7CFF]/[0.035] via-white/60 to-[#55E6C1]/[0.05] px-6 text-center dark:via-slate-950/50">
+    <div className="relative flex min-h-[240px] flex-col items-center justify-center overflow-hidden rounded-[24px] border border-dashed border-[#0B4F52]/20 bg-gradient-to-br from-[#0B4F52]/[0.035] via-white/60 to-[#22C7B8]/[0.05] px-6 text-center dark:via-slate-950/50">
       <motion.div
         aria-hidden
         animate={{ opacity: [0.4, 0.9, 0.4], scale: [1, 1.2, 1] }}
         transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute h-24 w-24 rounded-full bg-[#FF8BCB]/10 blur-3xl"
+        className="absolute h-24 w-24 rounded-full bg-[#38BDF8]/10 blur-3xl"
       />
 
       <motion.div
         animate={{ y: [0, -5, 0] }}
         transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
-        className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-[#6D7CFF]/10 text-[#5B68E8]"
+        className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-[#0B4F52]/10 text-[#0F766E]"
       >
         <DatabaseZap className="h-6 w-6" />
       </motion.div>
 
-      <p className="relative mt-3 text-sm font-extrabold text-[#33415C] dark:text-slate-100">
+      <p className="relative mt-3 text-sm font-extrabold text-[#17324D] dark:text-slate-100">
         No wallet activity
       </p>
 
@@ -615,7 +730,7 @@ function InsightCard({
     critical: "border-red-500/25 bg-red-500/[0.055] text-red-600 dark:text-red-400",
     high: "border-orange-500/25 bg-orange-500/[0.055] text-orange-600 dark:text-orange-400",
     medium: "border-amber-500/25 bg-amber-500/[0.055] text-amber-600 dark:text-amber-400",
-    info: "border-[#6D7CFF]/20 bg-[#6D7CFF]/[0.055] text-[#5B68E8] dark:text-[#AEB7FF]",
+    info: "border-[#0B4F52]/20 bg-[#0B4F52]/[0.055] text-[#0F766E] dark:text-[#99F6E4]",
     positive:
       "border-emerald-500/25 bg-emerald-500/[0.055] text-emerald-600 dark:text-emerald-400",
   }[insight.severity];
@@ -648,7 +763,7 @@ function InsightCard({
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-extrabold text-[#33415C] dark:text-slate-100">
+            <p className="text-sm font-extrabold text-[#17324D] dark:text-slate-100">
               {insight.title}
             </p>
 
@@ -662,7 +777,7 @@ function InsightCard({
           </p>
 
           <div className="mt-3 rounded-xl border border-white/60 bg-white/60 p-3 shadow-sm backdrop-blur dark:border-white/5 dark:bg-slate-950/[0.35]">
-            <p className="text-[11px] font-bold text-[#33415C] dark:text-slate-200">Evidence</p>
+            <p className="text-[11px] font-bold text-[#17324D] dark:text-slate-200">Evidence</p>
             <p className="mt-1 break-words text-[11px] text-slate-500 dark:text-slate-400">
               {insight.evidence}
             </p>
@@ -682,6 +797,32 @@ function InsightCard({
 ========================================================= */
 
 export default function AnalystWalletsPage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isAnalystRole =
+    user.role === "analyst";
+
+  useEffect(() => {
+    if (isAnalystRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isAnalystRole,
+    router,
+    user.role,
+  ]);
+
   const [range, setRange] = useState<AnalystRange>("30d");
   const [currency, setCurrency] = useState("BDT");
   const [currencyDraft, setCurrencyDraft] = useState("BDT");
@@ -701,6 +842,14 @@ export default function AnalystWalletsPage() {
   ======================================================= */
 
   useEffect(() => {
+    if (!isAnalystRole) {
+      setLoading(false);
+      setRefreshing(false);
+      setData(null);
+      setError("");
+      return;
+    }
+
     const controller = new AbortController();
     let active = true;
 
@@ -746,7 +895,7 @@ export default function AnalystWalletsPage() {
         controller.abort();
       }
     };
-  }, [range, currency, refreshKey]);
+  }, [isAnalystRole, range, currency, refreshKey]);
 
   /* =======================================================
      CURRENCY
@@ -754,6 +903,10 @@ export default function AnalystWalletsPage() {
 
   const applyCurrency = (event: FormEvent) => {
     event.preventDefault();
+
+    if (!isAnalystRole) {
+      return;
+    }
 
     const normalized = currencyDraft.trim().toUpperCase();
 
@@ -766,6 +919,10 @@ export default function AnalystWalletsPage() {
   };
 
   const toggleSeries = (key: TrendSeriesKey) => {
+    if (!isAnalystRole) {
+      return;
+    }
+
     setHiddenSeries((current) =>
       current.includes(key)
         ? current.filter((item) => item !== key)
@@ -796,10 +953,30 @@ export default function AnalystWalletsPage() {
      LOADING
   ======================================================= */
 
+  if (!isAnalystRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center px-4">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-teal-500/15 bg-teal-500/10 text-teal-700 shadow-sm dark:text-teal-300">
+            <RefreshCcw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening analyst workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Wallet Analytics is available only to analyst accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
   if (loading && !data) {
     return (
       <div className="relative isolate space-y-5">
-        <div className="h-44 animate-pulse rounded-[30px] border border-[#6D7CFF]/10 bg-gradient-to-r from-[#6D7CFF]/10 via-[#FF8BCB]/10 to-[#55E6C1]/10" />
+        <div className="h-44 animate-pulse rounded-[30px] border border-[#0B4F52]/10 bg-gradient-to-r from-[#0B4F52]/10 via-[#38BDF8]/10 to-[#22C7B8]/10" />
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, index) => (
@@ -812,7 +989,7 @@ export default function AnalystWalletsPage() {
                 delay: index * 0.08,
                 ease: "easeInOut",
               }}
-              className="h-40 rounded-[24px] border border-[#6D7CFF]/10 bg-white/70 shadow-sm dark:bg-slate-950/60"
+              className="h-40 rounded-[24px] border border-[#0B4F52]/10 bg-white/70 shadow-sm dark:bg-slate-950/60"
             />
           ))}
         </div>
@@ -845,8 +1022,14 @@ export default function AnalystWalletsPage() {
 
           <button
             type="button"
-            onClick={() => setRefreshKey((value) => value + 1)}
-            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#6D7CFF] to-[#FF8BCB] px-5 py-3 text-sm font-bold text-white shadow-[0_12px_30px_-14px_rgba(109,124,255,0.75)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_38px_-14px_rgba(109,124,255,0.9)]"
+            onClick={() => {
+                if (!isAnalystRole) {
+                  return;
+                }
+
+                setRefreshKey((value) => value + 1);
+              }}
+            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#0B4F52] to-[#38BDF8] px-5 py-3 text-sm font-bold text-white shadow-[0_12px_30px_-14px_rgba(109,124,255,0.75)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_38px_-14px_rgba(109,124,255,0.9)]"
           >
             <RotateCcw className="h-4 w-4" />
             Try again
@@ -887,13 +1070,13 @@ export default function AnalystWalletsPage() {
         aria-hidden
         animate={{ opacity: [0.4, 0.85, 0.4], y: [0, -18, 0] }}
         transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
-        className="pointer-events-none absolute left-[9%] top-16 -z-10 h-40 w-40 rounded-full bg-[#6D7CFF]/10 blur-[80px]"
+        className="pointer-events-none absolute left-[9%] top-16 -z-10 h-40 w-40 rounded-full bg-[#0B4F52]/10 blur-[80px]"
       />
       <motion.div
         aria-hidden
         animate={{ opacity: [0.35, 0.8, 0.35], y: [0, 20, 0] }}
         transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
-        className="pointer-events-none absolute right-[6%] top-72 -z-10 h-44 w-44 rounded-full bg-[#FF8BCB]/10 blur-[90px]"
+        className="pointer-events-none absolute right-[6%] top-72 -z-10 h-44 w-44 rounded-full bg-[#38BDF8]/10 blur-[90px]"
       />
 
       {/* HEADER */}
@@ -902,7 +1085,7 @@ export default function AnalystWalletsPage() {
         initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.55, ease: easeOut }}
-        className="relative overflow-hidden rounded-[30px] border border-[#6D7CFF]/[0.15] bg-white/[0.82] p-6 shadow-[0_28px_90px_-52px_rgba(85,102,242,0.68)] backdrop-blur-2xl sm:p-7 dark:border-white/10 dark:bg-slate-950/[0.76]"
+        className="relative overflow-hidden rounded-[30px] border border-[#0B4F52]/[0.15] bg-white/[0.82] p-6 shadow-[0_28px_90px_-52px_rgba(85,102,242,0.68)] backdrop-blur-2xl sm:p-7 dark:border-white/10 dark:bg-slate-950/[0.76]"
       >
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(125deg,rgba(109,124,255,0.055),transparent_36%,rgba(255,139,203,0.05)_68%,rgba(85,230,193,0.06))]" />
 
@@ -910,15 +1093,15 @@ export default function AnalystWalletsPage() {
           aria-hidden
           animate={{ x: [0, 22, 0], y: [0, -14, 0], scale: [1, 1.08, 1] }}
           transition={{ duration: 11, repeat: Infinity, ease: "easeInOut" }}
-          className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-[#6D7CFF]/[0.18] blur-3xl"
+          className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-[#0B4F52]/[0.18] blur-3xl"
         />
         <motion.div
           aria-hidden
           animate={{ x: [0, -18, 0], y: [0, 16, 0] }}
           transition={{ duration: 13, repeat: Infinity, ease: "easeInOut" }}
-          className="pointer-events-none absolute -bottom-24 left-[28%] h-56 w-56 rounded-full bg-[#FF8BCB]/[0.14] blur-3xl"
+          className="pointer-events-none absolute -bottom-24 left-[28%] h-56 w-56 rounded-full bg-[#38BDF8]/[0.14] blur-3xl"
         />
-        <div className="pointer-events-none absolute bottom-0 right-[18%] h-40 w-40 rounded-full bg-[#55E6C1]/[0.12] blur-3xl" />
+        <div className="pointer-events-none absolute bottom-0 right-[18%] h-40 w-40 rounded-full bg-[#22C7B8]/[0.12] blur-3xl" />
 
         <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
           <div className="min-w-0">
@@ -933,7 +1116,7 @@ export default function AnalystWalletsPage() {
                 Network {data.status}
               </span>
 
-              <span className="inline-flex items-center gap-2 rounded-full border border-[#6D7CFF]/[0.15] bg-[#6D7CFF]/[0.075] px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-[#5B68E8] shadow-sm backdrop-blur dark:text-[#B6BEFF]">
+              <span className="inline-flex items-center gap-2 rounded-full border border-[#0B4F52]/[0.15] bg-[#0B4F52]/[0.075] px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-[#0F766E] shadow-sm backdrop-blur dark:text-[#A7F3D0]">
                 <motion.span
                   animate={{ rotate: [0, 12, -12, 0] }}
                   transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
@@ -943,13 +1126,13 @@ export default function AnalystWalletsPage() {
                 Opal Glow workspace
               </span>
 
-              <span className="inline-flex items-center gap-2 rounded-full border border-[#55E6C1]/20 bg-[#55E6C1]/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-[#188E75] dark:text-[#82F3D6]">
+              <span className="inline-flex items-center gap-2 rounded-full border border-[#22C7B8]/20 bg-[#22C7B8]/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-[#0F766E] dark:text-[#99F6E4]">
                 <WalletCards className="h-3.5 w-3.5" />
                 Coffer Wallet Network
               </span>
             </div>
 
-            <h1 className="mt-4 bg-gradient-to-r from-[#33415C] via-[#6D7CFF] to-[#2FBF9D] bg-clip-text text-2xl font-black tracking-tight text-transparent sm:text-4xl">
+            <h1 className="mt-4 bg-gradient-to-r from-[#17324D] via-[#0B4F52] to-[#14B8A6] bg-clip-text text-2xl font-black tracking-tight text-transparent sm:text-4xl">
               Wallet Analytics
             </h1>
 
@@ -959,48 +1142,45 @@ export default function AnalystWalletsPage() {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-[#6D7CFF]/10 bg-white/[0.55] p-2.5 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/[0.45]">
-            <label>
-              <span className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
-                Period
-              </span>
+          <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-[#0B4F52]/10 bg-white/[0.55] p-2.5 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/[0.45]">
+            <AnalystRangeSelect
+              value={range}
+              onChange={(nextRange) => {
+                if (!isAnalystRole) {
+                  return;
+                }
 
-              <select
-                value={range}
-                onChange={(event) => setRange(event.target.value as AnalystRange)}
-                className="h-11 rounded-xl border border-[#6D7CFF]/[0.15] bg-white/80 px-3 text-xs font-bold text-[#33415C] outline-none transition focus:border-[#6D7CFF]/50 focus:ring-4 focus:ring-[#6D7CFF]/10 dark:bg-slate-950/70 dark:text-slate-100"
-              >
-                {RANGE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+                setRange(nextRange);
+              }}
+            />
 
             <form onSubmit={applyCurrency}>
               <span className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
                 Currency
               </span>
 
-              <div className="flex overflow-hidden rounded-xl shadow-sm ring-1 ring-[#6D7CFF]/[0.15] focus-within:ring-4 focus-within:ring-[#6D7CFF]/10">
+              <div className="flex overflow-hidden rounded-xl shadow-sm ring-1 ring-[#0B4F52]/[0.15] focus-within:ring-4 focus-within:ring-[#0B4F52]/10">
                 <input
                   value={currencyDraft}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    if (!isAnalystRole) {
+                      return;
+                    }
+
                     setCurrencyDraft(
                       event.target.value
                         .replace(/[^a-z]/gi, "")
                         .slice(0, 3)
                         .toUpperCase()
-                    )
-                  }
+                    );
+                  }}
                   aria-label="Currency code"
-                  className="h-11 w-20 border-0 bg-white/[0.85] px-3 text-center text-xs font-black text-[#33415C] outline-none dark:bg-slate-950/70 dark:text-slate-100"
+                  className="h-11 w-20 border-0 bg-white/[0.85] px-3 text-center text-xs font-black text-[#17324D] outline-none dark:bg-slate-950/70 dark:text-slate-100"
                 />
 
                 <button
                   type="submit"
-                  className="h-11 border-l border-[#6D7CFF]/10 bg-[#6D7CFF]/[0.075] px-3 text-[10px] font-black uppercase text-[#5B68E8] transition hover:bg-[#6D7CFF]/[0.15] dark:text-[#B6BEFF]"
+                  className="h-11 border-l border-[#0B4F52]/10 bg-[#0B4F52]/[0.075] px-3 text-[10px] font-black uppercase text-[#0F766E] transition hover:bg-[#0B4F52]/[0.15] dark:text-[#A7F3D0]"
                 >
                   Apply
                 </button>
@@ -1011,8 +1191,14 @@ export default function AnalystWalletsPage() {
               type="button"
               disabled={refreshing}
               whileTap={{ scale: 0.96 }}
-              onClick={() => setRefreshKey((value) => value + 1)}
-              className="group inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-[#6D7CFF] to-[#FF8BCB] px-4 text-xs font-black text-white shadow-[0_14px_32px_-16px_rgba(109,124,255,0.9)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_42px_-16px_rgba(109,124,255,1)] disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => {
+                if (!isAnalystRole) {
+                  return;
+                }
+
+                setRefreshKey((value) => value + 1);
+              }}
+              className="group inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-[#0B4F52] to-[#38BDF8] px-4 text-xs font-black text-white shadow-[0_14px_32px_-16px_rgba(109,124,255,0.9)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_42px_-16px_rgba(109,124,255,1)] disabled:cursor-not-allowed disabled:opacity-50"
             >
               <RefreshCcw
                 className={`h-4 w-4 transition-transform group-hover:rotate-45 ${
@@ -1024,7 +1210,7 @@ export default function AnalystWalletsPage() {
           </div>
         </div>
 
-        <div className="relative mt-5 flex flex-wrap gap-2 border-t border-[#6D7CFF]/10 pt-4 text-[11px] text-slate-500 dark:text-slate-400">
+        <div className="relative mt-5 flex flex-wrap gap-2 border-t border-[#0B4F52]/10 pt-4 text-[11px] text-slate-500 dark:text-slate-400">
           {[
             `Updated ${formatDate(data.generatedAt)}`,
             data.filters.currency,
@@ -1036,7 +1222,7 @@ export default function AnalystWalletsPage() {
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.15 + index * 0.06 }}
-              className="rounded-full border border-[#6D7CFF]/10 bg-white/[0.55] px-3 py-1.5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-950/[0.35]"
+              className="rounded-full border border-[#0B4F52]/10 bg-white/[0.55] px-3 py-1.5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-950/[0.35]"
             >
               {item}
             </motion.span>
@@ -1052,7 +1238,7 @@ export default function AnalystWalletsPage() {
           value={<AnimatedNumber value={data.population.totalWallets} />}
           description="Personal Coffer wallets"
           icon={WalletCards}
-          iconClass="bg-[#6D7CFF]/10 text-[#5B68E8] dark:text-[#AEB7FF]"
+          iconClass="bg-[#0B4F52]/10 text-[#0F766E] dark:text-[#99F6E4]"
         />
 
         <SummaryCard
@@ -1088,7 +1274,7 @@ export default function AnalystWalletsPage() {
           value={data.metrics.engagedWallets.value}
           metric={data.metrics.engagedWallets}
           icon={UserRoundCheck}
-          iconClass="bg-[#6D7CFF]/10 text-[#5B68E8] dark:text-[#AEB7FF]"
+          iconClass="bg-[#0B4F52]/10 text-[#0F766E] dark:text-[#99F6E4]"
         />
 
         <MetricCard
@@ -1096,7 +1282,7 @@ export default function AnalystWalletsPage() {
           value={data.metrics.newWallets.value}
           metric={data.metrics.newWallets}
           icon={WalletCards}
-          iconClass="bg-[#55E6C1]/[0.14] text-[#188E75] dark:text-[#82F3D6]"
+          iconClass="bg-[#22C7B8]/[0.14] text-[#0F766E] dark:text-[#99F6E4]"
         />
 
         <MetricCard
@@ -1104,7 +1290,7 @@ export default function AnalystWalletsPage() {
           value={data.metrics.merchantPayingWallets.value}
           metric={data.metrics.merchantPayingWallets}
           icon={CreditCard}
-          iconClass="bg-[#FF8BCB]/[0.12] text-[#D85AA8] dark:text-[#FFA7D8]"
+          iconClass="bg-[#38BDF8]/[0.12] text-[#D85AA8] dark:text-[#FFA7D8]"
         />
 
         <MetricCard
@@ -1120,7 +1306,7 @@ export default function AnalystWalletsPage() {
           value={data.metrics.repeatEngagedWallets.value}
           metric={data.metrics.repeatEngagedWallets}
           icon={Repeat2}
-          iconClass="bg-[#8AD8FF]/[0.15] text-[#397FAB] dark:text-[#A9E5FF]"
+          iconClass="bg-[#7DD3FC]/[0.15] text-[#397FAB] dark:text-[#A9E5FF]"
         />
 
         <MetricCard
@@ -1128,7 +1314,7 @@ export default function AnalystWalletsPage() {
           value={data.metrics.walletActivityEvents.value}
           metric={data.metrics.walletActivityEvents}
           icon={TrendingUp}
-          iconClass="bg-[#55E6C1]/[0.14] text-[#188E75] dark:text-[#82F3D6]"
+          iconClass="bg-[#22C7B8]/[0.14] text-[#0F766E] dark:text-[#99F6E4]"
         />
 
         <MetricCard
@@ -1136,7 +1322,7 @@ export default function AnalystWalletsPage() {
           value={data.metrics.merchantPaymentCount.value}
           metric={data.metrics.merchantPaymentCount}
           icon={CreditCard}
-          iconClass="bg-[#FF8BCB]/[0.12] text-[#D85AA8] dark:text-[#FFA7D8]"
+          iconClass="bg-[#38BDF8]/[0.12] text-[#D85AA8] dark:text-[#FFA7D8]"
         />
 
         <MetricCard
@@ -1154,7 +1340,7 @@ export default function AnalystWalletsPage() {
         title="Wallet network activity"
         description="Engaged wallets, P2P transfers, merchant payments and new wallet creation. Click a series to isolate it."
         action={
-          <div className="flex items-center gap-1 rounded-xl border border-[#6D7CFF]/[0.15] bg-white/60 p-1 shadow-sm backdrop-blur dark:bg-slate-950/50">
+          <div className="flex items-center gap-1 rounded-xl border border-[#0B4F52]/[0.15] bg-white/60 p-1 shadow-sm backdrop-blur dark:bg-slate-950/50">
             {(
               [
                 { value: "flow", label: "Flow", icon: AreaChartIcon },
@@ -1167,18 +1353,24 @@ export default function AnalystWalletsPage() {
                 <button
                   key={option.value}
                   type="button"
-                  onClick={() => setTrendView(option.value)}
+                  onClick={() => {
+                    if (!isAnalystRole) {
+                      return;
+                    }
+
+                    setTrendView(option.value);
+                  }}
                   className={`relative inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[10px] font-black uppercase tracking-wide transition ${
                     active
                       ? "text-white"
-                      : "text-slate-500 hover:text-[#5B68E8] dark:text-slate-400"
+                      : "text-slate-500 hover:text-[#0F766E] dark:text-slate-400"
                   }`}
                 >
                   {active ? (
                     <motion.span
                       layoutId="trend-view-pill"
                       transition={{ type: "spring", stiffness: 320, damping: 28 }}
-                      className="absolute inset-0 rounded-lg bg-gradient-to-r from-[#6D7CFF] to-[#FF8BCB]"
+                      className="absolute inset-0 rounded-lg bg-gradient-to-r from-[#0B4F52] to-[#38BDF8]"
                     />
                   ) : null}
 
@@ -1206,7 +1398,7 @@ export default function AnalystWalletsPage() {
                     className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-wide transition ${
                       hidden
                         ? "border-slate-200 bg-transparent text-slate-400 dark:border-white/10"
-                        : "border-[#6D7CFF]/15 bg-white/70 text-[#33415C] shadow-sm dark:bg-slate-950/50 dark:text-slate-200"
+                        : "border-[#0B4F52]/15 bg-white/70 text-[#17324D] shadow-sm dark:bg-slate-950/50 dark:text-slate-200"
                     }`}
                   >
                     <motion.span
@@ -1225,7 +1417,7 @@ export default function AnalystWalletsPage() {
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, ease: easeOut }}
-              className="h-[360px] rounded-2xl bg-gradient-to-b from-[#6D7CFF]/[0.025] to-transparent p-1"
+              className="h-[360px] rounded-2xl bg-gradient-to-b from-[#0B4F52]/[0.025] to-transparent p-1"
             >
               <ResponsiveContainer width="100%" height="100%">
                 {trendView === "flow" ? (
@@ -1374,7 +1566,7 @@ export default function AnalystWalletsPage() {
                       delay: index * 0.09,
                       ease: easeOut,
                     }}
-                    className="relative h-full overflow-hidden rounded-full bg-gradient-to-r from-[#6D7CFF] via-[#FF8BCB] to-[#55E6C1] shadow-[0_0_18px_rgba(109,124,255,0.24)]"
+                    className="relative h-full overflow-hidden rounded-full bg-gradient-to-r from-[#0B4F52] via-[#38BDF8] to-[#22C7B8] shadow-[0_0_18px_rgba(109,124,255,0.24)]"
                   >
                     {/* travelling shimmer along the filled bar */}
                     <motion.span
@@ -1400,7 +1592,7 @@ export default function AnalystWalletsPage() {
           description="Completed wallet activity by use case. Hover a bar to highlight it."
         >
           {usageData.some((item) => item.count > 0) ? (
-            <div className="h-[280px] rounded-2xl bg-gradient-to-b from-[#FF8BCB]/[0.025] to-transparent p-1">
+            <div className="h-[280px] rounded-2xl bg-gradient-to-b from-[#38BDF8]/[0.025] to-transparent p-1">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
                   data={usageData}
@@ -1506,12 +1698,12 @@ export default function AnalystWalletsPage() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             whileHover={{ y: -4 }}
-            className="flex h-full flex-col justify-center rounded-2xl border border-[#6D7CFF]/10 bg-gradient-to-br from-white/90 to-[#6D7CFF]/[0.035] p-4 text-center shadow-sm transition hover:border-[#6D7CFF]/25 dark:from-slate-950/80 dark:to-[#6D7CFF]/[0.04]"
+            className="flex h-full flex-col justify-center rounded-2xl border border-[#0B4F52]/10 bg-gradient-to-br from-white/90 to-[#0B4F52]/[0.035] p-4 text-center shadow-sm transition hover:border-[#0B4F52]/25 dark:from-slate-950/80 dark:to-[#0B4F52]/[0.04]"
           >
             <motion.div
               animate={{ y: [0, -4, 0] }}
               transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-[#6D7CFF]/10 text-[#5B68E8] dark:text-[#AEB7FF]"
+              className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-[#0B4F52]/10 text-[#0F766E] dark:text-[#99F6E4]"
             >
               <Activity className="h-5 w-5" />
             </motion.div>
@@ -1519,7 +1711,7 @@ export default function AnalystWalletsPage() {
             <AnimatedNumber
               value={Number(data.engagement.transactionsPerEngagedWallet) || 0}
               format={(current) => current.toFixed(2)}
-              className="mt-3 block text-2xl font-black tabular-nums text-[#33415C] dark:text-slate-50"
+              className="mt-3 block text-2xl font-black tabular-nums text-[#17324D] dark:text-slate-50"
             />
 
             <p className="mt-1 text-[10px] font-black uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400">
@@ -1572,7 +1764,7 @@ export default function AnalystWalletsPage() {
             }
             description="Average across matching wallets"
             icon={WalletCards}
-            iconClass="bg-[#6D7CFF]/10 text-[#5B68E8] dark:text-[#AEB7FF]"
+            iconClass="bg-[#0B4F52]/10 text-[#0F766E] dark:text-[#99F6E4]"
           />
         </div>
       </Panel>
@@ -1600,7 +1792,7 @@ export default function AnalystWalletsPage() {
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.08 }}
                 whileHover={{ y: -4 }}
-                className="flex h-full flex-col rounded-2xl border border-[#6D7CFF]/10 bg-gradient-to-br from-white/90 to-[#6D7CFF]/[0.035] p-4 shadow-sm transition hover:border-[#6D7CFF]/25 dark:from-slate-950/80 dark:to-[#6D7CFF]/[0.04]"
+                className="flex h-full flex-col rounded-2xl border border-[#0B4F52]/10 bg-gradient-to-br from-white/90 to-[#0B4F52]/[0.035] p-4 shadow-sm transition hover:border-[#0B4F52]/25 dark:from-slate-950/80 dark:to-[#0B4F52]/[0.04]"
               >
                 <span
                   className={`inline-flex w-fit rounded-full px-2.5 py-1 text-[9px] font-black ${className}`}
@@ -1620,7 +1812,7 @@ export default function AnalystWalletsPage() {
                       whileInView={{ width: `${Math.min(item.percentage, 100)}%` }}
                       viewport={{ once: true }}
                       transition={{ duration: 0.9, delay: index * 0.08, ease: easeOut }}
-                      className="h-full rounded-full bg-gradient-to-r from-[#6D7CFF] to-[#55E6C1]"
+                      className="h-full rounded-full bg-gradient-to-r from-[#0B4F52] to-[#22C7B8]"
                     />
                   </div>
 
@@ -1640,7 +1832,7 @@ export default function AnalystWalletsPage() {
         title="Wallet intelligence"
         description="Deterministic signals derived from real Coffer wallet activity."
         action={
-          <span className="inline-flex items-center gap-2 rounded-xl border border-[#6D7CFF]/[0.15] bg-[#6D7CFF]/[0.075] px-3 py-1.5 text-[10px] font-black text-[#5B68E8] shadow-sm dark:text-[#B6BEFF]">
+          <span className="inline-flex items-center gap-2 rounded-xl border border-[#0B4F52]/[0.15] bg-[#0B4F52]/[0.075] px-3 py-1.5 text-[10px] font-black text-[#0F766E] shadow-sm dark:text-[#A7F3D0]">
             <motion.span
               animate={{ rotate: [0, 360] }}
               transition={{ duration: 14, repeat: Infinity, ease: "linear" }}
@@ -1668,21 +1860,21 @@ export default function AnalystWalletsPage() {
         initial={{ opacity: 0, y: 10 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        className="relative overflow-hidden rounded-[24px] border border-[#6D7CFF]/10 bg-white/[0.78] p-5 shadow-[0_18px_55px_-40px_rgba(85,102,242,0.5)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70"
+        className="relative overflow-hidden rounded-[24px] border border-[#0B4F52]/10 bg-white/[0.78] p-5 shadow-[0_18px_55px_-40px_rgba(85,102,242,0.5)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70"
       >
         <div className="flex gap-3">
-          <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-[#5B68E8]" />
+          <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-[#0F766E]" />
 
           <div className="min-w-0">
-            <p className="text-xs font-extrabold text-[#33415C] dark:text-slate-100">
+            <p className="text-xs font-extrabold text-[#17324D] dark:text-slate-100">
               Privacy-safe wallet analytics
             </p>
 
-            <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
+            <p className="mt-1 break-words text-[11px] leading-5 text-muted-foreground [overflow-wrap:anywhere]">
               {data.privacy.note}
             </p>
 
-            <p className="mt-1 text-[11px] leading-5 text-muted-foreground">{data.scopeNote}</p>
+            <p className="mt-1 break-words text-[11px] leading-5 text-muted-foreground [overflow-wrap:anywhere]">{data.scopeNote}</p>
           </div>
         </div>
       </motion.div>

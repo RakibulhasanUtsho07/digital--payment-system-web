@@ -3,11 +3,17 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
+  AnimatePresence,
   motion,
 } from "framer-motion";
 
@@ -22,6 +28,8 @@ import {
   CircleAlert,
   CircleCheckBig,
   CircleDollarSign,
+  ChevronDown,
+  Check,
   Clock3,
   CreditCard,
   Database,
@@ -51,6 +59,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   getAnalystLivePulse,
@@ -258,7 +274,7 @@ function insightClasses(severity: AnalystInsight["severity"]): string {
     case "positive":
       return "border-emerald-200 bg-emerald-50/80 dark:border-emerald-900/60 dark:bg-emerald-950/25";
     case "info":
-      return "border-violet-200 bg-violet-50/80 dark:border-violet-900/60 dark:bg-violet-950/25";
+      return "border-[#BFE4E1] bg-[#F3FAF9] dark:border-cyan-900/50 dark:bg-cyan-950/15";
   }
 }
 
@@ -334,7 +350,7 @@ function Surface({
   return (
     <motion.section
       variants={itemVariants}
-      className={`rounded-[26px] border border-[#DCE7E5] bg-white/95 shadow-[0_14px_42px_rgba(23,50,77,0.065)] ring-1 ring-white/70 backdrop-blur-xl transition-[border-color,box-shadow,transform] duration-300 hover:border-[#B9E8E1] hover:shadow-[0_18px_48px_rgba(15,157,145,0.09)] dark:border-slate-800 dark:bg-slate-950/95 dark:ring-white/5 ${className}`}
+      className={`min-w-0 rounded-[22px] border border-[#DCE7E5] bg-white/95 shadow-[0_12px_34px_rgba(23,50,77,0.055)] ring-1 ring-white/70 backdrop-blur-xl transition-[border-color,box-shadow,transform] duration-300 hover:border-[#C2DDD9] hover:shadow-[0_16px_42px_rgba(11,79,82,0.08)] dark:border-slate-800 dark:bg-slate-950/95 dark:ring-white/5 sm:rounded-[26px] ${className}`}
     >
       {children}
     </motion.section>
@@ -376,8 +392,8 @@ function SectionHeading({
   } as const;
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-      <div className="flex min-w-0 gap-3">
+    <div className="flex min-w-0 flex-col gap-3 md:flex-row md:items-start md:justify-between">
+      <div className="flex min-w-0 flex-1 gap-3">
         {Icon ? (
           <div
             className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${accents[accent].icon}`}
@@ -395,19 +411,358 @@ function SectionHeading({
             </p>
           ) : null}
 
-          <h2 className="mt-0.5 text-lg font-black tracking-[-0.02em] text-[#17324D] dark:text-white sm:text-xl">
+          <h2 className="mt-0.5 break-words text-lg font-black leading-tight tracking-[-0.02em] text-[#17324D] [overflow-wrap:anywhere] dark:text-white sm:text-xl">
             {title}
           </h2>
 
           {description ? (
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+            <p className="mt-1 max-w-3xl break-words text-sm leading-6 text-slate-500 [overflow-wrap:anywhere] dark:text-slate-400">
               {description}
             </p>
           ) : null}
         </div>
       </div>
 
-      {trailing ? <div className="shrink-0">{trailing}</div> : null}
+      {trailing ? <div className="min-w-0 w-full md:w-auto md:max-w-[48%]">{trailing}</div> : null}
+    </div>
+  );
+}
+
+
+interface AnalystSelectOption {
+  value: string;
+  label: string;
+}
+
+function AnalystSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: readonly AnalystSelectOption[];
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] =
+    useState(false);
+
+  const rootRef =
+    useRef<HTMLDivElement | null>(
+      null
+    );
+
+  const selected =
+    options.find(
+      (option) =>
+        option.value === value
+    ) ?? options[0];
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const handleOutside = (
+      event: MouseEvent
+    ) => {
+      const target =
+        event.target as Node;
+
+      if (
+        rootRef.current &&
+        !rootRef.current.contains(
+          target
+        )
+      ) {
+        setOpen(false);
+      }
+    };
+
+    const handleEscape = (
+      event: KeyboardEvent
+    ) => {
+      if (
+        event.key === "Escape"
+      ) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener(
+      "mousedown",
+      handleOutside
+    );
+
+    window.addEventListener(
+      "keydown",
+      handleEscape
+    );
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        handleOutside
+      );
+
+      window.removeEventListener(
+        "keydown",
+        handleEscape
+      );
+    };
+  }, [open]);
+
+  return (
+    <div
+      ref={rootRef}
+      className={`
+        relative
+        min-w-0
+
+        ${
+          open
+            ? "z-[120]"
+            : "z-20"
+        }
+      `}
+    >
+      <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">
+        {label}
+      </span>
+
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() =>
+          setOpen(
+            (current) =>
+              !current
+          )
+        }
+        className={`
+          group
+          flex
+          h-12
+          w-full
+          min-w-0
+          items-center
+          justify-between
+          gap-3
+          rounded-[15px]
+          border
+          bg-white
+          px-3.5
+          text-left
+          text-sm
+          font-bold
+          text-[#17324D]
+          shadow-[0_5px_18px_rgba(23,50,77,0.035)]
+          outline-none
+          transition-all
+          duration-200
+
+          hover:bg-[#FBFDFC]
+
+          focus-visible:ring-4
+          focus-visible:ring-[#0B4F52]/10
+
+          dark:bg-slate-900
+          dark:text-white
+          dark:focus-visible:ring-cyan-500/10
+
+          ${
+            open
+              ? "border-[#0B4F52] ring-4 ring-[#0B4F52]/10 dark:border-cyan-700 dark:ring-cyan-500/10"
+              : "border-[#D4E4E1] hover:border-[#AFCFC9] dark:border-slate-700 dark:hover:border-slate-600"
+          }
+        `}
+      >
+        <span className="min-w-0 flex-1 truncate">
+          {
+            selected?.label ??
+            `Select ${label}`
+          }
+        </span>
+
+        <span
+          className={`
+            flex
+            h-7
+            w-7
+            shrink-0
+            items-center
+            justify-center
+            rounded-lg
+            bg-[#0B4F52]/[0.07]
+            text-[#0B4F52]
+            transition-all
+            duration-200
+
+            dark:bg-cyan-400/[0.08]
+            dark:text-cyan-200
+
+            ${
+              open
+                ? "rotate-180 bg-[#0B4F52]/[0.12] dark:bg-cyan-400/[0.12]"
+                : "rotate-0"
+            }
+          `}
+        >
+          <ChevronDown className="h-4 w-4" />
+        </span>
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{
+              opacity: 0,
+              y: -6,
+              scale: 0.985,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+              scale: 1,
+            }}
+            exit={{
+              opacity: 0,
+              y: -5,
+              scale: 0.985,
+            }}
+            transition={{
+              duration: 0.16,
+              ease: [
+                0.22,
+                1,
+                0.36,
+                1,
+              ],
+            }}
+            role="listbox"
+            aria-label={label}
+            className="
+              absolute
+              left-0
+              right-0
+              top-[calc(100%+8px)]
+              z-[100]
+              max-h-64
+              overflow-y-auto
+              rounded-[16px]
+              border
+              border-[#D4E4E1]
+              bg-white
+              p-1.5
+              shadow-[0_18px_50px_rgba(23,50,77,0.16)]
+              ring-1
+              ring-white/80
+              backdrop-blur-xl
+
+              dark:border-slate-700
+              dark:bg-slate-900
+              dark:ring-white/5
+            "
+          >
+            {options.map(
+              (
+                option,
+                index
+              ) => {
+                const active =
+                  option.value ===
+                  value;
+
+                return (
+                  <motion.button
+                    key={
+                      option.value
+                    }
+                    type="button"
+                    role="option"
+                    aria-selected={
+                      active
+                    }
+                    initial={{
+                      opacity: 0,
+                      y: 3,
+                    }}
+                    animate={{
+                      opacity: 1,
+                      y: 0,
+                    }}
+                    transition={{
+                      delay:
+                        index * 0.018,
+                      duration:
+                        0.14,
+                    }}
+                    onClick={() => {
+                      onChange(
+                        option.value
+                      );
+                      setOpen(
+                        false
+                      );
+                    }}
+                    className={`
+                      flex
+                      w-full
+                      min-w-0
+                      items-center
+                      justify-between
+                      gap-3
+                      rounded-[11px]
+                      px-3
+                      py-2.5
+                      text-left
+                      text-sm
+                      font-bold
+                      transition-all
+                      duration-150
+
+                      ${
+                        active
+                          ? "bg-[#0B4F52]/[0.09] text-[#0B4F52] dark:bg-cyan-400/[0.10] dark:text-cyan-100"
+                          : "text-slate-600 hover:bg-slate-100/80 hover:text-[#0B4F52] dark:text-slate-300 dark:hover:bg-white/[0.06] dark:hover:text-cyan-100"
+                      }
+                    `}
+                  >
+                    <span className="min-w-0 flex-1 truncate">
+                      {
+                        option.label
+                      }
+                    </span>
+
+                    {active && (
+                      <span
+                        className="
+                          flex
+                          h-6
+                          w-6
+                          shrink-0
+                          items-center
+                          justify-center
+                          rounded-lg
+                          bg-[#0B4F52]
+                          text-white
+                          shadow-[0_5px_14px_rgba(11,79,82,.20)]
+
+                          dark:bg-cyan-700
+                        "
+                      >
+                        <Check className="h-3.5 w-3.5" />
+                      </span>
+                    )}
+                  </motion.button>
+                );
+              }
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -425,7 +780,7 @@ function StatusPill({
 
   return (
     <span
-      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold ${config.className}`}
+      className={`inline-flex max-w-full items-center gap-2 whitespace-normal rounded-full border px-3 py-1.5 text-xs font-bold ${config.className}`}
     >
       <span className="relative flex h-2 w-2">
         {live ? (
@@ -486,7 +841,7 @@ function MetricCard({
       variants={itemVariants}
       whileHover={{ y: -4 }}
       transition={{ duration: 0.2 }}
-      className="group relative overflow-hidden rounded-[24px] border border-[#DCE7E5] bg-white/95 p-5 shadow-[0_10px_30px_rgba(23,50,77,0.055)] ring-1 ring-white/80 backdrop-blur-xl transition-[border-color,box-shadow] duration-300 hover:border-[#A7E7DE] hover:shadow-[0_18px_46px_rgba(15,157,145,0.12)] dark:border-slate-800 dark:bg-slate-950/95 dark:ring-white/5"
+      className="group relative min-w-0 overflow-hidden rounded-[22px] border border-[#DCE7E5] bg-white/95 p-4 shadow-[0_8px_26px_rgba(23,50,77,0.05)] ring-1 ring-white/80 backdrop-blur-xl transition-[border-color,box-shadow] duration-300 hover:border-[#BEDBD7] hover:shadow-[0_14px_38px_rgba(11,79,82,0.09)] dark:border-slate-800 dark:bg-slate-950/95 dark:ring-white/5 sm:rounded-[24px] sm:p-5"
     >
       <div
         className={`absolute inset-x-0 top-0 h-1 ${accentConfig[accent].line}`}
@@ -496,12 +851,12 @@ function MetricCard({
         aria-hidden="true"
       />
 
-      <div className="flex items-start justify-between gap-4">
-        <div>
+      <div className="relative z-10 flex min-w-0 items-start justify-between gap-3 sm:gap-4">
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
             {label}
           </p>
-          <p className="mt-3 text-2xl font-black tracking-tight text-[#17324D] dark:text-white">
+          <p className="mt-3 break-words text-xl font-black leading-tight tracking-tight text-[#17324D] [overflow-wrap:anywhere] dark:text-white sm:text-2xl">
             {value}
           </p>
         </div>
@@ -513,14 +868,14 @@ function MetricCard({
         </div>
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-3">
-        <span className={`inline-flex items-center gap-1 text-xs font-bold ${trend.className}`}>
+      <div className="relative z-10 mt-4 flex min-w-0 flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+        <span className={`inline-flex min-w-0 flex-wrap items-center gap-1 text-xs font-bold ${trend.className}`}>
           <TrendIcon className="h-3.5 w-3.5" />
           {metricChange(metric)}
         </span>
 
         {helper ? (
-          <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500">
+          <span className="break-words text-[11px] font-medium text-slate-400 [overflow-wrap:anywhere] dark:text-slate-500 sm:text-right">
             {helper}
           </span>
         ) : null}
@@ -549,11 +904,11 @@ function RatioRow({
 
   return (
     <div>
-      <div className="mb-2 flex items-center justify-between gap-4 text-sm">
-        <span className="font-medium text-slate-600 dark:text-slate-300">
+      <div className="mb-2 flex min-w-0 items-start justify-between gap-3 text-sm">
+        <span className="min-w-0 break-words font-medium text-slate-600 [overflow-wrap:anywhere] dark:text-slate-300">
           {label}
         </span>
-        <span className="font-extrabold text-[#17324D] dark:text-white">
+        <span className="shrink-0 font-extrabold text-[#17324D] dark:text-white">
           {formatPercent(value)}
         </span>
       </div>
@@ -591,22 +946,22 @@ function MiniStat({
   } as const;
 
   return (
-    <div className="rounded-2xl border border-[#DCE7E5] bg-[linear-gradient(180deg,#FFFFFF_0%,#F7FBFA_100%)] p-4 shadow-[0_8px_22px_rgba(23,50,77,0.035)] transition duration-300 hover:-translate-y-0.5 hover:border-[#B9E8E1] dark:border-slate-800 dark:bg-slate-900/70">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+    <div className="min-w-0 rounded-2xl border border-[#DCE7E5] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFA_100%)] p-3.5 shadow-[0_7px_20px_rgba(23,50,77,0.03)] transition duration-300 hover:-translate-y-0.5 hover:border-[#C2DDD9] dark:border-slate-800 dark:bg-slate-900/70 sm:p-4">
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <p className="min-w-0 break-words text-xs font-semibold leading-5 text-slate-500 [overflow-wrap:anywhere] dark:text-slate-400">
           {label}
         </p>
         <div
-          className={`flex h-8 w-8 items-center justify-center rounded-xl ${accents[accent]}`}
+          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${accents[accent]}`}
         >
           <Icon className="h-4 w-4" />
         </div>
       </div>
-      <p className="mt-2 text-xl font-black tracking-tight text-[#17324D] dark:text-white">
+      <p className="mt-2 break-words text-lg font-black leading-tight tracking-tight text-[#17324D] [overflow-wrap:anywhere] dark:text-white sm:text-xl">
         {value}
       </p>
       {helper ? (
-        <p className="mt-1 text-[11px] leading-5 text-slate-400 dark:text-slate-500">
+        <p className="mt-1 break-words text-[11px] leading-5 text-slate-400 [overflow-wrap:anywhere] dark:text-slate-500">
           {helper}
         </p>
       ) : null}
@@ -655,7 +1010,7 @@ function BreakdownList({
                 {formatNumber(item.count)} records
               </p>
             </div>
-            <span className="text-sm font-extrabold text-[#17324D] dark:text-white">
+            <span className="shrink-0 text-sm font-extrabold text-[#17324D] dark:text-white">
               {formatPercent(item.percentage)}
             </span>
           </div>
@@ -701,7 +1056,7 @@ function PaymentChartTooltip({
   }
 
   return (
-    <div className="rounded-2xl border border-[#CDEAE5] bg-white/95 p-3 shadow-[0_16px_42px_rgba(23,50,77,0.14)] backdrop-blur-xl dark:border-slate-700 dark:bg-slate-950/95">
+    <div className="max-w-[280px] rounded-2xl border border-[#CDEAE5] bg-white/95 p-3 shadow-[0_16px_42px_rgba(23,50,77,0.14)] backdrop-blur-xl dark:border-slate-700 dark:bg-slate-950/95 sm:max-w-[320px]">
       <p className="mb-2 text-xs font-bold text-slate-500 dark:text-slate-400">
         {label ? formatBucket(label) : ""}
       </p>
@@ -709,16 +1064,16 @@ function PaymentChartTooltip({
         {payload.map((entry) => (
           <div
             key={String(entry.dataKey)}
-            className="flex items-center justify-between gap-6 text-xs"
+            className="flex min-w-0 items-center justify-between gap-3 text-xs"
           >
-            <span className="inline-flex items-center gap-2 text-slate-600 dark:text-slate-300">
+            <span className="inline-flex min-w-0 items-center gap-2 text-slate-600 dark:text-slate-300">
               <span
                 className="h-2 w-2 rounded-full"
                 style={{ backgroundColor: entry.color }}
               />
               {entry.name}
             </span>
-            <span className="font-extrabold text-[#17324D] dark:text-white">
+            <span className="shrink-0 font-extrabold text-[#17324D] dark:text-white">
               {formatNumber(Number(entry.value ?? 0))}
             </span>
           </div>
@@ -735,14 +1090,14 @@ function PaymentActivityChart({
 }) {
   if (points.length === 0) {
     return (
-      <div className="flex h-[320px] items-center justify-center rounded-2xl border border-dashed border-[#D4E5E2] text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
+      <div className="flex h-[250px] items-center justify-center rounded-2xl border border-dashed border-[#D4E5E2] px-4 text-center text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400 sm:h-[300px] lg:h-[320px]">
         No trend data available.
       </div>
     );
   }
 
   return (
-    <div className="h-[340px] w-full">
+    <div className="h-[260px] min-w-0 w-full overflow-hidden sm:h-[300px] lg:h-[340px]">
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart
           data={points}
@@ -836,17 +1191,17 @@ function PulseChartTooltip({
   }
 
   return (
-    <div className="rounded-2xl border border-[#BDEDE6] bg-white/95 p-3 shadow-[0_16px_42px_rgba(15,157,145,0.14)] backdrop-blur-xl dark:border-cyan-900/60 dark:bg-slate-950/95">
+    <div className="max-w-[280px] rounded-2xl border border-[#CDEAE5] bg-white/95 p-3 shadow-[0_16px_42px_rgba(11,79,82,0.12)] backdrop-blur-xl dark:border-cyan-900/50 dark:bg-slate-950/95 sm:max-w-[320px]">
       <p className="mb-2 text-xs font-bold text-[#22C7B8]">
         {label ? formatBucket(label) : ""}
       </p>
       {payload.map((entry) => (
         <div
           key={String(entry.dataKey)}
-          className="flex items-center justify-between gap-6 text-xs"
+          className="flex min-w-0 items-center justify-between gap-3 text-xs"
         >
-          <span className="text-slate-600 dark:text-slate-300">{entry.name}</span>
-          <span className="font-extrabold text-[#17324D] dark:text-white">
+          <span className="min-w-0 truncate text-slate-600 dark:text-slate-300">{entry.name}</span>
+          <span className="shrink-0 font-extrabold text-[#17324D] dark:text-white">
             {formatNumber(Number(entry.value ?? 0))}
           </span>
         </div>
@@ -862,14 +1217,14 @@ function LivePulseChart({
 }) {
   if (points.length === 0) {
     return (
-      <div className="flex h-[220px] items-center justify-center rounded-2xl border border-dashed border-cyan-100 text-sm text-slate-500 dark:border-cyan-900/50 dark:text-slate-400">
+      <div className="flex h-[200px] items-center justify-center rounded-2xl border border-dashed border-[#D4E5E2] px-4 text-center text-sm text-slate-500 dark:border-cyan-900/40 dark:text-slate-400 sm:h-[220px]">
         No live timeline available.
       </div>
     );
   }
 
   return (
-    <div className="h-[230px] w-full">
+    <div className="h-[210px] min-w-0 w-full overflow-hidden sm:h-[230px]">
       <ResponsiveContainer width="100%" height="100%">
         <AreaChart
           data={points}
@@ -938,10 +1293,10 @@ function LivePulseChart({
 
 function DashboardSkeleton() {
   return (
-    <div className="min-h-screen bg-[#F4F8F7] p-4 dark:bg-slate-950 sm:p-6 lg:p-8">
-      <div className="mx-auto max-w-[1500px] space-y-6">
+    <div className="min-h-screen bg-[#F4F8F7] p-3 dark:bg-slate-950 sm:p-5 lg:p-7 xl:p-8">
+      <div className="mx-auto max-w-[1500px] space-y-4 sm:space-y-5 lg:space-y-6">
         <div className="h-36 animate-pulse rounded-[28px] bg-[#DDEAE7]/[0.85] dark:bg-slate-800" />
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid min-w-0 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, index) => (
             <div
               key={index}
@@ -963,6 +1318,32 @@ function DashboardSkeleton() {
 ========================================================= */
 
 export default function AnalystDashboardPage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isAnalystRole =
+    user.role === "analyst";
+
+  useEffect(() => {
+    if (isAnalystRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isAnalystRole,
+    router,
+    user.role,
+  ]);
+
   const [range, setRange] = useState<AnalystRange>("30d");
   const [mode, setMode] = useState<AnalystMode>("all");
   const [currencyInput, setCurrencyInput] = useState("BDT");
@@ -980,6 +1361,13 @@ export default function AnalystDashboardPage() {
   const [pulseRefresh, setPulseRefresh] = useState(0);
 
   useEffect(() => {
+    if (!isAnalystRole) {
+      setOverviewLoading(false);
+      setOverview(null);
+      setOverviewError(null);
+      return;
+    }
+
     const controller = new AbortController();
 
     setOverviewLoading(true);
@@ -1014,9 +1402,16 @@ export default function AnalystDashboardPage() {
       });
 
     return () => controller.abort();
-  }, [range, mode, currency, manualRefresh]);
+  }, [isAnalystRole, range, mode, currency, manualRefresh]);
 
   useEffect(() => {
+    if (!isAnalystRole) {
+      setPulseLoading(false);
+      setPulse(null);
+      setPulseError(null);
+      return;
+    }
+
     const controller = new AbortController();
 
     setPulseLoading(true);
@@ -1050,9 +1445,13 @@ export default function AnalystDashboardPage() {
       });
 
     return () => controller.abort();
-  }, [mode, currency, manualRefresh, pulseRefresh]);
+  }, [isAnalystRole, mode, currency, manualRefresh, pulseRefresh]);
 
   useEffect(() => {
+    if (!isAnalystRole) {
+      return;
+    }
+
     const seconds = Math.max(10, pulse?.refreshAfterSeconds ?? 20);
 
     const timer = window.setInterval(() => {
@@ -1060,9 +1459,13 @@ export default function AnalystDashboardPage() {
     }, seconds * 1000);
 
     return () => window.clearInterval(timer);
-  }, [pulse?.refreshAfterSeconds]);
+  }, [isAnalystRole, pulse?.refreshAfterSeconds]);
 
   const applyCurrency = () => {
+    if (!isAnalystRole) {
+      return;
+    }
+
     const next = currencyInput.trim().toUpperCase();
 
     if (!/^[A-Z]{3}$/.test(next)) {
@@ -1075,6 +1478,10 @@ export default function AnalystDashboardPage() {
   };
 
   const refreshAll = () => {
+    if (!isAnalystRole) {
+      return;
+    }
+
     setManualRefresh((current) => current + 1);
   };
 
@@ -1085,6 +1492,26 @@ export default function AnalystDashboardPage() {
       (item) => item.severity === "critical" || item.severity === "high"
     ).length ?? 0;
   }, [overview?.insights]);
+
+  if (!isAnalystRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center px-4">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-teal-500/15 bg-teal-500/10 text-teal-700 shadow-sm dark:text-teal-300">
+            <RefreshCcw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening analyst workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Analyst Overview is available only to analyst accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   if (overviewLoading && !overview) {
     return <DashboardSkeleton />;
@@ -1104,14 +1531,14 @@ export default function AnalystDashboardPage() {
         variants={containerVariants}
         initial="hidden"
         animate="show"
-        className="relative z-10 mx-auto max-w-[1500px] space-y-6 p-4 sm:p-6 lg:p-8"
+        className="relative z-10 mx-auto max-w-[1500px] space-y-4 p-3 sm:space-y-5 sm:p-5 lg:space-y-6 lg:p-7 xl:p-8"
       >
         {/* ===================================================
             HERO
         ==================================================== */}
         <motion.section
           variants={itemVariants}
-          className="relative overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(135deg,#10283F_0%,#0B4F52_47%,#10273A_100%)] p-6 text-white shadow-[0_30px_85px_rgba(9,78,80,0.24)] sm:p-8"
+          className="relative min-w-0 overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(135deg,#10283F_0%,#0B4F52_47%,#10273A_100%)] p-4 text-white shadow-[0_24px_70px_rgba(9,78,80,0.22)] sm:rounded-[28px] sm:p-6 lg:rounded-[32px] lg:p-8"
         >
           <div
             className="pointer-events-none absolute inset-0 opacity-40"
@@ -1142,25 +1569,25 @@ export default function AnalystDashboardPage() {
             aria-hidden="true"
           />
 
-          <div className="relative z-10 flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-            <div className="max-w-3xl">
+          <div className="relative z-10 flex min-w-0 flex-col gap-5 lg:gap-6 xl:flex-row xl:items-end xl:justify-between">
+            <div className="min-w-0 max-w-3xl">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.09] px-3 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] text-[11px] font-bold uppercase tracking-[0.18em] text-white/75 backdrop-blur">
                 <BrainCircuit className="h-3.5 w-3.5 text-[#7CEFE0]" />
                 Coffer intelligence workspace
               </div>
 
-              <h1 className="mt-4 text-3xl font-black tracking-[-0.03em] sm:text-4xl lg:text-5xl">
+              <h1 className="mt-4 break-words text-2xl font-black leading-tight tracking-[-0.03em] [overflow-wrap:anywhere] sm:text-4xl lg:text-5xl">
                 Analyst Overview
               </h1>
 
-              <p className="mt-3 max-w-2xl text-sm leading-7 text-white/[0.72] sm:text-[15px]">
+              <p className="mt-3 max-w-2xl break-words text-sm leading-6 text-white/[0.72] [overflow-wrap:anywhere] sm:text-[15px] sm:leading-7">
                 One read-only view for gateway performance, merchant health,
                 wallet activity, live operations, risk, revenue quality and
                 deterministic intelligence.
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex max-w-full flex-wrap items-center gap-2">
               {overview ? (
                 <StatusPill status={overviewStatus} label="Overview" />
               ) : null}
@@ -1187,12 +1614,12 @@ export default function AnalystDashboardPage() {
             </div>
           </div>
 
-          <div className="relative z-10 mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="relative z-10 mt-6 grid min-w-0 gap-3 sm:grid-cols-2 lg:mt-7 lg:grid-cols-4">
             <div className="rounded-2xl border border-white/[0.12] bg-white/[0.085] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-[#7CEFE0]/[0.35] hover:bg-white/[0.115] hover:shadow-[0_14px_34px_rgba(0,0,0,0.10)]">
               <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/[0.55]">
                 Scope
               </p>
-              <p className="mt-1.5 text-sm font-bold text-white">
+              <p className="mt-1.5 break-words text-sm font-bold leading-5 text-white [overflow-wrap:anywhere]">
                 {RANGE_OPTIONS.find((item) => item.value === range)?.label} · {mode}
               </p>
             </div>
@@ -1200,13 +1627,13 @@ export default function AnalystDashboardPage() {
               <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/[0.55]">
                 Currency
               </p>
-              <p className="mt-1.5 text-sm font-bold text-white">{currency}</p>
+              <p className="mt-1.5 break-words text-sm font-bold leading-5 text-white [overflow-wrap:anywhere]">{currency}</p>
             </div>
             <div className="rounded-2xl border border-white/[0.12] bg-white/[0.085] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-[#7CEFE0]/[0.35] hover:bg-white/[0.115] hover:shadow-[0_14px_34px_rgba(0,0,0,0.10)]">
               <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/[0.55]">
                 Priority signals
               </p>
-              <p className="mt-1.5 text-sm font-bold text-white">
+              <p className="mt-1.5 break-words text-sm font-bold leading-5 text-white [overflow-wrap:anywhere]">
                 {formatNumber(topInsightCount)} high / critical
               </p>
             </div>
@@ -1214,7 +1641,7 @@ export default function AnalystDashboardPage() {
               <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-white/[0.55]">
                 Engine
               </p>
-              <p className="mt-1.5 text-sm font-bold text-white">
+              <p className="mt-1.5 break-words text-sm font-bold leading-5 text-white [overflow-wrap:anywhere]">
                 Deterministic rules
               </p>
             </div>
@@ -1224,68 +1651,140 @@ export default function AnalystDashboardPage() {
         {/* ===================================================
             FILTERS
         ==================================================== */}
-        <Surface className="bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(246,251,250,0.98)_100%)] p-4 sm:p-5">
-          <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-[1fr_1fr_1fr_auto] xl:items-end">
-            <label className="space-y-2">
-              <span className="text-[11px] font-bold uppercase tracking-[0.13em] text-slate-500 dark:text-slate-400">
-                Range
-              </span>
-              <select
-                value={range}
-                onChange={(event) => setRange(event.target.value as AnalystRange)}
-                className="w-full rounded-2xl border border-[#D7E5E2] bg-white px-3 py-2.5 shadow-[0_4px_14px_rgba(23,50,77,0.025)] text-sm font-semibold text-[#17324D] outline-none transition hover:border-[#B6DCD6] focus:border-[#0F9D91] focus:ring-4 focus:ring-[#0F9D91]/10 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-              >
-                {RANGE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+        <Surface className="relative z-40 overflow-visible bg-[linear-gradient(180deg,rgba(255,255,255,0.985)_0%,rgba(248,251,250,0.985)_100%)] p-4 sm:p-5">
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,.78fr)_auto] xl:items-end">
+            <AnalystSelect
+              label="Range"
+              value={range}
+              options={RANGE_OPTIONS}
+              onChange={(nextValue) => {
+                if (!isAnalystRole) {
+                  return;
+                }
 
-            <label className="space-y-2">
-              <span className="text-[11px] font-bold uppercase tracking-[0.13em] text-slate-500 dark:text-slate-400">
-                Environment
-              </span>
-              <select
-                value={mode}
-                onChange={(event) => setMode(event.target.value as AnalystMode)}
-                className="w-full rounded-2xl border border-[#D7E5E2] bg-white px-3 py-2.5 shadow-[0_4px_14px_rgba(23,50,77,0.025)] text-sm font-semibold text-[#17324D] outline-none transition hover:border-[#B6DCD6] focus:border-[#0F9D91] focus:ring-4 focus:ring-[#0F9D91]/10 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-              >
-                {MODE_OPTIONS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+                setRange(
+                  nextValue as AnalystRange
+                );
+              }}
+            />
 
-            <label className="space-y-2">
-              <span className="text-[11px] font-bold uppercase tracking-[0.13em] text-slate-500 dark:text-slate-400">
+            <AnalystSelect
+              label="Environment"
+              value={mode}
+              options={MODE_OPTIONS}
+              onChange={(nextValue) => {
+                if (!isAnalystRole) {
+                  return;
+                }
+
+                setMode(
+                  nextValue as AnalystMode
+                );
+              }}
+            />
+
+            <label className="min-w-0">
+              <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">
                 Currency
               </span>
+
               <input
                 value={currencyInput}
                 maxLength={3}
-                onChange={(event) =>
-                  setCurrencyInput(event.target.value.toUpperCase())
-                }
+                onChange={(event) => {
+                  if (!isAnalystRole) {
+                    return;
+                  }
+
+                  setCurrencyInput(
+                    event.target.value
+                      .replace(/[^a-z]/gi, "")
+                      .slice(0, 3)
+                      .toUpperCase()
+                  );
+                }}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter") {
+                  if (
+                    event.key === "Enter"
+                  ) {
                     applyCurrency();
                   }
                 }}
-                className="w-full rounded-2xl border border-[#D7E5E2] bg-white px-3 py-2.5 shadow-[0_4px_14px_rgba(23,50,77,0.025)] text-sm font-semibold uppercase text-[#17324D] outline-none transition hover:border-[#B6DCD6] focus:border-[#0F9D91] focus:ring-4 focus:ring-[#0F9D91]/10 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                className="
+                  h-12
+                  w-full
+                  min-w-0
+                  rounded-[15px]
+                  border
+                  border-[#D4E4E1]
+                  bg-white
+                  px-3.5
+                  text-sm
+                  font-bold
+                  uppercase
+                  tracking-[0.08em]
+                  text-[#17324D]
+                  shadow-[0_5px_18px_rgba(23,50,77,0.035)]
+                  outline-none
+                  transition-all
+                  duration-200
+
+                  placeholder:font-semibold
+                  placeholder:tracking-normal
+                  placeholder:text-slate-400
+
+                  hover:border-[#AFCFC9]
+                  hover:bg-[#FBFDFC]
+
+                  focus:border-[#0B4F52]
+                  focus:ring-4
+                  focus:ring-[#0B4F52]/10
+
+                  dark:border-slate-700
+                  dark:bg-slate-900
+                  dark:text-white
+                  dark:hover:border-slate-600
+                  dark:focus:border-cyan-700
+                  dark:focus:ring-cyan-500/10
+                "
                 placeholder="BDT"
               />
             </label>
 
             <motion.button
               type="button"
-              whileHover={{ y: -1 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={applyCurrency}
-              className="rounded-2xl bg-[linear-gradient(135deg,#0F9D91_0%,#14B8A6_58%,#2DD4BF_100%)] px-5 py-2.5 text-sm font-bold text-white shadow-[0_10px_28px_rgba(15,157,145,0.28)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_15px_36px_rgba(15,157,145,0.34)]"
+              whileHover={{
+                y: -1,
+              }}
+              whileTap={{
+                scale: 0.985,
+              }}
+              onClick={
+                applyCurrency
+              }
+              className="
+                h-12
+                w-full
+                rounded-[15px]
+                border
+                border-[#0B4F52]/10
+                bg-[linear-gradient(135deg,#10283F_0%,#0B4F52_58%,#0F766E_100%)]
+                px-5
+                text-sm
+                font-extrabold
+                text-white
+                shadow-[0_10px_26px_rgba(11,79,82,0.22)]
+                transition-all
+                duration-300
+
+                hover:brightness-105
+                hover:shadow-[0_14px_34px_rgba(11,79,82,0.28)]
+
+                sm:col-span-2
+                xl:col-span-1
+                xl:w-auto
+                xl:min-w-[142px]
+              "
             >
               Apply filters
             </motion.button>
@@ -1298,12 +1797,12 @@ export default function AnalystDashboardPage() {
         {overviewError ? (
           <motion.div
             variants={itemVariants}
-            className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200"
+            className="flex min-w-0 items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200"
           >
             <CircleAlert className="mt-0.5 h-5 w-5 shrink-0" />
-            <div>
+            <div className="min-w-0">
               <p className="font-bold">Overview error</p>
-              <p className="mt-1 opacity-90">{overviewError}</p>
+              <p className="mt-1 break-words opacity-90 [overflow-wrap:anywhere]">{overviewError}</p>
             </div>
           </motion.div>
         ) : null}
@@ -1311,12 +1810,12 @@ export default function AnalystDashboardPage() {
         {pulseError ? (
           <motion.div
             variants={itemVariants}
-            className="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200"
+            className="flex min-w-0 items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200"
           >
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
-            <div>
+            <div className="min-w-0">
               <p className="font-bold">Live pulse unavailable</p>
-              <p className="mt-1 opacity-90">{pulseError}</p>
+              <p className="mt-1 break-words opacity-90 [overflow-wrap:anywhere]">{pulseError}</p>
             </div>
           </motion.div>
         ) : null}
@@ -1408,7 +1907,7 @@ export default function AnalystDashboardPage() {
             {/* ===================================================
                 MAIN PERFORMANCE CHART + EXECUTIVE RATIOS
             ==================================================== */}
-            <div className="grid gap-6 xl:grid-cols-[1.45fr_0.75fr]">
+            <div className="grid min-w-0 items-start gap-4 sm:gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,0.75fr)] xl:gap-6">
               <Surface className="p-5 sm:p-6">
                 <SectionHeading
                   eyebrow="Gateway performance"
@@ -1417,7 +1916,7 @@ export default function AnalystDashboardPage() {
                   icon={Activity}
                   accent="indigo"
                   trailing={
-                    <div className="flex flex-wrap gap-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                    <div className="flex max-w-full flex-wrap gap-x-3 gap-y-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
                       <span className="inline-flex items-center gap-1.5">
                         <span className="h-2.5 w-2.5 rounded-full bg-[#17324D]" />
                         Attempts
@@ -1434,7 +1933,7 @@ export default function AnalystDashboardPage() {
                   }
                 />
 
-                <div className="mt-5">
+                <div className="mt-4 min-w-0 overflow-hidden sm:mt-5">
                   <PaymentActivityChart points={overview.trend} />
                 </div>
               </Surface>
@@ -1448,7 +1947,7 @@ export default function AnalystDashboardPage() {
                   accent="navy"
                 />
 
-                <div className="mt-6 space-y-5">
+                <div className="mt-5 space-y-4 sm:mt-6 sm:space-y-5">
                   <RatioRow
                     label="Payment failure rate"
                     value={overview.executive.paymentFailureRate}
@@ -1476,17 +1975,17 @@ export default function AnalystDashboardPage() {
                   />
                 </div>
 
-                <div className="mt-6 rounded-2xl border border-[#0F9D91]/10 bg-[#0F9D91]/5 p-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
+                <div className="mt-5 rounded-2xl border border-[#0B4F52]/10 bg-[#0B4F52]/[0.045] p-4 sm:mt-6">
+                  <div className="flex min-w-0 flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
                       <p className="text-xs font-bold uppercase tracking-[0.12em] text-[#0F9D91]">
                         In-progress gateway payments
                       </p>
-                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                      <p className="mt-1 break-words text-xs text-slate-500 [overflow-wrap:anywhere] dark:text-slate-400">
                         Current unresolved payment attempts
                       </p>
                     </div>
-                    <span className="text-2xl font-black text-[#17324D] dark:text-white">
+                    <span className="shrink-0 text-2xl font-black text-[#17324D] dark:text-white">
                       {formatNumber(overview.executive.pendingPaymentCount)}
                     </span>
                   </div>
@@ -1497,7 +1996,7 @@ export default function AnalystDashboardPage() {
             {/* ===================================================
                 USERS / WALLET + MERCHANT
             ==================================================== */}
-            <div className="grid gap-6 xl:grid-cols-2">
+            <div className="grid min-w-0 items-start gap-4 sm:gap-5 xl:grid-cols-2 xl:gap-6">
               <Surface className="p-5 sm:p-6">
                 <SectionHeading
                   eyebrow="Coffer ecosystem"
@@ -1507,7 +2006,7 @@ export default function AnalystDashboardPage() {
                   accent="cyan"
                 />
 
-                <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="mt-5 grid min-w-0 gap-3 sm:grid-cols-2 2xl:grid-cols-4">
                   <MiniStat
                     label="Active users"
                     value={formatNumber(overview.accounts.activeUsers)}
@@ -1535,8 +2034,8 @@ export default function AnalystDashboardPage() {
                   />
                 </div>
 
-                <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl border border-cyan-100 bg-cyan-50/50 p-4 dark:border-cyan-900/40 dark:bg-cyan-950/15">
+                <div className="mt-4 grid min-w-0 gap-3 sm:mt-5 sm:grid-cols-2">
+                  <div className="min-w-0 rounded-2xl border border-[#D5E8E5] bg-[#F6FAF9] p-4 dark:border-cyan-900/35 dark:bg-cyan-950/10">
                     <div className="flex items-center gap-2 text-[#22C7B8]">
                       <Activity className="h-4 w-4" />
                       <p className="text-xs font-bold uppercase tracking-[0.12em]">
@@ -1546,12 +2045,12 @@ export default function AnalystDashboardPage() {
                     <p className="mt-2 text-2xl font-black text-[#17324D] dark:text-white">
                       {formatNumber(overview.metrics.walletTransactionCount.value)}
                     </p>
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    <p className="mt-1 break-words text-xs text-slate-500 [overflow-wrap:anywhere] dark:text-slate-400">
                       {formatPercent(overview.executive.walletTransactionFailureRate)} failure rate
                     </p>
                   </div>
 
-                  <div className="rounded-2xl border border-violet-100 bg-violet-50/50 p-4 dark:border-violet-900/40 dark:bg-violet-950/15">
+                  <div className="min-w-0 rounded-2xl border border-[#D7E5EA] bg-[#F6F9FA] p-4 dark:border-sky-900/35 dark:bg-sky-950/10">
                     <div className="flex items-center gap-2 text-[#38BDF8]">
                       <ShieldAlert className="h-4 w-4" />
                       <p className="text-xs font-bold uppercase tracking-[0.12em]">
@@ -1561,7 +2060,7 @@ export default function AnalystDashboardPage() {
                     <p className="mt-2 text-2xl font-black text-[#17324D] dark:text-white">
                       {formatNumber(overview.operations.highRiskTransactionCount)}
                     </p>
-                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    <p className="mt-1 break-words text-xs text-slate-500 [overflow-wrap:anywhere] dark:text-slate-400">
                       {formatPercent(overview.executive.highRiskTransactionRate)} high-risk share
                     </p>
                   </div>
@@ -1577,7 +2076,7 @@ export default function AnalystDashboardPage() {
                   accent="indigo"
                 />
 
-                <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="mt-5 grid min-w-0 gap-3 sm:grid-cols-2 2xl:grid-cols-4">
                   <MiniStat
                     label="Total"
                     value={formatNumber(overview.merchantHealth.totalMerchants)}
@@ -1604,7 +2103,7 @@ export default function AnalystDashboardPage() {
                   />
                 </div>
 
-                <div className="mt-6 space-y-5">
+                <div className="mt-5 space-y-4 sm:mt-6 sm:space-y-5">
                   <RatioRow
                     label="Activation rate"
                     value={overview.merchantHealth.activationRate}
@@ -1628,7 +2127,7 @@ export default function AnalystDashboardPage() {
                 LIVE PLATFORM PULSE
             ==================================================== */}
             <Surface className="overflow-hidden">
-              <div className="border-b border-cyan-100 bg-gradient-to-r from-cyan-50/80 via-white to-white p-5 dark:border-cyan-900/40 dark:from-cyan-950/20 dark:via-slate-950 dark:to-slate-950 sm:p-6">
+              <div className="border-b border-[#DCE7E5] bg-[linear-gradient(90deg,rgba(15,157,145,.065),rgba(255,255,255,.96)_48%,rgba(56,189,248,.04))] p-4 dark:border-cyan-900/35 dark:bg-[linear-gradient(90deg,rgba(15,157,145,.08),rgba(2,6,23,.96)_55%,rgba(56,189,248,.04))] sm:p-6">
                 <SectionHeading
                   eyebrow="Signal cyan · live data"
                   title="Live platform pulse"
@@ -1637,7 +2136,7 @@ export default function AnalystDashboardPage() {
                   accent="cyan"
                   trailing={
                     pulse ? (
-                      <div className="text-right text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                      <div className="max-w-full break-words text-left text-[11px] font-medium text-slate-500 [overflow-wrap:anywhere] dark:text-slate-400 md:text-right">
                         <p>Updated {formatDateTime(pulse.generatedAt)}</p>
                         <p className="mt-1">Refresh every {pulse.refreshAfterSeconds}s</p>
                       </div>
@@ -1646,9 +2145,9 @@ export default function AnalystDashboardPage() {
                 />
               </div>
 
-              <div className="p-5 sm:p-6">
+              <div className="p-4 sm:p-6">
                 {pulseLoading && !pulse ? (
-                  <div className="grid gap-3 sm:grid-cols-4">
+                  <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                     {Array.from({ length: 4 }).map((_, index) => (
                       <div
                         key={index}
@@ -1658,7 +2157,7 @@ export default function AnalystDashboardPage() {
                   </div>
                 ) : pulse ? (
                   <div className="space-y-6">
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
                       <MiniStat
                         label="Attempts / 60 min"
                         value={formatNumber(pulse.windows.last60Minutes.attemptCount)}
@@ -1697,14 +2196,14 @@ export default function AnalystDashboardPage() {
                       />
                     </div>
 
-                    <div className="grid gap-6 xl:grid-cols-[1.35fr_0.85fr]">
-                      <div className="rounded-2xl border border-cyan-100 bg-cyan-50/25 p-4 dark:border-cyan-900/40 dark:bg-cyan-950/10">
-                        <div className="mb-2 flex items-center justify-between gap-3">
+                    <div className="grid min-w-0 items-start gap-4 sm:gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,0.85fr)] xl:gap-6">
+                      <div className="min-w-0 rounded-2xl border border-[#DCE7E5] bg-[#F8FBFA] p-3.5 dark:border-cyan-900/35 dark:bg-cyan-950/10 sm:p-4">
+                        <div className="mb-2 flex min-w-0 flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
                           <div>
-                            <p className="text-sm font-extrabold text-[#17324D] dark:text-white">
+                            <p className="break-words text-sm font-extrabold text-[#17324D] [overflow-wrap:anywhere] dark:text-white">
                               Live attempt flow
                             </p>
-                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            <p className="mt-1 break-words text-xs leading-5 text-slate-500 [overflow-wrap:anywhere] dark:text-slate-400">
                               Attempt and failure activity from the latest live timeline.
                             </p>
                           </div>
@@ -1728,10 +2227,10 @@ export default function AnalystDashboardPage() {
                             <motion.div
                               key={score.key}
                               whileHover={{ x: 3 }}
-                              className="rounded-2xl border border-slate-200/80 bg-white p-4 dark:border-slate-800 dark:bg-slate-950"
+                              className="min-w-0 rounded-2xl border border-[#DCE7E5] bg-white p-4 dark:border-slate-800 dark:bg-slate-950"
                             >
-                              <div className="flex items-center justify-between gap-3">
-                                <p className="text-sm font-bold text-[#17324D] dark:text-white">
+                              <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+                                <p className="min-w-0 break-words text-sm font-bold text-[#17324D] [overflow-wrap:anywhere] dark:text-white">
                                   {score.label}
                                 </p>
                                 <span
@@ -1740,15 +2239,15 @@ export default function AnalystDashboardPage() {
                                   {config.label}
                                 </span>
                               </div>
-                              <div className="mt-2 flex items-end justify-between gap-3">
+                              <div className="mt-2 flex min-w-0 flex-wrap items-end justify-between gap-2">
                                 <p className="text-2xl font-black text-[#17324D] dark:text-white">
                                   {score.score}
                                 </p>
-                                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                                <p className="break-words text-right text-[11px] text-slate-500 [overflow-wrap:anywhere] dark:text-slate-400">
                                   {score.trend}
                                 </p>
                               </div>
-                              <p className="mt-2 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
+                              <p className="mt-2 break-words text-[11px] leading-5 text-slate-500 [overflow-wrap:anywhere] dark:text-slate-400">
                                 {score.basis}
                               </p>
                             </motion.div>
@@ -1768,13 +2267,13 @@ export default function AnalystDashboardPage() {
                             className={`rounded-2xl border p-4 ${alertClasses(alert.severity)}`}
                           >
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                              <div>
-                                <p className="font-bold">{alert.title}</p>
-                                <p className="mt-1 text-sm leading-6 opacity-90">
+                              <div className="min-w-0 flex-1">
+                                <p className="break-words font-bold [overflow-wrap:anywhere]">{alert.title}</p>
+                                <p className="mt-1 break-words text-sm leading-6 opacity-90 [overflow-wrap:anywhere]">
                                   {alert.description}
                                 </p>
                               </div>
-                              <span className="shrink-0 rounded-full bg-white/60 px-2.5 py-1 text-[10px] font-bold dark:bg-black/20">
+                              <span className="max-w-full break-all rounded-full bg-white/60 px-2.5 py-1 text-[10px] font-bold dark:bg-black/20 sm:break-normal">
                                 {alert.metric}
                               </span>
                             </div>
@@ -1782,7 +2281,7 @@ export default function AnalystDashboardPage() {
                         ))}
                       </div>
                     ) : (
-                      <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/25 dark:text-emerald-200">
+                      <div className="flex min-w-0 items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/25 dark:text-emerald-200">
                         <CircleCheckBig className="h-5 w-5" />
                         No live alerts are currently active.
                       </div>
@@ -1808,7 +2307,7 @@ export default function AnalystDashboardPage() {
                 accent="violet"
               />
 
-              <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+              <div className="mt-5 grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-6">
                 <MiniStat
                   label="High-risk transactions"
                   value={formatNumber(overview.riskSummary.highRiskTransactionCount)}
@@ -1859,15 +2358,15 @@ export default function AnalystDashboardPage() {
             {/* ===================================================
                 BREAKDOWNS
             ==================================================== */}
-            <div className="grid gap-6 xl:grid-cols-3">
-              <Surface className="p-5 sm:p-6">
+            <div className="grid min-w-0 gap-4 sm:gap-5 xl:grid-cols-3 xl:items-stretch xl:gap-6">
+              <Surface className="h-full p-5 sm:p-6">
                 <SectionHeading
                   title="Payment status"
                   description="Gateway lifecycle distribution."
                   icon={CreditCard}
                   accent="indigo"
                 />
-                <div className="mt-6">
+                <div className="mt-5">
                   <BreakdownList
                     items={overview.paymentStatus}
                     emptyLabel="No payment status data."
@@ -1876,14 +2375,14 @@ export default function AnalystDashboardPage() {
                 </div>
               </Surface>
 
-              <Surface className="p-5 sm:p-6">
+              <Surface className="h-full p-5 sm:p-6">
                 <SectionHeading
                   title="Provider mix"
                   description="Payment attempt share by provider."
                   icon={Zap}
                   accent="cyan"
                 />
-                <div className="mt-6">
+                <div className="mt-5">
                   <BreakdownList
                     items={overview.providers}
                     emptyLabel="No provider data."
@@ -1892,14 +2391,14 @@ export default function AnalystDashboardPage() {
                 </div>
               </Surface>
 
-              <Surface className="p-5 sm:p-6">
+              <Surface className="h-full p-5 sm:p-6">
                 <SectionHeading
                   title="Transaction risk"
                   description="Wallet transaction risk distribution."
                   icon={ShieldAlert}
                   accent="violet"
                 />
-                <div className="mt-6">
+                <div className="mt-5">
                   <BreakdownList
                     items={overview.transactionRisk}
                     emptyLabel="No wallet-risk data."
@@ -1912,8 +2411,8 @@ export default function AnalystDashboardPage() {
             {/* ===================================================
                 REVENUE + DATA QUALITY
             ==================================================== */}
-            <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-              <Surface className="p-5 sm:p-6">
+            <div className="grid min-w-0 gap-4 sm:gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] xl:items-stretch xl:gap-6">
+              <Surface className="h-full p-5 sm:p-6">
                 <SectionHeading
                   eyebrow="Revenue quality"
                   title="Revenue ledger"
@@ -1922,7 +2421,7 @@ export default function AnalystDashboardPage() {
                   accent="indigo"
                 />
 
-                <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                <div className="mt-5 grid min-w-0 gap-3 sm:grid-cols-2 2xl:grid-cols-3">
                   <MiniStat
                     label="Classified net revenue"
                     value={formatMinor(
@@ -1947,7 +2446,7 @@ export default function AnalystDashboardPage() {
                 </div>
               </Surface>
 
-              <Surface className="p-5 sm:p-6">
+              <Surface className="h-full p-5 sm:p-6">
                 <SectionHeading
                   eyebrow="Freshness"
                   title="Data confidence"
@@ -1956,31 +2455,31 @@ export default function AnalystDashboardPage() {
                   accent="navy"
                 />
 
-                <div className="mt-6 space-y-3">
-                  <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
-                    <div>
+                <div className="mt-5 space-y-3">
+                  <div className="flex min-w-0 flex-col items-start gap-2 rounded-2xl border border-[#E6EFED] bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
                       <p className="text-xs font-semibold text-slate-500">Overview generated</p>
-                      <p className="mt-1 text-sm font-bold text-[#17324D] dark:text-white">
+                      <p className="mt-1 break-words text-sm font-bold text-[#17324D] [overflow-wrap:anywhere] dark:text-white">
                         {formatDateTime(overview.generatedAt)}
                       </p>
                     </div>
                     <Clock3 className="h-5 w-5 text-[#0F9D91]" />
                   </div>
 
-                  <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
-                    <div>
+                  <div className="flex min-w-0 flex-col items-start gap-2 rounded-2xl border border-[#E6EFED] bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
                       <p className="text-xs font-semibold text-slate-500">Latest daily fact</p>
-                      <p className="mt-1 text-sm font-bold text-[#17324D] dark:text-white">
+                      <p className="mt-1 break-words text-sm font-bold text-[#17324D] [overflow-wrap:anywhere] dark:text-white">
                         {formatDateTime(overview.freshness.latestDailyFactGeneratedAt)}
                       </p>
                     </div>
                     <Database className="h-5 w-5 text-[#22C7B8]" />
                   </div>
 
-                  <div className="flex items-center justify-between gap-4 rounded-2xl bg-slate-50 p-4 dark:bg-slate-900">
-                    <div>
+                  <div className="flex min-w-0 flex-col items-start gap-2 rounded-2xl border border-[#E6EFED] bg-slate-50/80 p-4 dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
                       <p className="text-xs font-semibold text-slate-500">Daily fact coverage</p>
-                      <p className="mt-1 text-sm font-bold text-[#17324D] dark:text-white">
+                      <p className="mt-1 break-words text-sm font-bold text-[#17324D] [overflow-wrap:anywhere] dark:text-white">
                         {formatNumber(overview.freshness.dailyFactDaysCovered)} days
                       </p>
                     </div>
@@ -1994,7 +2493,7 @@ export default function AnalystDashboardPage() {
                 INTELLIGENCE
             ==================================================== */}
             <Surface className="overflow-hidden">
-              <div className="border-b border-violet-100 bg-gradient-to-r from-violet-50/80 via-white to-white p-5 dark:border-violet-900/40 dark:from-violet-950/20 dark:via-slate-950 dark:to-slate-950 sm:p-6">
+              <div className="border-b border-[#DCE7E5] bg-[linear-gradient(90deg,rgba(11,79,82,.06),rgba(255,255,255,.97)_52%,rgba(56,189,248,.04))] p-4 dark:border-cyan-900/35 dark:bg-[linear-gradient(90deg,rgba(11,79,82,.08),rgba(2,6,23,.96)_58%,rgba(56,189,248,.04))] sm:p-6">
                 <SectionHeading
                   eyebrow="Insight violet · intelligence"
                   title="Deterministic analyst insights"
@@ -2002,7 +2501,7 @@ export default function AnalystDashboardPage() {
                   icon={BrainCircuit}
                   accent="violet"
                   trailing={
-                    <span className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-white px-3 py-1.5 text-[11px] font-bold text-[#38BDF8] dark:border-violet-900/50 dark:bg-slate-950">
+                    <span className="inline-flex max-w-full items-center gap-2 rounded-full border border-[#CFE4E1] bg-white px-3 py-1.5 text-[11px] font-bold text-[#0B4F52] dark:border-cyan-900/45 dark:bg-slate-950 dark:text-cyan-300">
                       <Sparkles className="h-3.5 w-3.5" />
                       {overview.insights.length} signals
                     </span>
@@ -2010,7 +2509,7 @@ export default function AnalystDashboardPage() {
                 />
               </div>
 
-              <div className="grid gap-4 p-5 sm:p-6 lg:grid-cols-2">
+              <div className="grid min-w-0 items-start gap-3 p-4 sm:gap-4 sm:p-6 xl:grid-cols-2">
                 {overview.insights.length > 0 ? (
                   overview.insights.map((insight, index) => (
                     <motion.article
@@ -2019,17 +2518,17 @@ export default function AnalystDashboardPage() {
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: index * 0.045 }}
                       whileHover={{ y: -3 }}
-                      className={`rounded-2xl border p-5 ${insightClasses(
+                      className={`min-w-0 rounded-2xl border p-4 sm:p-5 ${insightClasses(
                         insight.severity
                       )}`}
                     >
                       <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="flex min-w-0 gap-3">
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/75 text-[#38BDF8] shadow-sm dark:bg-slate-950/60">
+                        <div className="flex min-w-0 flex-1 gap-3">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/75 text-[#0F9D91] shadow-sm dark:bg-slate-950/60">
                             <BrainCircuit className="h-4 w-4" />
                           </div>
-                          <div>
-                            <p className="font-extrabold text-[#17324D] dark:text-white">
+                          <div className="min-w-0">
+                            <p className="break-words font-extrabold text-[#17324D] [overflow-wrap:anywhere] dark:text-white">
                               {insight.title}
                             </p>
                             <p className="mt-1 text-[11px] font-bold uppercase tracking-[0.11em] text-slate-500 dark:text-slate-400">
@@ -2038,26 +2537,26 @@ export default function AnalystDashboardPage() {
                           </div>
                         </div>
 
-                        <span className="rounded-full bg-white/70 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600 dark:bg-slate-900/70 dark:text-slate-300">
+                        <span className="max-w-full shrink-0 rounded-full bg-white/70 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-slate-600 dark:bg-slate-900/70 dark:text-slate-300">
                           {insight.severity}
                         </span>
                       </div>
 
-                      <p className="mt-4 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                      <p className="mt-4 break-words text-sm leading-6 text-slate-600 [overflow-wrap:anywhere] dark:text-slate-300">
                         {insight.description}
                       </p>
 
-                      <div className="mt-4 rounded-xl bg-white/60 p-3 text-xs leading-5 text-slate-700 dark:bg-slate-950/40 dark:text-slate-300">
+                      <div className="mt-4 break-words rounded-xl bg-white/60 p-3 text-xs leading-5 text-slate-700 [overflow-wrap:anywhere] dark:bg-slate-950/40 dark:text-slate-300">
                         <strong>Evidence:</strong> {insight.evidence}
                       </div>
 
-                      <p className="mt-3 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                      <p className="mt-3 break-words text-xs leading-5 text-slate-500 [overflow-wrap:anywhere] dark:text-slate-400">
                         <strong>Review:</strong> {insight.recommendedAction}
                       </p>
                     </motion.article>
                   ))
                 ) : (
-                  <div className="col-span-full flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-sm text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/25 dark:text-emerald-200">
+                  <div className="col-span-full flex min-w-0 items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 dark:border-emerald-900/50 dark:bg-emerald-950/25 dark:text-emerald-200 sm:p-5">
                     <CircleCheckBig className="h-5 w-5" />
                     No deterministic insight signals were generated for this scope.
                   </div>
@@ -2070,23 +2569,23 @@ export default function AnalystDashboardPage() {
             ==================================================== */}
             <motion.div
               variants={itemVariants}
-              className="flex flex-col gap-3 rounded-[24px] border border-[#DCE7E5] bg-white/95 px-5 py-4 shadow-[0_10px_30px_rgba(23,50,77,0.05)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/95 sm:flex-row sm:items-center sm:justify-between"
+              className="flex min-w-0 flex-col gap-3 rounded-[22px] border border-[#DCE7E5] bg-white/95 px-4 py-4 shadow-[0_10px_30px_rgba(23,50,77,0.05)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/95 sm:px-5 lg:flex-row lg:items-center lg:justify-between"
             >
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#38BDF8]/10 text-[#38BDF8]">
+              <div className="flex min-w-0 items-start gap-3 sm:items-center">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#0B4F52]/[0.08] text-[#0B4F52] dark:text-cyan-300">
                   <BrainCircuit className="h-4 w-4" />
                 </div>
-                <div>
-                  <p className="text-sm font-bold text-[#17324D] dark:text-white">
+                <div className="min-w-0">
+                  <p className="break-words text-sm font-bold text-[#17324D] [overflow-wrap:anywhere] dark:text-white">
                     Read-only analyst workspace
                   </p>
-                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                  <p className="mt-0.5 break-words text-xs leading-5 text-slate-500 [overflow-wrap:anywhere] dark:text-slate-400">
                     Insights support review only and cannot execute payment, refund, payout, KYC or configuration actions.
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+              <div className="flex min-w-0 items-start gap-2 break-words text-[11px] font-semibold leading-5 text-slate-500 [overflow-wrap:anywhere] dark:text-slate-400 lg:shrink-0 lg:items-center lg:text-right">
                 <Database className="h-3.5 w-3.5" />
                 Last generated {formatDateTime(overview.generatedAt)}
               </div>
