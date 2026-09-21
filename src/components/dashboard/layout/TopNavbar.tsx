@@ -40,7 +40,6 @@ import {
   Search,
   Settings,
   ShieldCheck,
-  Store,
   Users,
   WalletCards,
   Webhook,
@@ -48,7 +47,6 @@ import {
 } from "lucide-react";
 
 import CofferAiCopilot from "@/components/dashboard/ai/CofferAiCopilot";
-import SupportChat from "@/components/shared/SupportChat";
 
 
 /* =========================================================
@@ -109,7 +107,110 @@ const BRAND_SOFT = `
   )
 `;
 
-const ACCENT = BRAND.highlight;
+
+/* =========================================================
+   ROLE COLOR THEMES
+
+   user + admin + super_admin:
+   keep the existing Coffer brand direction.
+
+   merchant:
+   purple / violet.
+
+   analyst:
+   matches the Analyst hero:
+   #10243A -> #0B4F52 -> #10273A
+
+   support:
+   matches the Support hero:
+   emerald-500 -> emerald-600 -> teal-700
+========================================================= */
+
+interface RoleTheme {
+  gradient: string;
+  softGradient: string;
+  accent: string;
+  accentSecondary: string;
+  border: string;
+  shadow: string;
+  lightText: string;
+  lightMuted: string;
+  glow: string;
+}
+
+const DEFAULT_ROLE_THEME: RoleTheme = {
+  gradient: BRAND_GRADIENT,
+  softGradient: BRAND_SOFT,
+  accent: BRAND.highlight,
+  accentSecondary: "#7c3aed",
+  border: "rgba(91,58,143,0.20)",
+  shadow: "rgba(59,35,104,0.24)",
+  lightText: "#ede9fe",
+  lightMuted: "rgba(237,233,254,0.68)",
+  glow: "rgba(139,92,246,0.30)",
+};
+
+const MERCHANT_ROLE_THEME: RoleTheme = {
+  gradient:
+    "linear-gradient(135deg, #160827 0%, #3b146f 44%, #6d28d9 72%, #7c3aed 100%)",
+  softGradient:
+    "linear-gradient(135deg, rgba(109,40,217,0.10), rgba(124,58,237,0.14))",
+  accent: "#7c3aed",
+  accentSecondary: "#a855f7",
+  border: "rgba(167,139,250,0.28)",
+  shadow: "rgba(91,33,182,0.30)",
+  lightText: "#f3e8ff",
+  lightMuted: "rgba(243,232,255,0.70)",
+  glow: "rgba(168,85,247,0.34)",
+};
+
+const ANALYST_ROLE_THEME: RoleTheme = {
+  gradient:
+    "linear-gradient(135deg, #10243A 0%, #0B4F52 52%, #10273A 100%)",
+  softGradient:
+    "linear-gradient(135deg, rgba(34,211,238,0.08), rgba(20,184,166,0.12))",
+  accent: "#0f9f9a",
+  accentSecondary: "#22d3ee",
+  border: "rgba(103,232,249,0.24)",
+  shadow: "rgba(13,148,136,0.28)",
+  lightText: "#cffafe",
+  lightMuted: "rgba(207,250,254,0.68)",
+  glow: "rgba(34,211,238,0.30)",
+};
+
+const SUPPORT_ROLE_THEME: RoleTheme = {
+  gradient:
+    "linear-gradient(135deg, #10b981 0%, #059669 48%, #0f766e 100%)",
+  softGradient:
+    "linear-gradient(135deg, rgba(16,185,129,0.09), rgba(13,148,136,0.13))",
+  accent: "#059669",
+  accentSecondary: "#14b8a6",
+  border: "rgba(110,231,183,0.30)",
+  shadow: "rgba(16,185,129,0.28)",
+  lightText: "#d1fae5",
+  lightMuted: "rgba(209,250,229,0.72)",
+  glow: "rgba(45,212,191,0.30)",
+};
+
+function getRoleTheme(
+  role: UserRole
+): RoleTheme {
+  if (role === "merchant") {
+    return MERCHANT_ROLE_THEME;
+  }
+
+  if (role === "analyst") {
+    return ANALYST_ROLE_THEME;
+  }
+
+  if (role === "support") {
+    return SUPPORT_ROLE_THEME;
+  }
+
+  return DEFAULT_ROLE_THEME;
+}
+
+
 
 /* =========================================================
    SEARCH ITEMS
@@ -552,11 +653,17 @@ function ProfileAvatar({
   name,
   containerClassName,
   textClassName = "text-[13px]",
+  accent = BRAND.highlight,
+  borderColor = "rgba(91,58,143,0.20)",
+  shadow = "0 6px 18px rgba(59,35,104,0.18)",
 }: {
   avatarUrl?: string;
   name: string;
   containerClassName: string;
   textClassName?: string;
+  accent?: string;
+  borderColor?: string;
+  shadow?: string;
 }) {
   const [
     imageFailed,
@@ -619,15 +726,18 @@ function ProfileAvatar({
         ${containerClassName}
         ${textClassName}
 
+        border
+        bg-card
         font-black
         tracking-tight
-        text-white
+        dark:bg-[#0B0F19]
       `}
       style={{
-        background:
-          BRAND_GRADIENT,
+        color:
+          accent,
+        borderColor,
         boxShadow:
-          "0 6px 18px rgba(59,35,104,0.30)",
+          shadow,
       }}
     >
       {getInitials(name)}
@@ -734,6 +844,15 @@ export default function TopNavbar({
           : userRole === "support"
             ? "Support Center"
             : "My Wallet";
+
+  const roleTheme =
+    getRoleTheme(
+      userRole
+    );
+
+  // Main surfaces always follow the app light/dark theme.
+  // Role colors are accents only: text, icons, borders, badges,
+  // compact controls, and subtle glow details.
 
   /* =======================================================
      SEARCH
@@ -885,7 +1004,7 @@ export default function TopNavbar({
             1,
           ],
         }}
-        className="
+        className={`
           sticky
           top-0
           z-30
@@ -896,25 +1015,25 @@ export default function TopNavbar({
           items-center
 
           border-b
-          border-border
-          dark:border-white/10
-
-          bg-card/95
-          dark:bg-[#070B14]/95
-
-          text-card-foreground
-          dark:text-slate-100
 
           px-4
 
           backdrop-blur-xl
 
-          transition-colors
+          transition-all
           duration-300
 
           sm:px-5
           lg:px-7
-        "
+
+          border-border
+          bg-card/95
+          text-card-foreground
+
+          dark:border-white/10
+          dark:bg-[#070B14]/95
+          dark:text-slate-100
+        `}
       >
         <div
           className="
@@ -952,41 +1071,16 @@ export default function TopNavbar({
                 scale: 0.92,
               }}
               className="
-                flex
-                h-10
-                w-10
-                shrink-0
-                items-center
-                justify-center
-
-                rounded-xl
-
-                border
-                border-border
-                dark:border-white/10
-
-                bg-card
-                dark:bg-[#0B0F19]
-
-                shadow-sm
-
-                transition-all
-
-                hover:bg-muted
-                dark:hover:bg-white/10
-
+                flex h-10 w-10 shrink-0 items-center justify-center rounded-xl
+                border border-border bg-card shadow-sm transition-all hover:bg-muted
+                dark:border-white/10 dark:bg-[#0B0F19] dark:hover:bg-white/10
                 lg:hidden
               "
+              style={{
+                color: roleTheme.accent,
+              }}
             >
-              <Menu
-                className="
-                  h-[18px]
-                  w-[18px]
-
-                  text-[#2e1f4f]
-                  dark:text-slate-200
-                "
-              />
+              <Menu className="h-[18px] w-[18px]" />
             </motion.button>
 
             <div className="min-w-0">
@@ -999,61 +1093,36 @@ export default function TopNavbar({
                 "
               >
                 <span
-                  className="
-                    whitespace-nowrap
-                    text-[9px]
-                    font-extrabold
-                    uppercase
-                    tracking-[0.17em]
-
-                    text-slate-500
-                    dark:text-slate-400
-                  "
+                  className="whitespace-nowrap text-[9px] font-extrabold uppercase tracking-[0.17em] text-slate-500 dark:text-slate-400"
                 >
                   Digital Wallet
                 </span>
 
                 <span
-                  className="
-                    h-1
-                    w-1
-                    shrink-0
-                    rounded-full
-
-                    bg-[#3b2368]
-                    dark:bg-violet-400
-                  "
+                  className="h-1 w-1 shrink-0 rounded-full"
+                  style={{
+                    background:
+                      roleTheme.accent,
+                    boxShadow:
+                      `0 0 10px ${roleTheme.glow}`,
+                  }}
                 />
 
                 <span
-                  className="
-                    whitespace-nowrap
-                    text-[9px]
-                    font-extrabold
-                    uppercase
-                    tracking-[0.17em]
-
-                    text-[#5b3a8f]
-                    dark:text-violet-300
-                  "
+                  className="whitespace-nowrap text-[9px] font-extrabold uppercase tracking-[0.17em]"
+                  style={{
+                    color: roleTheme.accent,
+                  }}
                 >
                   {workspaceLabel}
                 </span>
               </div>
 
               <h1
-                className="
-                  mt-[3px]
-                  truncate
-                  text-[15px]
-                  font-extrabold
-                  tracking-[-0.025em]
-
-                  text-[#2e1f4f]
-                  dark:text-slate-100
-
-                  sm:text-[16px]
-                "
+                className="mt-[3px] truncate text-[15px] font-extrabold tracking-[-0.025em] sm:text-[16px]"
+                style={{
+                  color: roleTheme.accent,
+                }}
               >
                 {currentPageTitle}
               </h1>
@@ -1082,82 +1151,19 @@ export default function TopNavbar({
               whileTap={{
                 scale: 0.995,
               }}
-              className="
-                group
-
-                flex
-                h-[44px]
-                w-full
-                max-w-[540px]
-                items-center
-                gap-3
-
-                rounded-[16px]
-
-                border
-                border-border
-                dark:border-white/10
-
-                bg-muted/40
-                dark:bg-white/[0.04]
-
-                px-3
-
-                text-left
-
-                shadow-sm
-
-                transition-all
-                duration-200
-
-                hover:bg-card
-                dark:hover:bg-white/[0.07]
-              "
+              className="group flex h-[44px] w-full max-w-[540px] items-center gap-3 rounded-[16px] border border-border bg-muted/40 px-3 text-left shadow-sm transition-all duration-200 hover:bg-card dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/[0.07]"
             >
               <span
-                className="
-                  flex
-                  h-8
-                  w-8
-                  shrink-0
-                  items-center
-                  justify-center
-
-                  rounded-[11px]
-
-                  border
-                  border-border
-                  dark:border-white/10
-
-                  bg-card
-                  dark:bg-[#0B0F19]
-
-                  shadow-sm
-                "
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] border border-border bg-card shadow-sm dark:border-white/10 dark:bg-[#0B0F19]"
+                style={{
+                  color: roleTheme.accent,
+                }}
               >
-                <Search
-                  className="
-                    h-[16px]
-                    w-[16px]
-
-                    text-[#5b3a8f]
-                    dark:text-violet-300
-                  "
-                />
+                <Search className="h-[16px] w-[16px]" />
               </span>
 
               <span
-                className="
-                  min-w-0
-                  flex-1
-                  truncate
-
-                  text-[12px]
-                  font-medium
-
-                  text-slate-500
-                  dark:text-slate-400
-                "
+                className="min-w-0 flex-1 truncate text-[12px] font-medium text-slate-500 dark:text-slate-400"
               >
                 {userRole === "merchant"
                   ? "Search payments, transactions, customers, analytics..."
@@ -1165,32 +1171,7 @@ export default function TopNavbar({
               </span>
 
               <span
-                className="
-                  flex
-                  shrink-0
-                  items-center
-                  gap-1
-
-                  rounded-[8px]
-
-                  border
-                  border-border
-                  dark:border-white/10
-
-                  bg-card
-                  dark:bg-[#0B0F19]
-
-                  px-2
-                  py-1
-
-                  text-[9px]
-                  font-bold
-
-                  text-slate-500
-                  dark:text-slate-400
-
-                  shadow-sm
-                "
+                className="flex shrink-0 items-center gap-1 rounded-[8px] border border-border bg-card px-2 py-1 text-[9px] font-bold text-slate-500 shadow-sm dark:border-white/10 dark:bg-[#0B0F19] dark:text-slate-400"
               >
                 <Command className="h-3 w-3" />
                 K
@@ -1223,41 +1204,12 @@ export default function TopNavbar({
               whileTap={{
                 scale: 0.92,
               }}
-              className="
-                flex
-                h-10
-                w-10
-                items-center
-                justify-center
-
-                rounded-xl
-
-                border
-                border-border
-                dark:border-white/10
-
-                bg-card
-                dark:bg-[#0B0F19]
-
-                shadow-sm
-
-                transition-all
-
-                hover:bg-muted
-                dark:hover:bg-white/10
-
-                md:hidden
-              "
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-card shadow-sm transition-all hover:bg-muted dark:border-white/10 dark:bg-[#0B0F19] dark:hover:bg-white/10 md:hidden"
+              style={{
+                color: roleTheme.accent,
+              }}
             >
-              <Search
-                className="
-                  h-[17px]
-                  w-[17px]
-
-                  text-[#5b3a8f]
-                  dark:text-violet-300
-                "
-              />
+              <Search className="h-[17px] w-[17px]" />
             </motion.button>
 
             {/* AI INSIGHTS */}
@@ -1278,39 +1230,11 @@ export default function TopNavbar({
               whileTap={{
                 scale: 0.96,
               }}
-              className="
-                relative
-                hidden
-                h-10
-                items-center
-                justify-center
-
-                overflow-hidden
-
-                rounded-[13px]
-
-                border
-
-                px-4
-
-                text-[10px]
-                font-extrabold
-
-                shadow-sm
-
-                transition-all
-                duration-200
-
-                sm:flex
-
-                border-[#3b2368]/20
-                bg-violet-50/50
-                text-[#5b3a8f]
-
-                dark:border-violet-400/20
-                dark:bg-violet-500/[0.10]
-                dark:text-violet-300
-              "
+              className="relative hidden h-10 items-center justify-center overflow-hidden rounded-[13px] border bg-card px-4 text-[10px] font-extrabold shadow-sm transition-all duration-200 hover:bg-muted dark:bg-[#0B0F19] sm:flex"
+              style={{
+                borderColor: roleTheme.border,
+                color: roleTheme.accent,
+              }}
             >
               <span
                 className="
@@ -1348,42 +1272,12 @@ export default function TopNavbar({
               whileTap={{
                 scale: 0.92,
               }}
-              className="
-                relative
-
-                flex
-                h-10
-                w-10
-                items-center
-                justify-center
-
-                rounded-[13px]
-
-                border
-                border-border
-                dark:border-white/10
-
-                bg-card
-                dark:bg-[#0B0F19]
-
-                shadow-sm
-
-                transition-all
-                duration-200
-
-                hover:bg-muted
-                dark:hover:bg-white/10
-              "
+              className="relative flex h-10 w-10 items-center justify-center rounded-[13px] border border-border bg-card shadow-sm transition-all duration-200 hover:bg-muted dark:border-white/10 dark:bg-[#0B0F19] dark:hover:bg-white/10"
+              style={{
+                color: roleTheme.accent,
+              }}
             >
-              <Bell
-                className="
-                  h-[16px]
-                  w-[16px]
-
-                  text-[#5b3a8f]
-                  dark:text-violet-300
-                "
-              />
+              <Bell className="h-[16px] w-[16px]" />
 
               <span
                 className="
@@ -1423,32 +1317,7 @@ export default function TopNavbar({
                 whileTap={{
                   scale: 0.98,
                 }}
-                className="
-                  flex
-                  h-[44px]
-                  items-center
-                  gap-2
-
-                  rounded-[15px]
-
-                  border
-                  border-border
-                  dark:border-white/10
-
-                  bg-card
-                  dark:bg-[#0B0F19]
-
-                  p-[5px]
-                  pr-2.5
-
-                  shadow-sm
-
-                  transition-all
-                  duration-200
-
-                  hover:bg-muted
-                  dark:hover:bg-white/10
-                "
+                className="flex h-[44px] items-center gap-2 rounded-[15px] border border-border bg-card p-[5px] pr-2.5 shadow-sm transition-all duration-200 hover:bg-muted dark:border-white/10 dark:bg-[#0B0F19] dark:hover:bg-white/10"
               >
                 <ProfileAvatar
                   avatarUrl={
@@ -1456,6 +1325,15 @@ export default function TopNavbar({
                   }
                   name={
                     userName
+                  }
+                  accent={
+                    roleTheme.accent
+                  }
+                  borderColor={
+                    roleTheme.border
+                  }
+                  shadow={
+                    `0 7px 20px ${roleTheme.shadow}`
                   }
                   containerClassName="
                     flex
@@ -1477,29 +1355,16 @@ export default function TopNavbar({
                   "
                 >
                   <p
-                    className="
-                      truncate
-                      text-[10px]
-                      font-extrabold
-
-                      text-[#2e1f4f]
-                      dark:text-slate-100
-                    "
+                    className="truncate text-[10px] font-extrabold"
+                    style={{
+                      color: roleTheme.accent,
+                    }}
                   >
                     {userName}
                   </p>
 
                   <p
-                    className="
-                      mt-[1px]
-                      text-[7.5px]
-                      font-extrabold
-                      uppercase
-                      tracking-[0.08em]
-
-                      text-slate-400
-                      dark:text-slate-500
-                    "
+                    className="mt-[1px] text-[7.5px] font-extrabold uppercase tracking-[0.08em] text-slate-400 dark:text-slate-500"
                   >
                     {roleLabel}
                   </p>
@@ -1507,17 +1372,8 @@ export default function TopNavbar({
 
                 <ChevronDown
                   className={`
-                    hidden
-                    h-[14px]
-                    w-[14px]
-                    transition-transform
-                    duration-200
-
-                    text-slate-400
-                    dark:text-slate-500
-
-                    lg:block
-
+                    hidden h-[14px] w-[14px] text-slate-400 transition-transform duration-200
+                    dark:text-slate-500 lg:block
                     ${
                       profileOpen
                         ? "rotate-180"
@@ -1591,17 +1447,12 @@ export default function TopNavbar({
                       "
                     >
                       <div
-                        className="
-                          rounded-[14px]
-                          p-3
-
-                          border
-                          border-[#3b2368]/10
-                          dark:border-violet-400/10
-                        "
+                        className="rounded-[14px] border p-3"
                         style={{
                           background:
-                            BRAND_SOFT,
+                            "var(--muted)",
+                          borderColor:
+                            roleTheme.border,
                         }}
                       >
                         <div className="flex items-center gap-3">
@@ -1611,6 +1462,15 @@ export default function TopNavbar({
                             }
                             name={
                               userName
+                            }
+                            accent={
+                              roleTheme.accent
+                            }
+                            borderColor={
+                              roleTheme.border
+                            }
+                            shadow={
+                              `0 7px 20px ${roleTheme.shadow}`
                             }
                             containerClassName="
                               flex
@@ -1626,14 +1486,10 @@ export default function TopNavbar({
 
                           <div className="min-w-0">
                             <p
-                              className="
-                                truncate
-                                text-[11px]
-                                font-extrabold
-
-                                text-[#2e1f4f]
-                                dark:text-slate-100
-                              "
+                              className="truncate text-[11px] font-extrabold"
+                              style={{
+                                color: roleTheme.accent,
+                              }}
                             >
                               {userName}
                             </p>
@@ -1654,16 +1510,11 @@ export default function TopNavbar({
                             )}
 
                             <p
-                              className="
-                                mt-1
-                                text-[8px]
-                                font-extrabold
-                                uppercase
-                                tracking-[0.1em]
-
-                                text-[#5b3a8f]
-                                dark:text-violet-300
-                              "
+                              className="mt-1 text-[8px] font-extrabold uppercase tracking-[0.1em]"
+                              style={{
+                                color:
+                                  roleTheme.accent,
+                              }}
                             >
                               {roleLabel}
                             </p>
@@ -1711,18 +1562,15 @@ export default function TopNavbar({
                           hover:bg-muted
                           dark:hover:bg-white/[0.06]
 
-                          hover:text-[#5b3a8f]
-                          dark:hover:text-violet-300
+                          hover:opacity-90
                         "
                       >
                         <Settings
-                          className="
-                            h-[15px]
-                            w-[15px]
-
-                            text-[#5b3a8f]
-                            dark:text-violet-300
-                          "
+                          className="h-[15px] w-[15px]"
+                          style={{
+                            color:
+                              roleTheme.accent,
+                          }}
                         />
 
                         {userRole ===
@@ -1842,17 +1690,7 @@ export default function TopNavbar({
                 "
                 style={{
                   background:
-                    userRole ===
-                    "merchant"
-                      ? `
-                        linear-gradient(
-                          90deg,
-                          #2563eb,
-                          #0ea5e9,
-                          #22d3ee
-                        )
-                      `
-                      : BRAND_GRADIENT,
+                    roleTheme.gradient,
                 }}
               />
 
@@ -1878,8 +1716,7 @@ export default function TopNavbar({
                     w-[18px]
                     shrink-0
 
-                    text-[#5b3a8f]
-                    dark:text-violet-300
+                    
                   "
                 />
 
@@ -1953,13 +1790,11 @@ export default function TopNavbar({
                     "
                   >
                     <X
-                      className="
-                        h-[15px]
-                        w-[15px]
-
-                        text-[#5b3a8f]
-                        dark:text-violet-300
-                      "
+                      className="h-[15px] w-[15px]"
+                      style={{
+                        color:
+                          roleTheme.accent,
+                      }}
                     />
                   </motion.button>
                 )}
@@ -2044,10 +1879,11 @@ export default function TopNavbar({
                             style={{
                               background:
                                 active
-                                  ? userRole ===
-                                    "merchant"
-                                    ? "linear-gradient(135deg, rgba(37,99,235,0.08), rgba(14,165,233,0.09))"
-                                    : BRAND_SOFT
+                                  ? "var(--muted)"
+                                  : undefined,
+                              boxShadow:
+                                active
+                                  ? `inset 3px 0 0 ${roleTheme.accent}`
                                   : undefined,
                             }}
                           >
@@ -2068,29 +1904,22 @@ export default function TopNavbar({
                               style={{
                                 background:
                                   active
-                                    ? userRole ===
-                                      "merchant"
-                                      ? `
-                                        linear-gradient(
-                                          135deg,
-                                          #2563eb,
-                                          #0ea5e9
-                                        )
-                                      `
-                                      : BRAND_GRADIENT
+                                    ? "var(--card)"
                                     : "var(--muted)",
 
                                 color:
                                   active
-                                    ? "#ffffff"
+                                    ? roleTheme.accent
                                     : undefined,
+
+                                border:
+                                  active
+                                    ? `1px solid ${roleTheme.border}`
+                                    : "1px solid transparent",
 
                                 boxShadow:
                                   active
-                                    ? userRole ===
-                                      "merchant"
-                                      ? "0 7px 18px rgba(37,99,235,0.25)"
-                                      : "0 7px 18px rgba(59,35,104,0.25)"
+                                    ? `0 7px 18px ${roleTheme.shadow}`
                                     : undefined,
                               }}
                             >
@@ -2101,7 +1930,7 @@ export default function TopNavbar({
 
                                   ${
                                     active
-                                      ? "text-white"
+                                      ? ""
                                       : "text-slate-500 dark:text-slate-300"
                                   }
                                 `}
@@ -2109,20 +1938,19 @@ export default function TopNavbar({
                             </motion.span>
 
                             <span
-                              className={`
-                                truncate
-                                text-[12px]
-                                font-bold
-
-                                ${
-                                  active
-                                    ? userRole ===
-                                      "merchant"
-                                      ? "text-blue-600 dark:text-blue-400"
-                                      : "text-[#5b3a8f] dark:text-violet-300"
-                                    : "text-slate-700 dark:text-slate-200"
-                                }
-                              `}
+                              className={`truncate text-[12px] font-bold ${
+                                active
+                                  ? ""
+                                  : "text-slate-700 dark:text-slate-200"
+                              }`}
+                              style={
+                                active
+                                  ? {
+                                      color:
+                                        roleTheme.accent,
+                                    }
+                                  : undefined
+                              }
                             >
                               {
                                 item.title
@@ -2140,26 +1968,15 @@ export default function TopNavbar({
                                   opacity: 1,
                                   scale: 1,
                                 }}
-                                className={`
-                                  ml-auto
-
-                                  rounded-full
-
-                                  px-2
-                                  py-0.5
-
-                                  text-[8px]
-                                  font-extrabold
-                                  uppercase
-                                  tracking-wider
-
-                                  ${
-                                    userRole ===
-                                    "merchant"
-                                      ? "bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300"
-                                      : "bg-violet-100 text-[#5b3a8f] dark:bg-violet-500/10 dark:text-violet-300"
-                                  }
-                                `}
+                                className="ml-auto rounded-full px-2 py-0.5 text-[8px] font-extrabold uppercase tracking-wider"
+                                style={{
+                                  background:
+                                    "var(--muted)",
+                                  color:
+                                    roleTheme.accent,
+                                  border:
+                                    `1px solid ${roleTheme.border}`,
+                                }}
                               >
                                 Current
                               </motion.span>
@@ -2190,21 +2007,15 @@ export default function TopNavbar({
                     "
                   >
                     <div
-                      className={`
-                        flex
-                        h-11
-                        w-11
-                        items-center
-                        justify-center
-                        rounded-xl
-
-                        ${
-                          userRole ===
-                          "merchant"
-                            ? "bg-blue-100 text-blue-600 dark:bg-blue-500/10 dark:text-blue-300"
-                            : "bg-violet-100 text-[#5b3a8f] dark:bg-violet-500/10 dark:text-violet-300"
-                        }
-                      `}
+                      className="flex h-11 w-11 items-center justify-center rounded-xl"
+                      style={{
+                        background:
+                          "var(--muted)",
+                        color:
+                          roleTheme.accent,
+                        border:
+                          `1px solid ${roleTheme.border}`,
+                      }}
                     >
                       <Search
                         className="
@@ -2249,20 +2060,15 @@ export default function TopNavbar({
 
       {(userRole === "user" ||
         userRole === "merchant") && (
-        <>
-          <SupportChat />
-
-          <CofferAiCopilot
-            userName={
-              userName
-            }
-            portal={
-              userRole === "merchant"
-                ? "merchant"
-                : "personal"
-            }
-          />
-        </>
+        <CofferAiCopilot
+          userName={userName}
+          portal={
+            userRole === "merchant"
+              ? "merchant"
+              : "personal"
+          }
+          role={userRole}
+        />
       )}
 
       {(userRole === "support" ||
@@ -2279,19 +2085,44 @@ export default function TopNavbar({
           animate={{ opacity: 1, y: 0, scale: 1 }}
           whileHover={{ y: -3, scale: 1.02 }}
           whileTap={{ scale: 0.97 }}
-          className="fixed bottom-4 right-4 z-[120] flex h-[58px] items-center gap-3 rounded-[20px] border border-violet-300/25 bg-[#120b27] px-3.5 text-white shadow-[0_22px_65px_rgba(65,31,132,.38)] outline-none focus-visible:ring-4 focus-visible:ring-violet-400/35 sm:bottom-6 sm:right-6"
+          className="fixed bottom-4 right-4 z-[120] flex h-[58px] items-center gap-3 rounded-[20px] border bg-card px-3.5 outline-none transition hover:bg-muted focus-visible:ring-4 dark:bg-[#0B0F19] sm:bottom-6 sm:right-6"
+          style={{
+            borderColor:
+              roleTheme.border,
+            color:
+              roleTheme.accent,
+            boxShadow:
+              `0 18px 48px ${roleTheme.shadow}`,
+          }}
           aria-label="Open Support AI Copilot"
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-[13px] border border-white/15 bg-white/10">
+          <span
+            className="flex h-9 w-9 items-center justify-center rounded-[13px] border bg-muted/70"
+            style={{
+              borderColor: roleTheme.border,
+              color: roleTheme.accent,
+            }}
+          >
             <Bot className="h-[19px] w-[19px]" />
           </span>
 
           <span className="hidden pr-1 text-left sm:block">
-            <span className="block text-[11px] font-black">
+            <span
+              className="block text-[11px] font-black"
+              style={{
+                color: roleTheme.accent,
+              }}
+            >
               Support AI
             </span>
 
-            <span className="mt-0.5 block text-[8px] font-bold uppercase tracking-[0.16em] text-violet-200/70">
+            <span
+              className="mt-0.5 block text-[8px] font-bold uppercase tracking-[0.16em]"
+              style={{
+                color:
+                  roleTheme.accentSecondary,
+              }}
+            >
               Human-approved copilot
             </span>
           </span>

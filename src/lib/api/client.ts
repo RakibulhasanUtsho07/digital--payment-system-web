@@ -1,12 +1,15 @@
-const rawApiUrl = (
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:5000"
-).replace(/\/+$/, "");
+/* =========================================================
+   SAME-ORIGIN API BASE
 
-/* Accept a host URL with or without the trailing /api segment. */
-const API_URL = /\/api$/i.test(rawApiUrl)
-  ? rawApiUrl
-  : `${rawApiUrl}/api`;
+   Browser:
+   /api/backend/users/profile
+
+   Next.js BFF internally forwards to:
+   BACKEND_API_URL/users/profile
+========================================================= */
+
+const API_URL =
+  "/api/backend";
 
 /* =========================================================
    API ERROR TYPE
@@ -16,6 +19,7 @@ interface ApiErrorResponse {
   success?: boolean;
   message?: string;
   error?: string;
+  code?: string;
 }
 
 /* =========================================================
@@ -25,32 +29,45 @@ interface ApiErrorResponse {
 export function isApiAbortError(
   error: unknown
 ): boolean {
-  /*
-   * Browser fetch normally throws DOMException:
-   *
-   * name = "AbortError"
-   *
-   * Error check is also included because different
-   * runtimes may expose the aborted request differently.
-   */
-
   if (
     typeof DOMException !==
       "undefined" &&
-    error instanceof DOMException &&
-    error.name === "AbortError"
+    error instanceof
+      DOMException &&
+    error.name ===
+      "AbortError"
   ) {
     return true;
   }
 
   if (
     error instanceof Error &&
-    error.name === "AbortError"
+    error.name ===
+      "AbortError"
   ) {
     return true;
   }
 
   return false;
+}
+
+/* =========================================================
+   NORMALIZE ENDPOINT
+========================================================= */
+
+function normalizeEndpoint(
+  endpoint: string
+): string {
+  const value =
+    endpoint.trim();
+
+  if (!value) {
+    return "";
+  }
+
+  return value.startsWith("/")
+    ? value
+    : `/${value}`;
 }
 
 /* =========================================================
@@ -72,7 +89,20 @@ export async function apiClient<T>(
   ======================================================== */
 
   const requestHeaders =
-    new Headers(headers);
+    new Headers(
+      headers
+    );
+
+  if (
+    !requestHeaders.has(
+      "Accept"
+    )
+  ) {
+    requestHeaders.set(
+      "Accept",
+      "application/json"
+    );
+  }
 
   /* =======================================================
      CHECK FORMDATA
@@ -81,24 +111,23 @@ export async function apiClient<T>(
   const isFormData =
     typeof FormData !==
       "undefined" &&
-    body instanceof FormData;
+    body instanceof
+      FormData;
 
   /* =======================================================
-     CONTENT TYPE HANDLING
+     CONTENT TYPE
   ======================================================== */
 
-  if (isFormData) {
+  if (
+    isFormData
+  ) {
     /*
-     * IMPORTANT:
+     * Never manually set Content-Type
+     * for FormData.
      *
-     * FormData হলে Content-Type manually set করা যাবে না।
-     *
-     * Browser automatically set করবে:
-     *
-     * multipart/form-data;
-     * boundary=----WebKitFormBoundary...
+     * Browser must generate the
+     * multipart boundary.
      */
-
     requestHeaders.delete(
       "Content-Type"
     );
@@ -113,10 +142,6 @@ export async function apiClient<T>(
       "Content-Type"
     )
   ) {
-    /*
-     * Normal JSON request
-     */
-
     requestHeaders.set(
       "Content-Type",
       "application/json"
@@ -127,14 +152,20 @@ export async function apiClient<T>(
      REQUEST URL
   ======================================================== */
 
+  const normalizedEndpoint =
+    normalizeEndpoint(
+      endpoint
+    );
+
   const url =
-    `${API_URL}${endpoint}`;
+    `${API_URL}${normalizedEndpoint}`;
 
   /* =======================================================
      FETCH
   ======================================================== */
 
-  let response: Response;
+  let response:
+    Response;
 
   try {
     response =
@@ -148,6 +179,16 @@ export async function apiClient<T>(
 
           body,
 
+          /*
+           * IMPORTANT:
+           *
+           * access_token is now a cookie
+           * on the frontend domain.
+           *
+           * This sends it to:
+           *
+           * /api/backend/*
+           */
           credentials:
             "include",
 
@@ -155,19 +196,11 @@ export async function apiClient<T>(
             "no-store",
         }
       );
-  } catch (error) {
+  } catch (
+    error
+  ) {
     /* =====================================================
-       EXPECTED REQUEST CANCELLATION
-
-       These are normal situations:
-       - component unmount
-       - route change
-       - filter change
-       - new request replacing old request
-       - React development Strict Mode lifecycle
-
-       Abort is NOT a real network error.
-       So do NOT console.error it.
+       ABORT IS NOT A NETWORK FAILURE
     ===================================================== */
 
     if (
@@ -178,13 +211,14 @@ export async function apiClient<T>(
       throw error;
     }
 
-    /* =====================================================
-       REAL NETWORK ERROR
-    ===================================================== */
-
     console.error(
       "API NETWORK ERROR:",
-      error
+      {
+        endpoint:
+          normalizedEndpoint,
+
+        error,
+      }
     );
 
     throw new Error(
@@ -193,7 +227,7 @@ export async function apiClient<T>(
   }
 
   /* =======================================================
-     READ RESPONSE AS TEXT FIRST
+     READ RESPONSE
   ======================================================== */
 
   let rawText =
@@ -202,12 +236,9 @@ export async function apiClient<T>(
   try {
     rawText =
       await response.text();
-  } catch (error) {
-    /*
-     * response.text() can also be interrupted
-     * when the request is aborted.
-     */
-
+  } catch (
+    error
+  ) {
     if (
       isApiAbortError(
         error
@@ -218,18 +249,24 @@ export async function apiClient<T>(
 
     console.error(
       "API RESPONSE READ ERROR:",
-      error
-    );
+      {
+        endpoint:
+          normalizedEndpoint,
 
-    rawText =
-      "";
+        status:
+          response.status,
+
+        error,
+      }
+    );
   }
 
   /* =======================================================
      PARSE RESPONSE SAFELY
   ======================================================== */
 
-  let data: unknown =
+  let data:
+    unknown =
     null;
 
   if (
@@ -241,12 +278,6 @@ export async function apiClient<T>(
           rawText
         );
     } catch {
-      /*
-       * Server may return HTML/text error.
-       *
-       * Do not crash with JSON.parse error.
-       */
-
       data = {
         message:
           rawText,
@@ -255,7 +286,7 @@ export async function apiClient<T>(
   }
 
   /* =======================================================
-     HANDLE HTTP ERROR
+     HANDLE HTTP ERRORS
   ======================================================== */
 
   if (
@@ -264,36 +295,55 @@ export async function apiClient<T>(
     let message =
       `Request failed with status ${response.status}.`;
 
+    let errorCode:
+      string |
+      undefined;
+
     if (
       typeof data ===
         "object" &&
       data !== null
     ) {
       const errorData =
-        data as ApiErrorResponse;
+        data as
+          ApiErrorResponse;
 
       if (
-        typeof errorData.message ===
+        typeof errorData
+          .message ===
           "string" &&
-        errorData.message.trim()
+        errorData
+          .message
+          .trim()
       ) {
         message =
           errorData.message;
       } else if (
-        typeof errorData.error ===
+        typeof errorData
+          .error ===
           "string" &&
-        errorData.error.trim()
+        errorData
+          .error
+          .trim()
       ) {
         message =
           errorData.error;
       }
+
+      if (
+        typeof errorData
+          .code ===
+          "string"
+      ) {
+        errorCode =
+          errorData.code;
+      }
     }
 
     /*
-     * Prevent huge HTML/server body
-     * from being displayed in the UI.
+     * Never dump a huge HTML error page
+     * into the UI.
      */
-
     if (
       message.length >
       500
@@ -302,9 +352,52 @@ export async function apiClient<T>(
         `Server error (${response.status}). Please try again.`;
     }
 
-    throw new Error(
-      message
+    /*
+     * Helpful debug without exposing
+     * cookies or sensitive request data.
+     */
+    if (
+      process.env.NODE_ENV ===
+      "development"
+    ) {
+      console.warn(
+        "API REQUEST FAILED:",
+        {
+          endpoint:
+            normalizedEndpoint,
+
+          status:
+            response.status,
+
+          code:
+            errorCode,
+
+          message,
+        }
+      );
+    }
+
+    const apiError =
+      new Error(
+        message
+      );
+
+    /*
+     * Optional metadata for callers that
+     * need HTTP status/code.
+     */
+    Object.assign(
+      apiError,
+      {
+        status:
+          response.status,
+
+        code:
+          errorCode,
+      }
     );
+
+    throw apiError;
   }
 
   /* =======================================================
