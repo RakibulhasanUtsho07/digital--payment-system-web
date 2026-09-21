@@ -10,6 +10,10 @@ import {
 } from "react";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   AnimatePresence,
   motion,
 } from "framer-motion";
@@ -33,6 +37,14 @@ import {
   WalletCards,
   type LucideIcon,
 } from "lucide-react";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   createAnalystReport,
@@ -371,6 +383,32 @@ function EmptyState() {
 ========================================================= */
 
 export default function AnalystReportsPage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isAnalystRole =
+    user.role === "analyst";
+
+  useEffect(() => {
+    if (isAnalystRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isAnalystRole,
+    router,
+    user.role,
+  ]);
+
   const [reports, setReports] = useState<AnalystReportSummary[]>([]);
   const [range, setRange] = useState<AnalystRange>("30d");
   const [mode, setMode] = useState<AnalystMode>("all");
@@ -383,6 +421,13 @@ export default function AnalystReportsPage() {
   const [error, setError] = useState("");
 
   const load = useCallback(async (showRefresh = false) => {
+    if (!isAnalystRole) {
+      setRefreshing(false);
+      setInitialLoading(false);
+
+      return;
+    }
+
     try {
       if (showRefresh) {
         setRefreshing(true);
@@ -397,15 +442,24 @@ export default function AnalystReportsPage() {
       setRefreshing(false);
       setInitialLoading(false);
     }
-  }, []);
+  }, [isAnalystRole]);
 
   useEffect(() => {
+    if (!isAnalystRole) {
+      setInitialLoading(false);
+
+      return;
+    }
+
     const timerId = window.setTimeout(() => {
       void load();
     }, 0);
 
     return () => window.clearTimeout(timerId);
-  }, [load]);
+  }, [
+    isAnalystRole,
+    load,
+  ]);
 
   const readyReports = useMemo(
     () => reports.filter((report) => report.status.toLowerCase() === "ready").length,
@@ -427,6 +481,10 @@ export default function AnalystReportsPage() {
   );
 
   async function generate() {
+    if (!isAnalystRole) {
+      return;
+    }
+
     try {
       setError("");
 
@@ -455,6 +513,10 @@ export default function AnalystReportsPage() {
   }
 
   async function download(report: AnalystReportSummary) {
+    if (!isAnalystRole) {
+      return;
+    }
+
     try {
       setError("");
       setDownloadingId(report.id);
@@ -464,6 +526,26 @@ export default function AnalystReportsPage() {
     } finally {
       setDownloadingId(null);
     }
+  }
+
+  if (!isAnalystRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center px-4">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-teal-500/15 bg-teal-500/10 text-teal-700 shadow-sm dark:text-teal-300">
+            <RefreshCcw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening analyst workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Report Builder is available only to analyst accounts.
+          </p>
+        </div>
+      </main>
+    );
   }
 
   return (
@@ -616,8 +698,20 @@ export default function AnalystReportsPage() {
         }
       >
         <div className="relative z-20 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <SelectField label="Period" value={range} options={RANGE_OPTIONS} onChange={setRange} icon={Clock3} />
-          <SelectField label="Mode" value={mode} options={MODE_OPTIONS} onChange={setMode} icon={WalletCards} />
+          <SelectField label="Period" value={range} options={RANGE_OPTIONS} onChange={(nextRange) => {
+            if (!isAnalystRole) {
+              return;
+            }
+
+            setRange(nextRange);
+          }} icon={Clock3} />
+          <SelectField label="Mode" value={mode} options={MODE_OPTIONS} onChange={(nextMode) => {
+            if (!isAnalystRole) {
+              return;
+            }
+
+            setMode(nextMode);
+          }} icon={WalletCards} />
 
           <label>
             <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">Currency</span>
@@ -628,20 +722,30 @@ export default function AnalystReportsPage() {
               <input
                 value={currency}
                 maxLength={3}
-                onChange={(event) =>
+                onChange={(event) => {
+                  if (!isAnalystRole) {
+                    return;
+                  }
+
                   setCurrency(
                     event.target.value
                       .replace(/[^a-z]/gi, "")
                       .slice(0, 3)
                       .toUpperCase()
-                  )
-                }
+                  );
+                }}
                 className="h-12 w-full rounded-xl border border-border bg-background pl-12 pr-3 text-center text-xs font-black uppercase outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
               />
             </div>
           </label>
 
-          <SelectField label="Report format" value={format} options={FORMAT_OPTIONS} onChange={setFormat} icon={BarChart3} />
+          <SelectField label="Report format" value={format} options={FORMAT_OPTIONS} onChange={(nextFormat) => {
+            if (!isAnalystRole) {
+              return;
+            }
+
+            setFormat(nextFormat);
+          }} icon={BarChart3} />
         </div>
 
         <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">

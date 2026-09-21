@@ -10,6 +10,10 @@ import {
 } from "react";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   AnimatePresence,
   motion,
 } from "framer-motion";
@@ -50,6 +54,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   getAnalystRevenueAnalytics,
@@ -1502,6 +1514,32 @@ function RevenueCompositionChart({
 ========================================================= */
 
 export default function AnalystRevenuePage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isAnalystRole =
+    user.role === "analyst";
+
+  useEffect(() => {
+    if (isAnalystRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isAnalystRole,
+    router,
+    user.role,
+  ]);
+
   const [
     range,
     setRange,
@@ -1591,6 +1629,15 @@ export default function AnalystRevenuePage() {
 
   useEffect(
     () => {
+      if (!isAnalystRole) {
+        setLoading(false);
+        setRefreshing(false);
+        setData(null);
+        setError("");
+
+        return;
+      }
+
       const controller =
         new AbortController();
 
@@ -1676,6 +1723,7 @@ export default function AnalystRevenuePage() {
       };
     },
     [
+      isAnalystRole,
       range,
       mode,
       currency,
@@ -1727,6 +1775,10 @@ export default function AnalystRevenuePage() {
   ) {
     event.preventDefault();
 
+    if (!isAnalystRole) {
+      return;
+    }
+
     const next =
       currencyDraft
         .trim()
@@ -1746,6 +1798,26 @@ export default function AnalystRevenuePage() {
 
     setCurrency(
       next
+    );
+  }
+
+  if (!isAnalystRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center px-4">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-teal-500/15 bg-teal-500/10 text-teal-700 shadow-sm dark:text-teal-300">
+            <RefreshCcw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening analyst workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Revenue Analytics is available only to analyst accounts.
+          </p>
+        </div>
+      </main>
     );
   }
 
@@ -1894,12 +1966,16 @@ export default function AnalystRevenuePage() {
             whileTap={{
               scale: 0.97,
             }}
-            onClick={() =>
+            onClick={() => {
+              if (!isAnalystRole) {
+                return;
+              }
+
               setRefreshKey(
                 (current) =>
                   current + 1
-              )
-            }
+              );
+            }}
             className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/10 px-4 text-xs font-extrabold text-white shadow-[0_10px_30px_rgba(0,0,0,0.12)] backdrop-blur transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <RefreshCcw
@@ -1984,21 +2060,39 @@ export default function AnalystRevenuePage() {
             label="Period"
             value={range}
             options={RANGE_OPTIONS}
-            onChange={setRange}
+            onChange={(nextRange) => {
+              if (!isAnalystRole) {
+                return;
+              }
+
+              setRange(nextRange);
+            }}
           />
 
           <FilterSelect
             label="Payment mode"
             value={mode}
             options={MODE_OPTIONS}
-            onChange={setMode}
+            onChange={(nextMode) => {
+              if (!isAnalystRole) {
+                return;
+              }
+
+              setMode(nextMode);
+            }}
           />
 
           <FilterSelect
             label="Revenue event"
             value={kind}
             options={KIND_OPTIONS}
-            onChange={setKind}
+            onChange={(nextKind) => {
+              if (!isAnalystRole) {
+                return;
+              }
+
+              setKind(nextKind);
+            }}
           />
 
           <form
@@ -2014,7 +2108,11 @@ export default function AnalystRevenuePage() {
                 <input
                   value={currencyDraft}
                   maxLength={3}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    if (!isAnalystRole) {
+                      return;
+                    }
+
                     setCurrencyDraft(
                       event.target.value
                         .replace(
@@ -2026,8 +2124,8 @@ export default function AnalystRevenuePage() {
                           3
                         )
                         .toUpperCase()
-                    )
-                  }
+                    );
+                  }}
                   className="h-11 min-w-0 flex-1 rounded-l-xl border border-border bg-background px-3 text-center text-xs font-black uppercase outline-none transition focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10"
                 />
 
