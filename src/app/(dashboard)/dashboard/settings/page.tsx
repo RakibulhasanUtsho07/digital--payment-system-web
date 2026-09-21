@@ -11,9 +11,21 @@ import React, {
 import Link from "next/link";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   useTheme,
   type ThemeMode,
 } from "@/context/ThemeContext";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   settingsApi,
@@ -668,10 +680,49 @@ function errorText(
 ========================================================= */
 
 export default function UserSettingsPage() {
+  const router =
+    useRouter();
+
   const {
     theme,
     setTheme,
   } = useTheme();
+
+  /*
+   * DashboardSessionContext is populated from the
+   * authenticated backend profile by the dashboard layout.
+   * The backend-confirmed role is the source of truth.
+   */
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isUserRole =
+    user.role === "user";
+
+  /* =======================================================
+     USER-ONLY PAGE GUARD
+
+     Only personal role=user accounts may use Settings.
+     Merchant / Analyst / Support / Admin / Super Admin
+     are redirected to their own dashboard home.
+  ======================================================= */
+
+  useEffect(() => {
+    if (isUserRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isUserRole,
+    router,
+    user.role,
+  ]);
 
   const [
     mounted,
@@ -828,6 +879,14 @@ export default function UserSettingsPage() {
     async (
       silent = false
     ) => {
+      if (!isUserRole) {
+        setMounted(true);
+        setLoading(false);
+        setRefreshing(false);
+
+        return;
+      }
+
       if (silent) {
         setRefreshing(
           true
@@ -950,10 +1009,18 @@ export default function UserSettingsPage() {
     };
 
   useEffect(() => {
+    if (!isUserRole) {
+      setMounted(true);
+      setLoading(false);
+      setRefreshing(false);
+
+      return;
+    }
+
     void loadSettings();
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isUserRole]);
 
   /* =======================================================
      KEEP DRAFT THEME SYNCED
@@ -991,6 +1058,16 @@ export default function UserSettingsPage() {
 
   const loadSessions =
     async () => {
+      if (!isUserRole) {
+        router.replace(
+          getDashboardHome(
+            user.role
+          )
+        );
+
+        return;
+      }
+
       if (
         sessionsLoading
       ) {
@@ -1066,6 +1143,16 @@ export default function UserSettingsPage() {
 
   const openSessions =
     async () => {
+      if (!isUserRole) {
+        router.replace(
+          getDashboardHome(
+            user.role
+          )
+        );
+
+        return;
+      }
+
       setDrawerType(
         "sessions"
       );
@@ -1075,6 +1162,16 @@ export default function UserSettingsPage() {
 
   const logoutOtherDevices =
     async () => {
+      if (!isUserRole) {
+        router.replace(
+          getDashboardHome(
+            user.role
+          )
+        );
+
+        return;
+      }
+
       if (
         sessionActionLoading
       ) {
@@ -1306,6 +1403,16 @@ export default function UserSettingsPage() {
     async (
       nextTheme: ThemeMode
     ) => {
+      if (!isUserRole) {
+        router.replace(
+          getDashboardHome(
+            user.role
+          )
+        );
+
+        return;
+      }
+
       setDraft(
         (
           current
@@ -1332,6 +1439,16 @@ export default function UserSettingsPage() {
 
   const saveChanges =
     async () => {
+      if (!isUserRole) {
+        router.replace(
+          getDashboardHome(
+            user.role
+          )
+        );
+
+        return;
+      }
+
       if (saving) {
         return;
       }
@@ -1484,6 +1601,16 @@ export default function UserSettingsPage() {
 
   const discardChanges =
     async () => {
+      if (!isUserRole) {
+        router.replace(
+          getDashboardHome(
+            user.role
+          )
+        );
+
+        return;
+      }
+
       setDraft(
         savedSettings
       );
@@ -1517,6 +1644,16 @@ export default function UserSettingsPage() {
         | "json"
         | "csv"
     ) => {
+      if (!isUserRole) {
+        router.replace(
+          getDashboardHome(
+            user.role
+          )
+        );
+
+        return;
+      }
+
       try {
         const response =
           await settingsApi.exportData();
@@ -1761,6 +1898,16 @@ export default function UserSettingsPage() {
 
   const deleteAccount =
     async () => {
+      if (!isUserRole) {
+        router.replace(
+          getDashboardHome(
+            user.role
+          )
+        );
+
+        return;
+      }
+
       if (
         !deletePassword.trim()
       ) {
@@ -1816,6 +1963,30 @@ export default function UserSettingsPage() {
         );
       }
     };
+
+  /* =======================================================
+     USER-ONLY REDIRECTING
+  ======================================================= */
+
+  if (!isUserRole) {
+    return (
+      <main className="flex min-h-[75vh] items-center justify-center bg-background px-4 text-foreground">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-200/50 bg-violet-50 text-violet-700 shadow-sm dark:border-violet-900/60 dark:bg-violet-950/30 dark:text-violet-200">
+            <RefreshCw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-card-foreground">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">
+            Settings & Preferences is available only to personal user accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   /* =======================================================
      PRE MOUNT
