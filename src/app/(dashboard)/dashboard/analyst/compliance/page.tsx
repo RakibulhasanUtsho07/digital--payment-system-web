@@ -8,6 +8,10 @@ import {
   type ReactNode,
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+
+import {
+  useRouter,
+} from "next/navigation";
 import {
   Activity,
   AlertTriangle,
@@ -46,6 +50,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
+
 import {
   getAnalystCompliance,
   type AnalystComplianceData,
@@ -549,6 +561,45 @@ function ComplianceLoading() {
 }
 
 export default function AnalystCompliancePage() {
+  const router =
+    useRouter();
+
+  /*
+   * DashboardSessionContext is populated from the
+   * authenticated backend profile by the dashboard layout.
+   * The backend-confirmed role is the source of truth.
+   */
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isAnalystRole =
+    user.role === "analyst";
+
+  /* =======================================================
+     ANALYST-ONLY PAGE GUARD
+
+     Only role=analyst can stay on Compliance Analytics.
+     Every other dashboard role is redirected to its own
+     dashboard home.
+  ======================================================= */
+
+  useEffect(() => {
+    if (isAnalystRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isAnalystRole,
+    router,
+    user.role,
+  ]);
+
   const [range, setRange] = useState<AnalystRange>("30d");
   const [data, setData] = useState<AnalystComplianceData | null>(null);
   const [error, setError] = useState("");
@@ -556,27 +607,60 @@ export default function AnalystCompliancePage() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    const controller = new AbortController();
+    if (!isAnalystRole) {
+      setLoading(false);
+      setData(null);
+      setError("");
+
+      return;
+    }
+
+    const controller =
+      new AbortController();
+
     let active = true;
+
     (async () => {
       try {
         setLoading(true);
         setError("");
-        const result = await getAnalystCompliance(range, controller.signal);
-        if (active) setData(result);
+
+        const result =
+          await getAnalystCompliance(
+            range,
+            controller.signal
+          );
+
+        if (active) {
+          setData(result);
+        }
       } catch (cause: unknown) {
-        if (active && !controller.signal.aborted) {
-          setError(cause instanceof Error ? cause.message : "Unable to load compliance analytics.");
+        if (
+          active &&
+          !controller.signal.aborted
+        ) {
+          setError(
+            cause instanceof Error
+              ? cause.message
+              : "Unable to load compliance analytics."
+          );
         }
       } finally {
-        if (active) setLoading(false);
+        if (active) {
+          setLoading(false);
+        }
       }
     })();
+
     return () => {
       active = false;
       controller.abort();
     };
-  }, [range, refreshKey]);
+  }, [
+    isAnalystRole,
+    range,
+    refreshKey,
+  ]);
 
   const chartData = useMemo(
     () => data?.trend.map((item) => ({ ...item, label: bucketLabel(item.bucket, range) })) ?? [],
@@ -596,7 +680,29 @@ export default function AnalystCompliancePage() {
     [data]
   );
 
-  if (loading && !data) return <ComplianceLoading />;
+  if (!isAnalystRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center px-4">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-teal-500/15 bg-teal-500/10 text-teal-700 shadow-sm dark:text-teal-300">
+            <RefreshCcw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Compliance Analytics is available only to analyst accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (loading && !data) {
+    return <ComplianceLoading />;
+  }
 
   return (
     <main className="space-y-6">
@@ -648,7 +754,16 @@ export default function AnalystCompliancePage() {
             <button
               type="button"
               disabled={loading}
-              onClick={() => setRefreshKey((value) => value + 1)}
+              onClick={() => {
+                if (!isAnalystRole) {
+                  return;
+                }
+
+                setRefreshKey(
+                  (value) =>
+                    value + 1
+                );
+              }}
               className="relative inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.08] px-4 py-3 text-xs font-black text-white shadow-lg backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/[0.12] disabled:opacity-60"
             >
               <RefreshCcw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
@@ -663,9 +778,35 @@ export default function AnalystCompliancePage() {
       <motion.section initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08, duration: 0.45 }} className="relative z-30 rounded-[24px] border border-slate-200/80 bg-white/90 p-4 shadow-[0_18px_55px_-40px_rgba(15,118,110,0.45)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div className="w-full sm:max-w-sm">
-            <OceanSelect label="Analysis range" value={range} options={RANGE_OPTIONS} onChange={setRange} icon={Clock3} />
+            <OceanSelect
+              label="Analysis range"
+              value={range}
+              options={RANGE_OPTIONS}
+              onChange={(nextRange) => {
+                if (!isAnalystRole) {
+                  return;
+                }
+
+                setRange(nextRange);
+              }}
+              icon={Clock3}
+            />
           </div>
-          <button type="button" onClick={() => { setRange("30d"); setError(""); }} disabled={range === "30d"} className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-[10px] font-black uppercase tracking-wide text-slate-600 transition hover:border-teal-500/30 hover:text-teal-700 disabled:opacity-40 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+          <button
+            type="button"
+            onClick={() => {
+              if (!isAnalystRole) {
+                return;
+              }
+
+              setRange("30d");
+              setError("");
+            }}
+            disabled={
+              range === "30d"
+            }
+            className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 text-[10px] font-black uppercase tracking-wide text-slate-600 transition hover:border-teal-500/30 hover:text-teal-700 disabled:opacity-40 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
+          >
             <RotateCcw className="h-3.5 w-3.5" /> Reset range
           </button>
         </div>

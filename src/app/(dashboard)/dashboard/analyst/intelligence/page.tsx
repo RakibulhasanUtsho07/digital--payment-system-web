@@ -15,6 +15,10 @@ import {
 } from "framer-motion";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   Activity,
   AlertTriangle,
   BadgeCheck,
@@ -59,6 +63,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   getAnalystIntelligence,
@@ -1382,6 +1394,44 @@ function IntelligenceLoading() {
 ========================================================= */
 
 export default function AnalystIntelligencePage() {
+  const router =
+    useRouter();
+
+  /*
+   * DashboardSessionContext is populated from the
+   * authenticated backend profile by the dashboard layout.
+   * The backend-confirmed role is the source of truth.
+   */
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isAnalystRole =
+    user.role === "analyst";
+
+  /* =======================================================
+     ANALYST-ONLY PAGE GUARD
+
+     Only role=analyst can stay in Analyst Intelligence.
+     All other roles are redirected to their own dashboard.
+  ======================================================= */
+
+  useEffect(() => {
+    if (isAnalystRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isAnalystRole,
+    router,
+    user.role,
+  ]);
+
   const [
     range,
     setRange,
@@ -1481,6 +1531,15 @@ export default function AnalystIntelligencePage() {
 
   useEffect(
     () => {
+      if (!isAnalystRole) {
+        setLoading(false);
+        setRefreshing(false);
+        setData(null);
+        setError("");
+
+        return;
+      }
+
       const controller =
         new AbortController();
 
@@ -1567,6 +1626,7 @@ export default function AnalystIntelligencePage() {
       };
     },
     [
+      isAnalystRole,
       range,
       mode,
       currency,
@@ -1655,6 +1715,10 @@ export default function AnalystIntelligencePage() {
   ) {
     event.preventDefault();
 
+    if (!isAnalystRole) {
+      return;
+    }
+
     const next =
       currencyDraft
         .trim()
@@ -1686,6 +1750,10 @@ export default function AnalystIntelligencePage() {
   }
 
   function resetFilters() {
+    if (!isAnalystRole) {
+      return;
+    }
+
     setRange(
       "30d"
     );
@@ -1712,6 +1780,26 @@ export default function AnalystIntelligencePage() {
 
     setError(
       ""
+    );
+  }
+
+  if (!isAnalystRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center px-4">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-teal-500/15 bg-teal-500/10 text-teal-700 shadow-sm dark:text-teal-300">
+            <RefreshCcw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening analyst workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Analyst Intelligence is available only to analyst accounts.
+          </p>
+        </div>
+      </main>
     );
   }
 
@@ -1898,15 +1986,19 @@ export default function AnalystIntelligencePage() {
               disabled={
                 refreshing
               }
-              onClick={() =>
+              onClick={() => {
+                if (!isAnalystRole) {
+                  return;
+                }
+
                 setRefreshKey(
                   (
                     current
                   ) =>
                     current +
                     1
-                )
-              }
+                );
+              }}
               className="relative inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.08] px-4 py-3 text-xs font-black text-white shadow-lg backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/[0.12] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <RefreshCcw
@@ -2044,9 +2136,17 @@ export default function AnalystIntelligencePage() {
             options={
               RANGE_OPTIONS
             }
-            onChange={
-              setRange
-            }
+            onChange={(
+              nextRange
+            ) => {
+              if (!isAnalystRole) {
+                return;
+              }
+
+              setRange(
+                nextRange
+              );
+            }}
             icon={
               Clock3
             }
@@ -2060,9 +2160,17 @@ export default function AnalystIntelligencePage() {
             options={
               MODE_OPTIONS
             }
-            onChange={
-              setMode
-            }
+            onChange={(
+              nextMode
+            ) => {
+              if (!isAnalystRole) {
+                return;
+              }
+
+              setMode(
+                nextMode
+              );
+            }}
             icon={
               Layers3
             }
@@ -2076,9 +2184,17 @@ export default function AnalystIntelligencePage() {
             options={
               SEVERITY_OPTIONS
             }
-            onChange={
-              setSeverity
-            }
+            onChange={(
+              nextSeverity
+            ) => {
+              if (!isAnalystRole) {
+                return;
+              }
+
+              setSeverity(
+                nextSeverity
+              );
+            }}
             icon={
               Gauge
             }
@@ -2092,9 +2208,17 @@ export default function AnalystIntelligencePage() {
             options={
               CATEGORY_OPTIONS
             }
-            onChange={
-              setCategory
-            }
+            onChange={(
+              nextCategory
+            ) => {
+              if (!isAnalystRole) {
+                return;
+              }
+
+              setCategory(
+                nextCategory
+              );
+            }}
             icon={
               BarChart3
             }
