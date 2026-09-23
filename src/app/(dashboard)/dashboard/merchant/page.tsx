@@ -11,6 +11,10 @@ import React, {
 import Link from "next/link";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   Activity,
   ArrowRight,
   BarChart3,
@@ -53,6 +57,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   apiClient,
@@ -1540,7 +1552,7 @@ function PeriodDropdown({
       ref={
         containerRef
       }
-      className="relative z-40"
+      className={`relative w-full min-w-0 ${open ? "z-[90]" : "z-20"} sm:w-auto`}
     >
       <motion.button
         type="button"
@@ -1559,8 +1571,11 @@ function PeriodDropdown({
         className={`
           flex
           h-11
-          min-w-[170px]
+          w-full
+          min-w-0
           items-center
+
+          sm:min-w-[170px]
           justify-between
           gap-3
           rounded-2xl
@@ -1580,7 +1595,7 @@ function PeriodDropdown({
           }
         `}
       >
-        <div className="flex items-center gap-2.5">
+        <div className="flex min-w-0 items-center gap-2.5">
           <div
             className="
               flex
@@ -1673,7 +1688,8 @@ function PeriodDropdown({
               absolute
               right-0
               top-full
-              w-[220px]
+              z-[100]
+              w-[min(220px,calc(100vw-2rem))]
               overflow-hidden
               rounded-2xl
               border
@@ -4413,6 +4429,32 @@ function HeroPill({
 ========================================================= */
 
 export default function MerchantOverviewPage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isMerchantRole =
+    user.role === "merchant";
+
+  useEffect(() => {
+    if (isMerchantRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isMerchantRole,
+    router,
+    user.role,
+  ]);
+
   const [
     period,
     setPeriod,
@@ -4461,6 +4503,15 @@ export default function MerchantOverviewPage() {
         isRefresh =
           false
       ) => {
+        if (!isMerchantRole) {
+          setLoading(false);
+          setRefreshing(false);
+          setData(null);
+          setErrorMessage("");
+
+          return;
+        }
+
         try {
           if (
             isRefresh
@@ -4528,15 +4579,23 @@ export default function MerchantOverviewPage() {
         }
       },
       [
+        isMerchantRole,
         period,
       ]
     );
 
   useEffect(
     () => {
+      if (!isMerchantRole) {
+        setLoading(false);
+
+        return;
+      }
+
       void loadOverview();
     },
     [
+      isMerchantRole,
       loadOverview,
     ]
   );
@@ -4654,6 +4713,30 @@ export default function MerchantOverviewPage() {
     );
 
   /* =======================================================
+     MERCHANT-ONLY REDIRECTING
+  ======================================================= */
+
+  if (!isMerchantRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center bg-background px-4 text-foreground">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-500/15 bg-violet-500/10 text-violet-700 shadow-sm dark:text-violet-300">
+            <RefreshCcw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Merchant overview is available only to merchant accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  /* =======================================================
      FULL ERROR
   ======================================================= */
 
@@ -4694,9 +4777,13 @@ export default function MerchantOverviewPage() {
 
             <button
               type="button"
-              onClick={() =>
-                void loadOverview()
-              }
+              onClick={() => {
+                if (!isMerchantRole) {
+                  return;
+                }
+
+                void loadOverview();
+              }}
               className="
                 mt-6
                 inline-flex
@@ -4760,10 +4847,6 @@ export default function MerchantOverviewPage() {
           duration:
             0.6,
         }}
-        whileHover={{
-          y:
-            -2,
-        }}
         className="
           relative
           overflow-hidden
@@ -4794,7 +4877,7 @@ export default function MerchantOverviewPage() {
           <div className="min-w-0 max-w-[810px]">
             {/* MERCHANT */}
 
-            <div className="flex items-center gap-3">
+            <div className="flex min-w-0 items-start gap-3">
               <motion.div
                 whileHover={{
                   rotate:
@@ -4807,6 +4890,7 @@ export default function MerchantOverviewPage() {
                   flex
                   h-12
                   w-12
+                  shrink-0
                   items-center
                   justify-center
                   rounded-2xl
@@ -4828,10 +4912,12 @@ export default function MerchantOverviewPage() {
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   <span
                     className="
-                      truncate
+                      break-words
                       text-xl
                       font-black
+                      leading-tight
                       tracking-[-0.03em]
+                      [overflow-wrap:anywhere]
 
                       sm:text-2xl
                     "
@@ -5072,10 +5158,14 @@ export default function MerchantOverviewPage() {
             }}
             className="
               flex
-              items-center
-              justify-between
+              min-w-0
+              flex-col
               gap-3
               rounded-2xl
+
+              sm:flex-row
+              sm:items-center
+              sm:justify-between
               border
               border-red-200/70
               bg-red-500/5
@@ -5086,7 +5176,7 @@ export default function MerchantOverviewPage() {
               text-red-600
             "
           >
-            <div className="flex items-center gap-2">
+            <div className="flex min-w-0 items-start gap-2">
               <XCircle className="h-4 w-4 shrink-0" />
 
               {
@@ -5096,11 +5186,15 @@ export default function MerchantOverviewPage() {
 
             <button
               type="button"
-              onClick={() =>
+              onClick={() => {
+                if (!isMerchantRole) {
+                  return;
+                }
+
                 void loadOverview(
                   true
-                )
-              }
+                );
+              }}
               className="rounded-lg px-3 py-2 font-black hover:bg-red-500/5"
             >
               Retry
@@ -5137,24 +5231,32 @@ export default function MerchantOverviewPage() {
           sm:justify-between
         "
       >
-        <div>
+        <div className="min-w-0">
           <p className="text-[10px] font-black uppercase tracking-[0.17em] text-violet-600 dark:text-violet-300">
             Business Overview
           </p>
 
-          <h2 className="mt-1 text-xl font-black tracking-[-0.03em] text-foreground">
+          <h2 className="mt-1 break-words text-xl font-black leading-tight tracking-[-0.03em] text-foreground [overflow-wrap:anywhere]">
             Performance snapshot
           </h2>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
           <PeriodDropdown
             value={
               period
             }
-            onChange={
-              setPeriod
-            }
+            onChange={(
+              nextPeriod
+            ) => {
+              if (!isMerchantRole) {
+                return;
+              }
+
+              setPeriod(
+                nextPeriod
+              );
+            }}
           />
 
           <motion.button

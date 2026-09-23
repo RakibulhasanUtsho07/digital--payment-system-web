@@ -11,6 +11,10 @@ import React, {
 import Link from "next/link";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   motion,
 } from "framer-motion";
 
@@ -30,6 +34,14 @@ import {
   WalletCards,
   X,
 } from "lucide-react";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   getMerchantReport,
@@ -847,11 +859,13 @@ function PurpleSelect({
       }
       className={`
         relative
+        w-full
+        min-w-0
 
         ${
           open
-            ? "z-40"
-            : "z-10"
+            ? "z-[90]"
+            : "z-20"
         }
       `}
     >
@@ -962,14 +976,21 @@ function PurpleSelect({
             absolute
             left-0
             top-[calc(100%+8px)]
-            z-50
+            z-[100]
             w-full
-            min-w-[190px]
+            min-w-[220px]
+            max-w-[calc(100vw-2rem)]
             overflow-hidden
             rounded-2xl
-            merchant-surface
+            border
+            border-violet-200/60
+            bg-white/95
             p-1.5
-            shadow-[0_22px_55px_rgba(40,18,80,0.16)]
+            shadow-[0_24px_65px_rgba(40,18,80,0.20)]
+            backdrop-blur-xl
+
+            dark:border-white/10
+            dark:bg-slate-950/95
           "
         >
           {options.map(
@@ -1017,14 +1038,14 @@ function PurpleSelect({
                     }
                   `}
                 >
-                  <span>
+                  <span className="min-w-0 truncate">
                     {
                       option.label
                     }
                   </span>
 
                   {active ? (
-                    <Check className="h-4 w-4" />
+                    <Check className="h-4 w-4 shrink-0" />
                   ) : null}
                 </button>
               );
@@ -1198,6 +1219,7 @@ function SummaryCard({
       }}
       className={`
         relative
+        h-full
         min-w-0
         overflow-hidden
         rounded-[24px]
@@ -1243,12 +1265,13 @@ function SummaryCard({
             }
             className={`
               mt-3
-              truncate
+              break-words
               text-[clamp(1rem,1.7vw,1.45rem)]
               font-black
               leading-tight
               tracking-[-0.03em]
               tabular-nums
+              [overflow-wrap:anywhere]
 
               ${
                 featured
@@ -1263,8 +1286,10 @@ function SummaryCard({
           <p
             className={`
               mt-2
-              truncate
+              break-words
               text-xs
+              leading-5
+              [overflow-wrap:anywhere]
 
               ${
                 featured
@@ -1322,7 +1347,9 @@ function ReportMetric({
           -2,
       }}
       className="
+        h-full
         min-w-0
+        overflow-hidden
         rounded-2xl
         bg-violet-500/[0.045]
         p-4
@@ -1346,11 +1373,13 @@ function ReportMetric({
         }
         className="
           mt-2
-          truncate
+          break-words
           text-sm
           font-black
+          leading-tight
           merchant-text
           tabular-nums
+          [overflow-wrap:anywhere]
         "
       >
         {value}
@@ -1364,6 +1393,32 @@ function ReportMetric({
 ========================================================= */
 
 export default function MerchantReportsPage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isMerchantRole =
+    user.role === "merchant";
+
+  useEffect(() => {
+    if (isMerchantRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role,
+      ),
+    );
+  }, [
+    isMerchantRole,
+    router,
+    user.role,
+  ]);
+
   const [
     reportType,
     setReportType,
@@ -1446,6 +1501,15 @@ export default function MerchantReportsPage() {
         refresh =
           false
       ) => {
+        if (!isMerchantRole) {
+          setLoading(false);
+          setRefreshing(false);
+          setReport(null);
+          setError("");
+
+          return;
+        }
+
         try {
           if (
             appliedFilters.from &&
@@ -1553,15 +1617,23 @@ export default function MerchantReportsPage() {
       },
       [
         appliedFilters,
+        isMerchantRole,
         reportType,
       ]
     );
 
   useEffect(
     () => {
+      if (!isMerchantRole) {
+        setLoading(false);
+
+        return;
+      }
+
       void loadReport();
     },
     [
+      isMerchantRole,
       loadReport,
     ]
   );
@@ -1575,6 +1647,10 @@ export default function MerchantReportsPage() {
       nextType:
         MerchantReportType
     ) => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       if (
         nextType ===
         reportType
@@ -1621,6 +1697,10 @@ export default function MerchantReportsPage() {
 
   const applyFilters =
     () => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       if (
         filters.from &&
         filters.to &&
@@ -1660,6 +1740,10 @@ export default function MerchantReportsPage() {
 
   const resetFilters =
     () => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       const clean = {
         ...EMPTY_FILTERS,
       };
@@ -1832,6 +1916,7 @@ export default function MerchantReportsPage() {
         ];
       },
       [
+        isMerchantRole,
         report,
       ]
     );
@@ -1843,6 +1928,10 @@ export default function MerchantReportsPage() {
   const exportReport =
     useCallback(
       () => {
+        if (!isMerchantRole) {
+          return;
+        }
+
         if (
           !report ||
           report.reportType ===
@@ -2026,6 +2115,30 @@ export default function MerchantReportsPage() {
           : "Report Overview";
 
   /* =======================================================
+     MERCHANT-ONLY REDIRECTING
+  ======================================================== */
+
+  if (!isMerchantRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center bg-background px-4 text-foreground">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-500/15 bg-violet-500/10 text-violet-700 shadow-sm dark:text-violet-300">
+            <RefreshCw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Merchant Reports & Exports is available only to merchant accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  /* =======================================================
      RENDER
   ======================================================== */
 
@@ -2078,7 +2191,7 @@ export default function MerchantReportsPage() {
           >
             <PurpleAuroraBackground />
 
-            <div className="relative">
+            <div className="relative z-10 min-w-0">
               <div
                 className="
                   flex
@@ -2090,7 +2203,7 @@ export default function MerchantReportsPage() {
                   lg:justify-between
                 "
               >
-                <div className="max-w-3xl">
+                <div className="min-w-0 max-w-3xl">
                   <div
                     className="
                       inline-flex
@@ -2113,7 +2226,7 @@ export default function MerchantReportsPage() {
                     Merchant intelligence
                   </div>
 
-                  <h1 className="mt-4 text-3xl font-black tracking-tight">
+                  <h1 className="mt-4 break-words text-3xl font-black leading-tight tracking-tight [overflow-wrap:anywhere]">
                     Reports & Exports
                   </h1>
 
@@ -2124,7 +2237,7 @@ export default function MerchantReportsPage() {
                   </p>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
+                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
                   <motion.button
                     whileHover={{
                       y:
@@ -2139,15 +2252,23 @@ export default function MerchantReportsPage() {
                       refreshing ||
                       loading
                     }
-                    onClick={() =>
+                    onClick={() => {
+                      if (!isMerchantRole) {
+                        return;
+                      }
+
                       void loadReport(
                         true
-                      )
-                    }
+                      );
+                    }}
                     className="
                       inline-flex
                       h-11
+                      w-full
                       items-center
+                      justify-center
+
+                      sm:w-auto
                       gap-2
                       rounded-2xl
                       border
@@ -2196,7 +2317,11 @@ export default function MerchantReportsPage() {
                     className="
                       inline-flex
                       h-11
+                      w-full
                       items-center
+                      justify-center
+
+                      sm:w-auto
                       gap-2
                       rounded-2xl
                       bg-white
@@ -2225,36 +2350,36 @@ export default function MerchantReportsPage() {
                   sm:grid-cols-3
                 "
               >
-                <div className="rounded-2xl border border-white/10 bg-white/[0.08] p-3">
+                <div className="h-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.08] p-3">
                   <p className="text-[10px] font-black uppercase tracking-wider text-violet-100/65">
                     Current report
                   </p>
 
-                  <p className="mt-1 text-base font-black">
+                  <p className="mt-1 break-words text-base font-black leading-tight [overflow-wrap:anywhere]">
                     {
                       reportTitle
                     }
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-white/[0.08] p-3">
+                <div className="h-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.08] p-3">
                   <p className="text-[10px] font-black uppercase tracking-wider text-violet-100/65">
                     Merchant
                   </p>
 
-                  <p className="mt-1 truncate text-base font-black">
+                  <p className="mt-1 break-words text-base font-black leading-tight [overflow-wrap:anywhere]">
                     {
                       merchantName
                     }
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-white/[0.08] p-3">
+                <div className="h-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.08] p-3">
                   <p className="text-[10px] font-black uppercase tracking-wider text-violet-100/65">
                     Generated
                   </p>
 
-                  <p className="mt-1 truncate text-base font-black">
+                  <p className="mt-1 break-words text-base font-black leading-tight [overflow-wrap:anywhere]">
                     {report
                       ? formatDateTime(
                           report.generatedAt
@@ -2281,7 +2406,8 @@ export default function MerchantReportsPage() {
             <div
               className="
                 flex
-                min-w-max
+                w-full
+                min-w-0
                 gap-2
                 overflow-x-auto
                 scroll-smooth
@@ -2320,6 +2446,7 @@ export default function MerchantReportsPage() {
                       className={`
                         inline-flex
                         h-11
+                        shrink-0
                         items-center
                         gap-2
                         rounded-2xl
@@ -2367,6 +2494,8 @@ export default function MerchantReportsPage() {
                 0,
             }}
             className="
+              relative
+              z-30
               overflow-visible
               rounded-[28px]
               merchant-surface
@@ -2375,10 +2504,14 @@ export default function MerchantReportsPage() {
             <div
               className="
                 flex
-                items-center
-                justify-between
+                flex-col
+                items-stretch
                 gap-4
                 rounded-t-[28px]
+
+                sm:flex-row
+                sm:items-center
+                sm:justify-between
                 px-5
                 py-4
                 text-white
@@ -2388,13 +2521,13 @@ export default function MerchantReportsPage() {
                   "linear-gradient(132deg,#4C1D95 0%,#6D28D9 60%,#9333EA 100%)",
               }}
             >
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/10">
                   <Filter className="h-4 w-4" />
                 </div>
 
-                <div>
-                  <h2 className="font-black">
+                <div className="min-w-0">
+                  <h2 className="break-words font-black leading-tight [overflow-wrap:anywhere]">
                     Report filters
                   </h2>
 
@@ -2406,14 +2539,18 @@ export default function MerchantReportsPage() {
 
               <button
                 type="button"
-                onClick={() =>
+                onClick={() => {
+                  if (!isMerchantRole) {
+                    return;
+                  }
+
                   setFilterOpen(
                     (
                       current
                     ) =>
                       !current
-                  )
-                }
+                  );
+                }}
                 className="
                   flex
                   h-9
@@ -2685,8 +2822,11 @@ export default function MerchantReportsPage() {
                       className="
                         inline-flex
                         h-11
+                        w-full
                         items-center
                         justify-center
+
+                        sm:w-auto
                         gap-2
                         rounded-xl
                         bg-violet-500/[0.06]
@@ -2715,8 +2855,11 @@ export default function MerchantReportsPage() {
                     className="
                       inline-flex
                       h-11
+                      w-full
                       items-center
                       justify-center
+
+                      sm:w-auto
                       gap-2
                       rounded-xl
                       bg-violet-600
@@ -2772,23 +2915,27 @@ export default function MerchantReportsPage() {
                 sm:justify-between
               "
             >
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm font-black text-rose-600">
                   Unable to load report
                 </p>
 
-                <p className="mt-1 text-xs text-rose-600">
+                <p className="mt-1 break-words text-xs leading-5 text-rose-600 [overflow-wrap:anywhere]">
                   {error}
                 </p>
               </div>
 
               <button
                 type="button"
-                onClick={() =>
+                onClick={() => {
+                  if (!isMerchantRole) {
+                    return;
+                  }
+
                   void loadReport(
                     true
-                  )
-                }
+                  );
+                }}
                 className="
                   inline-flex
                   h-9
@@ -3423,8 +3570,10 @@ function PayoutReportView({
                   </td>
 
                   <td className="px-5 py-4 text-sm merchant-text">
-                    {row.destination ||
-                      "—"}
+                    <span className="block max-w-[260px] break-words leading-5 [overflow-wrap:anywhere]">
+                      {row.destination ||
+                        "—"}
+                    </span>
                   </td>
 
                   <td className="px-5 py-4">
@@ -3661,6 +3810,8 @@ function HiddenScrollTable({
   return (
     <div
       className="
+        min-w-0
+        max-w-full
         overflow-x-auto
         scroll-smooth
         overscroll-x-contain
@@ -3749,7 +3900,7 @@ function StatusBadge({
 
 function EmptyReport() {
   return (
-    <div className="flex min-h-[320px] items-center justify-center p-8 text-center">
+    <div className="flex items-center justify-center px-8 py-12 text-center">
       <div>
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-500/[0.08] text-violet-600">
           <FileBarChart2 className="h-6 w-6" />
@@ -3769,7 +3920,7 @@ function EmptyReport() {
 
 function EmptyRows() {
   return (
-    <div className="flex min-h-[220px] items-center justify-center p-8 text-center">
+    <div className="flex items-center justify-center px-8 py-10 text-center">
       <div>
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-violet-500/[0.07] text-violet-600">
           <FileBarChart2 className="h-5 w-5" />
