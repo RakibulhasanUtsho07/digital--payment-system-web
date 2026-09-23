@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -46,6 +47,10 @@ import {
 import {
   supportDashboardApi,
 } from "@/lib/api/supportDashboardApi";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
 
 /* =========================================================
    DISPUTE DOMAIN
@@ -675,7 +680,7 @@ function SupportSelect<
                 0.16,
             }}
             role="listbox"
-            className="absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-2xl border border-emerald-100 bg-white/95 p-1.5 shadow-[0_24px_70px_-20px_rgba(5,150,105,.28)] backdrop-blur-xl dark:border-white/10 dark:bg-[#071b16]/95"
+            className="support-dispute-scroll absolute left-0 right-0 z-50 mt-2 max-h-72 overflow-y-auto overscroll-contain rounded-2xl border border-emerald-100 bg-white/95 p-1.5 shadow-[0_24px_70px_-20px_rgba(5,150,105,.28)] backdrop-blur-xl dark:border-white/10 dark:bg-[#071b16]/95"
           >
             {options.map(
               (
@@ -878,7 +883,7 @@ function MetricCard({
             {label}
           </p>
 
-          <p className="mt-3 break-words text-2xl font-black tracking-tight text-slate-950 dark:text-white">
+          <p className="mt-3 break-words text-xl font-black leading-7 tracking-tight text-slate-950 dark:text-white sm:text-2xl">
             {value}
           </p>
 
@@ -1064,7 +1069,7 @@ function CopyField({
       }}
       className="rounded-2xl border border-emerald-100 bg-emerald-50/30 p-4 dark:border-white/10 dark:bg-white/[0.025]"
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-3 min-[480px]:flex-row min-[480px]:items-start min-[480px]:justify-between">
         <div className="min-w-0">
           <Icon className="h-4 w-4 text-emerald-600" />
 
@@ -1099,10 +1104,172 @@ function CopyField({
 }
 
 /* =========================================================
-   PAGE
+   SUPPORT-ONLY ACCESS
+========================================================= */
+
+function isAuthorizationError(
+  error: unknown
+): boolean {
+  const maybeRecord =
+    error &&
+    typeof error === "object"
+      ? (
+          error as
+            Record<
+              string,
+              unknown
+            >
+        )
+      : null;
+
+  const response =
+    maybeRecord?.response &&
+    typeof maybeRecord.response ===
+      "object"
+      ? (
+          maybeRecord.response as
+            Record<
+              string,
+              unknown
+            >
+        )
+      : null;
+
+  const status =
+    Number(
+      maybeRecord?.status ??
+        maybeRecord?.statusCode ??
+        response?.status
+    );
+
+  if (
+    status === 401 ||
+    status === 403
+  ) {
+    return true;
+  }
+
+  const message =
+    error instanceof Error
+      ? error.message
+          .toLowerCase()
+      : String(
+          error ?? ""
+        ).toLowerCase();
+
+  return (
+    message.includes("401") ||
+    message.includes("403") ||
+    message.includes(
+      "unauthorized"
+    ) ||
+    message.includes(
+      "forbidden"
+    ) ||
+    message.includes(
+      "access denied"
+    ) ||
+    message.includes(
+      "not authorized"
+    )
+  );
+}
+
+function SupportNotFoundState() {
+  return (
+    <main className="relative flex min-h-[78vh] items-center justify-center overflow-hidden bg-background px-4 text-foreground">
+      <div className="pointer-events-none absolute left-1/2 top-1/2 h-[440px] w-[440px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-500/[0.08] blur-[120px]" />
+
+      <motion.section
+        initial={{
+          opacity: 0,
+          y: 18,
+          scale: 0.98,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          scale: 1,
+        }}
+        transition={{
+          duration: 0.45,
+          ease: [
+            0.22,
+            1,
+            0.36,
+            1,
+          ],
+        }}
+        className="relative w-full max-w-xl overflow-hidden rounded-[32px] border border-border bg-card p-7 text-center shadow-[0_28px_90px_rgba(15,23,42,.10)] sm:p-10"
+      >
+        <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-emerald-500/[0.08] blur-3xl" />
+
+        <div className="relative">
+          <div className="mx-auto grid h-16 w-16 place-items-center rounded-[22px] border border-emerald-500/15 bg-emerald-500/10 text-emerald-600">
+            <ShieldAlert className="h-6 w-6" />
+          </div>
+
+          <p className="mt-6 text-[11px] font-black uppercase tracking-[0.22em] text-emerald-600">
+            Error 404
+          </p>
+
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">
+            Page not found
+          </h1>
+
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+            The page you are looking for does not exist or is not available.
+          </p>
+        </div>
+      </motion.section>
+    </main>
+  );
+}
+
+/* =========================================================
+   OUTER ACCESS GATE
 ========================================================= */
 
 export default function SupportDisputeCasesPage() {
+  const {
+    user,
+  } = useDashboardSession();
+
+  const [
+    accessDenied,
+    setAccessDenied,
+  ] = useState(false);
+
+  const denyAccess =
+    useCallback(() => {
+      setAccessDenied(true);
+    }, []);
+
+  if (
+    accessDenied ||
+    user?.role !== "support"
+  ) {
+    return (
+      <SupportNotFoundState />
+    );
+  }
+
+  return (
+    <SupportDisputeCasesContent
+      onUnauthorized={denyAccess}
+    />
+  );
+}
+
+/* =========================================================
+   PAGE CONTENT
+========================================================= */
+
+function SupportDisputeCasesContent({
+  onUnauthorized,
+}: {
+  onUnauthorized: () => void;
+}) {
   const [
     search,
     setSearch,
@@ -1307,6 +1474,16 @@ export default function SupportDisputeCasesPage() {
                     unknown
                 ) {
                   if (
+                    active &&
+                    isAuthorizationError(
+                      requestError
+                    )
+                  ) {
+                    onUnauthorized();
+                    return;
+                  }
+
+                  if (
                     active
                   ) {
                     setError(
@@ -1350,6 +1527,7 @@ export default function SupportDisputeCasesPage() {
       to,
       page,
       refreshKey,
+      onUnauthorized,
     ]
   );
 
@@ -1360,6 +1538,12 @@ export default function SupportDisputeCasesPage() {
       ) {
         return;
       }
+
+      const previousOverflow =
+        document.body.style.overflow;
+
+      document.body.style.overflow =
+        "hidden";
 
       function onKeyDown(
         event:
@@ -1380,11 +1564,15 @@ export default function SupportDisputeCasesPage() {
         onKeyDown
       );
 
-      return () =>
+      return () => {
+        document.body.style.overflow =
+          previousOverflow;
+
         window.removeEventListener(
           "keydown",
           onKeyDown
         );
+      };
     },
     [
       selected,
@@ -1484,7 +1672,7 @@ export default function SupportDisputeCasesPage() {
   }
 
   return (
-    <main className="space-y-6">
+    <main className="w-full min-w-0 space-y-5 overflow-x-clip pb-8 sm:space-y-6">
       {/* ===================================================
           HERO
       ==================================================== */}
@@ -1512,7 +1700,7 @@ export default function SupportDisputeCasesPage() {
             1,
           ],
         }}
-        className="relative isolate overflow-hidden rounded-[30px] border border-emerald-300/10 bg-[linear-gradient(135deg,#052E2B_0%,#064E3B_48%,#065F46_100%)] p-6 text-white shadow-[0_28px_80px_-42px_rgba(5,150,105,.58)] md:p-7 lg:p-8"
+        className="relative isolate overflow-hidden rounded-[30px] border border-emerald-300/10 bg-[linear-gradient(135deg,#052E2B_0%,#064E3B_48%,#065F46_100%)] p-5 text-white shadow-[0_28px_80px_-42px_rgba(5,150,105,.58)] sm:p-6 md:p-7 lg:p-8"
       >
         <motion.div
           animate={{
@@ -1735,7 +1923,7 @@ export default function SupportDisputeCasesPage() {
             </div>
           </div>
 
-          <div className="relative shrink-0">
+          <div className="relative w-full shrink-0 sm:w-auto">
             <motion.div
               animate={{
                 rotate:
@@ -1769,7 +1957,7 @@ export default function SupportDisputeCasesPage() {
                     1
                 )
               }
-              className="relative inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-xs font-black text-emerald-900 shadow-[0_12px_30px_rgba(0,0,0,.16)] transition hover:-translate-y-0.5 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+              className="relative inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white px-5 text-xs font-black text-emerald-900 shadow-[0_12px_30px_rgba(0,0,0,.16)] transition hover:-translate-y-0.5 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             >
               <RefreshCcw
                 className={`h-4 w-4 ${
@@ -1860,7 +2048,7 @@ export default function SupportDisputeCasesPage() {
           </button>
         </div>
 
-        <div className="grid gap-3 xl:grid-cols-[1.6fr_1fr_1fr_1fr]">
+        <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(0,1.6fr)_minmax(220px,1fr)_minmax(180px,1fr)_minmax(180px,1fr)]">
           <div>
             <p className="mb-1.5 px-1 text-[9px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
               Search dispute
@@ -2059,7 +2247,7 @@ export default function SupportDisputeCasesPage() {
         }
         initial="hidden"
         animate="show"
-        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"
+        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5"
       >
         <MetricCard
           label="Total disputes"
@@ -2313,7 +2501,7 @@ export default function SupportDisputeCasesPage() {
                           </div>
 
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-black text-slate-950 dark:text-white">
+                            <p className="break-words text-sm font-black leading-5 text-slate-950 dark:text-white">
                               {
                                 dispute.disputeId
                               }
@@ -2328,7 +2516,7 @@ export default function SupportDisputeCasesPage() {
                         </div>
 
                         <span
-                          className={`shrink-0 rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-wide ${statusTone(
+                          className={`max-w-full self-start whitespace-normal rounded-full border px-2.5 py-1 text-left text-[9px] font-black uppercase leading-4 tracking-wide min-[480px]:shrink-0 ${statusTone(
                             dispute.status
                           )}`}
                         >
@@ -2344,7 +2532,7 @@ export default function SupportDisputeCasesPage() {
                             Amount
                           </p>
 
-                          <p className="mt-1 font-black text-slate-700 dark:text-slate-200">
+                          <p className="mt-1 break-words font-black leading-4 text-slate-700 dark:text-slate-200">
                             {money(
                               dispute.amount,
                               dispute.currency
@@ -2398,8 +2586,8 @@ export default function SupportDisputeCasesPage() {
 
             {/* DESKTOP */}
 
-            <div className="support-scroll-hidden hidden overflow-x-auto lg:block">
-              <table className="w-full min-w-[1100px] text-left">
+            <div className="support-dispute-scroll hidden overflow-x-auto overscroll-x-contain lg:block">
+              <table className="w-full min-w-[1040px] text-left">
                 <thead>
                   <tr className="border-b border-emerald-100 bg-emerald-50/60 text-[9px] font-black uppercase tracking-[0.13em] text-slate-500 dark:border-white/10 dark:bg-white/[0.035] dark:text-slate-400">
                     <th className="px-4 py-3.5">
@@ -2494,7 +2682,7 @@ export default function SupportDisputeCasesPage() {
 
                           <td className="px-4 py-4">
                             <span
-                              className={`inline-flex rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-wide ${statusTone(
+                              className={`inline-flex max-w-[150px] whitespace-normal rounded-full border px-2.5 py-1 text-left text-[9px] font-black uppercase leading-4 tracking-wide ${statusTone(
                                 dispute.status
                               )}`}
                             >
@@ -2601,7 +2789,7 @@ export default function SupportDisputeCasesPage() {
                 matches
               </p>
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2 sm:flex-nowrap">
                 <button
                   type="button"
                   disabled={
@@ -2672,7 +2860,7 @@ export default function SupportDisputeCasesPage() {
               duration:
                 0.18,
             }}
-            className="fixed inset-0 z-[120] bg-slate-950/60 backdrop-blur-sm"
+            className="fixed inset-0 z-[120] bg-slate-950/60 backdrop-blur-[3px]"
             onMouseDown={(
               event
             ) => {
@@ -2707,7 +2895,7 @@ export default function SupportDisputeCasesPage() {
                 damping:
                   30,
               }}
-              className="support-scroll-hidden absolute inset-y-0 right-0 w-full max-w-2xl overflow-y-auto bg-white text-slate-900 shadow-[-24px_0_80px_rgba(15,23,42,.32)] dark:bg-slate-950 dark:text-white"
+              className="support-dispute-scroll absolute inset-y-0 right-0 w-full max-w-[760px] overflow-y-auto overscroll-contain border-l border-emerald-100 bg-white text-slate-900 shadow-[-24px_0_80px_rgba(15,23,42,.32)] dark:border-white/10 dark:bg-slate-950 dark:text-white 2xl:max-w-[820px]"
             >
               {/* DRAWER HEADER */}
 
@@ -2744,13 +2932,13 @@ export default function SupportDisputeCasesPage() {
                       Dispute case evidence
                     </p>
 
-                    <h2 className="mt-1 truncate text-xl font-black text-white">
+                    <h2 className="mt-1 break-all text-xl font-black leading-7 text-white">
                       {
                         selected.disputeId
                       }
                     </h2>
 
-                    <p className="mt-1 truncate text-[10px] text-emerald-50/55">
+                    <p className="mt-1 break-all text-[10px] leading-4 text-emerald-50/55">
                       Payment {
                         selected.paymentId
                       }
@@ -2778,7 +2966,7 @@ export default function SupportDisputeCasesPage() {
                 }
                 initial="hidden"
                 animate="show"
-                className="space-y-5 p-5 sm:p-6"
+                className="space-y-5 p-4 pb-10 sm:p-6 sm:pb-12"
               >
                 {/* SUMMARY */}
 
@@ -2793,7 +2981,7 @@ export default function SupportDisputeCasesPage() {
                   <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <span
-                        className={`inline-flex rounded-full border px-3 py-1.5 text-[9px] font-black uppercase tracking-wide ${statusTone(
+                        className={`inline-flex max-w-full whitespace-normal rounded-full border px-3 py-1.5 text-left text-[9px] font-black uppercase leading-4 tracking-wide ${statusTone(
                           selected.status
                         )}`}
                       >
@@ -2941,7 +3129,7 @@ export default function SupportDisputeCasesPage() {
                       }
                     </p>
 
-                    <p className="mt-3 whitespace-pre-wrap text-xs leading-6 text-slate-600 dark:text-slate-300">
+                    <p className="mt-3 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-xs leading-6 text-slate-600 dark:text-slate-300">
                       {selected.description ||
                         "No additional dispute description is recorded."}
                     </p>
@@ -2962,7 +3150,7 @@ export default function SupportDisputeCasesPage() {
                       Merchant statement
                     </p>
 
-                    <p className="mt-2 whitespace-pre-wrap text-xs leading-6 text-slate-600 dark:text-slate-300">
+                    <p className="mt-2 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-xs leading-6 text-slate-600 dark:text-slate-300">
                       {selected.merchantResponse ||
                         "No merchant response is recorded yet."}
                     </p>
@@ -2993,7 +3181,7 @@ export default function SupportDisputeCasesPage() {
                       Resolution note
                     </p>
 
-                    <p className="mt-2 whitespace-pre-wrap text-xs leading-6 text-slate-700 dark:text-slate-200">
+                    <p className="mt-2 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-xs leading-6 text-slate-700 dark:text-slate-200">
                       {selected.resolutionNote ||
                         "This dispute does not have a final resolution note yet."}
                     </p>
@@ -3075,7 +3263,7 @@ export default function SupportDisputeCasesPage() {
                             }
                           </p>
 
-                          <p className="mt-1 text-xs font-black text-slate-800 dark:text-slate-100">
+                          <p className="mt-1 break-words text-xs font-black leading-5 text-slate-800 dark:text-slate-100">
                             {formatDateTime(
                               value as
                                 | string
@@ -3126,15 +3314,36 @@ export default function SupportDisputeCasesPage() {
       ==================================================== */}
 
       <style jsx global>{`
-        .support-scroll-hidden {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
+        .support-dispute-scroll {
+          scrollbar-width: thin;
+          scrollbar-color:
+            rgba(16, 185, 129, 0.42)
+            transparent;
         }
 
-        .support-scroll-hidden::-webkit-scrollbar {
-          width: 0;
-          height: 0;
-          display: none;
+        .support-dispute-scroll::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+
+        .support-dispute-scroll::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        .support-dispute-scroll::-webkit-scrollbar-thumb {
+          border: 2px solid transparent;
+          border-radius: 999px;
+          background:
+            rgba(16, 185, 129, 0.36);
+          background-clip:
+            padding-box;
+        }
+
+        .support-dispute-scroll::-webkit-scrollbar-thumb:hover {
+          background:
+            rgba(5, 150, 105, 0.54);
+          background-clip:
+            padding-box;
         }
       `}</style>
     </main>

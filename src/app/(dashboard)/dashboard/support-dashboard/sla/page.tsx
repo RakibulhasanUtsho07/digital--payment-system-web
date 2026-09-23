@@ -33,6 +33,10 @@ import {
   type TicketStatus,
 } from "@/lib/api/supportDashboardApi";
 
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
 /* =========================================================
    CONSTANTS
 ========================================================= */
@@ -183,11 +187,138 @@ const formatMinutes = (
   return `${hours}h ${remaining}m`;
 };
 
+
+function isAuthorizationError(
+  error: unknown
+): boolean {
+  const record =
+    error &&
+    typeof error === "object"
+      ? (error as Record<string, unknown>)
+      : null;
+
+  const response =
+    record?.response &&
+    typeof record.response === "object"
+      ? (record.response as Record<string, unknown>)
+      : null;
+
+  const status = Number(
+    record?.status ??
+      record?.statusCode ??
+      response?.status
+  );
+
+  if (
+    status === 401 ||
+    status === 403
+  ) {
+    return true;
+  }
+
+  const message =
+    error instanceof Error
+      ? error.message.toLowerCase()
+      : String(error ?? "").toLowerCase();
+
+  return (
+    message.includes("401") ||
+    message.includes("403") ||
+    message.includes("unauthorized") ||
+    message.includes("forbidden") ||
+    message.includes("access denied") ||
+    message.includes("not authorized")
+  );
+}
+
+/* =========================================================
+   SUPPORT-ONLY ACCESS
+========================================================= */
+
+function SupportNotFoundState() {
+  return (
+    <main className="relative flex min-h-[78vh] items-center justify-center overflow-hidden bg-background px-4 text-foreground">
+      <div className="pointer-events-none absolute left-1/2 top-1/2 h-[440px] w-[440px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-500/[0.08] blur-[120px]" />
+
+      <motion.section
+        initial={{
+          opacity: 0,
+          y: 18,
+          scale: 0.98,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          scale: 1,
+        }}
+        transition={{
+          duration: 0.45,
+          ease: [0.22, 1, 0.36, 1],
+        }}
+        className="relative w-full max-w-xl overflow-hidden rounded-[32px] border border-border bg-card p-7 text-center shadow-[0_28px_90px_rgba(15,23,42,.10)] sm:p-10"
+      >
+        <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-emerald-500/[0.08] blur-3xl" />
+
+        <div className="relative">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] border border-emerald-500/15 bg-emerald-500/10 text-emerald-600">
+            <ShieldAlert className="h-6 w-6" />
+          </div>
+
+          <p className="mt-6 text-[11px] font-black uppercase tracking-[0.22em] text-emerald-600">
+            Error 404
+          </p>
+
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">
+            Page not found
+          </h1>
+
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+            The page you are looking for does not exist or is not available.
+          </p>
+        </div>
+      </motion.section>
+    </main>
+  );
+}
+
 /* =========================================================
    PAGE
 ========================================================= */
 
 export default function SupportSlaPage() {
+  const {
+    user,
+  } = useDashboardSession();
+
+  const [
+    accessDenied,
+    setAccessDenied,
+  ] = useState(false);
+
+  const denyAccess =
+    useCallback(() => {
+      setAccessDenied(true);
+    }, []);
+
+  if (
+    accessDenied ||
+    user?.role !== "support"
+  ) {
+    return <SupportNotFoundState />;
+  }
+
+  return (
+    <SupportSlaContent
+      onUnauthorized={denyAccess}
+    />
+  );
+}
+
+function SupportSlaContent({
+  onUnauthorized,
+}: {
+  onUnauthorized: () => void;
+}) {
   const [
     summary,
     setSummary,
@@ -294,11 +425,22 @@ export default function SupportSlaPage() {
               response.summary
             );
           }
-        } catch {
+        } catch (
+          requestError
+        ) {
+          if (
+            isAuthorizationError(
+              requestError
+            )
+          ) {
+            onUnauthorized();
+            return;
+          }
+
           /*
            * Keep summary cards at their
-           * current values if summary
-           * request fails.
+           * current values if a non-auth
+           * summary request fails.
            */
         } finally {
           setSummaryLoading(
@@ -306,7 +448,9 @@ export default function SupportSlaPage() {
           );
         }
       },
-      []
+      [
+        onUnauthorized,
+      ]
     );
 
   /* =======================================================
@@ -406,6 +550,15 @@ export default function SupportSlaPage() {
         } catch (
           requestError
         ) {
+          if (
+            isAuthorizationError(
+              requestError
+            )
+          ) {
+            onUnauthorized();
+            return;
+          }
+
           setError(
             requestError instanceof Error
               ? requestError.message
@@ -422,6 +575,7 @@ export default function SupportSlaPage() {
         search,
         slaStatus,
         status,
+        onUnauthorized,
       ]
     );
 
@@ -580,8 +734,8 @@ export default function SupportSlaPage() {
     };
 
   return (
-    <main className="min-h-screen bg-transparent p-3 sm:p-4 md:p-6">
-      <div className="mx-auto max-w-[1500px] space-y-5">
+    <main className="w-full min-w-0 overflow-x-clip bg-transparent px-1 pb-8 sm:px-2 md:px-3">
+      <div className="mx-auto w-full max-w-[1500px] space-y-5">
         {/* =================================================
             PREMIUM SUPPORT HERO
         ================================================== */}
@@ -608,11 +762,11 @@ export default function SupportSlaPage() {
             <div className="support-sla-orb-delayed absolute -bottom-32 left-[30%] h-80 w-80 rounded-full bg-cyan-200/15 blur-3xl" />
             <div className="support-sla-beam absolute -left-48 top-1/2 h-28 w-[520px] -translate-y-1/2 rounded-full bg-white/10 blur-3xl" />
 
-            <div className="support-sla-ring support-sla-ring-one absolute -right-20 top-1/2 hidden h-[380px] w-[380px] -translate-y-1/2 rounded-full border border-white/10 xl:block" />
-            <div className="support-sla-ring support-sla-ring-two absolute right-0 top-1/2 hidden h-[250px] w-[250px] -translate-y-1/2 rounded-full border border-white/10 xl:block" />
+            <div className="support-sla-ring support-sla-ring-one absolute -right-20 top-1/2 hidden h-[380px] w-[380px] -translate-y-1/2 rounded-full border border-white/10 2xl:block" />
+            <div className="support-sla-ring support-sla-ring-two absolute right-0 top-1/2 hidden h-[250px] w-[250px] -translate-y-1/2 rounded-full border border-white/10 2xl:block" />
           </div>
 
-          <div className="relative z-10 grid min-h-[300px] gap-8 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-center lg:p-7 xl:grid-cols-[minmax(0,1fr)_430px] xl:p-8">
+          <div className="relative z-10 grid min-h-[300px] gap-8 p-5 sm:p-6 lg:p-7 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-center xl:p-8 2xl:grid-cols-[minmax(0,1fr)_430px]">
             <div className="max-w-3xl">
               <div className="inline-flex flex-wrap items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3.5 py-2 text-[9px] font-black uppercase tracking-[0.18em] text-emerald-50 backdrop-blur-md sm:text-[10px]">
                 <span className="support-sla-live-dot h-2 w-2 rounded-full bg-emerald-200" />
@@ -621,7 +775,7 @@ export default function SupportSlaPage() {
                 SLA Control Center
               </div>
 
-              <div className="mt-5 flex items-start gap-4">
+              <div className="mt-5 flex flex-col gap-4 min-[480px]:flex-row min-[480px]:items-start">
                 <motion.div
                   animate={{
                     y: [0, -6, 0],
@@ -695,11 +849,11 @@ export default function SupportSlaPage() {
                         </span>
 
                         <div className="min-w-0">
-                          <p className="truncate text-[8px] font-black uppercase tracking-[0.14em] text-white/55">
+                          <p className="break-words text-[8px] font-black uppercase leading-4 tracking-[0.14em] text-white/55">
                             {item.label}
                           </p>
 
-                          <p className="mt-0.5 truncate text-sm font-black text-white">
+                          <p className="mt-0.5 break-words text-sm font-black leading-5 text-white">
                             {summaryLoading ? "…" : item.value}
                           </p>
                         </div>
@@ -743,7 +897,7 @@ export default function SupportSlaPage() {
             </div>
 
             {/* Animated SLA visual */}
-            <div className="relative mx-auto hidden h-[260px] w-full max-w-[430px] lg:block">
+            <div className="relative mx-auto hidden h-[260px] w-full max-w-[430px] xl:block">
               <div className="absolute left-1/2 top-1/2 h-[238px] w-[238px] -translate-x-1/2 -translate-y-1/2">
                 <div className="support-sla-core absolute left-1/2 top-1/2 flex h-[108px] w-[108px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-white/10 shadow-[0_28px_65px_rgba(6,78,59,0.30)] backdrop-blur-xl">
                   <div className="relative flex h-[76px] w-[76px] items-center justify-center rounded-full border border-white/15 bg-white/10 text-white">
@@ -768,7 +922,7 @@ export default function SupportSlaPage() {
                 </div>
 
                 <div className="support-sla-float-card support-sla-float-card-one absolute -left-14 top-8 rounded-2xl border border-white/15 bg-white/10 px-3 py-2.5 shadow-xl backdrop-blur-xl">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
                     <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-white">
                       <Clock3 className="h-3.5 w-3.5" />
                     </span>
@@ -810,7 +964,7 @@ export default function SupportSlaPage() {
         {/* =================================================
             SUMMARY CARDS
         ================================================== */}
-        <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+        <section className="grid grid-cols-2 gap-3 md:grid-cols-3 2xl:grid-cols-5">
           {summaryCards.map(
             (card, index) => (
               <motion.div
@@ -835,7 +989,7 @@ export default function SupportSlaPage() {
                     {card.icon}
                   </span>
 
-                  <span className="text-[9px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+                  <span className="break-words text-right text-[9px] font-black uppercase leading-4 tracking-[0.12em] text-muted-foreground">
                     {card.label}
                   </span>
                 </div>
@@ -844,7 +998,7 @@ export default function SupportSlaPage() {
                   {summaryLoading ? (
                     <div className="h-7 w-16 animate-pulse rounded-lg bg-muted" />
                   ) : (
-                    <p className="text-2xl font-black text-foreground">
+                    <p className="break-words text-xl font-black leading-7 text-foreground sm:text-2xl">
                       {card.value}
                     </p>
                   )}
@@ -858,8 +1012,8 @@ export default function SupportSlaPage() {
             FILTERS
         ================================================== */}
         <section className="rounded-[26px] border border-border bg-card p-4 shadow-sm">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(260px,1fr)_180px_180px_180px]">
-            <div className="relative min-w-0 sm:col-span-2 xl:col-span-1">
+          <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(260px,1fr)_180px_180px_180px]">
+            <div className="relative min-w-0 md:col-span-2 2xl:col-span-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 
               <input
@@ -925,7 +1079,7 @@ export default function SupportSlaPage() {
             <div className="flex items-start gap-3">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
 
-              <p className="text-xs font-bold leading-5 text-rose-700 dark:text-rose-300">
+              <p className="min-w-0 break-words [overflow-wrap:anywhere] text-xs font-bold leading-5 text-rose-700 dark:text-rose-300">
                 {error}
               </p>
             </div>
@@ -935,7 +1089,7 @@ export default function SupportSlaPage() {
         {/* =================================================
             MOBILE / TABLET CARDS
         ================================================== */}
-        <section className="space-y-3 lg:hidden">
+        <section className="space-y-3 xl:hidden">
           {loading ? (
             <div className="space-y-3">
               {Array.from({
@@ -976,9 +1130,9 @@ export default function SupportSlaPage() {
         {/* =================================================
             DESKTOP TABLE
         ================================================== */}
-        <section className="hidden overflow-hidden rounded-[28px] border border-border bg-card shadow-sm lg:block">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1180px]">
+        <section className="hidden min-w-0 overflow-hidden rounded-[28px] border border-border bg-card shadow-sm xl:block">
+          <div className="support-sla-scroll overflow-x-auto overscroll-x-contain">
+            <table className="w-full min-w-[1120px]">
               <thead>
                 <tr className="border-b border-border bg-muted/60">
                   {[
@@ -1099,6 +1253,34 @@ export default function SupportSlaPage() {
       <style>{`
         .support-sla-hero {
           isolation: isolate;
+        }
+
+        .support-sla-scroll {
+          scrollbar-width: thin;
+          scrollbar-color:
+            rgba(16, 185, 129, 0.42)
+            transparent;
+        }
+
+        .support-sla-scroll::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+
+        .support-sla-scroll::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        .support-sla-scroll::-webkit-scrollbar-thumb {
+          border: 2px solid transparent;
+          border-radius: 999px;
+          background: rgba(16, 185, 129, 0.36);
+          background-clip: padding-box;
+        }
+
+        .support-sla-scroll::-webkit-scrollbar-thumb:hover {
+          background: rgba(5, 150, 105, 0.54);
+          background-clip: padding-box;
         }
 
         .support-sla-grid {
@@ -1455,7 +1637,7 @@ function SlaRow({
               {ticket.ticketNumber}
             </p>
 
-            <p className="mt-1 max-w-[280px] truncate text-xs font-black text-foreground">
+            <p className="mt-1 max-w-[280px] break-words text-xs font-black leading-5 text-foreground">
               {ticket.subject}
             </p>
 
@@ -1475,7 +1657,7 @@ function SlaRow({
               {ticket.customer.name}
             </p>
 
-            <p className="mt-1 max-w-[220px] truncate text-[9px] text-muted-foreground">
+            <p className="mt-1 max-w-[220px] break-all text-[9px] leading-4 text-muted-foreground">
               {ticket.customer.email}
             </p>
           </div>
@@ -1484,7 +1666,7 @@ function SlaRow({
 
       <td className="px-5 py-4">
         <span
-          className={`inline-flex rounded-full border px-2.5 py-1 text-[9px] font-black ${
+          className={`inline-flex max-w-[160px] whitespace-normal rounded-full border px-2.5 py-1 text-left text-[9px] font-black leading-4 ${
             priorityClasses[
               ticket.priority
             ] ??
@@ -1497,7 +1679,7 @@ function SlaRow({
 
       <td className="px-5 py-4">
         <span
-          className={`inline-flex rounded-full border px-2.5 py-1 text-[9px] font-black ${
+          className={`inline-flex max-w-[160px] whitespace-normal rounded-full border px-2.5 py-1 text-left text-[9px] font-black leading-4 ${
             statusClasses[
               ticket.status
             ] ??
@@ -1519,7 +1701,7 @@ function SlaRow({
               {ticket.assignee.name}
             </p>
 
-            <p className="mt-1 text-[9px] font-black uppercase tracking-[0.08em] text-muted-foreground">
+            <p className="mt-1 break-words text-[9px] font-black uppercase leading-4 tracking-[0.08em] text-muted-foreground">
               {ticket.assignee.role}
             </p>
           </div>
@@ -1532,7 +1714,7 @@ function SlaRow({
 
       <td className="px-5 py-4">
         <span
-          className={`inline-flex rounded-full border px-2.5 py-1 text-[9px] font-black ${
+          className={`inline-flex max-w-[160px] whitespace-normal rounded-full border px-2.5 py-1 text-left text-[9px] font-black leading-4 ${
             slaClasses[
               ticket.sla.status
             ]
@@ -1588,7 +1770,7 @@ function SlaRow({
           <Clock3 className="mt-0.5 h-3.5 w-3.5 text-muted-foreground" />
 
           <div>
-            <p className="text-[10px] font-bold text-foreground">
+            <p className="break-words text-[10px] font-bold leading-4 text-foreground">
               {formatDateTime(
                 ticket.sla.dueAt
               )}
@@ -1625,7 +1807,7 @@ function SlaMobileCard({
 
   return (
     <article className="rounded-[24px] border border-border bg-card p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-3 min-[480px]:flex-row min-[480px]:items-start min-[480px]:justify-between">
         <div className="min-w-0">
           <p className="text-[9px] font-black uppercase tracking-[0.1em] text-emerald-700 dark:text-emerald-400">
             {ticket.ticketNumber}
@@ -1641,7 +1823,7 @@ function SlaMobileCard({
         </div>
 
         <span
-          className={`shrink-0 rounded-full border px-2.5 py-1 text-[8px] font-black ${
+          className={`max-w-full self-start whitespace-normal rounded-full border px-2.5 py-1 text-left text-[8px] font-black leading-4 min-[480px]:shrink-0 ${
             slaClasses[
               ticket.sla.status
             ]
@@ -1651,7 +1833,7 @@ function SlaMobileCard({
         </span>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3">
+      <div className="mt-4 grid grid-cols-1 gap-3 min-[460px]:grid-cols-2">
         <MobileInfo
           label="Customer"
           value={ticket.customer.name}
@@ -1709,7 +1891,7 @@ function SlaMobileCard({
             Due at
           </p>
 
-          <p className="mt-1 text-[10px] font-bold text-foreground">
+          <p className="mt-1 break-words text-[10px] font-bold leading-4 text-foreground">
             {formatDateTime(
               ticket.sla.dueAt
             )}
@@ -1766,7 +1948,7 @@ function SelectField({
             event.target.value
           )
         }
-        className="h-11 w-full appearance-none rounded-xl border border-border bg-muted/60 px-4 pr-10 text-xs font-bold text-foreground outline-none transition focus:border-emerald-400 focus:bg-background focus:ring-4 focus:ring-emerald-500/10"
+        className="h-11 min-w-0 w-full appearance-none rounded-xl border border-border bg-muted/60 px-4 pr-10 text-xs font-bold text-foreground outline-none transition focus:border-emerald-400 focus:bg-background focus:ring-4 focus:ring-emerald-500/10"
       >
         {options.map(
           (option) => (

@@ -50,6 +50,10 @@ import {
   type SupportAnalytics,
 } from "@/lib/api/supportDashboardApi";
 
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
 /* =========================================================
    CONSTANTS
 ========================================================= */
@@ -104,10 +108,172 @@ function formatNumber(value: number) {
 }
 
 /* =========================================================
-   PAGE
+   SUPPORT-ONLY ACCESS
+========================================================= */
+
+function isAuthorizationError(
+  error: unknown
+): boolean {
+  const maybeRecord =
+    error &&
+    typeof error === "object"
+      ? (
+          error as
+            Record<
+              string,
+              unknown
+            >
+        )
+      : null;
+
+  const response =
+    maybeRecord?.response &&
+    typeof maybeRecord.response ===
+      "object"
+      ? (
+          maybeRecord.response as
+            Record<
+              string,
+              unknown
+            >
+        )
+      : null;
+
+  const status =
+    Number(
+      maybeRecord?.status ??
+        maybeRecord?.statusCode ??
+        response?.status
+    );
+
+  if (
+    status === 401 ||
+    status === 403
+  ) {
+    return true;
+  }
+
+  const message =
+    error instanceof Error
+      ? error.message
+          .toLowerCase()
+      : String(
+          error ?? ""
+        ).toLowerCase();
+
+  return (
+    message.includes("401") ||
+    message.includes("403") ||
+    message.includes(
+      "unauthorized"
+    ) ||
+    message.includes(
+      "forbidden"
+    ) ||
+    message.includes(
+      "access denied"
+    ) ||
+    message.includes(
+      "not authorized"
+    )
+  );
+}
+
+function SupportNotFoundState() {
+  return (
+    <main className="relative flex min-h-[78vh] items-center justify-center overflow-hidden bg-background px-4 text-foreground">
+      <div className="pointer-events-none absolute left-1/2 top-1/2 h-[440px] w-[440px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-500/[0.08] blur-[120px]" />
+
+      <motion.section
+        initial={{
+          opacity: 0,
+          y: 18,
+          scale: 0.98,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          scale: 1,
+        }}
+        transition={{
+          duration: 0.45,
+          ease: [
+            0.22,
+            1,
+            0.36,
+            1,
+          ],
+        }}
+        className="relative w-full max-w-xl overflow-hidden rounded-[32px] border border-border bg-card p-7 text-center shadow-[0_28px_90px_rgba(15,23,42,.10)] sm:p-10"
+      >
+        <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-emerald-500/[0.08] blur-3xl" />
+
+        <div className="relative">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] border border-emerald-500/15 bg-emerald-500/10 text-emerald-600">
+            <BarChart3 className="h-6 w-6" />
+          </div>
+
+          <p className="mt-6 text-[11px] font-black uppercase tracking-[0.22em] text-emerald-600">
+            Error 404
+          </p>
+
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">
+            Page not found
+          </h1>
+
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+            The page you are looking for does not exist or is not available.
+          </p>
+        </div>
+      </motion.section>
+    </main>
+  );
+}
+
+/* =========================================================
+   OUTER ACCESS GATE
 ========================================================= */
 
 export default function SupportAnalyticsPage() {
+  const {
+    user,
+  } = useDashboardSession();
+
+  const [
+    accessDenied,
+    setAccessDenied,
+  ] = useState(false);
+
+  const denyAccess =
+    useCallback(() => {
+      setAccessDenied(true);
+    }, []);
+
+  if (
+    accessDenied ||
+    user?.role !== "support"
+  ) {
+    return (
+      <SupportNotFoundState />
+    );
+  }
+
+  return (
+    <SupportAnalyticsContent
+      onUnauthorized={denyAccess}
+    />
+  );
+}
+
+/* =========================================================
+   PAGE CONTENT
+========================================================= */
+
+function SupportAnalyticsContent({
+  onUnauthorized,
+}: {
+  onUnauthorized: () => void;
+}) {
   const [days, setDays] = useState<AnalyticsRange>(30);
   const [analytics, setAnalytics] = useState<SupportAnalytics | null>(null);
 
@@ -144,6 +310,15 @@ export default function SupportAnalyticsPage() {
 
         setAnalytics(response.analytics);
       } catch (requestError) {
+        if (
+          isAuthorizationError(
+            requestError
+          )
+        ) {
+          onUnauthorized();
+          return;
+        }
+
         setError(
           requestError instanceof Error
             ? requestError.message
@@ -154,7 +329,10 @@ export default function SupportAnalyticsPage() {
         setRefreshing(false);
       }
     },
-    [days]
+    [
+      days,
+      onUnauthorized,
+    ]
   );
 
   useEffect(() => {
@@ -271,21 +449,6 @@ export default function SupportAnalyticsPage() {
   if (loading && !analytics) {
     return (
       <main className="support-analytics-page flex min-h-[70vh] items-center justify-center bg-transparent">
-        <style>{`
-          .support-analytics-page,
-          .support-analytics-page * {
-            scrollbar-width: none;
-            -ms-overflow-style: none;
-          }
-
-          .support-analytics-page::-webkit-scrollbar,
-          .support-analytics-page *::-webkit-scrollbar {
-            width: 0 !important;
-            height: 0 !important;
-            display: none !important;
-          }
-        `}</style>
-
         <div className="text-center">
           <div className="relative mx-auto h-16 w-16">
             <motion.div
@@ -316,23 +479,8 @@ export default function SupportAnalyticsPage() {
   }
 
   return (
-    <main className="support-analytics-page bg-transparent pb-8 text-foreground">
-      <style>{`
-        .support-analytics-page,
-        .support-analytics-page * {
-          scrollbar-width: none;
-          -ms-overflow-style: none;
-        }
-
-        .support-analytics-page::-webkit-scrollbar,
-        .support-analytics-page *::-webkit-scrollbar {
-          width: 0 !important;
-          height: 0 !important;
-          display: none !important;
-        }
-      `}</style>
-
-      <div className="mx-auto max-w-[1600px] space-y-6">
+    <main className="support-analytics-page w-full min-w-0 overflow-x-clip bg-transparent pb-8 text-foreground">
+      <div className="mx-auto w-full max-w-[1600px] space-y-5 px-1 sm:space-y-6 sm:px-0">
         {/* =================================================
             HERO
         ================================================= */}
@@ -498,7 +646,7 @@ export default function SupportAnalyticsPage() {
               </div>
             </div>
 
-            <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-center xl:flex-col xl:items-end">
+            <div className="flex w-full flex-col items-stretch gap-3 sm:w-auto sm:flex-row sm:items-center xl:flex-col xl:items-end">
               <div className="flex flex-wrap items-center gap-2">
                 {RANGE_OPTIONS.map(
                   (value) => (
@@ -539,7 +687,7 @@ export default function SupportAnalyticsPage() {
                   void loadAnalytics(true)
                 }
                 disabled={refreshing}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-white px-4 text-xs font-black text-emerald-800 shadow-[0_12px_32px_rgba(0,0,0,.16)] transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 text-xs font-black text-emerald-800 shadow-[0_12px_32px_rgba(0,0,0,.16)] transition hover:-translate-y-0.5 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
               >
                 <RefreshCw
                   className={`h-4 w-4 ${
@@ -603,7 +751,7 @@ export default function SupportAnalyticsPage() {
                 METRICS
             ============================================== */}
 
-            <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 2xl:grid-cols-7">
+            <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 min-[1900px]:grid-cols-7">
               <MetricCard
                 icon={Ticket}
                 label="Total tickets"
@@ -675,7 +823,7 @@ export default function SupportAnalyticsPage() {
                 DAILY + STATUS
             ============================================== */}
 
-            <section className="grid gap-4 xl:grid-cols-[1.55fr_.85fr]">
+            <section className="grid min-w-0 gap-4 2xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,.85fr)]">
               <motion.article
                 initial={{
                   opacity: 0,
@@ -694,7 +842,7 @@ export default function SupportAnalyticsPage() {
                   description="New support tickets compared with resolved tickets over the selected reporting period."
                 />
 
-                <div className="h-[310px] p-3 pt-2 sm:h-[350px] sm:p-4">
+                <div className="h-[320px] min-w-0 p-3 pt-2 sm:h-[360px] sm:p-4">
                   {dailyData.length === 0 ? (
                     <EmptyChart
                       title="No daily trend data"
@@ -835,7 +983,7 @@ export default function SupportAnalyticsPage() {
                   </p>
                 </div>
 
-                <div className="relative h-[310px] sm:h-[350px]">
+                <div className="relative h-[320px] min-w-0 sm:h-[360px]">
                   {statusData.length === 0 ? (
                     <div className="flex h-full items-center justify-center px-6 text-center text-xs font-bold text-emerald-50/70">
                       No status distribution data yet.
@@ -912,7 +1060,7 @@ export default function SupportAnalyticsPage() {
                 CATEGORY + PRIORITY
             ============================================== */}
 
-            <section className="grid gap-4 xl:grid-cols-2">
+            <section className="grid min-w-0 gap-4 2xl:grid-cols-2">
               <motion.article
                 initial={{
                   opacity: 0,
@@ -931,7 +1079,7 @@ export default function SupportAnalyticsPage() {
                   description="Which support areas generated the most tickets."
                 />
 
-                <div className="h-[300px] p-3 pt-2 sm:h-[330px] sm:p-4">
+                <div className="h-[310px] min-w-0 p-3 pt-2 sm:h-[340px] sm:p-4">
                   {categoryData.length === 0 ? (
                     <EmptyChart
                       title="No category data"
@@ -962,7 +1110,8 @@ export default function SupportAnalyticsPage() {
                           dataKey="name"
                           axisLine={false}
                           tickLine={false}
-                          interval={0}
+                          interval="preserveStartEnd"
+                          minTickGap={18}
                           tick={{
                             fontSize: 8,
                             fill:
@@ -1037,7 +1186,7 @@ export default function SupportAnalyticsPage() {
                   description="Visible support load across low, normal, high and urgent priority levels."
                 />
 
-                <div className="h-[300px] p-3 pt-2 sm:h-[330px] sm:p-4">
+                <div className="h-[310px] min-w-0 p-3 pt-2 sm:h-[340px] sm:p-4">
                   {priorityData.length === 0 ? (
                     <EmptyChart
                       title="No priority data"
@@ -1126,7 +1275,7 @@ export default function SupportAnalyticsPage() {
                 ACTIVITY + HEALTH PANEL
             ============================================== */}
 
-            <section className="grid gap-4 xl:grid-cols-[1.25fr_.75fr]">
+            <section className="grid min-w-0 gap-4 2xl:grid-cols-[minmax(0,1.25fr)_minmax(300px,.75fr)]">
               <motion.article
                 initial={{
                   opacity: 0,
@@ -1174,7 +1323,7 @@ export default function SupportAnalyticsPage() {
                             }}
                             className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-muted/35 px-3 py-3 sm:px-4"
                           >
-                            <span className="min-w-0 truncate text-[9px] font-black text-foreground">
+                            <span className="min-w-0 break-words text-[9px] font-black leading-4 text-foreground">
                               {item.name}
                             </span>
 
@@ -1402,7 +1551,7 @@ function MetricCard({
         {label}
       </p>
 
-      <p className="relative mt-1 text-xl font-black tracking-tight text-foreground">
+      <p className="relative mt-1 break-words text-lg font-black leading-6 tracking-tight text-foreground sm:text-xl">
         {value}
       </p>
 

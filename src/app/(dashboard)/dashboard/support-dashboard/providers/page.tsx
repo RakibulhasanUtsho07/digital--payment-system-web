@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -48,17 +49,155 @@ import {
 } from "recharts";
 
 import {
-  getAnalystProviderAnalytics,
   type AnalystMetric,
   type AnalystMode,
   type AnalystProviderAnalyticsData,
+  type AnalystProviderAnalyticsFilters,
   type AnalystProviderInsight,
   type AnalystRange,
 } from "@/lib/api/analystApi";
 
 import {
+  apiClient,
   isApiAbortError,
 } from "@/lib/api/client";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+/* =========================================================
+   SUPPORT PROVIDER API
+
+   This support-dashboard page must not call /analyst/providers,
+   because the Analyst router intentionally excludes Support.
+
+   Backend route expected:
+   GET /api/admin/support/providers
+   protected with requireSupport.
+========================================================= */
+
+interface SupportProviderAnalyticsResponse {
+  success: boolean;
+  data: AnalystProviderAnalyticsData;
+  message?: string;
+}
+
+async function getSupportProviderAnalytics(
+  filters: AnalystProviderAnalyticsFilters,
+  signal?: AbortSignal
+): Promise<AnalystProviderAnalyticsData> {
+  const params =
+    new URLSearchParams({
+      range: filters.range,
+      mode: filters.mode,
+      currency:
+        filters.currency
+          .trim()
+          .toUpperCase(),
+    });
+
+  const provider =
+    filters.provider
+      ?.trim()
+      .toLowerCase();
+
+  if (provider) {
+    params.set(
+      "provider",
+      provider
+    );
+  }
+
+  const response =
+    await apiClient<SupportProviderAnalyticsResponse>(
+      `/admin/support/providers?${params.toString()}`,
+      {
+        method: "GET",
+        signal,
+      }
+    );
+
+  if (
+    !response.success ||
+    !response.data
+  ) {
+    throw new Error(
+      response.message ||
+        "Unable to load provider analytics."
+    );
+  }
+
+  return response.data;
+}
+
+function isAuthorizationError(
+  error: unknown
+): boolean {
+  const record =
+    error &&
+    typeof error === "object"
+      ? (
+          error as
+            Record<
+              string,
+              unknown
+            >
+        )
+      : null;
+
+  const response =
+    record?.response &&
+    typeof record.response ===
+      "object"
+      ? (
+          record.response as
+            Record<
+              string,
+              unknown
+            >
+        )
+      : null;
+
+  const status =
+    Number(
+      record?.status ??
+        record?.statusCode ??
+        response?.status
+    );
+
+  if (
+    status === 401 ||
+    status === 403
+  ) {
+    return true;
+  }
+
+  const message =
+    error instanceof Error
+      ? error.message
+          .toLowerCase()
+      : String(
+          error ?? ""
+        ).toLowerCase();
+
+  return (
+    message.includes("401") ||
+    message.includes("403") ||
+    message.includes(
+      "unauthorized"
+    ) ||
+    message.includes(
+      "forbidden"
+    ) ||
+    message.includes(
+      "access denied"
+    ) ||
+    message.includes(
+      "not authorized"
+    )
+  );
+}
 
 /* =========================================================
    OPTIONS
@@ -503,7 +642,7 @@ function MetricCard({
             {label}
           </p>
 
-          <p className="mt-3 truncate text-2xl font-black tracking-tight text-card-foreground">
+          <p className="mt-3 break-words text-xl font-black leading-7 tracking-tight text-card-foreground sm:text-2xl">
             {value}
           </p>
         </div>
@@ -563,7 +702,7 @@ function SummaryCard({
             {label}
           </p>
 
-          <p className="mt-3 truncate text-2xl font-black text-card-foreground">
+          <p className="mt-3 break-words text-xl font-black leading-7 text-card-foreground sm:text-2xl">
             {value}
           </p>
 
@@ -605,7 +744,7 @@ function Panel({
     React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-border bg-card shadow-sm">
+    <section className="min-w-0 rounded-2xl border border-border bg-card shadow-sm">
       <div className="flex flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-base font-extrabold text-card-foreground">
@@ -620,7 +759,7 @@ function Panel({
         {action}
       </div>
 
-      <div className="p-5">
+      <div className="min-w-0 p-4 sm:p-5">
         {children}
       </div>
     </section>
@@ -711,7 +850,7 @@ function InsightCard({
             </span>
           </div>
 
-          <p className="mt-2 text-xs leading-5 text-muted-foreground">
+          <p className="mt-2 break-words [overflow-wrap:anywhere] text-xs leading-5 text-muted-foreground">
             {insight.description}
           </p>
 
@@ -720,12 +859,12 @@ function InsightCard({
               Evidence
             </p>
 
-            <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
+            <p className="mt-1 break-words [overflow-wrap:anywhere] text-[11px] leading-5 text-muted-foreground">
               {insight.evidence}
             </p>
           </div>
 
-          <p className="mt-3 text-[11px] leading-5 text-foreground/80">
+          <p className="mt-3 break-words [overflow-wrap:anywhere] text-[11px] leading-5 text-foreground/80">
             <span className="font-extrabold">
               Recommended review:
             </span>{" "}
@@ -738,10 +877,106 @@ function InsightCard({
 }
 
 /* =========================================================
+   SUPPORT-ONLY ACCESS
+========================================================= */
+
+function SupportNotFoundState() {
+  return (
+    <main className="relative flex min-h-[78vh] items-center justify-center overflow-hidden bg-background px-4 text-foreground">
+      <div className="pointer-events-none absolute left-1/2 top-1/2 h-[440px] w-[440px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-500/[0.08] blur-[120px]" />
+
+      <motion.section
+        initial={{
+          opacity: 0,
+          y: 18,
+          scale: 0.98,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          scale: 1,
+        }}
+        transition={{
+          duration: 0.45,
+          ease: [
+            0.22,
+            1,
+            0.36,
+            1,
+          ],
+        }}
+        className="relative w-full max-w-xl overflow-hidden rounded-[32px] border border-border bg-card p-7 text-center shadow-[0_28px_90px_rgba(15,23,42,.10)] sm:p-10"
+      >
+        <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-emerald-500/[0.08] blur-3xl" />
+
+        <div className="relative">
+          <div className="mx-auto grid h-16 w-16 place-items-center rounded-[22px] border border-emerald-500/15 bg-emerald-500/10 text-emerald-600">
+            <Server className="h-6 w-6" />
+          </div>
+
+          <p className="mt-6 text-[11px] font-black uppercase tracking-[0.22em] text-emerald-600">
+            Error 404
+          </p>
+
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">
+            Page not found
+          </h1>
+
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+            The page you are looking for does not exist or is not available.
+          </p>
+        </div>
+      </motion.section>
+    </main>
+  );
+}
+
+/* =========================================================
    PAGE
 ========================================================= */
 
-export default function AnalystProvidersPage() {
+export default function SupportProvidersPage() {
+  const {
+    user,
+  } =
+    useDashboardSession();
+
+  const [
+    accessDenied,
+    setAccessDenied,
+  ] =
+    useState(false);
+
+  const denyAccess =
+    useCallback(() => {
+      setAccessDenied(true);
+    }, []);
+
+  if (
+    accessDenied ||
+    user.role !==
+      "support"
+  ) {
+    return (
+      <SupportNotFoundState />
+    );
+  }
+
+  return (
+    <SupportProvidersContent
+      onUnauthorized={
+        denyAccess
+      }
+    />
+  );
+}
+
+function SupportProvidersContent({
+  onUnauthorized,
+}: {
+  onUnauthorized: () =>
+    void;
+}) {
   const [
     range,
     setRange,
@@ -849,7 +1084,7 @@ export default function AnalystProvidersPage() {
 
           try {
             const result =
-              await getAnalystProviderAnalytics(
+              await getSupportProviderAnalytics(
                 {
                   range,
 
@@ -884,6 +1119,15 @@ export default function AnalystProvidersPage() {
                 loadError
               )
             ) {
+              return;
+            }
+
+            if (
+              isAuthorizationError(
+                loadError
+              )
+            ) {
+              onUnauthorized();
               return;
             }
 
@@ -928,6 +1172,7 @@ export default function AnalystProvidersPage() {
       currency,
       provider,
       refreshKey,
+      onUnauthorized,
     ]
   );
 
@@ -1060,7 +1305,7 @@ export default function AnalystProvidersPage() {
       <div className="space-y-5">
         <div className="h-44 animate-pulse rounded-3xl bg-muted" />
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
           {Array.from({
             length:
               8,
@@ -1079,8 +1324,8 @@ export default function AnalystProvidersPage() {
           )}
         </div>
 
-        <div className="grid gap-5 xl:grid-cols-3">
-          <div className="h-[420px] animate-pulse rounded-2xl bg-muted xl:col-span-2" />
+        <div className="grid gap-5 2xl:grid-cols-3">
+          <div className="h-[420px] animate-pulse rounded-2xl bg-muted 2xl:col-span-2" />
 
           <div className="h-[420px] animate-pulse rounded-2xl bg-muted" />
         </div>
@@ -1156,7 +1401,7 @@ export default function AnalystProvidersPage() {
   ======================================================= */
 
   return (
-    <div className="space-y-6 pb-8">
+    <div className="w-full min-w-0 space-y-5 overflow-x-clip pb-8 sm:space-y-6">
       {/* ===================================================
           PREMIUM SUPPORT-DASHBOARD HERO
       ==================================================== */}
@@ -1190,7 +1435,7 @@ export default function AnalystProvidersPage() {
           <div className="provider-hero-ring provider-hero-ring-two absolute right-1 top-1/2 hidden h-[255px] w-[255px] -translate-y-1/2 rounded-full border border-white/10 xl:block" />
         </div>
 
-        <div className="relative z-10 grid min-h-[315px] gap-8 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_370px] lg:items-center lg:p-7 xl:grid-cols-[minmax(0,1fr)_440px] xl:p-8">
+        <div className="relative z-10 grid min-h-[315px] gap-8 p-5 sm:p-6 lg:p-7 xl:grid-cols-[minmax(0,1fr)_380px] xl:items-center xl:p-8 2xl:grid-cols-[minmax(0,1fr)_440px]">
           {/* Copy + live metrics */}
           <div className="max-w-4xl">
             <div className="flex flex-wrap items-center gap-2">
@@ -1213,7 +1458,7 @@ export default function AnalystProvidersPage() {
               </span>
             </div>
 
-            <div className="mt-5 flex items-start gap-4">
+            <div className="mt-5 flex flex-col gap-4 min-[480px]:flex-row min-[480px]:items-start">
               <motion.div
                 animate={{
                   y: [0, -6, 0],
@@ -1232,17 +1477,17 @@ export default function AnalystProvidersPage() {
 
               <div className="min-w-0">
                 <p className="text-[9px] font-black uppercase tracking-[0.18em] text-emerald-100">
-                  Analyst Operations
+                  Support Operations
                 </p>
 
                 <h1 className="mt-1 text-2xl font-black tracking-tight text-white sm:text-3xl lg:text-[36px] lg:leading-[1.08]">
-                  Provider Analytics
+                  Provider Health & Analytics
                 </h1>
 
                 <p className="mt-3 max-w-3xl text-[11px] leading-5 text-emerald-50/80 sm:text-xs sm:leading-6">
-                  Compare payment-provider reliability, success rate, failures,
-                  payment volume and completion latency across live Coffer
-                  gateway traffic.
+                  Inspect payment-provider reliability, success rate, failures,
+                  payment volume and completion latency to support customer
+                  investigations without changing financial state.
                 </p>
               </div>
             </div>
@@ -1305,11 +1550,11 @@ export default function AnalystProvidersPage() {
                       </span>
 
                       <div className="min-w-0">
-                        <p className="truncate text-[8px] font-black uppercase tracking-[0.14em] text-white/55">
+                        <p className="break-words text-[8px] font-black uppercase leading-4 tracking-[0.14em] text-white/55">
                           {item.label}
                         </p>
 
-                        <p className="mt-0.5 truncate text-sm font-black text-white">
+                        <p className="mt-0.5 break-words text-sm font-black leading-5 text-white">
                           {item.value}
                         </p>
                       </div>
@@ -1352,13 +1597,13 @@ export default function AnalystProvidersPage() {
 
               <span className="inline-flex items-center justify-center gap-2 text-[9px] font-bold text-white/65 sm:justify-start">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-200 shadow-[0_0_12px_rgba(167,243,208,0.85)]" />
-                Aggregate · read-only · live API data
+                Support-only · read-only · live API data
               </span>
             </div>
           </div>
 
           {/* Animated provider network visual */}
-          <div className="relative mx-auto hidden h-[270px] w-full max-w-[440px] lg:block">
+          <div className="relative mx-auto hidden h-[270px] w-full max-w-[440px] xl:block">
             <div className="absolute left-1/2 top-1/2 h-[245px] w-[245px] -translate-x-1/2 -translate-y-1/2">
               <div className="provider-core absolute left-1/2 top-1/2 flex h-[112px] w-[112px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[34px] border border-white/20 bg-white/10 shadow-[0_28px_65px_rgba(6,78,59,0.30)] backdrop-blur-xl">
                 <div className="flex h-[78px] w-[78px] items-center justify-center rounded-[25px] border border-white/15 bg-white/10 text-white">
@@ -1458,7 +1703,7 @@ export default function AnalystProvidersPage() {
       ==================================================== */}
 
       <section className="rounded-[26px] border border-border bg-card p-4 shadow-sm">
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_auto_auto] xl:items-end">
+        <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-[minmax(180px,1fr)_minmax(180px,1fr)_minmax(200px,1fr)_auto_auto] 2xl:items-end">
           <label className="min-w-0">
             <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">
               Period
@@ -1556,7 +1801,7 @@ export default function AnalystProvidersPage() {
               Currency
             </span>
 
-            <div className="flex">
+            <div className="flex w-full sm:w-auto">
               <input
                 value={currencyDraft}
                 onChange={(event) =>
@@ -1575,7 +1820,7 @@ export default function AnalystProvidersPage() {
                 }
                 maxLength={3}
                 aria-label="Currency code"
-                className="h-11 w-20 rounded-l-xl border border-r-0 border-border bg-muted/55 px-3 text-center text-xs font-black uppercase text-foreground outline-none transition focus:border-emerald-400 focus:bg-background"
+                className="h-11 min-w-0 flex-1 rounded-l-xl border border-r-0 border-border bg-muted/55 px-3 text-center text-xs font-black uppercase text-foreground outline-none transition focus:border-emerald-400 focus:bg-background sm:w-20 sm:flex-none"
               />
 
               <button
@@ -1617,7 +1862,7 @@ export default function AnalystProvidersPage() {
         <div className="flex items-center gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
           <AlertTriangle className="h-5 w-5 shrink-0" />
 
-          <p>
+          <p className="min-w-0 break-words [overflow-wrap:anywhere]">
             {error}
           </p>
         </div>
@@ -1627,7 +1872,7 @@ export default function AnalystProvidersPage() {
           PLATFORM SUMMARY
       ==================================================== */}
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
         <SummaryCard
           label="Providers"
           value={formatNumber(
@@ -1691,7 +1936,7 @@ export default function AnalystProvidersPage() {
           SELECTED METRICS
       ==================================================== */}
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
         <MetricCard
           label="Payment attempts"
           value={formatNumber(
@@ -1858,8 +2103,8 @@ export default function AnalystProvidersPage() {
           TREND + PROVIDER COMPARISON
       ==================================================== */}
 
-      <div className="grid gap-5 xl:grid-cols-3">
-        <div className="xl:col-span-2">
+      <div className="grid gap-5 2xl:grid-cols-3">
+        <div className="2xl:col-span-2">
           <Panel
             title="Provider traffic trend"
             description="Attempts, successful payments and failures for the selected provider scope."
@@ -1876,7 +2121,7 @@ export default function AnalystProvidersPage() {
                 item.attempts >
                 0
             ) ? (
-              <div className="h-[350px]">
+              <div className="h-[320px] min-w-0 sm:h-[350px]">
                 <ResponsiveContainer
                   width="100%"
                   height="100%"
@@ -1944,8 +2189,12 @@ export default function AnalystProvidersPage() {
                       tickLine={
                         false
                       }
+                      interval="preserveStartEnd"
                       minTickGap={
-                        24
+                        18
+                      }
+                      tickMargin={
+                        8
                       }
                       tick={{
                         fontSize:
@@ -2056,7 +2305,7 @@ export default function AnalystProvidersPage() {
         >
           {providerChart.length >
           0 ? (
-            <div className="h-[350px]">
+            <div className="h-[320px] min-w-0 sm:h-[350px]">
               <ResponsiveContainer
                 width="100%"
                 height="100%"
@@ -2214,8 +2463,8 @@ export default function AnalystProvidersPage() {
       >
         {data.providers.length >
         0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left">
+          <div className="support-provider-scroll overflow-x-auto overscroll-x-contain">
+            <table className="w-full min-w-[860px] text-left">
               <thead>
                 <tr className="border-b border-border">
                   <th className="px-3 py-3 text-[10px] font-black uppercase tracking-wider text-muted-foreground">
@@ -2281,7 +2530,7 @@ export default function AnalystProvidersPage() {
                                 item.provider
                               )
                             }
-                            className="text-xs font-extrabold text-foreground transition hover:text-primary"
+                            className="max-w-[180px] break-words text-left text-xs font-extrabold leading-5 text-foreground transition hover:text-primary"
                           >
                             {providerLabel(
                               item.provider
@@ -2352,7 +2601,7 @@ export default function AnalystProvidersPage() {
           TOP / WEAKEST
       ==================================================== */}
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid gap-5 xl:grid-cols-2">
         <Panel
           title="Top provider"
           description="Highest success rate in the current provider sample."
@@ -2436,7 +2685,7 @@ export default function AnalystProvidersPage() {
           FAILURE + LATENCY
       ==================================================== */}
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid gap-5 xl:grid-cols-2">
         <Panel
           title="Failure reasons"
           description="Recorded provider/payment failure codes for the selected scope."
@@ -2454,7 +2703,7 @@ export default function AnalystProvidersPage() {
                     }
                   >
                     <div className="mb-2 flex items-center justify-between gap-4">
-                      <span className="truncate text-xs font-bold text-foreground">
+                      <span className="min-w-0 break-words [overflow-wrap:anywhere] text-xs font-bold leading-5 text-foreground">
                         {providerLabel(
                           item.code
                         )}
@@ -2606,7 +2855,7 @@ export default function AnalystProvidersPage() {
               Read-only provider intelligence
             </p>
 
-            <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
+            <p className="mt-1 break-words [overflow-wrap:anywhere] text-[11px] leading-5 text-muted-foreground">
               {data.scopeNote}
             </p>
           </div>
@@ -2616,6 +2865,38 @@ export default function AnalystProvidersPage() {
       <style>{`
         .provider-hero {
           isolation: isolate;
+        }
+
+        .support-provider-scroll {
+          scrollbar-width: thin;
+          scrollbar-color:
+            rgba(16, 185, 129, 0.42)
+            transparent;
+        }
+
+        .support-provider-scroll::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+
+        .support-provider-scroll::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        .support-provider-scroll::-webkit-scrollbar-thumb {
+          border: 2px solid transparent;
+          border-radius: 999px;
+          background:
+            rgba(16, 185, 129, 0.36);
+          background-clip:
+            padding-box;
+        }
+
+        .support-provider-scroll::-webkit-scrollbar-thumb:hover {
+          background:
+            rgba(5, 150, 105, 0.54);
+          background-clip:
+            padding-box;
         }
 
         .provider-hero-grid {

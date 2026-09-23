@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -48,6 +49,10 @@ import {
   supportDashboardApi,
   type SupportPayment,
 } from "@/lib/api/supportDashboardApi";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
 
 /* =========================================================
    TYPES
@@ -190,6 +195,75 @@ function messageOf(error: unknown): string {
   return error instanceof Error
     ? error.message
     : "The request could not be completed.";
+}
+
+
+function isAuthorizationError(
+  error: unknown
+): boolean {
+  const record =
+    error &&
+    typeof error === "object"
+      ? (
+          error as
+            Record<
+              string,
+              unknown
+            >
+        )
+      : null;
+
+  const response =
+    record?.response &&
+    typeof record.response ===
+      "object"
+      ? (
+          record.response as
+            Record<
+              string,
+              unknown
+            >
+        )
+      : null;
+
+  const status =
+    Number(
+      record?.status ??
+        record?.statusCode ??
+        response?.status
+    );
+
+  if (
+    status === 401 ||
+    status === 403
+  ) {
+    return true;
+  }
+
+  const message =
+    error instanceof Error
+      ? error.message
+          .toLowerCase()
+      : String(
+          error ?? ""
+        ).toLowerCase();
+
+  return (
+    message.includes("401") ||
+    message.includes("403") ||
+    message.includes(
+      "unauthorized"
+    ) ||
+    message.includes(
+      "forbidden"
+    ) ||
+    message.includes(
+      "access denied"
+    ) ||
+    message.includes(
+      "not authorized"
+    )
+  );
 }
 
 function humanize(value: string): string {
@@ -398,7 +472,7 @@ function SupportSelect<T extends string>({
             exit={{ opacity: 0, y: -5, scale: 0.98 }}
             transition={{ duration: 0.16 }}
             role="listbox"
-            className="absolute left-0 right-0 z-50 mt-2 overflow-hidden rounded-2xl border border-emerald-100 bg-white/95 p-1.5 shadow-[0_24px_70px_-20px_rgba(5,150,105,.28)] backdrop-blur-xl dark:border-white/10 dark:bg-[#071b16]/95"
+            className="support-payment-scroll absolute left-0 right-0 z-50 mt-2 max-h-72 overflow-y-auto overscroll-contain rounded-2xl border border-emerald-100 bg-white/95 p-1.5 shadow-[0_24px_70px_-20px_rgba(5,150,105,.28)] backdrop-blur-xl dark:border-white/10 dark:bg-[#071b16]/95"
           >
             {options.map((option) => {
               const active = option.value === value;
@@ -539,7 +613,7 @@ function MetricCard({
             {label}
           </p>
 
-          <p className="mt-3 break-words text-2xl font-black tracking-tight text-slate-950 dark:text-white">
+          <p className="mt-3 break-words text-xl font-black leading-7 tracking-tight text-slate-950 dark:text-white sm:text-2xl">
             {value}
           </p>
 
@@ -616,7 +690,7 @@ function Panel({
         {action}
       </div>
 
-      <div className="p-5">{children}</div>
+      <div className="p-4 sm:p-5">{children}</div>
     </motion.section>
   );
 }
@@ -654,7 +728,7 @@ function CopyField({
       whileHover={{ y: -2 }}
       className="rounded-2xl border border-emerald-100 bg-emerald-50/30 p-4 dark:border-white/10 dark:bg-white/[0.025]"
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-3 min-[480px]:flex-row min-[480px]:items-start min-[480px]:justify-between">
         <div className="min-w-0">
           <Icon className="h-4 w-4 text-emerald-600" />
 
@@ -687,10 +761,106 @@ function CopyField({
 }
 
 /* =========================================================
+   SUPPORT-ONLY ACCESS
+========================================================= */
+
+function SupportNotFoundState() {
+  return (
+    <main className="relative flex min-h-[78vh] items-center justify-center overflow-hidden bg-background px-4 text-foreground">
+      <div className="pointer-events-none absolute left-1/2 top-1/2 h-[440px] w-[440px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-500/[0.08] blur-[120px]" />
+
+      <motion.section
+        initial={{
+          opacity: 0,
+          y: 18,
+          scale: 0.98,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          scale: 1,
+        }}
+        transition={{
+          duration: 0.45,
+          ease: [
+            0.22,
+            1,
+            0.36,
+            1,
+          ],
+        }}
+        className="relative w-full max-w-xl overflow-hidden rounded-[32px] border border-border bg-card p-7 text-center shadow-[0_28px_90px_rgba(15,23,42,.10)] sm:p-10"
+      >
+        <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-emerald-500/[0.08] blur-3xl" />
+
+        <div className="relative">
+          <div className="mx-auto grid h-16 w-16 place-items-center rounded-[22px] border border-emerald-500/15 bg-emerald-500/10 text-emerald-600">
+            <CircleDollarSign className="h-6 w-6" />
+          </div>
+
+          <p className="mt-6 text-[11px] font-black uppercase tracking-[0.22em] text-emerald-600">
+            Error 404
+          </p>
+
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">
+            Page not found
+          </h1>
+
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+            The page you are looking for does not exist or is not available.
+          </p>
+        </div>
+      </motion.section>
+    </main>
+  );
+}
+
+/* =========================================================
    PAGE
 ========================================================= */
 
 export default function SupportPaymentsPage() {
+  const {
+    user,
+  } =
+    useDashboardSession();
+
+  const [
+    accessDenied,
+    setAccessDenied,
+  ] =
+    useState(false);
+
+  const denyAccess =
+    useCallback(() => {
+      setAccessDenied(true);
+    }, []);
+
+  if (
+    accessDenied ||
+    user.role !==
+      "support"
+  ) {
+    return (
+      <SupportNotFoundState />
+    );
+  }
+
+  return (
+    <SupportPaymentsContent
+      onUnauthorized={
+        denyAccess
+      }
+    />
+  );
+}
+
+function SupportPaymentsContent({
+  onUnauthorized,
+}: {
+  onUnauthorized: () =>
+    void;
+}) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<PaymentStatusFilter>("All");
   const [sourceType, setSourceType] = useState<PaymentSourceFilter>("All");
@@ -743,8 +913,22 @@ export default function SupportPaymentsPage() {
           setTotal(result.total);
           setTotalPages(Math.max(1, result.totalPages));
         } catch (requestError: unknown) {
+          if (
+            active &&
+            isAuthorizationError(
+              requestError
+            )
+          ) {
+            onUnauthorized();
+            return;
+          }
+
           if (active) {
-            setError(messageOf(requestError));
+            setError(
+              messageOf(
+                requestError
+              )
+            );
           }
         } finally {
           if (active) {
@@ -767,6 +951,7 @@ export default function SupportPaymentsPage() {
     provider,
     page,
     refreshKey,
+    onUnauthorized,
   ]);
 
   useEffect(() => {
@@ -789,9 +974,24 @@ export default function SupportPaymentsPage() {
         }
       })
       .catch((requestError: unknown) => {
-        if (active) {
-          setError(messageOf(requestError));
+        if (!active) {
+          return;
         }
+
+        if (
+          isAuthorizationError(
+            requestError
+          )
+        ) {
+          onUnauthorized();
+          return;
+        }
+
+        setError(
+          messageOf(
+            requestError
+          )
+        );
       })
       .finally(() => {
         if (active) {
@@ -802,21 +1002,52 @@ export default function SupportPaymentsPage() {
     return () => {
       active = false;
     };
-  }, [selectedPaymentId]);
+  }, [
+    selectedPaymentId,
+    onUnauthorized,
+  ]);
 
   useEffect(() => {
-    if (!selectedPaymentId) return;
+    if (!selectedPaymentId) {
+      return;
+    }
 
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setSelectedPaymentId(null);
+    const previousOverflow =
+      document.body.style.overflow;
+
+    document.body.style.overflow =
+      "hidden";
+
+    function onKeyDown(
+      event: KeyboardEvent
+    ) {
+      if (
+        event.key ===
+        "Escape"
+      ) {
+        setSelectedPaymentId(
+          null
+        );
       }
     }
 
-    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener(
+      "keydown",
+      onKeyDown
+    );
 
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [selectedPaymentId]);
+    return () => {
+      document.body.style.overflow =
+        previousOverflow;
+
+      window.removeEventListener(
+        "keydown",
+        onKeyDown
+      );
+    };
+  }, [
+    selectedPaymentId,
+  ]);
 
   const visibleCompleted = useMemo(
     () => payments.filter((payment) => payment.status === "completed").length,
@@ -863,13 +1094,13 @@ export default function SupportPaymentsPage() {
   }
 
   return (
-    <main className="space-y-6">
+    <main className="w-full min-w-0 space-y-5 overflow-x-clip pb-8 sm:space-y-6">
       {/* HERO */}
       <motion.section
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-        className="relative isolate overflow-hidden rounded-[30px] border border-emerald-300/10 bg-[linear-gradient(135deg,#052E2B_0%,#064E3B_48%,#065F46_100%)] p-6 text-white shadow-[0_28px_80px_-42px_rgba(5,150,105,.58)] md:p-7 lg:p-8"
+        className="relative isolate overflow-hidden rounded-[30px] border border-emerald-300/10 bg-[linear-gradient(135deg,#052E2B_0%,#064E3B_48%,#065F46_100%)] p-5 text-white shadow-[0_28px_80px_-42px_rgba(5,150,105,.58)] sm:p-6 md:p-7 lg:p-8"
       >
         <motion.div
           animate={{
@@ -971,7 +1202,7 @@ export default function SupportPaymentsPage() {
             </div>
           </div>
 
-          <div className="relative shrink-0">
+          <div className="relative w-full shrink-0 sm:w-auto">
             <motion.div
               animate={{ rotate: 360 }}
               transition={{ duration: 19, repeat: Infinity, ease: "linear" }}
@@ -984,7 +1215,7 @@ export default function SupportPaymentsPage() {
               type="button"
               disabled={refreshing || loading}
               onClick={() => setRefreshKey((value) => value + 1)}
-              className="relative inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-xs font-black text-emerald-900 shadow-[0_12px_30px_rgba(0,0,0,.16)] transition hover:-translate-y-0.5 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+              className="relative inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white px-5 text-xs font-black text-emerald-900 shadow-[0_12px_30px_rgba(0,0,0,.16)] transition hover:-translate-y-0.5 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             >
               <RefreshCcw
                 className={`h-4 w-4 ${refreshing || loading ? "animate-spin" : ""}`}
@@ -1032,7 +1263,7 @@ export default function SupportPaymentsPage() {
           </button>
         </div>
 
-        <div className="grid gap-3 xl:grid-cols-[1.55fr_1fr_1fr_1fr_1fr]">
+        <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(0,1.55fr)_minmax(200px,1fr)_minmax(200px,1fr)_minmax(190px,1fr)_minmax(200px,1fr)]">
           <div>
             <p className="mb-1.5 px-1 text-[9px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
               Search payment
@@ -1149,7 +1380,7 @@ export default function SupportPaymentsPage() {
         variants={stagger}
         initial="hidden"
         animate="show"
-        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+        className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4"
       >
         <MetricCard
           label="Matching payments"
@@ -1214,7 +1445,7 @@ export default function SupportPaymentsPage() {
               <p className="mt-4 text-sm font-black text-slate-900 dark:text-white">
                 Searching payment records
               </p>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              <p className="mt-1 break-words text-xs leading-5 text-slate-500 dark:text-slate-400">
                 Reading merchant payment and customer context...
               </p>
             </div>
@@ -1255,26 +1486,26 @@ export default function SupportPaymentsPage() {
                         </div>
 
                         <div className="min-w-0">
-                          <p className="truncate text-sm font-black text-slate-950 dark:text-white">
+                          <p className="break-all text-sm font-black leading-5 text-slate-950 dark:text-white">
                             {payment.paymentId}
                           </p>
-                          <p className="mt-1 truncate text-[10px] text-slate-500 dark:text-slate-400">
+                          <p className="mt-1 break-words [overflow-wrap:anywhere] text-[10px] leading-4 text-slate-500 dark:text-slate-400">
                             {payment.provider} · {humanize(payment.sourceType)}
                           </p>
                         </div>
                       </div>
 
                       <span
-                        className={`rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-wide ${statusTone(payment.status)}`}
+                        className={`max-w-full self-start whitespace-normal rounded-full border px-2.5 py-1 text-left text-[9px] font-black uppercase leading-4 tracking-wide ${statusTone(payment.status)}`}
                       >
                         {humanize(payment.status)}
                       </span>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-2 gap-2 text-[10px]">
+                    <div className="mt-4 grid grid-cols-1 gap-2 text-[10px] min-[460px]:grid-cols-2">
                       <div className="rounded-xl bg-white p-3 dark:bg-white/5">
                         <p className="font-bold text-slate-400">Amount</p>
-                        <p className="mt-1 font-black text-slate-700 dark:text-slate-200">
+                        <p className="mt-1 break-words text-sm font-black leading-5 text-slate-700 dark:text-slate-200">
                           {money(payment.amount, payment.currency)}
                         </p>
                       </div>
@@ -1300,8 +1531,8 @@ export default function SupportPaymentsPage() {
               })}
             </div>
 
-            <div className="support-scroll-hidden hidden overflow-x-auto lg:block">
-              <table className="w-full min-w-[1080px] text-left">
+            <div className="support-payment-scroll hidden overflow-x-auto overscroll-x-contain lg:block">
+              <table className="w-full min-w-[1040px] text-left">
                 <thead>
                   <tr className="border-b border-emerald-100 bg-emerald-50/60 text-[9px] font-black uppercase tracking-[0.13em] text-slate-500 dark:border-white/10 dark:bg-white/[0.035] dark:text-slate-400">
                     <th className="px-4 py-3.5">Payment</th>
@@ -1333,10 +1564,10 @@ export default function SupportPaymentsPage() {
                             </div>
 
                             <div className="min-w-0">
-                              <p className="max-w-[220px] truncate font-black text-slate-900 dark:text-white">
+                              <p className="max-w-[220px] break-all font-black leading-5 text-slate-900 dark:text-white">
                                 {payment.paymentId}
                               </p>
-                              <p className="mt-1 max-w-[220px] truncate text-[9px] text-slate-400">
+                              <p className="mt-1 max-w-[220px] break-all text-[9px] leading-4 text-slate-400">
                                 {payment.merchantReference || payment.providerPaymentId || payment.id}
                               </p>
                             </div>
@@ -1345,7 +1576,7 @@ export default function SupportPaymentsPage() {
 
                         <td className="px-4 py-4">
                           <span
-                            className={`inline-flex rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-wide ${statusTone(payment.status)}`}
+                            className={`inline-flex max-w-[150px] whitespace-normal rounded-full border px-2.5 py-1 text-left text-[9px] font-black uppercase leading-4 tracking-wide ${statusTone(payment.status)}`}
                           >
                             {humanize(payment.status)}
                           </span>
@@ -1370,10 +1601,10 @@ export default function SupportPaymentsPage() {
                         </td>
 
                         <td className="px-4 py-4">
-                          <p className="max-w-[190px] truncate font-bold text-slate-700 dark:text-slate-200">
+                          <p className="max-w-[190px] break-words font-bold leading-5 text-slate-700 dark:text-slate-200">
                             {payment.customer?.name || "Guest / unavailable"}
                           </p>
-                          <p className="mt-1 max-w-[190px] truncate text-[9px] text-slate-400">
+                          <p className="mt-1 max-w-[190px] break-all text-[9px] leading-4 text-slate-400">
                             {payment.customer?.email || payment.customerId || "No customer ID"}
                           </p>
                         </td>
@@ -1408,7 +1639,7 @@ export default function SupportPaymentsPage() {
                 · {total.toLocaleString("en-BD")} matches
               </p>
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2 sm:flex-nowrap">
                 <button
                   type="button"
                   disabled={page <= 1}
@@ -1442,7 +1673,7 @@ export default function SupportPaymentsPage() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
-            className="fixed inset-0 z-[120] bg-slate-950/60 backdrop-blur-sm"
+            className="fixed inset-0 z-[120] bg-slate-950/60 backdrop-blur-[3px]"
             onMouseDown={(event) => {
               if (event.target === event.currentTarget) {
                 setSelectedPaymentId(null);
@@ -1454,7 +1685,7 @@ export default function SupportPaymentsPage() {
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "spring", stiffness: 260, damping: 30 }}
-              className="support-scroll-hidden absolute inset-y-0 right-0 w-full max-w-2xl overflow-y-auto bg-white text-slate-900 shadow-[-24px_0_80px_rgba(15,23,42,.32)] dark:bg-slate-950 dark:text-white"
+              className="support-payment-scroll absolute inset-y-0 right-0 w-full max-w-[780px] overflow-y-auto overscroll-contain border-l border-emerald-100 bg-white text-slate-900 shadow-[-24px_0_80px_rgba(15,23,42,.32)] dark:border-white/10 dark:bg-slate-950 dark:text-white 2xl:max-w-[840px]"
             >
               <div className="sticky top-0 z-20 overflow-hidden border-b border-white/10 bg-[linear-gradient(135deg,#052E2B_0%,#064E3B_52%,#065F46_100%)] p-5 text-white shadow-lg">
                 <motion.div
@@ -1471,10 +1702,10 @@ export default function SupportPaymentsPage() {
                     <p className="text-[9px] font-black uppercase tracking-[0.17em] text-emerald-100/70">
                       Payment investigation
                     </p>
-                    <h2 className="mt-1 truncate text-xl font-black text-white">
+                    <h2 className="mt-1 break-all text-xl font-black leading-7 text-white">
                       {detail?.paymentId || selectedPaymentId}
                     </h2>
-                    <p className="mt-1 truncate text-[10px] text-emerald-50/55">
+                    <p className="mt-1 break-words text-[10px] leading-4 text-emerald-50/55">
                       Read-only support evidence
                     </p>
                   </div>
@@ -1511,7 +1742,7 @@ export default function SupportPaymentsPage() {
                   variants={stagger}
                   initial="hidden"
                   animate="show"
-                  className="space-y-5 p-5 sm:p-6"
+                  className="space-y-5 p-4 pb-10 sm:p-6 sm:pb-12"
                 >
                   <motion.section
                     variants={reveal}
@@ -1527,7 +1758,7 @@ export default function SupportPaymentsPage() {
                           {humanize(detail.status)}
                         </span>
 
-                        <p className="mt-4 text-2xl font-black text-slate-950 dark:text-white">
+                        <p className="mt-4 break-words text-xl font-black leading-7 text-slate-950 dark:text-white sm:text-2xl">
                           {money(detail.amount, detail.currency)}
                         </p>
 
@@ -1611,7 +1842,7 @@ export default function SupportPaymentsPage() {
                           <p className="mt-3 text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
                             KYC status
                           </p>
-                          <p className="mt-1 text-xs font-black text-slate-800 dark:text-slate-100">
+                          <p className="mt-1 break-words text-xs font-black leading-5 text-slate-800 dark:text-slate-100">
                             {humanize(detail.customer.kycStatus)}
                           </p>
                         </motion.div>
@@ -1624,7 +1855,7 @@ export default function SupportPaymentsPage() {
                           <p className="mt-3 text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
                             Wallet
                           </p>
-                          <p className="mt-1 text-xs font-black text-slate-800 dark:text-slate-100">
+                          <p className="mt-1 break-words text-xs font-black leading-5 text-slate-800 dark:text-slate-100">
                             {detail.customer.walletLinked ? "Linked" : "Not linked"}
                           </p>
                         </motion.div>
@@ -1658,7 +1889,7 @@ export default function SupportPaymentsPage() {
                           <p className="mt-2 text-xs font-black text-slate-800 dark:text-slate-100">
                             {detail.failure.code || "No failure code"}
                           </p>
-                          <p className="mt-1 text-xs leading-5 text-slate-600 dark:text-slate-300">
+                          <p className="mt-1 break-words [overflow-wrap:anywhere] text-xs leading-5 text-slate-600 dark:text-slate-300">
                             {detail.failure.message || "No failure message recorded."}
                           </p>
                         </div>
@@ -1696,7 +1927,7 @@ export default function SupportPaymentsPage() {
                           <p className="text-[9px] font-black uppercase tracking-[0.13em] text-slate-400">
                             {String(label)}
                           </p>
-                          <p className="mt-1 text-xs font-black text-slate-800 dark:text-slate-100">
+                          <p className="mt-1 break-words text-xs font-black leading-5 text-slate-800 dark:text-slate-100">
                             {formatDateTime(value as string | null)}
                           </p>
                         </motion.div>
@@ -1744,15 +1975,36 @@ export default function SupportPaymentsPage() {
       </AnimatePresence>
 
       <style jsx global>{`
-        .support-scroll-hidden {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
+        .support-payment-scroll {
+          scrollbar-width: thin;
+          scrollbar-color:
+            rgba(16, 185, 129, 0.42)
+            transparent;
         }
 
-        .support-scroll-hidden::-webkit-scrollbar {
-          width: 0;
-          height: 0;
-          display: none;
+        .support-payment-scroll::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+
+        .support-payment-scroll::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        .support-payment-scroll::-webkit-scrollbar-thumb {
+          border: 2px solid transparent;
+          border-radius: 999px;
+          background:
+            rgba(16, 185, 129, 0.36);
+          background-clip:
+            padding-box;
+        }
+
+        .support-payment-scroll::-webkit-scrollbar-thumb:hover {
+          background:
+            rgba(5, 150, 105, 0.54);
+          background-clip:
+            padding-box;
         }
       `}</style>
     </main>

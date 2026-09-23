@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -61,6 +62,10 @@ import {
   type TicketPriority,
   type TicketStatus,
 } from "@/lib/api/supportDashboardApi";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
 
 /* =========================================================
    TYPES
@@ -171,6 +176,72 @@ function messageOf(error: unknown): string {
   return error instanceof Error
     ? error.message
     : "The request could not be completed.";
+}
+
+
+function isAuthorizationError(
+  error: unknown
+): boolean {
+  const record =
+    error &&
+    typeof error === "object"
+      ? (
+          error as Record<
+            string,
+            unknown
+          >
+        )
+      : null;
+
+  const response =
+    record?.response &&
+    typeof record.response ===
+      "object"
+      ? (
+          record.response as Record<
+            string,
+            unknown
+          >
+        )
+      : null;
+
+  const status =
+    Number(
+      record?.status ??
+        record?.statusCode ??
+        response?.status
+    );
+
+  if (
+    status === 401 ||
+    status === 403
+  ) {
+    return true;
+  }
+
+  const message =
+    error instanceof Error
+      ? error.message.toLowerCase()
+      : String(
+          error ?? ""
+        ).toLowerCase();
+
+  return (
+    message.includes("401") ||
+    message.includes("403") ||
+    message.includes(
+      "unauthorized"
+    ) ||
+    message.includes(
+      "forbidden"
+    ) ||
+    message.includes(
+      "access denied"
+    ) ||
+    message.includes(
+      "not authorized"
+    )
+  );
 }
 
 function formatDateTime(
@@ -390,7 +461,7 @@ function SupportSelect<T extends string>({
             exit={{ opacity: 0, y: -5, scale: 0.98 }}
             transition={{ duration: 0.16 }}
             role="listbox"
-            className="support-scroll-hidden absolute left-0 right-0 top-[calc(100%+8px)] z-[100] max-h-72 overflow-y-auto rounded-2xl border border-border bg-card p-1.5 shadow-[0_24px_70px_-20px_rgba(5,150,105,.28)]"
+            className="support-refund-scroll absolute left-0 right-0 top-[calc(100%+8px)] z-[100] max-h-72 overflow-y-auto overscroll-contain rounded-2xl border border-border bg-card p-1.5 shadow-[0_24px_70px_-20px_rgba(5,150,105,.28)]"
           >
             {options.map((option) => {
               const active = option.value === value;
@@ -529,7 +600,7 @@ function MetricCard({
           <p className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground">
             {label}
           </p>
-          <p className="mt-3 break-words text-2xl font-black tracking-tight text-foreground">
+          <p className="mt-3 break-words text-xl font-black leading-7 tracking-tight text-foreground sm:text-2xl">
             {value}
           </p>
           <p className="mt-1 text-[10px] leading-4 text-muted-foreground">
@@ -604,7 +675,7 @@ function Panel({
         {action}
       </div>
 
-      <div className="p-5">{children}</div>
+      <div className="min-w-0 p-4 sm:p-5">{children}</div>
     </motion.section>
   );
 }
@@ -642,7 +713,7 @@ function CopyField({
       whileHover={{ y: -2 }}
       className="rounded-2xl border border-border bg-muted/25 p-4"
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-3 min-[480px]:flex-row min-[480px]:items-start min-[480px]:justify-between">
         <div className="min-w-0">
           <Icon className="h-4 w-4 text-emerald-600" />
           <p className="mt-3 text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
@@ -673,10 +744,106 @@ function CopyField({
 }
 
 /* =========================================================
+   SUPPORT-ONLY ACCESS
+========================================================= */
+
+function SupportNotFoundState() {
+  return (
+    <main className="relative flex min-h-[78vh] items-center justify-center overflow-hidden bg-background px-4 text-foreground">
+      <div className="pointer-events-none absolute left-1/2 top-1/2 h-[440px] w-[440px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-500/[0.08] blur-[120px]" />
+
+      <motion.section
+        initial={{
+          opacity: 0,
+          y: 18,
+          scale: 0.98,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          scale: 1,
+        }}
+        transition={{
+          duration: 0.45,
+          ease: [
+            0.22,
+            1,
+            0.36,
+            1,
+          ],
+        }}
+        className="relative w-full max-w-xl overflow-hidden rounded-[32px] border border-border bg-card p-7 text-center shadow-[0_28px_90px_rgba(15,23,42,.10)] sm:p-10"
+      >
+        <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-emerald-500/[0.08] blur-3xl" />
+
+        <div className="relative">
+          <div className="mx-auto grid h-16 w-16 place-items-center rounded-[22px] border border-emerald-500/15 bg-emerald-500/10 text-emerald-600">
+            <RefreshCcw className="h-6 w-6" />
+          </div>
+
+          <p className="mt-6 text-[11px] font-black uppercase tracking-[0.22em] text-emerald-600">
+            Error 404
+          </p>
+
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">
+            Page not found
+          </h1>
+
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+            The page you are looking for does not exist or is not available.
+          </p>
+        </div>
+      </motion.section>
+    </main>
+  );
+}
+
+/* =========================================================
    PAGE
 ========================================================= */
 
 export default function SupportRefundRequestsPage() {
+  const {
+    user,
+  } =
+    useDashboardSession();
+
+  const [
+    accessDenied,
+    setAccessDenied,
+  ] =
+    useState(false);
+
+  const denyAccess =
+    useCallback(() => {
+      setAccessDenied(true);
+    }, []);
+
+  if (
+    accessDenied ||
+    user?.role !==
+      "support"
+  ) {
+    return (
+      <SupportNotFoundState />
+    );
+  }
+
+  return (
+    <SupportRefundRequestsContent
+      onUnauthorized={
+        denyAccess
+      }
+    />
+  );
+}
+
+function SupportRefundRequestsContent({
+  onUnauthorized,
+}: {
+  onUnauthorized: () =>
+    void;
+}) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<StatusFilter>("All");
   const [priority, setPriority] = useState<PriorityFilter>("All");
@@ -720,8 +887,22 @@ export default function SupportRefundRequestsPage() {
           setTotal(result.total);
           setTotalPages(Math.max(1, result.totalPages));
         } catch (requestError: unknown) {
+          if (
+            active &&
+            isAuthorizationError(
+              requestError
+            )
+          ) {
+            onUnauthorized();
+            return;
+          }
+
           if (active) {
-            setError(messageOf(requestError));
+            setError(
+              messageOf(
+                requestError
+              )
+            );
           }
         } finally {
           if (active) {
@@ -736,7 +917,14 @@ export default function SupportRefundRequestsPage() {
       active = false;
       window.clearTimeout(timer);
     };
-  }, [search, status, priority, page, refreshKey]);
+  }, [
+    search,
+    status,
+    priority,
+    page,
+    refreshKey,
+    onUnauthorized,
+  ]);
 
   useEffect(() => {
     if (!selectedTicketId) {
@@ -758,9 +946,24 @@ export default function SupportRefundRequestsPage() {
         }
       })
       .catch((requestError: unknown) => {
-        if (active) {
-          setError(messageOf(requestError));
+        if (!active) {
+          return;
         }
+
+        if (
+          isAuthorizationError(
+            requestError
+          )
+        ) {
+          onUnauthorized();
+          return;
+        }
+
+        setError(
+          messageOf(
+            requestError
+          )
+        );
       })
       .finally(() => {
         if (active) {
@@ -771,21 +974,52 @@ export default function SupportRefundRequestsPage() {
     return () => {
       active = false;
     };
-  }, [selectedTicketId]);
+  }, [
+    selectedTicketId,
+    onUnauthorized,
+  ]);
 
   useEffect(() => {
-    if (!selectedTicketId) return;
+    if (!selectedTicketId) {
+      return;
+    }
 
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        setSelectedTicketId(null);
+    const previousOverflow =
+      document.body.style.overflow;
+
+    document.body.style.overflow =
+      "hidden";
+
+    function onKeyDown(
+      event: KeyboardEvent
+    ) {
+      if (
+        event.key ===
+        "Escape"
+      ) {
+        setSelectedTicketId(
+          null
+        );
       }
     }
 
-    window.addEventListener("keydown", onKeyDown);
+    window.addEventListener(
+      "keydown",
+      onKeyDown
+    );
 
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [selectedTicketId]);
+    return () => {
+      document.body.style.overflow =
+        previousOverflow;
+
+      window.removeEventListener(
+        "keydown",
+        onKeyDown
+      );
+    };
+  }, [
+    selectedTicketId,
+  ]);
 
   const visibleUrgentHigh = useMemo(
     () => requests.filter(
@@ -858,13 +1092,13 @@ export default function SupportRefundRequestsPage() {
   }
 
   return (
-    <main className="support-refunds-page space-y-6 bg-transparent pb-8">
+    <main className="support-refunds-page w-full min-w-0 space-y-5 overflow-x-clip bg-transparent pb-8 sm:space-y-6">
       {/* HERO */}
       <motion.section
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-        className="relative isolate overflow-hidden rounded-[30px] border border-emerald-300/25 bg-[linear-gradient(135deg,#10B981_0%,#059669_48%,#047857_100%)] p-6 text-white shadow-[0_28px_80px_-38px_rgba(5,150,105,.70)] md:p-7 lg:p-8"
+        className="relative isolate overflow-hidden rounded-[30px] border border-emerald-300/25 bg-[linear-gradient(135deg,#10B981_0%,#059669_48%,#047857_100%)] p-5 text-white shadow-[0_28px_80px_-38px_rgba(5,150,105,.70)] sm:p-6 md:p-7 lg:p-8"
       >
         <motion.div
           animate={{
@@ -987,7 +1221,7 @@ export default function SupportRefundRequestsPage() {
             </div>
           </div>
 
-          <div className="relative shrink-0">
+          <div className="relative w-full shrink-0 sm:w-auto">
             <motion.div
               animate={{ rotate: 360 }}
               transition={{ duration: 19, repeat: Infinity, ease: "linear" }}
@@ -1000,7 +1234,7 @@ export default function SupportRefundRequestsPage() {
               type="button"
               disabled={refreshing || loading}
               onClick={() => setRefreshKey((value) => value + 1)}
-              className="relative inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-xs font-black text-emerald-900 shadow-[0_12px_30px_rgba(0,0,0,.16)] transition hover:-translate-y-0.5 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+              className="relative inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white px-5 text-xs font-black text-emerald-900 shadow-[0_12px_30px_rgba(0,0,0,.16)] transition hover:-translate-y-0.5 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             >
               <RefreshCcw
                 className={`h-4 w-4 ${refreshing || loading ? "animate-spin" : ""}`}
@@ -1048,7 +1282,7 @@ export default function SupportRefundRequestsPage() {
           </button>
         </div>
 
-        <div className="grid gap-3 xl:grid-cols-[1.6fr_1fr_1fr]">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1.6fr)_minmax(210px,1fr)_minmax(210px,1fr)]">
           <div>
             <p className="mb-1.5 px-1 text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
               Search refund case
@@ -1133,7 +1367,7 @@ export default function SupportRefundRequestsPage() {
         variants={stagger}
         initial="hidden"
         animate="show"
-        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+        className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4"
       >
         <MetricCard
           label="Matching refund cases"
@@ -1169,7 +1403,7 @@ export default function SupportRefundRequestsPage() {
       </motion.section>
 
       {/* REAL VISIBLE CHARTS */}
-      <section className="grid gap-5 xl:grid-cols-2">
+      <section className="grid gap-5 2xl:grid-cols-2">
         <motion.article
           variants={reveal}
           initial="hidden"
@@ -1231,7 +1465,9 @@ export default function SupportRefundRequestsPage() {
                     dataKey="name"
                     axisLine={false}
                     tickLine={false}
-                    minTickGap={12}
+                    interval="preserveStartEnd"
+                    minTickGap={16}
+                    tickMargin={8}
                     tick={{
                       fontSize: 9,
                       fill: "#94A3B8",
@@ -1454,7 +1690,7 @@ export default function SupportRefundRequestsPage() {
                       </p>
                     </div>
 
-                    <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-wide ${priorityTone(request.priority)}`}>
+                    <span className={`max-w-full self-start whitespace-normal rounded-full border px-2.5 py-1 text-left text-[9px] font-black uppercase leading-4 tracking-wide min-[480px]:shrink-0 ${priorityTone(request.priority)}`}>
                       {request.priority}
                     </span>
                   </div>
@@ -1469,10 +1705,10 @@ export default function SupportRefundRequestsPage() {
                   </div>
 
                   <div className="mt-4 rounded-2xl bg-muted/40 p-3">
-                    <p className="truncate text-xs font-black text-foreground">
+                    <p className="break-words text-xs font-black leading-5 text-foreground">
                       {request.customer.name}
                     </p>
-                    <p className="mt-1 truncate text-[10px] text-slate-400">
+                    <p className="mt-1 break-all text-[10px] leading-4 text-slate-400">
                       {request.customer.email || request.customer.id}
                     </p>
                   </div>
@@ -1489,8 +1725,8 @@ export default function SupportRefundRequestsPage() {
               ))}
             </div>
 
-            <div className="support-scroll-hidden hidden overflow-x-auto lg:block">
-              <table className="w-full min-w-[1100px] text-left">
+            <div className="support-refund-scroll hidden overflow-x-auto overscroll-x-contain lg:block">
+              <table className="w-full min-w-[1040px] text-left">
                 <thead>
                   <tr className="border-b border-border bg-emerald-500/[0.055] text-[9px] font-black uppercase tracking-[0.13em] text-muted-foreground">
                     <th className="px-4 py-3.5">Case</th>
@@ -1516,13 +1752,13 @@ export default function SupportRefundRequestsPage() {
                         <p className="font-black text-emerald-700 dark:text-emerald-300">
                           {request.ticketNumber}
                         </p>
-                        <p className="mt-1 max-w-[260px] truncate font-bold text-foreground">
+                        <p className="mt-1 max-w-[260px] break-words font-bold leading-5 text-foreground">
                           {request.subject}
                         </p>
                       </td>
 
                       <td className="px-4 py-4">
-                        <span className={`inline-flex rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-wide ${statusTone(request.status)}`}>
+                        <span className={`inline-flex max-w-[160px] whitespace-normal rounded-full border px-2.5 py-1 text-left text-[9px] font-black uppercase leading-4 tracking-wide ${statusTone(request.status)}`}>
                           {request.status}
                         </span>
                         <div className="mt-1.5">
@@ -1533,16 +1769,16 @@ export default function SupportRefundRequestsPage() {
                       </td>
 
                       <td className="px-4 py-4">
-                        <p className="max-w-[190px] truncate font-black text-foreground">
+                        <p className="max-w-[190px] break-words font-black leading-5 text-foreground">
                           {request.customer.name}
                         </p>
-                        <p className="mt-1 max-w-[190px] truncate text-[9px] text-slate-400">
+                        <p className="mt-1 max-w-[190px] break-all text-[9px] leading-4 text-slate-400">
                           {request.customer.email || request.customer.id}
                         </p>
                       </td>
 
                       <td className="px-4 py-4">
-                        <p className="max-w-[200px] truncate font-bold text-foreground">
+                        <p className="max-w-[200px] break-all font-bold leading-5 text-foreground">
                           {request.relatedReference || "Not available"}
                         </p>
                         <p className="mt-1 text-[9px] text-slate-400">
@@ -1588,7 +1824,7 @@ export default function SupportRefundRequestsPage() {
                 · {total.toLocaleString("en-BD")} matches
               </p>
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2 sm:flex-nowrap">
                 <button
                   type="button"
                   disabled={page <= 1}
@@ -1622,7 +1858,7 @@ export default function SupportRefundRequestsPage() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
-            className="fixed inset-0 z-[120] bg-slate-950/60 backdrop-blur-sm"
+            className="fixed inset-0 z-[120] bg-slate-950/60 backdrop-blur-[3px]"
             onMouseDown={(event) => {
               if (event.target === event.currentTarget) {
                 setSelectedTicketId(null);
@@ -1634,7 +1870,7 @@ export default function SupportRefundRequestsPage() {
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "spring", stiffness: 260, damping: 30 }}
-              className="support-scroll-hidden absolute inset-y-0 right-0 w-full max-w-2xl overflow-y-auto bg-background text-foreground shadow-[-24px_0_80px_rgba(15,23,42,.32)]"
+              className="support-refund-scroll absolute inset-y-0 right-0 w-full max-w-[780px] overflow-y-auto overscroll-contain border-l border-emerald-100 bg-background text-foreground shadow-[-24px_0_80px_rgba(15,23,42,.32)] dark:border-white/10 2xl:max-w-[840px]"
             >
               <div className="sticky top-0 z-20 overflow-hidden border-b border-white/15 bg-[linear-gradient(135deg,#10B981_0%,#059669_52%,#047857_100%)] p-5 text-white shadow-lg">
                 <motion.div
@@ -1648,10 +1884,10 @@ export default function SupportRefundRequestsPage() {
                     <p className="text-[9px] font-black uppercase tracking-[0.17em] text-emerald-100/70">
                       Refund support case
                     </p>
-                    <h2 className="mt-1 truncate text-xl font-black text-white">
+                    <h2 className="mt-1 break-all text-xl font-black leading-7 text-white">
                       {detail?.ticketNumber || "Loading case"}
                     </h2>
-                    <p className="mt-1 truncate text-[10px] text-emerald-50/55">
+                    <p className="mt-1 break-words [overflow-wrap:anywhere] text-[10px] leading-4 text-emerald-50/55">
                       {detail?.subject || selectedTicketId}
                     </p>
                   </div>
@@ -1688,7 +1924,7 @@ export default function SupportRefundRequestsPage() {
                   variants={stagger}
                   initial="hidden"
                   animate="show"
-                  className="space-y-5 p-5 sm:p-6"
+                  className="space-y-5 p-4 pb-10 sm:p-6 sm:pb-12"
                 >
                   <motion.section
                     variants={reveal}
@@ -1706,11 +1942,11 @@ export default function SupportRefundRequestsPage() {
                         </span>
                       </div>
 
-                      <h3 className="mt-4 text-lg font-black text-foreground">
+                      <h3 className="mt-4 break-words [overflow-wrap:anywhere] text-lg font-black leading-7 text-foreground">
                         {detail.subject}
                       </h3>
 
-                      <p className="mt-2 whitespace-pre-wrap text-xs leading-6 text-muted-foreground">
+                      <p className="mt-2 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-xs leading-6 text-muted-foreground">
                         {detail.description || "No decrypted description is available."}
                       </p>
                     </div>
@@ -1834,7 +2070,7 @@ export default function SupportRefundRequestsPage() {
                               </span>
                             </div>
 
-                            <p className="mt-3 whitespace-pre-wrap text-xs leading-5 text-muted-foreground">
+                            <p className="mt-3 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-xs leading-5 text-muted-foreground">
                               {message.body}
                             </p>
                           </motion.article>
@@ -1877,10 +2113,10 @@ export default function SupportRefundRequestsPage() {
                               </span>
                             </div>
 
-                            <p className="mt-2 text-xs leading-5 text-muted-foreground">
+                            <p className="mt-2 break-words [overflow-wrap:anywhere] text-xs leading-5 text-muted-foreground">
                               {item.summary}
                             </p>
-                            <p className="mt-1 text-[9px] font-bold text-slate-400">
+                            <p className="mt-1 break-words [overflow-wrap:anywhere] text-[9px] font-bold leading-4 text-slate-400">
                               Actor: {item.actorName}
                             </p>
                           </motion.div>
@@ -1932,19 +2168,36 @@ export default function SupportRefundRequestsPage() {
       </AnimatePresence>
 
       <style jsx global>{`
-        .support-refunds-page,
-        .support-refunds-page *,
-        .support-scroll-hidden {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
+        .support-refund-scroll {
+          scrollbar-width: thin;
+          scrollbar-color:
+            rgba(16, 185, 129, 0.42)
+            transparent;
         }
 
-        .support-refunds-page::-webkit-scrollbar,
-        .support-refunds-page *::-webkit-scrollbar,
-        .support-scroll-hidden::-webkit-scrollbar {
-          width: 0 !important;
-          height: 0 !important;
-          display: none !important;
+        .support-refund-scroll::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+
+        .support-refund-scroll::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        .support-refund-scroll::-webkit-scrollbar-thumb {
+          border: 2px solid transparent;
+          border-radius: 999px;
+          background:
+            rgba(16, 185, 129, 0.36);
+          background-clip:
+            padding-box;
+        }
+
+        .support-refund-scroll::-webkit-scrollbar-thumb:hover {
+          background:
+            rgba(5, 150, 105, 0.54);
+          background-clip:
+            padding-box;
         }
       `}</style>
     </main>
