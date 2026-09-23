@@ -535,7 +535,322 @@ const getErrorMessage = (
   return "Something went wrong.";
 };
 
+/* =========================================================
+   ADMIN / SUPER ADMIN ACCESS
+========================================================= */
+
+type AccessState =
+  | "checking"
+  | "allowed"
+  | "denied";
+
+const ADMIN_ROLES = new Set([
+  "admin",
+  "super_admin",
+]);
+
+function normalizeRole(
+  value: unknown
+): string {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+function getStoredRole(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const rawUser =
+    window.localStorage.getItem(
+      "auth_user"
+    );
+
+  if (!rawUser) {
+    return "";
+  }
+
+  try {
+    const parsed =
+      JSON.parse(rawUser);
+
+    const candidates = [
+      parsed?.role,
+      parsed?.user?.role,
+      parsed?.data?.role,
+      parsed?.profile?.role,
+    ];
+
+    for (const candidate of candidates) {
+      const role =
+        normalizeRole(candidate);
+
+      if (role) {
+        return role;
+      }
+    }
+  } catch {
+    return "";
+  }
+
+  return "";
+}
+
+function hasAdminAccess(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const authenticated =
+    window.localStorage.getItem(
+      "is_authenticated"
+    );
+
+  if (
+    (
+      authenticated !== "true" &&
+      authenticated !== "1"
+    ) ||
+    !window.localStorage.getItem(
+      "auth_user"
+    )
+  ) {
+    return false;
+  }
+
+  return ADMIN_ROLES.has(
+    getStoredRole()
+  );
+}
+
+function isAuthorizationError(
+  error: unknown
+): boolean {
+  const maybeRecord =
+    error &&
+    typeof error === "object"
+      ? (error as Record<string, unknown>)
+      : null;
+
+  const response =
+    maybeRecord?.response &&
+    typeof maybeRecord.response === "object"
+      ? (
+          maybeRecord.response as
+            Record<string, unknown>
+        )
+      : null;
+
+  const status =
+    Number(
+      maybeRecord?.status ??
+        maybeRecord?.statusCode ??
+        response?.status
+    );
+
+  if (
+    status === 401 ||
+    status === 403 ||
+    status === 404
+  ) {
+    return true;
+  }
+
+  const message =
+    error instanceof Error
+      ? error.message.toLowerCase()
+      : String(error ?? "")
+          .toLowerCase();
+
+  return (
+    message.includes("401") ||
+    message.includes("403") ||
+    message.includes("404") ||
+    message.includes(
+      "unauthorized"
+    ) ||
+    message.includes(
+      "forbidden"
+    ) ||
+    message.includes(
+      "access denied"
+    ) ||
+    message.includes(
+      "not authorized"
+    )
+  );
+}
+
+function AccessCheckingState() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 text-foreground">
+      <motion.div
+        initial={{
+          opacity: 0,
+          y: 8,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        className="text-center"
+      >
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-indigo-500/15 bg-indigo-500/10 text-indigo-600">
+          <RefreshCw className="h-5 w-5 animate-spin" />
+        </div>
+
+        <p className="mt-4 text-sm font-black">
+          Checking access
+        </p>
+
+        <p className="mt-1 text-xs text-muted-foreground">
+          Verifying administrator permissions…
+        </p>
+      </motion.div>
+    </main>
+  );
+}
+
+function AdminNotFoundState() {
+  return (
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-5 text-foreground">
+      <div className="pointer-events-none absolute -left-32 top-24 h-80 w-80 rounded-full bg-indigo-500/[0.07] blur-[100px]" />
+      <div className="pointer-events-none absolute -right-32 bottom-20 h-80 w-80 rounded-full bg-violet-500/[0.07] blur-[100px]" />
+
+      <motion.section
+        initial={{
+          opacity: 0,
+          y: 18,
+          scale: 0.98,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          scale: 1,
+        }}
+        transition={{
+          duration: 0.45,
+          ease: [
+            0.22,
+            1,
+            0.36,
+            1,
+          ],
+        }}
+        className="relative w-full max-w-xl overflow-hidden rounded-[32px] border border-border bg-card p-7 text-center shadow-[0_30px_90px_rgba(15,23,42,.12)] sm:p-10"
+      >
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.035]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(79,70,229,.7) 1px, transparent 1px), linear-gradient(90deg, rgba(79,70,229,.7) 1px, transparent 1px)",
+            backgroundSize:
+              "32px 32px",
+          }}
+        />
+
+        <div className="relative z-10">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] border border-indigo-500/15 bg-indigo-500/10 text-indigo-600">
+            <ShieldAlert className="h-7 w-7" />
+          </div>
+
+          <p className="mt-6 text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600">
+            Error 404
+          </p>
+
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">
+            Page not found
+          </h1>
+
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+            The page you are looking for does not exist or is not available.
+          </p>
+        </div>
+      </motion.section>
+    </main>
+  );
+}
+
+/* =========================================================
+   OUTER ACCESS GATE
+========================================================= */
+
 export default function AdminSettingsPage() {
+  const [
+    access,
+    setAccess,
+  ] =
+    useState<AccessState>(
+      "checking"
+    );
+
+  useEffect(() => {
+    const checkAccess =
+      () => {
+        setAccess(
+          hasAdminAccess()
+            ? "allowed"
+            : "denied"
+        );
+      };
+
+    checkAccess();
+
+    window.addEventListener(
+      "storage",
+      checkAccess
+    );
+
+    window.addEventListener(
+      "coffer-auth-state-changed",
+      checkAccess
+    );
+
+    return () => {
+      window.removeEventListener(
+        "storage",
+        checkAccess
+      );
+
+      window.removeEventListener(
+        "coffer-auth-state-changed",
+        checkAccess
+      );
+    };
+  }, []);
+
+  if (access === "checking") {
+    return (
+      <AccessCheckingState />
+    );
+  }
+
+  if (access === "denied") {
+    return (
+      <AdminNotFoundState />
+    );
+  }
+
+  return (
+    <AdminSettingsContent
+      onUnauthorized={() =>
+        setAccess("denied")
+      }
+    />
+  );
+}
+
+/* =========================================================
+   SETTINGS CONTENT
+========================================================= */
+
+function AdminSettingsContent({
+  onUnauthorized,
+}: {
+  onUnauthorized: () => void;
+}) {
   const [
     mounted,
     setMounted,
@@ -543,6 +858,16 @@ export default function AdminSettingsPage() {
     useState(
       false
     );
+
+  useEffect(() => {
+    if (
+      !hasAdminAccess()
+    ) {
+      onUnauthorized();
+    }
+  }, [
+    onUnauthorized,
+  ]);
 
   const [
     activeSection,
@@ -690,10 +1015,11 @@ export default function AdminSettingsPage() {
     );
 
   const loadPlatformSettings =
-    async (
-      silent =
-        false
-    ) => {
+    useCallback(
+      async (
+        silent =
+          false
+      ) => {
       if (!silent) {
         setLoading(
           true
@@ -726,6 +1052,15 @@ export default function AdminSettingsPage() {
       } catch (
         error
       ) {
+        if (
+          isAuthorizationError(
+            error
+          )
+        ) {
+          onUnauthorized();
+          return;
+        }
+
         const message =
           getErrorMessage(
             error
@@ -750,7 +1085,11 @@ export default function AdminSettingsPage() {
           );
         }
       }
-    };
+    },
+    [
+      onUnauthorized,
+    ]
+  );
 
   useEffect(() => {
     setMounted(
@@ -758,8 +1097,9 @@ export default function AdminSettingsPage() {
     );
 
     void loadPlatformSettings();
-
-  }, []);
+  }, [
+    loadPlatformSettings,
+  ]);
 
   const loadAdminSessions = useCallback(async (silent = false) => {
     if (!silent) setSessionsLoading(true);
@@ -777,15 +1117,45 @@ export default function AdminSettingsPage() {
 
       setSessions(response.sessions ?? []);
     } catch (error) {
-      console.error("ADMIN SESSIONS ERROR:", error);
-      setSessionsError(error instanceof Error ? error.message : "Failed to load active admin sessions.");
+      if (
+        isAuthorizationError(
+          error
+        )
+      ) {
+        onUnauthorized();
+        return;
+      }
+
+      console.error(
+        "ADMIN SESSIONS ERROR:",
+        error
+      );
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to load active admin sessions.";
+
+      setSessionsError(
+        message
+      );
+
       if (silent) {
-        setToast({ type: "error", message: error instanceof Error ? error.message : "Failed to load active admin sessions." });
+        setToast({
+          type: "error",
+          message,
+        });
       }
     } finally {
-      if (!silent) setSessionsLoading(false);
+      if (!silent) {
+        setSessionsLoading(
+          false
+        );
+      }
     }
-  }, []);
+  }, [
+    onUnauthorized,
+  ]);
 
   useEffect(() => {
   void loadAdminSessions();
@@ -1004,7 +1374,22 @@ export default function AdminSettingsPage() {
       setSessions((current) => current.filter((item) => item.id !== sessionId));
       setToast({ type: "success", message: response.message || "Session signed out successfully." });
     } catch (error) {
-      setToast({ type: "error", message: error instanceof Error ? error.message : "Failed to sign out session." });
+      if (
+        isAuthorizationError(
+          error
+        )
+      ) {
+        onUnauthorized();
+        return;
+      }
+
+      setToast({
+        type: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to sign out session.",
+      });
     } finally {
       setSessionActionLoading(null);
     }
@@ -1021,7 +1406,22 @@ export default function AdminSettingsPage() {
       setSessions((current) => current.filter((item) => item.isCurrent));
       setToast({ type: "success", message: response.message || "Other sessions signed out successfully." });
     } catch (error) {
-      setToast({ type: "error", message: error instanceof Error ? error.message : "Failed to sign out other sessions." });
+      if (
+        isAuthorizationError(
+          error
+        )
+      ) {
+        onUnauthorized();
+        return;
+      }
+
+      setToast({
+        type: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to sign out other sessions.",
+      });
     } finally {
       setSessionActionLoading(null);
     }
@@ -1034,7 +1434,22 @@ export default function AdminSettingsPage() {
       await setTheme(nextTheme);
       setToast({ type: "success", message: `Dashboard theme changed to ${nextTheme}.` });
     } catch (error) {
-      setToast({ type: "error", message: error instanceof Error ? error.message : "Failed to change dashboard theme." });
+      if (
+        isAuthorizationError(
+          error
+        )
+      ) {
+        onUnauthorized();
+        return;
+      }
+
+      setToast({
+        type: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to change dashboard theme.",
+      });
     } finally {
       setThemeSaving(false);
     }
@@ -1112,6 +1527,23 @@ export default function AdminSettingsPage() {
       } catch (
         error
       ) {
+        if (
+          isAuthorizationError(
+            error
+          )
+        ) {
+          setReauthOpen(
+            false
+          );
+
+          setReauthPassword(
+            ""
+          );
+
+          onUnauthorized();
+          return;
+        }
+
         setReauthError(
           getErrorMessage(
             error
