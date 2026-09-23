@@ -11,6 +11,7 @@ import Link from "next/link";
 
 import {
   useParams,
+  useRouter,
 } from "next/navigation";
 
 import {
@@ -40,6 +41,14 @@ import {
 } from "framer-motion";
 
 import IssueRefundButton from "../components/IssueRefundButton";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   apiClient,
@@ -679,12 +688,9 @@ function DetailRow({
 
   return (
     <motion.div
-      whileHover={{
-        x:
-          3,
-      }}
       className="
         flex
+        min-w-0
         flex-col
         gap-2
         border-b
@@ -694,8 +700,9 @@ function DetailRow({
         last:border-b-0
 
         sm:flex-row
-        sm:items-center
+        sm:items-start
         sm:justify-between
+        sm:gap-6
       "
     >
       <div className="min-w-0">
@@ -779,6 +786,8 @@ function SummaryCard({
       className="
         group
         relative
+        h-full
+        min-w-0
         overflow-hidden
         rounded-[22px]
         border
@@ -802,15 +811,15 @@ function SummaryCard({
         "
       />
 
-      <div className="flex items-start justify-between gap-4">
-        <div>
+      <div className="flex min-w-0 items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
           <p className="text-[9px] font-black uppercase tracking-[0.13em] text-violet-500/75">
             {
               title
             }
           </p>
 
-          <p className="mt-3 break-words text-xl font-black text-violet-800 dark:text-violet-100">
+          <p className="mt-3 break-words text-xl font-black leading-tight text-violet-800 dark:text-violet-100 [overflow-wrap:anywhere]">
             {
               value
             }
@@ -934,6 +943,32 @@ function ErrorState({
 ========================================================= */
 
 export default function MerchantPaymentDetailsPage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isMerchantRole =
+    user.role === "merchant";
+
+  useEffect(() => {
+    if (isMerchantRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isMerchantRole,
+    router,
+    user.role,
+  ]);
+
   const params =
     useParams();
 
@@ -988,6 +1023,15 @@ export default function MerchantPaymentDetailsPage() {
       }: {
         silent?: boolean;
       } = {}) => {
+        if (!isMerchantRole) {
+          setLoading(false);
+          setRefreshing(false);
+          setData(null);
+          setError("");
+
+          return;
+        }
+
         if (
           !paymentId
         ) {
@@ -1073,15 +1117,23 @@ export default function MerchantPaymentDetailsPage() {
         }
       },
       [
+        isMerchantRole,
         paymentId,
       ]
     );
 
   useEffect(
     () => {
+      if (!isMerchantRole) {
+        setLoading(false);
+
+        return;
+      }
+
       void fetchPayment();
     },
     [
+      isMerchantRole,
       fetchPayment,
     ]
   );
@@ -1327,6 +1379,26 @@ export default function MerchantPaymentDetailsPage() {
       ]
     );
 
+  if (!isMerchantRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center bg-background px-4 text-foreground">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-500/15 bg-violet-500/10 text-violet-700 shadow-sm dark:text-violet-300">
+            <RefreshCw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Merchant payment details are available only to merchant accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
   if (
     loading
   ) {
@@ -1347,9 +1419,13 @@ export default function MerchantPaymentDetailsPage() {
           message={
             error
           }
-          onRetry={() =>
-            void fetchPayment()
-          }
+          onRetry={() => {
+            if (!isMerchantRole) {
+              return;
+            }
+
+            void fetchPayment();
+          }}
         />
       </div>
     );
@@ -1400,12 +1476,12 @@ export default function MerchantPaymentDetailsPage() {
               <div className="flex items-start gap-3 rounded-2xl border border-red-200 bg-red-500/[0.06] p-4">
                 <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
 
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm font-black text-foreground">
                     Refresh failed
                   </p>
 
-                  <p className="mt-1 text-sm merchant-muted">
+                  <p className="mt-1 break-words text-sm leading-5 merchant-muted [overflow-wrap:anywhere]">
                     {
                       error
                     }
@@ -1541,7 +1617,7 @@ export default function MerchantPaymentDetailsPage() {
                 </div>
               </div>
 
-              <div className="flex shrink-0 flex-col gap-3 sm:flex-row">
+              <div className="flex w-full shrink-0 flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap lg:justify-end">
                 <IssueRefundButton
                   paymentId={
                     payment.paymentId
@@ -1577,12 +1653,16 @@ export default function MerchantPaymentDetailsPage() {
                   whileHover={{
                     y: -3,
                   }}
-                  onClick={() =>
+                  onClick={() => {
+                    if (!isMerchantRole) {
+                      return;
+                    }
+
                     void fetchPayment({
                       silent:
                         true,
-                    })
-                  }
+                    });
+                  }}
                   disabled={
                     refreshing
                   }
