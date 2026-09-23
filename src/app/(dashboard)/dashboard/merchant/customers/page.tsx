@@ -11,6 +11,10 @@ import React, {
 import Link from "next/link";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
@@ -37,6 +41,14 @@ import {
 import {
   createPortal,
 } from "react-dom";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   apiClient,
@@ -927,6 +939,13 @@ function FilterDropdown({
         option.value ===
         value,
     ) ??
+    options.find(
+      (
+        option,
+      ) =>
+        option.value ===
+        "",
+    ) ??
     options[0];
 
   const updatePosition =
@@ -963,7 +982,10 @@ function FilterDropdown({
 
         const width =
           Math.min(
-            rect.width,
+            Math.max(
+              rect.width,
+              220,
+            ),
             window.innerWidth -
               viewportPadding *
                 2,
@@ -1228,14 +1250,16 @@ function FilterDropdown({
                  * Dropdown closes automatically when scrolling.
                  */
                 zIndex:
-                  30,
+                  80,
               }}
               className="
                 overflow-y-auto
                 rounded-2xl
+                border
+                border-violet-200/60
                 bg-white/95
                 p-1.5
-                shadow-[0_22px_60px_rgba(30,15,60,0.18)]
+                shadow-[0_24px_70px_rgba(30,15,60,0.22)]
                 backdrop-blur-xl
 
                 [scrollbar-width:none]
@@ -1289,7 +1313,7 @@ function FilterDropdown({
                         }
                       `}
                     >
-                      <span>
+                      <span className="min-w-0 truncate">
                         {
                           option.label
                         }
@@ -1636,6 +1660,7 @@ function SummaryCard({
         }}
         className="
           relative
+          h-full
           min-w-0
           overflow-hidden
           rounded-[24px]
@@ -1720,10 +1745,11 @@ function SummaryCard({
             className="
               mt-2
               w-full
-              whitespace-nowrap
+              break-words
               text-[clamp(1.15rem,1.7vw,1.75rem)]
               font-black
-              leading-none
+              leading-tight
+              [overflow-wrap:anywhere]
               tracking-[-0.035em]
               tabular-nums
             "
@@ -1767,7 +1793,9 @@ function SummaryCard({
       }}
       className="
         relative
+        h-full
         min-w-0
+        overflow-hidden
         rounded-[24px]
         bg-white/80
         p-5
@@ -1823,10 +1851,11 @@ function SummaryCard({
         className="
           mt-2
           w-full
-          whitespace-nowrap
+          break-words
           text-[clamp(1.05rem,1.55vw,1.65rem)]
           font-black
-          leading-none
+          leading-tight
+          [overflow-wrap:anywhere]
           tracking-[-0.035em]
           merchant-text
           tabular-nums
@@ -1908,7 +1937,7 @@ function EmptyState({
     () => void;
 }) {
   return (
-    <div className="flex min-h-[420px] flex-col items-center justify-center px-6 text-center">
+    <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
       <div
         className="
           flex
@@ -2009,6 +2038,32 @@ function MobileMetric({
 ========================================================= */
 
 export default function MerchantCustomersPage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isMerchantRole =
+    user.role === "merchant";
+
+  useEffect(() => {
+    if (isMerchantRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isMerchantRole,
+    router,
+    user.role,
+  ]);
+
   const [
     customers,
     setCustomers,
@@ -2099,6 +2154,15 @@ export default function MerchantCustomersPage() {
             boolean;
         },
       ) => {
+        if (!isMerchantRole) {
+          setLoading(false);
+          setRefreshing(false);
+          setCustomers([]);
+          setError("");
+
+          return;
+        }
+
         const silent =
           options?.silent ===
           true;
@@ -2194,17 +2258,25 @@ export default function MerchantCustomersPage() {
       },
       [
         appliedFilters,
+        isMerchantRole,
       ],
     );
 
   useEffect(
     () => {
+      if (!isMerchantRole) {
+        setLoading(false);
+
+        return;
+      }
+
       void fetchCustomers(
         1,
         appliedFilters,
       );
     },
     [
+      isMerchantRole,
       appliedFilters,
       fetchCustomers,
     ],
@@ -2222,6 +2294,10 @@ export default function MerchantCustomersPage() {
       value:
         string,
     ) => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       setFilters(
         (
           current,
@@ -2236,6 +2312,10 @@ export default function MerchantCustomersPage() {
 
   const applyFilters =
     () => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       /*
        * Prevent impossible date range.
        */
@@ -2263,6 +2343,10 @@ export default function MerchantCustomersPage() {
 
   const clearFilters =
     () => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       const cleared =
         getInitialFilters();
 
@@ -2322,6 +2406,10 @@ export default function MerchantCustomersPage() {
       nextPage:
         number,
     ) => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       if (
         nextPage <
           1 ||
@@ -2522,6 +2610,30 @@ export default function MerchantCustomersPage() {
       : 0;
 
   /* =======================================================
+     MERCHANT-ONLY REDIRECTING
+  ======================================================== */
+
+  if (!isMerchantRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center bg-background px-4 text-foreground">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-500/15 bg-violet-500/10 text-violet-700 shadow-sm dark:text-violet-300">
+            <RefreshCw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Merchant Customers is available only to merchant accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  /* =======================================================
      RENDER
   ======================================================== */
 
@@ -2583,7 +2695,7 @@ export default function MerchantCustomersPage() {
                   xl:justify-between
                 "
               >
-                <div className="max-w-3xl">
+                <div className="min-w-0 max-w-3xl">
                   <motion.div
                     variants={
                       heroItem
@@ -2664,7 +2776,11 @@ export default function MerchantCustomersPage() {
                   disabled={
                     refreshing
                   }
-                  onClick={() =>
+                  onClick={() => {
+                    if (!isMerchantRole) {
+                      return;
+                    }
+
                     void fetchCustomers(
                       pagination.page,
                       appliedFilters,
@@ -2672,12 +2788,15 @@ export default function MerchantCustomersPage() {
                         silent:
                           true,
                       },
-                    )
-                  }
+                    );
+                  }}
                   className="
                     inline-flex
                     h-11
+                    w-full
                     items-center
+
+                    sm:w-auto
                     justify-center
                     gap-2
                     self-start
@@ -3591,8 +3710,8 @@ export default function MerchantCustomersPage() {
                                   />
 
                                   <div className="min-w-0">
-                                    <div className="flex items-center gap-2">
-                                      <p className="truncate text-sm font-bold merchant-text">
+                                    <div className="flex min-w-0 items-start gap-2">
+                                      <p className="min-w-0 break-words text-sm font-bold leading-tight merchant-text [overflow-wrap:anywhere]">
                                         {item.customer
                                           ?.name ||
                                           "Customer"}

@@ -36,6 +36,14 @@ import {
 } from "framer-motion";
 
 import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
+
+import {
   apiClient,
 } from "@/lib/api/client";
 
@@ -1024,6 +1032,8 @@ function SummaryCard({
         }}
         className="
           relative
+          h-full
+          min-w-0
           overflow-hidden
           rounded-[24px]
           p-5
@@ -1044,9 +1054,10 @@ function SummaryCard({
             <p
               className={`
                 mt-2
-                overflow-hidden
-                whitespace-nowrap
+                break-words
                 font-black
+                leading-tight
+                [overflow-wrap:anywhere]
                 tracking-tight
                 tabular-nums
 
@@ -1098,6 +1109,9 @@ function SummaryCard({
           -4,
       }}
       className="
+        h-full
+        min-w-0
+        overflow-hidden
         rounded-[24px]
         bg-white/80
         p-5
@@ -1115,9 +1129,10 @@ function SummaryCard({
           <p
             className={`
               mt-2
-              overflow-hidden
-              whitespace-nowrap
+              break-words
               font-black
+              leading-tight
+              [overflow-wrap:anywhere]
               tracking-tight
               merchant-text
               tabular-nums
@@ -1163,13 +1178,13 @@ function InfoRow({
     boolean;
 }) {
   return (
-    <div className="flex flex-col gap-1.5 py-3 sm:flex-row sm:items-center sm:justify-between">
-      <span className="text-xs font-medium merchant-muted">
+    <div className="flex min-w-0 flex-col gap-1.5 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+      <span className="shrink-0 text-xs font-medium merchant-muted">
         {label}
       </span>
 
       <span
-        className={`text-sm font-semibold merchant-text ${
+        className={`min-w-0 break-words text-sm font-semibold leading-5 merchant-text sm:max-w-[65%] sm:text-right [overflow-wrap:anywhere] ${
           mono
             ? "font-mono text-xs"
             : ""
@@ -1224,6 +1239,29 @@ export default function MerchantCustomerDetailsPage() {
 
   const router =
     useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isMerchantRole =
+    user.role === "merchant";
+
+  useEffect(() => {
+    if (isMerchantRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isMerchantRole,
+    router,
+    user.role,
+  ]);
 
   const customerId =
     typeof params?.customerId ===
@@ -1297,6 +1335,17 @@ export default function MerchantCustomerDetailsPage() {
         silent =
           false,
       ) => {
+        if (!isMerchantRole) {
+          setLoading(false);
+          setRefreshing(false);
+          setCustomer(null);
+          setSummary(null);
+          setPayments([]);
+          setError("");
+
+          return;
+        }
+
         if (
           !customerId
         ) {
@@ -1425,14 +1474,22 @@ export default function MerchantCustomerDetailsPage() {
       },
       [
         customerId,
+        isMerchantRole,
       ],
     );
 
   useEffect(
     () => {
+      if (!isMerchantRole) {
+        setLoading(false);
+
+        return;
+      }
+
       void fetchCustomer();
     },
     [
+      isMerchantRole,
       fetchCustomer,
     ],
   );
@@ -1494,6 +1551,30 @@ export default function MerchantCustomerDetailsPage() {
     );
 
   /* =======================================================
+     MERCHANT-ONLY REDIRECTING
+  ======================================================== */
+
+  if (!isMerchantRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center bg-background px-4 text-foreground">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-500/15 bg-violet-500/10 text-violet-700 shadow-sm dark:text-violet-300">
+            <RefreshCw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Merchant customer details are available only to merchant accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  /* =======================================================
      LOADING
   ======================================================== */
 
@@ -1540,9 +1621,13 @@ export default function MerchantCustomerDetailsPage() {
             <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
               <button
                 type="button"
-                onClick={() =>
-                  void fetchCustomer()
-                }
+                onClick={() => {
+                  if (!isMerchantRole) {
+                    return;
+                  }
+
+                  void fetchCustomer();
+                }}
                 className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-bold text-white merchant-gradient"
               >
                 <RefreshCw className="h-4 w-4" />
@@ -1603,18 +1688,25 @@ export default function MerchantCustomerDetailsPage() {
 
             <button
               type="button"
-              onClick={() =>
+              onClick={() => {
+                if (!isMerchantRole) {
+                  return;
+                }
+
                 void fetchCustomer(
                   true,
-                )
-              }
+                );
+              }}
               disabled={
                 refreshing
               }
               className="
                 inline-flex
                 h-10
+                w-full
                 items-center
+
+                sm:w-auto
                 justify-center
                 gap-2
                 rounded-xl
@@ -1689,7 +1781,7 @@ export default function MerchantCustomerDetailsPage() {
 
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h1 className="truncate text-xl font-black sm:text-2xl">
+                      <h1 className="min-w-0 break-words text-xl font-black leading-tight sm:text-2xl [overflow-wrap:anywhere]">
                         {
                           customer.name
                         }
@@ -1704,7 +1796,7 @@ export default function MerchantCustomerDetailsPage() {
                       ) : null}
                     </div>
 
-                    <p className="mt-2 truncate font-mono text-xs text-white/70 sm:text-sm">
+                    <p className="mt-2 break-all font-mono text-xs leading-5 text-white/70 sm:text-sm">
                       {
                         customer.customerId
                       }
@@ -2387,7 +2479,7 @@ export default function MerchantCustomerDetailsPage() {
 
                                 <td className="px-5 py-4">
                                   <div className="flex min-w-[160px] items-center gap-2.5">
-                                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/[0.08] text-violet-600">
+                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-500/[0.08] text-violet-600">
                                       <MethodIcon className="h-4 w-4" />
                                     </div>
 
