@@ -29,6 +29,10 @@ import {
   type SupportKnowledgeBaseDetail,
 } from "@/lib/api/supportDashboardApi";
 
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
 const PAGE_SIZE = 12;
 
 /* =========================================================
@@ -64,10 +68,170 @@ function formatDate(
 }
 
 /* =========================================================
-   PAGE
+   SUPPORT-ONLY ACCESS
+========================================================= */
+
+function isAuthorizationError(
+  error: unknown
+): boolean {
+  const record =
+    error &&
+    typeof error === "object"
+      ? (
+          error as
+            Record<
+              string,
+              unknown
+            >
+        )
+      : null;
+
+  const response =
+    record?.response &&
+    typeof record.response ===
+      "object"
+      ? (
+          record.response as
+            Record<
+              string,
+              unknown
+            >
+        )
+      : null;
+
+  const status =
+    Number(
+      record?.status ??
+        record?.statusCode ??
+        response?.status
+    );
+
+  if (
+    status === 401 ||
+    status === 403
+  ) {
+    return true;
+  }
+
+  const message =
+    error instanceof Error
+      ? error.message
+          .toLowerCase()
+      : String(
+          error ?? ""
+        ).toLowerCase();
+
+  return (
+    message.includes("401") ||
+    message.includes("403") ||
+    message.includes(
+      "unauthorized"
+    ) ||
+    message.includes(
+      "forbidden"
+    ) ||
+    message.includes(
+      "access denied"
+    ) ||
+    message.includes(
+      "not authorized"
+    )
+  );
+}
+
+function SupportNotFoundState() {
+  return (
+    <main className="relative flex min-h-[78vh] items-center justify-center overflow-hidden bg-background px-4 text-foreground">
+      <div className="pointer-events-none absolute left-1/2 top-1/2 h-[440px] w-[440px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-500/[0.08] blur-[120px]" />
+
+      <motion.section
+        initial={{
+          opacity: 0,
+          y: 18,
+          scale: 0.98,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          scale: 1,
+        }}
+        transition={{
+          duration: 0.45,
+          ease: [
+            0.22,
+            1,
+            0.36,
+            1,
+          ],
+        }}
+        className="relative w-full max-w-xl overflow-hidden rounded-[32px] border border-border bg-card p-7 text-center shadow-[0_28px_90px_rgba(15,23,42,.10)] sm:p-10"
+      >
+        <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-emerald-500/[0.08] blur-3xl" />
+
+        <div className="relative">
+          <div className="mx-auto grid h-16 w-16 place-items-center rounded-[22px] border border-emerald-500/15 bg-emerald-500/10 text-emerald-600">
+            <BookOpen className="h-6 w-6" />
+          </div>
+
+          <p className="mt-6 text-[11px] font-black uppercase tracking-[0.22em] text-emerald-600">
+            Error 404
+          </p>
+
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">
+            Page not found
+          </h1>
+
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+            The page you are looking for does not exist or is not available.
+          </p>
+        </div>
+      </motion.section>
+    </main>
+  );
+}
+
+/* =========================================================
+   OUTER ACCESS GATE
 ========================================================= */
 
 export default function SupportKnowledgeBasePage() {
+  const {
+    user,
+  } = useDashboardSession();
+
+  const [
+    accessDenied,
+    setAccessDenied,
+  ] = useState(false);
+
+  const denyAccess =
+    useCallback(() => {
+      setAccessDenied(true);
+    }, []);
+
+  if (
+    accessDenied ||
+    user?.role !== "support"
+  ) {
+    return <SupportNotFoundState />;
+  }
+
+  return (
+    <SupportKnowledgeBaseContent
+      onUnauthorized={denyAccess}
+    />
+  );
+}
+
+/* =========================================================
+   PAGE CONTENT
+========================================================= */
+
+function SupportKnowledgeBaseContent({
+  onUnauthorized,
+}: {
+  onUnauthorized: () => void;
+}) {
   const [
     articles,
     setArticles,
@@ -207,6 +371,15 @@ export default function SupportKnowledgeBasePage() {
         } catch (
           requestError
         ) {
+          if (
+            isAuthorizationError(
+              requestError
+            )
+          ) {
+            onUnauthorized();
+            return;
+          }
+
           setError(
             requestError instanceof
               Error
@@ -224,6 +397,7 @@ export default function SupportKnowledgeBasePage() {
         category,
         page,
         search,
+        onUnauthorized,
       ]
     );
 
@@ -291,6 +465,15 @@ export default function SupportKnowledgeBasePage() {
         } catch (
           requestError
         ) {
+          if (
+            isAuthorizationError(
+              requestError
+            )
+          ) {
+            onUnauthorized();
+            return;
+          }
+
           setDetailError(
             requestError instanceof
               Error
@@ -303,8 +486,56 @@ export default function SupportKnowledgeBasePage() {
           );
         }
       },
-      []
+      [
+        onUnauthorized,
+      ]
     );
+
+  const closeArticle = () => {
+    setSelectedId(null);
+    setDetail(null);
+    setDetailError("");
+  };
+
+  useEffect(() => {
+    if (!selectedId) {
+      return;
+    }
+
+    const previousOverflow =
+      document.body.style.overflow;
+
+    document.body.style.overflow =
+      "hidden";
+
+    function onKeyDown(
+      event: KeyboardEvent
+    ) {
+      if (
+        event.key ===
+        "Escape"
+      ) {
+        closeArticle();
+      }
+    }
+
+    window.addEventListener(
+      "keydown",
+      onKeyDown
+    );
+
+    return () => {
+      document.body.style.overflow =
+        previousOverflow;
+
+      window.removeEventListener(
+        "keydown",
+        onKeyDown
+      );
+    };
+  }, [
+    selectedId,
+  ]);
 
   /* =======================================================
      CATEGORY OPTIONS
@@ -361,8 +592,8 @@ export default function SupportKnowledgeBasePage() {
   ======================================================= */
 
   return (
-    <main className="min-h-screen bg-transparent p-3 sm:p-4 md:p-6">
-      <div className="mx-auto max-w-[1500px] space-y-5">
+    <main className="min-h-screen w-full min-w-0 overflow-x-clip bg-transparent px-1 pb-8 sm:px-2 md:px-3">
+      <div className="mx-auto w-full max-w-[1500px] space-y-5">
         {/* =================================================
             HERO
         ================================================= */}
@@ -396,7 +627,7 @@ export default function SupportKnowledgeBasePage() {
             <div className="support-kb-ring support-kb-ring-two absolute -right-2 top-1/2 hidden h-[230px] w-[230px] -translate-y-1/2 rounded-full border border-white/10 xl:block" />
           </div>
 
-          <div className="relative z-10 grid min-h-[280px] gap-8 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-center lg:p-7 xl:grid-cols-[minmax(0,1fr)_420px] xl:p-8">
+          <div className="relative z-10 grid min-h-[280px] gap-8 p-5 sm:p-6 lg:p-7 xl:grid-cols-[minmax(0,1fr)_370px] xl:items-center xl:p-8 2xl:grid-cols-[minmax(0,1fr)_420px]">
             {/* Hero copy */}
             <div className="max-w-3xl">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3.5 py-2 text-[9px] font-black uppercase tracking-[0.18em] text-emerald-50 backdrop-blur-md sm:text-[10px]">
@@ -406,7 +637,7 @@ export default function SupportKnowledgeBasePage() {
                 Knowledge Workspace
               </div>
 
-              <div className="mt-5 flex items-start gap-4">
+              <div className="mt-5 flex flex-col gap-4 min-[480px]:flex-row min-[480px]:items-start">
                 <motion.div
                   animate={{
                     y: [0, -5, 0],
@@ -511,7 +742,8 @@ export default function SupportKnowledgeBasePage() {
                     )
                   }
                   disabled={
-                    refreshing
+                    refreshing ||
+                    loading
                   }
                   className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-2xl bg-white px-4 text-[10px] font-black text-emerald-700 shadow-[0_12px_28px_rgba(6,78,59,0.20)] transition hover:bg-emerald-50 disabled:opacity-60 sm:w-auto"
                 >
@@ -536,7 +768,7 @@ export default function SupportKnowledgeBasePage() {
             </div>
 
             {/* Animated knowledge visual */}
-            <div className="relative mx-auto hidden h-[250px] w-full max-w-[420px] lg:block">
+            <div className="relative mx-auto hidden h-[250px] w-full max-w-[420px] xl:block">
               <div className="support-kb-visual absolute left-1/2 top-1/2 h-[230px] w-[230px] -translate-x-1/2 -translate-y-1/2">
                 <div className="support-kb-core absolute left-1/2 top-1/2 flex h-[104px] w-[104px] -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-[30px] border border-white/20 bg-white/10 shadow-[0_25px_60px_rgba(6,78,59,0.28)] backdrop-blur-xl">
                   <div className="flex h-[74px] w-[74px] items-center justify-center rounded-[24px] border border-white/15 bg-white/10 text-white">
@@ -560,7 +792,7 @@ export default function SupportKnowledgeBasePage() {
                 </div>
 
                 <div className="support-kb-float-card support-kb-float-card-one absolute -left-12 top-8 rounded-2xl border border-white/15 bg-white/10 px-3 py-2.5 shadow-xl backdrop-blur-xl">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
                     <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-white/10 text-white">
                       <Search className="h-3.5 w-3.5" />
                     </span>
@@ -604,7 +836,7 @@ export default function SupportKnowledgeBasePage() {
         ================================================= */}
 
         <section className="rounded-[24px] border border-border bg-card p-4 shadow-sm">
-          <div className="grid gap-3 lg:grid-cols-[1fr_240px_auto]">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_260px_auto]">
             <label className="relative">
               <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 
@@ -676,7 +908,7 @@ export default function SupportKnowledgeBasePage() {
                 !search &&
                 !category
               }
-              className="h-11 rounded-2xl border border-border bg-muted/55 px-4 text-[10px] font-black text-muted-foreground transition hover:border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:text-emerald-400"
+              className="h-11 rounded-2xl border border-border bg-muted/55 px-4 text-[10px] font-black text-muted-foreground transition hover:border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-40 md:col-span-2 xl:col-span-1 dark:hover:text-emerald-400"
             >
               Clear filters
             </button>
@@ -729,7 +961,7 @@ export default function SupportKnowledgeBasePage() {
             </p>
           </div>
         ) : (
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <section className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
             {articles.map(
               (
                 article,
@@ -763,8 +995,8 @@ export default function SupportKnowledgeBasePage() {
                   }
                   className="group rounded-[24px] border border-border bg-card p-5 text-left shadow-sm transition hover:border-emerald-500/30 hover:shadow-[0_16px_38px_rgba(16,185,129,0.10)]"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <span className="inline-flex rounded-full border border-emerald-500/15 bg-emerald-500/10 px-2.5 py-1 text-[8px] font-black text-emerald-700 dark:text-emerald-300">
+                  <div className="flex flex-col gap-2 min-[460px]:flex-row min-[460px]:items-start min-[460px]:justify-between">
+                    <span className="inline-flex max-w-full self-start whitespace-normal break-words rounded-full border border-emerald-500/15 bg-emerald-500/10 px-2.5 py-1 text-left text-[8px] font-black leading-4 text-emerald-700 dark:text-emerald-300">
                       {
                         article.category
                       }
@@ -802,7 +1034,7 @@ export default function SupportKnowledgeBasePage() {
                             key={
                               item
                             }
-                            className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-[7px] font-bold text-muted-foreground"
+                            className="inline-flex max-w-full items-center gap-1 break-all rounded-full bg-muted px-2 py-1 text-[7px] font-bold leading-4 text-muted-foreground"
                           >
                             <Tag className="h-2.5 w-2.5" />
 
@@ -814,8 +1046,8 @@ export default function SupportKnowledgeBasePage() {
                       )}
                   </div>
 
-                  <div className="mt-5 flex items-center justify-between border-t border-border pt-4">
-                    <span className="font-mono text-[8px] text-muted-foreground">
+                  <div className="mt-5 flex min-w-0 flex-col gap-2 border-t border-border pt-4 min-[460px]:flex-row min-[460px]:items-center min-[460px]:justify-between">
+                    <span className="min-w-0 break-all font-mono text-[8px] leading-4 text-muted-foreground">
                       /
                       {
                         article.slug
@@ -909,12 +1141,10 @@ export default function SupportKnowledgeBasePage() {
             exit={{
               opacity: 0,
             }}
-            onMouseDown={() =>
-              setSelectedId(
-                null
-              )
+            onMouseDown={
+              closeArticle
             }
-            className="fixed inset-0 z-[120] bg-black/45 backdrop-blur-sm"
+            className="fixed inset-0 z-[120] bg-slate-950/55 backdrop-blur-[3px]"
           >
             <motion.aside
               initial={{
@@ -937,7 +1167,7 @@ export default function SupportKnowledgeBasePage() {
               ) =>
                 event.stopPropagation()
               }
-              className="absolute right-0 top-0 flex h-full w-full max-w-[620px] flex-col border-l border-border bg-background shadow-2xl"
+              className="absolute right-0 top-0 flex h-full w-full max-w-[740px] flex-col border-l border-border bg-background shadow-[-24px_0_80px_rgba(15,23,42,.30)] 2xl:max-w-[800px]"
             >
               <div className="flex items-start justify-between gap-4 border-b border-border bg-card p-5 sm:p-6">
                 <div>
@@ -946,7 +1176,7 @@ export default function SupportKnowledgeBasePage() {
                     Base
                   </p>
 
-                  <h2 className="mt-1 text-xl font-black text-foreground">
+                  <h2 className="mt-1 break-words [overflow-wrap:anywhere] text-xl font-black leading-7 text-foreground">
                     {detail?.title ||
                       "Article details"}
                   </h2>
@@ -954,10 +1184,8 @@ export default function SupportKnowledgeBasePage() {
 
                 <button
                   type="button"
-                  onClick={() =>
-                    setSelectedId(
-                      null
-                    )
+                  onClick={
+                    closeArticle
                   }
                   className="flex h-10 w-10 items-center justify-center rounded-2xl border border-border bg-muted text-muted-foreground transition hover:border-emerald-500/30 hover:bg-emerald-500/10 hover:text-emerald-700 dark:hover:text-emerald-400"
                 >
@@ -965,7 +1193,7 @@ export default function SupportKnowledgeBasePage() {
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-5 [scrollbar-width:none] sm:p-6 [&::-webkit-scrollbar]:hidden">
+              <div className="support-kb-scroll flex-1 overflow-y-auto overscroll-contain p-4 pb-10 sm:p-6 sm:pb-12">
                 {detailLoading ? (
                   <div className="flex min-h-[300px] items-center justify-center">
                     <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
@@ -980,7 +1208,7 @@ export default function SupportKnowledgeBasePage() {
                   <div className="space-y-5">
                     <section className="rounded-[24px] border border-border bg-card p-5">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full bg-emerald-500/10 px-2.5 py-1 text-[8px] font-black text-emerald-700 dark:text-emerald-300">
+                        <span className="max-w-full break-words rounded-full bg-emerald-500/10 px-2.5 py-1 text-[8px] font-black leading-4 text-emerald-700 dark:text-emerald-300">
                           {
                             detail.category
                           }
@@ -995,7 +1223,7 @@ export default function SupportKnowledgeBasePage() {
                       </div>
 
                       {detail.summary && (
-                        <p className="mt-4 text-[11px] leading-6 text-muted-foreground">
+                        <p className="mt-4 break-words [overflow-wrap:anywhere] text-[11px] leading-6 text-muted-foreground">
                           {
                             detail.summary
                           }
@@ -1009,7 +1237,7 @@ export default function SupportKnowledgeBasePage() {
                         content
                       </p>
 
-                      <div className="mt-4 whitespace-pre-wrap text-[11px] leading-6 text-foreground/85">
+                      <div className="mt-4 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[11px] leading-6 text-foreground/85">
                         {
                           detail.content
                         }
@@ -1033,7 +1261,7 @@ export default function SupportKnowledgeBasePage() {
                                 key={
                                   item
                                 }
-                                className="rounded-full border border-border bg-muted px-2.5 py-1 text-[8px] font-bold text-muted-foreground"
+                                className="max-w-full break-all rounded-full border border-border bg-muted px-2.5 py-1 text-[8px] font-bold leading-4 text-muted-foreground"
                               >
                                 {
                                   item
@@ -1055,6 +1283,38 @@ export default function SupportKnowledgeBasePage() {
       <style>{`
         .support-kb-hero {
           isolation: isolate;
+        }
+
+        .support-kb-scroll {
+          scrollbar-width: thin;
+          scrollbar-color:
+            rgba(16, 185, 129, 0.42)
+            transparent;
+        }
+
+        .support-kb-scroll::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+
+        .support-kb-scroll::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        .support-kb-scroll::-webkit-scrollbar-thumb {
+          border: 2px solid transparent;
+          border-radius: 999px;
+          background:
+            rgba(16, 185, 129, 0.36);
+          background-clip:
+            padding-box;
+        }
+
+        .support-kb-scroll::-webkit-scrollbar-thumb:hover {
+          background:
+            rgba(5, 150, 105, 0.54);
+          background-clip:
+            padding-box;
         }
 
         .support-kb-grid {

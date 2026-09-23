@@ -48,6 +48,10 @@ import {
   type SupportSavedReply,
 } from "@/lib/api/supportDashboardApi";
 
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
 const PAGE_SIZE = 12;
 
 const HERO_PARTICLES = [
@@ -89,11 +93,138 @@ function messageOf(error: unknown): string {
     : "The request could not be completed.";
 }
 
+
+function isAuthorizationError(
+  error: unknown
+): boolean {
+  const record =
+    error &&
+    typeof error === "object"
+      ? (error as Record<string, unknown>)
+      : null;
+
+  const response =
+    record?.response &&
+    typeof record.response === "object"
+      ? (record.response as Record<string, unknown>)
+      : null;
+
+  const status = Number(
+    record?.status ??
+      record?.statusCode ??
+      response?.status
+  );
+
+  if (
+    status === 401 ||
+    status === 403
+  ) {
+    return true;
+  }
+
+  const message =
+    error instanceof Error
+      ? error.message.toLowerCase()
+      : String(error ?? "").toLowerCase();
+
+  return (
+    message.includes("401") ||
+    message.includes("403") ||
+    message.includes("unauthorized") ||
+    message.includes("forbidden") ||
+    message.includes("access denied") ||
+    message.includes("not authorized")
+  );
+}
+
+/* =========================================================
+   SUPPORT-ONLY ACCESS
+========================================================= */
+
+function SupportNotFoundState() {
+  return (
+    <main className="relative flex min-h-[78vh] items-center justify-center overflow-hidden bg-background px-4 text-foreground">
+      <div className="pointer-events-none absolute left-1/2 top-1/2 h-[440px] w-[440px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-500/[0.08] blur-[120px]" />
+
+      <motion.section
+        initial={{
+          opacity: 0,
+          y: 18,
+          scale: 0.98,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          scale: 1,
+        }}
+        transition={{
+          duration: 0.45,
+          ease: [0.22, 1, 0.36, 1],
+        }}
+        className="relative w-full max-w-xl overflow-hidden rounded-[32px] border border-border bg-card p-7 text-center shadow-[0_28px_90px_rgba(15,23,42,.10)] sm:p-10"
+      >
+        <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-emerald-500/[0.08] blur-3xl" />
+
+        <div className="relative">
+          <div className="mx-auto grid h-16 w-16 place-items-center rounded-[22px] border border-emerald-500/15 bg-emerald-500/10 text-emerald-600">
+            <MessageSquareText className="h-6 w-6" />
+          </div>
+
+          <p className="mt-6 text-[11px] font-black uppercase tracking-[0.22em] text-emerald-600">
+            Error 404
+          </p>
+
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">
+            Page not found
+          </h1>
+
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+            The page you are looking for does not exist or is not available.
+          </p>
+        </div>
+      </motion.section>
+    </main>
+  );
+}
+
 /* =========================================================
    PAGE
 ========================================================= */
 
 export default function SupportSavedRepliesPage() {
+  const {
+    user,
+  } = useDashboardSession();
+
+  const [
+    accessDenied,
+    setAccessDenied,
+  ] = useState(false);
+
+  const denyAccess =
+    useCallback(() => {
+      setAccessDenied(true);
+    }, []);
+
+  if (
+    accessDenied ||
+    user?.role !== "support"
+  ) {
+    return <SupportNotFoundState />;
+  }
+
+  return (
+    <SupportSavedRepliesContent
+      onUnauthorized={denyAccess}
+    />
+  );
+}
+
+function SupportSavedRepliesContent({
+  onUnauthorized,
+}: {
+  onUnauthorized: () => void;
+}) {
   const [replies, setReplies] = useState<SupportSavedReply[]>([]);
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("");
@@ -143,13 +274,31 @@ export default function SupportSavedRepliesPage() {
         setTotal(response.total ?? 0);
         setTotalPages(Math.max(1, response.totalPages ?? 1));
       } catch (requestError) {
-        setError(messageOf(requestError));
+        if (
+          isAuthorizationError(
+            requestError
+          )
+        ) {
+          onUnauthorized();
+          return;
+        }
+
+        setError(
+          messageOf(
+            requestError
+          )
+        );
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    [category, page, search]
+    [
+      category,
+      page,
+      search,
+      onUnauthorized,
+    ]
   );
 
   useEffect(() => {
@@ -229,12 +378,25 @@ export default function SupportSavedRepliesPage() {
 
       setSelected(response.reply);
     } catch (requestError) {
+      if (
+        isAuthorizationError(
+          requestError
+        )
+      ) {
+        onUnauthorized();
+        return;
+      }
+
       setSelected(null);
-      setDetailError(messageOf(requestError));
+      setDetailError(
+        messageOf(
+          requestError
+        )
+      );
     } finally {
       setDetailLoading(false);
     }
-  }, []);
+  }, [onUnauthorized]);
 
   /* =======================================================
      COPY
@@ -253,6 +415,42 @@ export default function SupportSavedRepliesPage() {
       setCopiedId(null);
     }
   }, []);
+
+
+  useEffect(() => {
+    if (!selectedId) {
+      return;
+    }
+
+    const previousOverflow =
+      document.body.style.overflow;
+
+    document.body.style.overflow =
+      "hidden";
+
+    function onKeyDown(
+      event: KeyboardEvent
+    ) {
+      if (event.key === "Escape") {
+        setSelectedId(null);
+      }
+    }
+
+    window.addEventListener(
+      "keydown",
+      onKeyDown
+    );
+
+    return () => {
+      document.body.style.overflow =
+        previousOverflow;
+
+      window.removeEventListener(
+        "keydown",
+        onKeyDown
+      );
+    };
+  }, [selectedId]);
 
   /* =======================================================
      PAGINATION
@@ -274,23 +472,38 @@ export default function SupportSavedRepliesPage() {
   ======================================================= */
 
   return (
-    <main className="support-saved-replies-page bg-transparent pb-8">
+    <main className="support-saved-replies-page w-full min-w-0 overflow-x-clip bg-transparent pb-8">
       <style jsx global>{`
-        .support-saved-replies-page,
-        .support-saved-replies-page * {
-          scrollbar-width: none;
-          -ms-overflow-style: none;
+        .support-saved-reply-scroll {
+          scrollbar-width: thin;
+          scrollbar-color:
+            rgba(16, 185, 129, 0.42)
+            transparent;
         }
 
-        .support-saved-replies-page::-webkit-scrollbar,
-        .support-saved-replies-page *::-webkit-scrollbar {
-          width: 0 !important;
-          height: 0 !important;
-          display: none !important;
+        .support-saved-reply-scroll::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+
+        .support-saved-reply-scroll::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        .support-saved-reply-scroll::-webkit-scrollbar-thumb {
+          border: 2px solid transparent;
+          border-radius: 999px;
+          background: rgba(16, 185, 129, 0.36);
+          background-clip: padding-box;
+        }
+
+        .support-saved-reply-scroll::-webkit-scrollbar-thumb:hover {
+          background: rgba(5, 150, 105, 0.54);
+          background-clip: padding-box;
         }
       `}</style>
 
-      <div className="mx-auto max-w-[1600px] space-y-6">
+      <div className="mx-auto w-full max-w-[1600px] space-y-5 sm:space-y-6">
         {/* =================================================
             HERO — ALWAYS ANIMATED EMERALD
         ================================================= */}
@@ -308,7 +521,7 @@ export default function SupportSavedRepliesPage() {
             duration: 0.55,
             ease: [0.22, 1, 0.36, 1],
           }}
-          className="relative isolate overflow-hidden rounded-[30px] border border-emerald-300/25 bg-[linear-gradient(135deg,#10B981_0%,#059669_48%,#047857_100%)] p-6 text-white shadow-[0_28px_80px_-38px_rgba(5,150,105,.70)] md:p-7 lg:p-8"
+          className="relative isolate overflow-hidden rounded-[30px] border border-emerald-300/25 bg-[linear-gradient(135deg,#10B981_0%,#059669_48%,#047857_100%)] p-5 text-white shadow-[0_28px_80px_-38px_rgba(5,150,105,.70)] sm:p-6 md:p-7 lg:p-8"
         >
           {/* animated glow 1 */}
           <motion.div
@@ -447,7 +660,7 @@ export default function SupportSavedRepliesPage() {
               </div>
             </div>
 
-            <div className="relative shrink-0">
+            <div className="relative w-full shrink-0 sm:w-auto">
               <motion.div
                 aria-hidden
                 animate={{
@@ -474,7 +687,7 @@ export default function SupportSavedRepliesPage() {
                 }}
                 onClick={() => void loadReplies(true)}
                 disabled={refreshing || loading}
-                className="relative inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-xs font-black text-emerald-800 shadow-[0_12px_32px_rgba(0,0,0,.16)] transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="relative inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white px-5 text-xs font-black text-emerald-800 shadow-[0_12px_32px_rgba(0,0,0,.16)] transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
               >
                 <RefreshCw
                   className={`h-4 w-4 ${
@@ -508,7 +721,7 @@ export default function SupportSavedRepliesPage() {
             SUMMARY
         ================================================= */}
 
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
           <SummaryCard
             icon={MessageSquareText}
             label="Visible Replies"
@@ -546,7 +759,7 @@ export default function SupportSavedRepliesPage() {
             ANALYTICS + EMERALD INFO PANEL
         ================================================= */}
 
-        <section className="grid gap-5 xl:grid-cols-[1.55fr_.75fr]">
+        <section className="grid gap-5 2xl:grid-cols-[1.55fr_.75fr]">
           <motion.article
             initial={{
               opacity: 0,
@@ -623,7 +836,9 @@ export default function SupportSavedRepliesPage() {
                       dataKey="name"
                       axisLine={false}
                       tickLine={false}
-                      minTickGap={14}
+                      interval="preserveStartEnd"
+                      minTickGap={16}
+                      tickMargin={8}
                       tick={{
                         fontSize: 9,
                         fill: "var(--muted-foreground)",
@@ -785,7 +1000,7 @@ export default function SupportSavedRepliesPage() {
             )}
           </div>
 
-          <div className="grid gap-3 lg:grid-cols-[1fr_280px]">
+          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_280px]">
             <label className="relative">
               <span className="mb-1.5 block px-1 text-[8px] font-black uppercase tracking-[0.14em] text-muted-foreground">
                 Search
@@ -881,7 +1096,7 @@ export default function SupportSavedRepliesPage() {
             </p>
           </div>
         ) : (
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <section className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
             {replies.map((reply, index) => (
               <motion.article
                 key={reply.id}
@@ -907,12 +1122,12 @@ export default function SupportSavedRepliesPage() {
                 <div className="pointer-events-none absolute -right-12 -top-12 h-28 w-28 rounded-full bg-emerald-500/[0.05] blur-3xl transition group-hover:bg-emerald-500/[0.09]" />
 
                 <div className="relative">
-                  <div className="flex items-start justify-between gap-3">
-                    <span className="rounded-full border border-emerald-500/15 bg-emerald-500/10 px-2.5 py-1 text-[8px] font-black text-emerald-700 dark:text-emerald-300">
+                  <div className="flex flex-col gap-2 min-[460px]:flex-row min-[460px]:items-start min-[460px]:justify-between">
+                    <span className="max-w-full self-start whitespace-normal break-words rounded-full border border-emerald-500/15 bg-emerald-500/10 px-2.5 py-1 text-left text-[8px] font-black leading-4 text-emerald-700 dark:text-emerald-300">
                       {reply.category}
                     </span>
 
-                    <span className="rounded-lg bg-muted px-2 py-1 font-mono text-[8px] font-black text-muted-foreground">
+                    <span className="max-w-full break-all rounded-lg bg-muted px-2 py-1 font-mono text-[8px] font-black leading-4 text-muted-foreground">
                       /{reply.shortcut}
                     </span>
                   </div>
@@ -935,7 +1150,7 @@ export default function SupportSavedRepliesPage() {
                     {(reply.tags ?? []).slice(0, 4).map((item) => (
                       <span
                         key={item}
-                        className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-[7px] font-bold text-muted-foreground"
+                        className="inline-flex max-w-full items-center gap-1 break-all rounded-full bg-muted px-2 py-1 text-[7px] font-bold leading-4 text-muted-foreground"
                       >
                         <Tag className="h-2.5 w-2.5" />
                         {item}
@@ -943,8 +1158,8 @@ export default function SupportSavedRepliesPage() {
                     ))}
                   </div>
 
-                  <div className="mt-5 flex items-center justify-between gap-3 border-t border-border pt-4">
-                    <span className="text-[8px] text-muted-foreground">
+                  <div className="mt-5 flex flex-col gap-3 border-t border-border pt-4 min-[460px]:flex-row min-[460px]:items-center min-[460px]:justify-between">
+                    <span className="break-words text-[8px] leading-4 text-muted-foreground">
                       Updated {formatDate(reply.updatedAt)}
                     </span>
 
@@ -984,7 +1199,7 @@ export default function SupportSavedRepliesPage() {
             {paginationText}
           </p>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
             <PageButton
               label="Previous page"
               disabled={page <= 1}
@@ -1040,7 +1255,7 @@ export default function SupportSavedRepliesPage() {
               opacity: 0,
             }}
             onMouseDown={() => setSelectedId(null)}
-            className="fixed inset-0 z-[120] bg-black/45 backdrop-blur-[5px]"
+            className="fixed inset-0 z-[120] bg-slate-950/55 backdrop-blur-[3px]"
           >
             <motion.aside
               initial={{
@@ -1061,7 +1276,7 @@ export default function SupportSavedRepliesPage() {
                 damping: 30,
               }}
               onMouseDown={(event) => event.stopPropagation()}
-              className="absolute right-0 top-0 flex h-full w-full max-w-[580px] flex-col border-l border-border bg-background shadow-2xl"
+              className="absolute right-0 top-0 flex h-full w-full max-w-[720px] flex-col border-l border-border bg-background shadow-[-24px_0_80px_rgba(15,23,42,.30)] 2xl:max-w-[780px]"
             >
               <div className="relative overflow-hidden border-b border-emerald-400/20 bg-[linear-gradient(135deg,#10B981_0%,#059669_55%,#047857_100%)] p-5 text-white sm:p-6">
                 <motion.div
@@ -1084,7 +1299,7 @@ export default function SupportSavedRepliesPage() {
                       Saved Reply
                     </p>
 
-                    <h2 className="mt-1 truncate text-xl font-black">
+                    <h2 className="mt-1 break-words [overflow-wrap:anywhere] text-xl font-black leading-7">
                       {selected?.title || "Reply details"}
                     </h2>
                   </div>
@@ -1100,7 +1315,7 @@ export default function SupportSavedRepliesPage() {
                 </div>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
+              <div className="support-saved-reply-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-10 sm:p-6 sm:pb-12">
                 {detailLoading ? (
                   <div className="flex min-h-[300px] items-center justify-center">
                     <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
@@ -1117,12 +1332,12 @@ export default function SupportSavedRepliesPage() {
                           {selected.category}
                         </span>
 
-                        <span className="rounded-lg bg-muted px-2 py-1 font-mono text-[8px] font-black text-muted-foreground">
+                        <span className="max-w-full break-all rounded-lg bg-muted px-2 py-1 font-mono text-[8px] font-black leading-4 text-muted-foreground">
                           /{selected.shortcut}
                         </span>
                       </div>
 
-                      <div className="mt-4 whitespace-pre-wrap rounded-2xl border border-border bg-muted/45 p-4 text-[11px] leading-6 text-foreground">
+                      <div className="mt-4 whitespace-pre-wrap break-words [overflow-wrap:anywhere] rounded-2xl border border-border bg-muted/45 p-4 text-[11px] leading-6 text-foreground">
                         {selected.content}
                       </div>
 
@@ -1131,7 +1346,7 @@ export default function SupportSavedRepliesPage() {
                           {(selected.tags ?? []).map((item) => (
                             <span
                               key={item}
-                              className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2.5 py-1 text-[8px] font-bold text-muted-foreground"
+                              className="inline-flex max-w-full items-center gap-1 break-all rounded-full border border-border bg-background px-2.5 py-1 text-[8px] font-bold leading-4 text-muted-foreground"
                             >
                               <Tag className="h-2.5 w-2.5 text-emerald-600" />
                               {item}
@@ -1149,7 +1364,7 @@ export default function SupportSavedRepliesPage() {
                           scale: 0.97,
                         }}
                         onClick={() => void copyReply(selected)}
-                        className="mt-5 inline-flex h-10 items-center gap-2 rounded-xl bg-emerald-600 px-4 text-[9px] font-black text-white shadow-sm transition hover:bg-emerald-700"
+                        className="mt-5 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-[9px] font-black text-white shadow-sm transition hover:bg-emerald-700 sm:w-auto"
                       >
                         {copiedId === selected.id ? (
                           <CheckCircle2 className="h-3.5 w-3.5" />
@@ -1271,7 +1486,7 @@ function SummaryCard({
             {label}
           </p>
 
-          <p className="mt-3 text-2xl font-black tracking-tight text-foreground">
+          <p className="mt-3 break-words text-xl font-black leading-7 tracking-tight text-foreground sm:text-2xl">
             {value}
           </p>
 
@@ -1387,11 +1602,11 @@ function CategorySelect({
         </span>
 
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-xs font-black text-foreground">
+          <span className="block break-words text-xs font-black leading-5 text-foreground">
             {currentLabel}
           </span>
 
-          <span className="mt-0.5 block truncate text-[9px] text-muted-foreground">
+          <span className="mt-0.5 block break-words text-[9px] leading-4 text-muted-foreground">
             {value
               ? "Filter replies by this category"
               : "Show every available category"}
@@ -1433,7 +1648,7 @@ function CategorySelect({
               duration: 0.16,
             }}
             role="listbox"
-            className="absolute left-0 right-0 top-[calc(100%+8px)] z-[100] max-h-64 overflow-y-auto rounded-2xl border border-border bg-card p-1.5 shadow-[0_24px_70px_-20px_rgba(5,150,105,.30)]"
+            className="support-saved-reply-scroll absolute left-0 right-0 top-[calc(100%+8px)] z-[100] max-h-64 overflow-y-auto overscroll-contain rounded-2xl border border-border bg-card p-1.5 shadow-[0_24px_70px_-20px_rgba(5,150,105,.30)]"
           >
             <CategoryOption
               active={!value}
