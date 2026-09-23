@@ -11,6 +11,10 @@ import React, {
 import Link from "next/link";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
@@ -40,6 +44,14 @@ import {
 import {
   createPortal,
 } from "react-dom";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   createMerchantPayout,
@@ -671,7 +683,10 @@ function PayoutDropdown({
 
       const width =
         Math.min(
-          rect.width,
+          Math.max(
+            rect.width,
+            220,
+          ),
           window.innerWidth -
             padding *
               2,
@@ -870,11 +885,13 @@ function PayoutDropdown({
                 position.maxHeight,
 
               zIndex:
-                30,
+                100,
             }}
             className="
               overflow-y-auto
               rounded-2xl
+              border
+              border-violet-200/60
               bg-white/95
               p-1.5
               shadow-[0_22px_60px_rgba(30,15,60,0.18)]
@@ -929,10 +946,12 @@ function PayoutDropdown({
                       }
                     `}
                   >
-                    {option.label}
+                    <span className="min-w-0 truncate">
+                      {option.label}
+                    </span>
 
                     {active ? (
-                      <Check className="h-4 w-4" />
+                      <Check className="h-4 w-4 shrink-0" />
                     ) : null}
                   </button>
                 );
@@ -1074,10 +1093,11 @@ function StatCard({
         <p
           className={`
             mt-3
-            whitespace-nowrap
+            break-words
             text-[clamp(1.05rem,1.8vw,1.7rem)]
             font-black
-            leading-none
+            leading-tight
+            [overflow-wrap:anywhere]
             tracking-[-0.035em]
             tabular-nums
 
@@ -1114,6 +1134,8 @@ function StatCard({
         }}
         className="
           relative
+          h-full
+          min-w-0
           overflow-hidden
           rounded-[24px]
           p-5
@@ -1135,6 +1157,9 @@ function StatCard({
         y: -4,
       }}
       className="
+        h-full
+        min-w-0
+        overflow-hidden
         rounded-[24px]
         bg-white/80
         p-5
@@ -1153,6 +1178,32 @@ function StatCard({
 ========================================================= */
 
 export default function MerchantPayoutsPage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isMerchantRole =
+    user.role === "merchant";
+
+  useEffect(() => {
+    if (isMerchantRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role,
+      ),
+    );
+  }, [
+    isMerchantRole,
+    router,
+    user.role,
+  ]);
+
   const [
     payouts,
     setPayouts,
@@ -1312,6 +1363,15 @@ export default function MerchantPayoutsPage() {
       async (
         silent = false,
       ) => {
+        if (!isMerchantRole) {
+          setLoading(false);
+          setRefreshing(false);
+          setPayouts([]);
+          setError("");
+
+          return;
+        }
+
         try {
           setError("");
 
@@ -1415,6 +1475,7 @@ export default function MerchantPayoutsPage() {
       },
       [
         from,
+        isMerchantRole,
         method,
         page,
         search,
@@ -1425,9 +1486,16 @@ export default function MerchantPayoutsPage() {
 
   useEffect(
     () => {
+      if (!isMerchantRole) {
+        setLoading(false);
+
+        return;
+      }
+
       void loadPayouts();
     },
     [
+      isMerchantRole,
       loadPayouts,
     ],
   );
@@ -1438,6 +1506,10 @@ export default function MerchantPayoutsPage() {
 
   useEffect(
     () => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       const timer =
         window.setTimeout(
           () => {
@@ -1456,6 +1528,7 @@ export default function MerchantPayoutsPage() {
         );
     },
     [
+      isMerchantRole,
       searchInput,
     ],
   );
@@ -1466,6 +1539,10 @@ export default function MerchantPayoutsPage() {
 
   const openPayoutModal =
     () => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       setForm(
         EMPTY_FORM,
       );
@@ -1480,6 +1557,10 @@ export default function MerchantPayoutsPage() {
 
   const submitPayout =
     async () => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       const amount =
         Number(
           form.amount,
@@ -1644,6 +1725,26 @@ export default function MerchantPayoutsPage() {
   /* =======================================================
      RENDER
   ======================================================== */
+
+  if (!isMerchantRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center bg-background px-4 text-foreground">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-500/15 bg-violet-500/10 text-violet-700 shadow-sm dark:text-violet-300">
+            <RefreshCw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Merchant Payouts is available only to merchant accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="merchant-theme relative z-0 isolate min-h-full">
@@ -2119,7 +2220,7 @@ export default function MerchantPayoutsPage() {
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <p className="truncate font-mono text-xs font-black text-violet-600">
+                              <p className="break-all font-mono text-xs font-black leading-5 text-violet-600">
                                 {
                                   payout.payoutId
                                 }
@@ -2141,7 +2242,7 @@ export default function MerchantPayoutsPage() {
                             </span>
                           </div>
 
-                          <p className="mt-4 whitespace-nowrap text-xl font-black merchant-text">
+                          <p className="mt-4 break-words text-xl font-black leading-tight merchant-text [overflow-wrap:anywhere]">
                             {formatMoney(
                               payout.netAmount,
                               payout.currency,
@@ -2149,7 +2250,7 @@ export default function MerchantPayoutsPage() {
                           </p>
 
                           <div className="mt-4 flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                               <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-violet-500/[0.08] text-violet-600">
                                 <MethodIcon className="h-4 w-4" />
                               </span>
@@ -2253,7 +2354,7 @@ export default function MerchantPayoutsPage() {
                                   )}
                                 </Link>
 
-                                <p className="mt-1 max-w-[180px] truncate text-xs merchant-muted">
+                                <p className="mt-1 max-w-[180px] break-words text-xs leading-5 merchant-muted [overflow-wrap:anywhere]">
                                   {payout.merchantReference ||
                                     "No reference"}
                                 </p>
@@ -2294,7 +2395,7 @@ export default function MerchantPayoutsPage() {
                               </td>
 
                               <td className="px-5 py-4">
-                                <p className="max-w-[210px] truncate text-sm font-semibold merchant-text">
+                                <p className="max-w-[210px] break-words text-sm font-semibold leading-5 merchant-text [overflow-wrap:anywhere]">
                                   {payout.destination ||
                                     payout.destinationReference ||
                                     "—"}
@@ -2352,7 +2453,11 @@ export default function MerchantPayoutsPage() {
                       disabled={
                         !hasPreviousPage
                       }
-                      onClick={() =>
+                      onClick={() => {
+                        if (!isMerchantRole) {
+                          return;
+                        }
+
                         setPage(
                           (
                             current,
@@ -2362,8 +2467,8 @@ export default function MerchantPayoutsPage() {
                               current -
                                 1,
                             ),
-                        )
-                      }
+                        );
+                      }}
                       className="inline-flex h-9 items-center gap-1 rounded-xl bg-violet-500/[0.06] px-3 text-xs font-bold merchant-text disabled:opacity-40"
                     >
                       <ArrowLeft className="h-4 w-4" />
@@ -2382,7 +2487,11 @@ export default function MerchantPayoutsPage() {
                       disabled={
                         !hasNextPage
                       }
-                      onClick={() =>
+                      onClick={() => {
+                        if (!isMerchantRole) {
+                          return;
+                        }
+
                         setPage(
                           (
                             current,
@@ -2392,8 +2501,8 @@ export default function MerchantPayoutsPage() {
                               current +
                                 1,
                             ),
-                        )
-                      }
+                        );
+                      }}
                       className="inline-flex h-9 items-center gap-1 rounded-xl bg-violet-500/[0.06] px-3 text-xs font-bold merchant-text disabled:opacity-40"
                     >
                       Next
@@ -2413,7 +2522,8 @@ export default function MerchantPayoutsPage() {
       ==================================================== */}
 
       <AnimatePresence>
-        {payoutModalOpen ? (
+        {isMerchantRole &&
+        payoutModalOpen ? (
           <motion.div
             initial={{
               opacity: 0,
@@ -2424,12 +2534,19 @@ export default function MerchantPayoutsPage() {
             exit={{
               opacity: 0,
             }}
-            className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm"
-            onMouseDown={() =>
+            className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto bg-slate-950/45 px-4 py-6 backdrop-blur-sm sm:items-center"
+            onMouseDown={() => {
+              if (
+                !isMerchantRole ||
+                submitting
+              ) {
+                return;
+              }
+
               setPayoutModalOpen(
                 false,
-              )
-            }
+              );
+            }}
           >
             <motion.div
               initial={{
@@ -2452,7 +2569,7 @@ export default function MerchantPayoutsPage() {
               ) =>
                 event.stopPropagation()
               }
-              className="merchant-surface w-full max-w-xl overflow-hidden rounded-[28px] shadow-2xl"
+              className="merchant-surface my-auto max-h-[calc(100vh-3rem)] w-full max-w-xl overflow-x-hidden overflow-y-auto rounded-[28px] shadow-2xl"
             >
               <div
                 className="px-5 py-5 text-white"
@@ -2461,9 +2578,9 @@ export default function MerchantPayoutsPage() {
                     "linear-gradient(132deg,#4C1D95 0%,#6D28D9 60%,#9333EA 100%)",
                 }}
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h2 className="text-lg font-black">
+                <div className="flex min-w-0 items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <h2 className="break-words text-lg font-black leading-tight [overflow-wrap:anywhere]">
                       Request payout
                     </h2>
 
@@ -2478,12 +2595,19 @@ export default function MerchantPayoutsPage() {
 
                   <button
                     type="button"
-                    onClick={() =>
+                    onClick={() => {
+                      if (
+                        !isMerchantRole ||
+                        submitting
+                      ) {
+                        return;
+                      }
+
                       setPayoutModalOpen(
                         false,
-                      )
-                    }
-                    className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10"
+                      );
+                    }}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/10"
                   >
                     <X className="h-4 w-4" />
                   </button>
@@ -2505,7 +2629,11 @@ export default function MerchantPayoutsPage() {
                     }
                     onChange={(
                       event,
-                    ) =>
+                    ) => {
+                      if (!isMerchantRole) {
+                        return;
+                      }
+
                       setForm(
                         (
                           current,
@@ -2515,8 +2643,8 @@ export default function MerchantPayoutsPage() {
                           amount:
                             event.target.value,
                         }),
-                      )
-                    }
+                      );
+                    }}
                     placeholder="0.00"
                     className="merchant-text mt-2 h-12 w-full rounded-2xl border-0 bg-violet-500/[0.055] px-4 text-sm outline-none focus:ring-4 focus:ring-violet-500/[0.09]"
                   />
@@ -2537,7 +2665,11 @@ export default function MerchantPayoutsPage() {
                       }
                       onChange={(
                         value,
-                      ) =>
+                      ) => {
+                        if (!isMerchantRole) {
+                          return;
+                        }
+
                         setForm(
                           (
                             current,
@@ -2547,8 +2679,8 @@ export default function MerchantPayoutsPage() {
                             payoutMethod:
                               value as MerchantPayoutMethod,
                           }),
-                        )
-                      }
+                        );
+                      }}
                     />
                   </div>
                 </div>
@@ -2564,7 +2696,11 @@ export default function MerchantPayoutsPage() {
                     }
                     onChange={(
                       event,
-                    ) =>
+                    ) => {
+                      if (!isMerchantRole) {
+                        return;
+                      }
+
                       setForm(
                         (
                           current,
@@ -2574,8 +2710,8 @@ export default function MerchantPayoutsPage() {
                           destination:
                             event.target.value,
                         }),
-                      )
-                    }
+                      );
+                    }}
                     placeholder="Example: BRAC Bank ****1234"
                     className="merchant-text mt-2 h-12 w-full rounded-2xl border-0 bg-violet-500/[0.055] px-4 text-sm outline-none focus:ring-4 focus:ring-violet-500/[0.09]"
                   />
@@ -2596,7 +2732,11 @@ export default function MerchantPayoutsPage() {
                     }
                     onChange={(
                       event,
-                    ) =>
+                    ) => {
+                      if (!isMerchantRole) {
+                        return;
+                      }
+
                       setForm(
                         (
                           current,
@@ -2606,8 +2746,8 @@ export default function MerchantPayoutsPage() {
                           destinationReference:
                             event.target.value,
                         }),
-                      )
-                    }
+                      );
+                    }}
                     placeholder="Account or destination reference"
                     className="merchant-text mt-2 h-12 w-full rounded-2xl border-0 bg-violet-500/[0.055] px-4 text-sm outline-none focus:ring-4 focus:ring-violet-500/[0.09]"
                   />
@@ -2624,7 +2764,11 @@ export default function MerchantPayoutsPage() {
                     }
                     onChange={(
                       event,
-                    ) =>
+                    ) => {
+                      if (!isMerchantRole) {
+                        return;
+                      }
+
                       setForm(
                         (
                           current,
@@ -2634,22 +2778,29 @@ export default function MerchantPayoutsPage() {
                           merchantReference:
                             event.target.value,
                         }),
-                      )
-                    }
+                      );
+                    }}
                     placeholder="Optional internal reference"
                     className="merchant-text mt-2 h-12 w-full rounded-2xl border-0 bg-violet-500/[0.055] px-4 text-sm outline-none focus:ring-4 focus:ring-violet-500/[0.09]"
                   />
                 </label>
 
-                <div className="flex gap-3 pt-2">
+                <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row">
                   <button
                     type="button"
-                    onClick={() =>
+                    onClick={() => {
+                      if (
+                        !isMerchantRole ||
+                        submitting
+                      ) {
+                        return;
+                      }
+
                       setPayoutModalOpen(
                         false,
-                      )
-                    }
-                    className="h-11 flex-1 rounded-2xl bg-violet-500/[0.06] text-sm font-bold merchant-text"
+                      );
+                    }}
+                    className="h-11 w-full rounded-2xl bg-violet-500/[0.06] text-sm font-bold merchant-text sm:flex-1"
                   >
                     Cancel
                   </button>
@@ -2659,10 +2810,14 @@ export default function MerchantPayoutsPage() {
                     disabled={
                       submitting
                     }
-                    onClick={() =>
-                      void submitPayout()
-                    }
-                    className="h-11 flex-1 rounded-2xl bg-violet-600 text-sm font-black text-white disabled:opacity-50"
+                    onClick={() => {
+                      if (!isMerchantRole) {
+                        return;
+                      }
+
+                      void submitPayout();
+                    }}
+                    className="h-11 w-full rounded-2xl bg-violet-600 text-sm font-black text-white disabled:opacity-50 sm:flex-1"
                   >
                     {submitting
                       ? "Creating..."

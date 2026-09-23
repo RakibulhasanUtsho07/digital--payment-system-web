@@ -10,6 +10,7 @@ import Link from "next/link";
 
 import {
   useParams,
+  useRouter,
 } from "next/navigation";
 
 import {
@@ -35,6 +36,14 @@ import {
   AnimatePresence,
   motion,
 } from "framer-motion";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   getMerchantPayoutDetail,
@@ -742,8 +751,9 @@ function DetailRow({
         py-4
 
         sm:flex-row
-        sm:items-center
+        sm:items-start
         sm:justify-between
+        sm:gap-6
       "
     >
       <div className="min-w-0">
@@ -762,10 +772,12 @@ function DetailRow({
         <div
           className="
             mt-1
-            break-all
+            break-words
             text-sm
             font-semibold
+            leading-5
             merchant-text
+            [overflow-wrap:anywhere]
           "
         >
           {value}
@@ -816,8 +828,9 @@ function PurpleDetailRow({
         p-3.5
 
         sm:flex-row
-        sm:items-center
+        sm:items-start
         sm:justify-between
+        sm:gap-6
       "
     >
       <div className="min-w-0">
@@ -833,7 +846,7 @@ function PurpleDetailRow({
           {label}
         </p>
 
-        <p className="mt-1 break-all text-sm font-bold text-white">
+        <p className="mt-1 break-words text-sm font-bold leading-5 text-white [overflow-wrap:anywhere]">
           {value}
         </p>
       </div>
@@ -949,7 +962,7 @@ function TimelineItem({
         </p>
 
         <p
-          className={`mt-1 text-sm font-bold ${
+          className={`mt-1 break-words text-sm font-bold leading-5 [overflow-wrap:anywhere] ${
             active
               ? "text-white"
               : "text-white/45"
@@ -989,6 +1002,32 @@ function LoadingState() {
 ========================================================= */
 
 export default function MerchantPayoutDetailsPage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isMerchantRole =
+    user.role === "merchant";
+
+  useEffect(() => {
+    if (isMerchantRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role,
+      ),
+    );
+  }, [
+    isMerchantRole,
+    router,
+    user.role,
+  ]);
+
   const params =
     useParams<{
       payoutId:
@@ -1063,6 +1102,16 @@ export default function MerchantPayoutDetailsPage() {
         silent =
           false,
       ) => {
+        if (!isMerchantRole) {
+          setLoading(false);
+          setRefreshing(false);
+          setPayout(null);
+          setMerchant(null);
+          setError("");
+
+          return;
+        }
+
         if (
           !payoutId
         ) {
@@ -1147,18 +1196,50 @@ export default function MerchantPayoutDetailsPage() {
         }
       },
       [
+        isMerchantRole,
         payoutId,
       ],
     );
 
   useEffect(
     () => {
+      if (!isMerchantRole) {
+        setLoading(false);
+
+        return;
+      }
+
       void loadPayout();
     },
     [
+      isMerchantRole,
       loadPayout,
     ],
   );
+
+  /* =======================================================
+     MERCHANT-ONLY REDIRECTING
+  ======================================================== */
+
+  if (!isMerchantRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center bg-background px-4 text-foreground">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-500/15 bg-violet-500/10 text-violet-700 shadow-sm dark:text-violet-300">
+            <RefreshCw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Merchant payout details are available only to merchant accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   /* =======================================================
      LOADING
@@ -1272,9 +1353,13 @@ export default function MerchantPayoutDetailsPage() {
           >
             <button
               type="button"
-              onClick={() =>
-                void loadPayout()
-              }
+              onClick={() => {
+                if (!isMerchantRole) {
+                  return;
+                }
+
+                void loadPayout();
+              }}
               className="
                 inline-flex
                 items-center
@@ -1431,16 +1516,22 @@ export default function MerchantPayoutDetailsPage() {
               disabled={
                 refreshing
               }
-              onClick={() =>
+              onClick={() => {
+                if (!isMerchantRole) {
+                  return;
+                }
+
                 void loadPayout(
                   true,
-                )
-              }
+                );
+              }}
               className="
                 inline-flex
                 h-10
-                w-fit
+                w-full
                 items-center
+
+                sm:w-auto
                 justify-center
                 gap-2
                 rounded-xl
@@ -1490,12 +1581,12 @@ export default function MerchantPayoutDetailsPage() {
             >
               <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
 
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm font-bold merchant-text">
                   Refresh failed
                 </p>
 
-                <p className="mt-1 text-sm text-rose-600">
+                <p className="mt-1 break-words text-sm leading-5 text-rose-600 [overflow-wrap:anywhere]">
                   {error}
                 </p>
               </div>
@@ -1528,7 +1619,7 @@ export default function MerchantPayoutDetailsPage() {
           >
             <PurpleAuroraBackground />
 
-            <div className="relative">
+            <div className="relative z-10 min-w-0">
               <div
                 className="
                   flex
