@@ -11,6 +11,10 @@ import React, {
 import Link from "next/link";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
@@ -37,6 +41,14 @@ import {
 import {
   createPortal,
 } from "react-dom";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   getMerchantSettlements,
@@ -516,7 +528,10 @@ function SettlementDropdown({
 
         const width =
           Math.min(
-            rect.width,
+            Math.max(
+              rect.width,
+              220
+            ),
             window.innerWidth -
               padding * 2
           );
@@ -721,11 +736,13 @@ function SettlementDropdown({
                 maxHeight:
                   position.maxHeight,
 
-                zIndex: 30,
+                zIndex: 100,
               }}
               className="
                 overflow-y-auto
                 rounded-2xl
+                border
+                border-violet-200/60
                 bg-white/95
                 p-1.5
                 shadow-[0_22px_60px_rgba(30,15,60,0.18)]
@@ -782,14 +799,14 @@ function SettlementDropdown({
                         }
                       `}
                     >
-                      <span>
+                      <span className="min-w-0 truncate">
                         {
                           option.label
                         }
                       </span>
 
                       {active ? (
-                        <Check className="h-4 w-4" />
+                        <Check className="h-4 w-4 shrink-0" />
                       ) : null}
                     </button>
                   );
@@ -1016,6 +1033,7 @@ function StatCard({
       }}
       className={`
         relative
+        h-full
         min-w-0
         overflow-hidden
         rounded-[24px]
@@ -1093,12 +1111,13 @@ function StatCard({
           }
           className={`
             mt-3
-            whitespace-nowrap
+            break-words
             text-[clamp(1.05rem,1.6vw,1.65rem)]
             font-black
-            leading-none
+            leading-tight
             tracking-[-0.035em]
             tabular-nums
+            [overflow-wrap:anywhere]
 
             ${
               featured
@@ -1129,6 +1148,32 @@ function StatCard({
 ========================================================= */
 
 export default function MerchantSettlementPage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isMerchantRole =
+    user.role === "merchant";
+
+  useEffect(() => {
+    if (isMerchantRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role,
+      ),
+    );
+  }, [
+    isMerchantRole,
+    router,
+    user.role,
+  ]);
+
   const [
     settlements,
     setSettlements,
@@ -1271,6 +1316,10 @@ export default function MerchantSettlementPage() {
 
   useEffect(
     () => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       const timer =
         window.setTimeout(
           () => {
@@ -1290,6 +1339,7 @@ export default function MerchantSettlementPage() {
       };
     },
     [
+      isMerchantRole,
       searchInput,
     ]
   );
@@ -1303,6 +1353,15 @@ export default function MerchantSettlementPage() {
       async (
         showRefresh = false
       ) => {
+        if (!isMerchantRole) {
+          setLoading(false);
+          setRefreshing(false);
+          setSettlements([]);
+          setSummary(EMPTY_SUMMARY);
+          setError(null);
+          return;
+        }
+
         try {
           if (
             showRefresh
@@ -1441,6 +1500,7 @@ export default function MerchantSettlementPage() {
       [
         currencyFilter,
         from,
+        isMerchantRole,
         page,
         search,
         status,
@@ -1450,9 +1510,15 @@ export default function MerchantSettlementPage() {
 
   useEffect(
     () => {
+      if (!isMerchantRole) {
+        setLoading(false);
+        return;
+      }
+
       void loadSettlements();
     },
     [
+      isMerchantRole,
       loadSettlements,
     ]
   );
@@ -1472,6 +1538,10 @@ export default function MerchantSettlementPage() {
 
   const clearFilters =
     () => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       setSearchInput("");
       setSearch("");
       setStatus("");
@@ -1576,6 +1646,28 @@ export default function MerchantSettlementPage() {
     );
 
   /* =======================================================
+     MERCHANT-ONLY REDIRECT
+  ======================================================== */
+
+  if (!isMerchantRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center bg-background px-4 text-foreground">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-500/15 bg-violet-500/10 text-violet-700 shadow-sm dark:text-violet-300">
+            <RefreshCw className="h-6 w-6 animate-spin" />
+          </div>
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening your workspace
+          </p>
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Merchant Settlements is available only to merchant accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  /* =======================================================
      RENDER
   ======================================================== */
 
@@ -1623,7 +1715,7 @@ export default function MerchantSettlementPage() {
           >
             <PurpleAuroraBackground />
 
-            <div className="relative">
+            <div className="relative z-10 min-w-0">
               <div
                 className="
                   flex
@@ -1635,7 +1727,7 @@ export default function MerchantSettlementPage() {
                   lg:justify-between
                 "
               >
-                <div className="max-w-3xl">
+                <div className="min-w-0 max-w-3xl">
                   <div
                     className="
                       inline-flex
@@ -1662,8 +1754,11 @@ export default function MerchantSettlementPage() {
                   <h1
                     className="
                       mt-4
+                      break-words
                       text-2xl
                       font-black
+                      leading-tight
+                      [overflow-wrap:anywhere]
                       tracking-tight
 
                       sm:text-3xl
@@ -1702,16 +1797,18 @@ export default function MerchantSettlementPage() {
                   disabled={
                     refreshing
                   }
-                  onClick={() =>
-                    void loadSettlements(
-                      true
-                    )
-                  }
+                  onClick={() => {
+                    if (!isMerchantRole) return;
+                    void loadSettlements(true);
+                  }}
                   className="
                     inline-flex
                     h-11
-                    w-fit
+                    w-full
                     items-center
+                    justify-center
+
+                    sm:w-auto
                     justify-center
                     gap-2
                     rounded-2xl
@@ -2008,11 +2105,10 @@ export default function MerchantSettlementPage() {
                     }
                     onChange={(
                       event
-                    ) =>
-                      setSearchInput(
-                        event.target.value
-                      )
-                    }
+                    ) => {
+                      if (!isMerchantRole) return;
+                      setSearchInput(event.target.value);
+                    }}
                     placeholder="Settlement ID, payout ID..."
                     className="
                       merchant-text
@@ -2043,6 +2139,7 @@ export default function MerchantSettlementPage() {
                     <button
                       type="button"
                       onClick={() => {
+                        if (!isMerchantRole) return;
                         setSearchInput("");
                         setSearch("");
                         setPage(1);
@@ -2087,6 +2184,7 @@ export default function MerchantSettlementPage() {
                   onChange={(
                     value
                   ) => {
+                    if (!isMerchantRole) return;
                     setStatus(
                       value as
                         | MerchantSettlementStatus
@@ -2116,6 +2214,7 @@ export default function MerchantSettlementPage() {
                   onChange={(
                     event
                   ) => {
+                    if (!isMerchantRole) return;
                     setCurrencyFilter(
                       event.target.value
                         .replace(
@@ -2174,6 +2273,7 @@ export default function MerchantSettlementPage() {
                   onChange={(
                     value
                   ) => {
+                    if (!isMerchantRole) return;
                     setFrom(
                       value
                     );
@@ -2198,6 +2298,7 @@ export default function MerchantSettlementPage() {
                   onChange={(
                     value
                   ) => {
+                    if (!isMerchantRole) return;
                     setTo(
                       value
                     );
@@ -2259,15 +2360,15 @@ export default function MerchantSettlementPage() {
                 sm:justify-between
               "
             >
-              <div className="flex items-start gap-3">
+              <div className="flex min-w-0 items-start gap-3">
                 <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
 
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm font-black merchant-text">
                     Unable to load settlements
                   </p>
 
-                  <p className="mt-1 text-sm text-rose-600">
+                  <p className="mt-1 break-words text-sm leading-5 text-rose-600 [overflow-wrap:anywhere]">
                     {error}
                   </p>
                 </div>
@@ -2275,11 +2376,10 @@ export default function MerchantSettlementPage() {
 
               <button
                 type="button"
-                onClick={() =>
-                  void loadSettlements(
-                    true
-                  )
-                }
+                onClick={() => {
+                  if (!isMerchantRole) return;
+                  void loadSettlements(true);
+                }}
                 className="
                   inline-flex
                   items-center
@@ -2345,9 +2445,12 @@ export default function MerchantSettlementPage() {
                 className="
                   relative
                   flex
-                  items-center
-                  justify-between
-                  gap-4
+                  flex-col
+                  gap-3
+
+                  sm:flex-row
+                  sm:items-center
+                  sm:justify-between
                 "
               >
                 <div>
@@ -2506,7 +2609,7 @@ export default function MerchantSettlementPage() {
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
-                                <p className="truncate font-mono text-xs font-black text-violet-600">
+                                <p className="break-all font-mono text-xs font-black leading-5 text-violet-600">
                                   {
                                     settlement.settlementId
                                   }
@@ -2564,7 +2667,7 @@ export default function MerchantSettlementPage() {
                                   Gross
                                 </p>
 
-                                <p className="mt-1 whitespace-nowrap text-sm font-black merchant-text">
+                                <p className="mt-1 break-words text-sm font-black leading-tight merchant-text [overflow-wrap:anywhere]">
                                   {formatMoney(
                                     settlement.grossAmount,
                                     settlement.currency
@@ -2577,7 +2680,7 @@ export default function MerchantSettlementPage() {
                                   Net
                                 </p>
 
-                                <p className="mt-1 whitespace-nowrap text-sm font-black merchant-text">
+                                <p className="mt-1 break-words text-sm font-black leading-tight merchant-text [overflow-wrap:anywhere]">
                                   {formatMoney(
                                     settlement.netAmount,
                                     settlement.currency
@@ -2612,6 +2715,8 @@ export default function MerchantSettlementPage() {
                 <div
                   className="
                     hidden
+                    min-w-0
+                    max-w-full
                     overflow-x-auto
                     scroll-smooth
                     overscroll-x-contain
@@ -2863,24 +2968,18 @@ export default function MerchantSettlementPage() {
                       : `Showing ${visibleStart}-${visibleEnd} of ${total}`}
                   </p>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                     <button
                       type="button"
                       disabled={
                         !hasPreviousPage
                       }
-                      onClick={() =>
-                        setPage(
-                          (
-                            current
-                          ) =>
-                            Math.max(
-                              1,
-                              current -
-                                1
-                            )
-                        )
-                      }
+                      onClick={() => {
+                        if (!isMerchantRole) return;
+                        setPage((current) =>
+                          Math.max(1, current - 1)
+                        );
+                      }}
                       className="
                         inline-flex
                         h-9
@@ -2925,18 +3024,12 @@ export default function MerchantSettlementPage() {
                       disabled={
                         !hasNextPage
                       }
-                      onClick={() =>
-                        setPage(
-                          (
-                            current
-                          ) =>
-                            Math.min(
-                              totalPages,
-                              current +
-                                1
-                            )
-                        )
-                      }
+                      onClick={() => {
+                        if (!isMerchantRole) return;
+                        setPage((current) =>
+                          Math.min(totalPages, current + 1)
+                        );
+                      }}
                       className="
                         inline-flex
                         h-9

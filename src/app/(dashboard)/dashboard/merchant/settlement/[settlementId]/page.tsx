@@ -35,6 +35,14 @@ import {
 } from "framer-motion";
 
 import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
+
+import {
   getMerchantSettlementDetail,
   type MerchantSettlement,
   type MerchantSettlementPayment,
@@ -531,8 +539,9 @@ function DetailRow({
         py-4
 
         sm:flex-row
-        sm:items-center
+        sm:items-start
         sm:justify-between
+        sm:gap-6
       "
     >
       <div className="min-w-0">
@@ -551,9 +560,11 @@ function DetailRow({
         <div
           className="
             mt-1
-            break-all
+            break-words
             text-sm
             font-semibold
+            leading-5
+            [overflow-wrap:anywhere]
             merchant-text
           "
         >
@@ -598,8 +609,9 @@ function PurpleInfoRow({
         p-3.5
 
         sm:flex-row
-        sm:items-center
+        sm:items-start
         sm:justify-between
+        sm:gap-6
       "
     >
       <div className="min-w-0">
@@ -618,9 +630,11 @@ function PurpleInfoRow({
         <p
           className="
             mt-1
-            break-all
+            break-words
             text-sm
             font-black
+            leading-5
+            [overflow-wrap:anywhere]
             text-white
           "
         >
@@ -718,7 +732,7 @@ function PaymentRow({
           </p>
 
           {payment.merchantReference ? (
-            <p className="mt-1 truncate text-xs merchant-muted">
+            <p className="mt-1 break-words text-xs leading-5 merchant-muted [overflow-wrap:anywhere]">
               Reference:{" "}
 
               <span className="font-semibold merchant-text">
@@ -879,13 +893,15 @@ function RefundRow({
           ) : null}
         </div>
 
-        <div className="shrink-0 lg:text-right">
+        <div className="w-full min-w-0 lg:w-auto lg:shrink-0 lg:text-right">
           <p
             className="
-              whitespace-nowrap
+              break-words
               text-base
               font-black
+              leading-tight
               text-rose-600
+              [overflow-wrap:anywhere]
             "
           >
             −{" "}
@@ -957,7 +973,9 @@ function SummaryCard({
           -3,
       }}
       className="
+        h-full
         min-w-0
+        overflow-hidden
         rounded-[24px]
         bg-white/80
         p-5
@@ -986,12 +1004,13 @@ function SummaryCard({
             }
             className="
               mt-3
-              whitespace-nowrap
+              break-words
               text-[clamp(1rem,1.6vw,1.55rem)]
               font-black
-              leading-none
+              leading-tight
               tracking-[-0.035em]
               merchant-text
+              [overflow-wrap:anywhere]
               tabular-nums
             "
           >
@@ -1038,10 +1057,15 @@ function CalculationRow({
     <div
       className="
         flex
-        items-center
-        justify-between
-        gap-4
+        flex-col
+        items-start
+        gap-2
         rounded-xl
+
+        sm:flex-row
+        sm:items-center
+        sm:justify-between
+        sm:gap-4
         px-1
         py-2
       "
@@ -1052,9 +1076,11 @@ function CalculationRow({
 
       <span
         className={`
-          whitespace-nowrap
+          break-words
           text-sm
           font-bold
+          leading-tight
+          [overflow-wrap:anywhere]
 
           ${
             danger
@@ -1129,6 +1155,29 @@ export default function MerchantSettlementDetailPage() {
 
   const router =
     useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isMerchantRole =
+    user.role === "merchant";
+
+  useEffect(() => {
+    if (isMerchantRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role,
+      ),
+    );
+  }, [
+    isMerchantRole,
+    router,
+    user.role,
+  ]);
 
   /* =======================================================
      ROUTE PARAM
@@ -1252,6 +1301,17 @@ export default function MerchantSettlementDetailPage() {
       async (
         showRefresh = false
       ) => {
+        if (!isMerchantRole) {
+          setLoading(false);
+          setRefreshing(false);
+          setSettlement(null);
+          setPayments([]);
+          setRefunds([]);
+          setReconciliation(null);
+          setError(null);
+          return;
+        }
+
         if (
           !settlementId
         ) {
@@ -1365,18 +1425,47 @@ export default function MerchantSettlementDetailPage() {
         }
       },
       [
+        isMerchantRole,
         settlementId,
       ]
     );
 
   useEffect(
     () => {
+      if (!isMerchantRole) {
+        setLoading(false);
+        return;
+      }
+
       void loadSettlement();
     },
     [
+      isMerchantRole,
       loadSettlement,
     ]
   );
+
+  /* =======================================================
+     MERCHANT-ONLY REDIRECT
+  ======================================================== */
+
+  if (!isMerchantRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center bg-background px-4 text-foreground">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-500/15 bg-violet-500/10 text-violet-700 shadow-sm dark:text-violet-300">
+            <RefreshCw className="h-6 w-6 animate-spin" />
+          </div>
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening your workspace
+          </p>
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Merchant settlement details are available only to merchant accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   /* =======================================================
      LOADING
@@ -1488,9 +1577,10 @@ export default function MerchantSettlementDetailPage() {
           >
             <button
               type="button"
-              onClick={() =>
-                void loadSettlement()
-              }
+              onClick={() => {
+                if (!isMerchantRole) return;
+                void loadSettlement();
+              }}
               className="
                 inline-flex
                 items-center
@@ -1628,16 +1718,18 @@ export default function MerchantSettlementDetailPage() {
               disabled={
                 refreshing
               }
-              onClick={() =>
-                void loadSettlement(
-                  true
-                )
-              }
+              onClick={() => {
+                if (!isMerchantRole) return;
+                void loadSettlement(true);
+              }}
               className="
                 inline-flex
                 h-10
-                w-fit
+                w-full
                 items-center
+                justify-center
+
+                sm:w-auto
                 gap-2
                 rounded-xl
                 bg-violet-500/[0.07]
@@ -1700,12 +1792,12 @@ export default function MerchantSettlementDetailPage() {
             >
               <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
 
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm font-black merchant-text">
                   Unable to refresh settlement
                 </p>
 
-                <p className="mt-1 text-sm text-rose-600">
+                <p className="mt-1 break-words text-sm leading-5 text-rose-600 [overflow-wrap:anywhere]">
                   {error}
                 </p>
               </div>
@@ -1751,7 +1843,7 @@ export default function MerchantSettlementDetailPage() {
           >
             <PurpleAuroraBackground />
 
-            <div className="relative">
+            <div className="relative z-10 min-w-0">
               <div
                 className="
                   flex
@@ -1879,11 +1971,13 @@ export default function MerchantSettlementDetailPage() {
                   <p
                     className="
                       mt-2
-                      whitespace-nowrap
-                      text-[clamp(1.4rem,3vw,2.4rem)]
+                      break-words
+                      text-[clamp(1.35rem,3vw,2.4rem)]
                       font-black
+                      leading-tight
                       tracking-[-0.04em]
                       tabular-nums
+                      [overflow-wrap:anywhere]
                     "
                   >
                     {formatMoney(
