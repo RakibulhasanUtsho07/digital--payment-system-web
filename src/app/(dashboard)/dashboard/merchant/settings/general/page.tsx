@@ -6,6 +6,22 @@ import {
 } from "react";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
+  Loader2,
+} from "lucide-react";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
+
+import {
   updateMerchantGeneralSettings,
 } from "@/lib/api/merchantSettingsApi";
 
@@ -26,6 +42,18 @@ import {
 } from "../components/SettingsUI";
 
 export default function GeneralSettingsPage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } =
+    useDashboardSession();
+
+  const isMerchantRole =
+    user.role ===
+    "merchant";
+
   const {
     data,
     error: loadError,
@@ -59,8 +87,32 @@ export default function GeneralSettingsPage() {
   ] =
     useState("");
 
+  useEffect(() => {
+    if (
+      isMerchantRole
+    ) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role,
+      ),
+    );
+  }, [
+    isMerchantRole,
+    router,
+    user.role,
+  ]);
+
   useEffect(
     () => {
+      if (
+        !isMerchantRole
+      ) {
+        return;
+      }
+
       if (
         data
       ) {
@@ -72,30 +124,37 @@ export default function GeneralSettingsPage() {
     },
     [
       data,
+      isMerchantRole,
     ],
   );
 
-  if (
-    loadError
-  ) {
-    return (
-      <SettingsMessage
-        type="error"
-        message={
-          loadError
-        }
-      />
-    );
-  }
+  const updateForm =
+    (
+      values:
+        Partial<MerchantGeneralSettings>,
+    ) => {
+      if (
+        !isMerchantRole ||
+        !form
+      ) {
+        return;
+      }
 
-  if (
-    !form
-  ) {
-    return null;
-  }
+      setForm({
+        ...form,
+        ...values,
+      });
+    };
 
   const save =
     async () => {
+      if (
+        !isMerchantRole ||
+        !form
+      ) {
+        return;
+      }
+
       try {
         setSaving(
           true,
@@ -135,6 +194,80 @@ export default function GeneralSettingsPage() {
       }
     };
 
+  if (
+    !isMerchantRole
+  ) {
+    return (
+      <div
+        className="
+          grid
+          min-h-[50vh]
+          place-items-center
+          px-4
+        "
+      >
+        <div className="text-center">
+          <Loader2
+            className="
+              mx-auto
+              h-6
+              w-6
+              animate-spin
+              text-violet-600
+            "
+          />
+
+          <p
+            className="
+              mt-3
+              text-sm
+              font-bold
+              merchant-muted
+            "
+          >
+            Redirecting...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (
+    loadError
+  ) {
+    return (
+      <SettingsMessage
+        type="error"
+        message={
+          loadError
+        }
+      />
+    );
+  }
+
+  if (
+    !form
+  ) {
+    return (
+      <div
+        className="
+          grid
+          min-h-[260px]
+          place-items-center
+        "
+      >
+        <Loader2
+          className="
+            h-6
+            w-6
+            animate-spin
+            text-violet-600
+          "
+        />
+      </div>
+    );
+  }
+
   return (
     <SettingsSection
       eyebrow="General"
@@ -162,6 +295,7 @@ export default function GeneralSettingsPage() {
       <div
         className="
           grid
+          min-w-0
           gap-5
 
           md:grid-cols-2
@@ -182,9 +316,7 @@ export default function GeneralSettingsPage() {
             onChange={(
               event,
             ) =>
-              setForm({
-                ...form,
-
+              updateForm({
                 displayName:
                   event.target
                     .value,
@@ -208,9 +340,7 @@ export default function GeneralSettingsPage() {
             onChange={(
               event,
             ) =>
-              setForm({
-                ...form,
-
+              updateForm({
                 supportEmail:
                   event.target
                     .value,
@@ -233,9 +363,7 @@ export default function GeneralSettingsPage() {
             onChange={(
               event,
             ) =>
-              setForm({
-                ...form,
-
+              updateForm({
                 supportPhone:
                   event.target
                     .value,
@@ -260,9 +388,7 @@ export default function GeneralSettingsPage() {
             onChange={(
               event,
             ) =>
-              setForm({
-                ...form,
-
+              updateForm({
                 website:
                   event.target
                     .value,
@@ -279,14 +405,13 @@ export default function GeneralSettingsPage() {
               settingsInputClass
             }
             value={
-              form.timezone
+              form.timezone ??
+              ""
             }
             onChange={(
               event,
             ) =>
-              setForm({
-                ...form,
-
+              updateForm({
                 timezone:
                   event.target
                     .value,
@@ -304,14 +429,13 @@ export default function GeneralSettingsPage() {
               settingsInputClass
             }
             value={
-              form.locale
+              form.locale ??
+              "en"
             }
             onChange={(
               event,
             ) =>
-              setForm({
-                ...form,
-
+              updateForm({
                 locale:
                   event.target
                     .value,
@@ -337,9 +461,15 @@ export default function GeneralSettingsPage() {
         saving={
           saving
         }
-        onSave={() =>
-          void save()
-        }
+        onSave={() => {
+          if (
+            !isMerchantRole
+          ) {
+            return;
+          }
+
+          void save();
+        }}
       />
     </SettingsSection>
   );
