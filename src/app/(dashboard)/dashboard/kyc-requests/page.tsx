@@ -433,10 +433,219 @@ function SectionCard({
 }
 
 /* =========================================================
+   ADMIN / SUPER ADMIN ACCESS
+========================================================= */
+
+type AccessState =
+  | "checking"
+  | "allowed"
+  | "denied";
+
+const ADMIN_ROLES = new Set([
+  "admin",
+  "super_admin",
+]);
+
+function normalizeRole(
+  value: unknown
+): string {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+function getStoredRole(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const rawUser =
+    window.localStorage.getItem(
+      "auth_user"
+    );
+
+  if (!rawUser) {
+    return "";
+  }
+
+  try {
+    const parsed =
+      JSON.parse(rawUser);
+
+    const candidates = [
+      parsed?.role,
+      parsed?.user?.role,
+      parsed?.data?.role,
+      parsed?.profile?.role,
+    ];
+
+    for (const candidate of candidates) {
+      const role =
+        normalizeRole(candidate);
+
+      if (role) {
+        return role;
+      }
+    }
+  } catch {
+    return "";
+  }
+
+  return "";
+}
+
+function hasAdminAccess(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const authenticated =
+    window.localStorage.getItem(
+      "is_authenticated"
+    );
+
+  if (
+    authenticated !== "true" &&
+    authenticated !== "1"
+  ) {
+    return false;
+  }
+
+  return ADMIN_ROLES.has(
+    getStoredRole()
+  );
+}
+
+function isAuthorizationError(
+  error: unknown
+): boolean {
+  const message =
+    error instanceof Error
+      ? error.message
+      : String(error ?? "");
+
+  const normalized =
+    message.toLowerCase();
+
+  return (
+    normalized.includes("401") ||
+    normalized.includes("403") ||
+    normalized.includes(
+      "unauthorized"
+    ) ||
+    normalized.includes(
+      "forbidden"
+    ) ||
+    normalized.includes(
+      "access denied"
+    ) ||
+    normalized.includes(
+      "not authorized"
+    )
+  );
+}
+
+function AccessCheckingState() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 text-foreground">
+      <motion.div
+        initial={{
+          opacity: 0,
+          y: 8,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        className="text-center"
+      >
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-500/15 bg-violet-500/10 text-violet-600">
+          <Loader2 className="h-5 w-5 animate-spin" />
+        </div>
+
+        <p className="mt-4 text-sm font-black">
+          Checking access
+        </p>
+
+        <p className="mt-1 text-xs text-muted-foreground">
+          Verifying administrator permissions…
+        </p>
+      </motion.div>
+    </main>
+  );
+}
+
+function AdminNotFoundState() {
+  return (
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-5 text-foreground">
+      <div className="pointer-events-none absolute -left-32 top-24 h-80 w-80 rounded-full bg-violet-500/[0.07] blur-[100px]" />
+      <div className="pointer-events-none absolute -right-32 bottom-20 h-80 w-80 rounded-full bg-fuchsia-500/[0.05] blur-[100px]" />
+
+      <motion.section
+        initial={{
+          opacity: 0,
+          y: 18,
+          scale: 0.98,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          scale: 1,
+        }}
+        transition={{
+          duration: 0.45,
+          ease: [
+            0.22,
+            1,
+            0.36,
+            1,
+          ],
+        }}
+        className="relative w-full max-w-xl overflow-hidden rounded-[32px] border border-border bg-card p-7 text-center shadow-[0_30px_90px_rgba(15,23,42,.12)] sm:p-10"
+      >
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.035]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(124,58,237,.7) 1px, transparent 1px), linear-gradient(90deg, rgba(124,58,237,.7) 1px, transparent 1px)",
+            backgroundSize:
+              "32px 32px",
+          }}
+        />
+
+        <div className="relative z-10">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] border border-violet-500/15 bg-violet-500/10 text-violet-600">
+            <ShieldAlert className="h-7 w-7" />
+          </div>
+
+          <p className="mt-6 text-[10px] font-black uppercase tracking-[0.2em] text-violet-600">
+            Error 404
+          </p>
+
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">
+            Page not found
+          </h1>
+
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+            The page you are looking for does not exist or is not available.
+          </p>
+        </div>
+      </motion.section>
+    </main>
+  );
+}
+
+/* =========================================================
    PAGE
 ========================================================= */
 
 export default function AdminEkycPage() {
+  const [access, setAccess] =
+    useState<AccessState>(
+      "checking"
+    );
+
   const [overview, setOverview] =
     useState<EKYCOverview | null>(null);
 
@@ -488,7 +697,35 @@ export default function AdminEkycPage() {
   const [saving, setSaving] =
     useState(false);
 
+  /* =======================================================
+     ACCESS CHECK
+  ======================================================= */
+
+  useEffect(() => {
+    const timer =
+      window.setTimeout(
+        () => {
+          setAccess(
+            hasAdminAccess()
+              ? "allowed"
+              : "denied"
+          );
+        },
+        0
+      );
+
+    return () =>
+      window.clearTimeout(
+        timer
+      );
+  }, []);
+
   const load = useCallback(async () => {
+    if (
+      access !== "allowed"
+    ) {
+      return;
+    }
     setLoading(true);
     setError("");
 
@@ -510,13 +747,36 @@ export default function AdminEkycPage() {
         list.pagination.totalPages
       );
     } catch (requestError: unknown) {
+      if (
+        isAuthorizationError(
+          requestError
+        )
+      ) {
+        setAccess("denied");
+        setOverview(null);
+        setRecords([]);
+        setError("");
+        return;
+      }
+
       setError(messageOf(requestError));
     } finally {
       setLoading(false);
     }
-  }, [filter, page, search]);
+  }, [
+    access,
+    filter,
+    page,
+    search,
+  ]);
 
   useEffect(() => {
+    if (
+      access !== "allowed"
+    ) {
+      return;
+    }
+
     const timer =
       window.setTimeout(
         () => void load(),
@@ -525,7 +785,10 @@ export default function AdminEkycPage() {
 
     return () =>
       window.clearTimeout(timer);
-  }, [load]);
+  }, [
+    access,
+    load,
+  ]);
 
   useEffect(() => {
     if (!selected) return;
@@ -573,6 +836,19 @@ export default function AdminEkycPage() {
       setAudit(detail.audit);
       setDocuments(privateDocuments);
     } catch (requestError: unknown) {
+      if (
+        isAuthorizationError(
+          requestError
+        )
+      ) {
+        setAccess("denied");
+        setSelected(null);
+        setDocuments(null);
+        setAudit([]);
+        setError("");
+        return;
+      }
+
       setError(messageOf(requestError));
     } finally {
       setDetailLoading(false);
@@ -602,6 +878,17 @@ export default function AdminEkycPage() {
       setSelected(null);
       await load();
     } catch (requestError: unknown) {
+      if (
+        isAuthorizationError(
+          requestError
+        )
+      ) {
+        setAccess("denied");
+        setSelected(null);
+        setError("");
+        return;
+      }
+
       setError(messageOf(requestError));
     } finally {
       setSaving(false);
@@ -619,6 +906,17 @@ export default function AdminEkycPage() {
       setSelected(null);
       await load();
     } catch (requestError: unknown) {
+      if (
+        isAuthorizationError(
+          requestError
+        )
+      ) {
+        setAccess("denied");
+        setSelected(null);
+        setError("");
+        return;
+      }
+
       setError(messageOf(requestError));
     } finally {
       setSaving(false);
@@ -659,6 +957,18 @@ export default function AdminEkycPage() {
         : [],
     [overview]
   );
+
+  if (access === "checking") {
+    return (
+      <AccessCheckingState />
+    );
+  }
+
+  if (access === "denied") {
+    return (
+      <AdminNotFoundState />
+    );
+  }
 
   return (
     <main className="min-h-screen px-4 py-7 text-[var(--coffer-text)] sm:px-7">

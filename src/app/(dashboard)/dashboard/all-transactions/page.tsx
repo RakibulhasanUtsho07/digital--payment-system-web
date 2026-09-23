@@ -381,12 +381,181 @@ function typeLabel(
 }
 
 /* =========================================================
+   ACCESS CONTROL
+========================================================= */
+
+type AccessState =
+  | "checking"
+  | "allowed"
+  | "denied";
+
+type UnknownRecord = Record<
+  string,
+  unknown
+>;
+
+const ADMIN_ROLES = new Set([
+  "admin",
+  "super_admin",
+]);
+
+function normalizeRole(
+  value: unknown
+): string {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+function asRecord(
+  value: unknown
+): UnknownRecord | null {
+  return value !== null &&
+    typeof value === "object"
+    ? (value as UnknownRecord)
+    : null;
+}
+
+function getStoredUserRole(
+  value: unknown
+): string {
+  const root = asRecord(value);
+
+  if (!root) {
+    return "";
+  }
+
+  const directRole =
+    root.role;
+
+  if (directRole !== undefined) {
+    return normalizeRole(
+      directRole
+    );
+  }
+
+  const nestedUser =
+    asRecord(root.user);
+
+  if (
+    nestedUser?.role !==
+    undefined
+  ) {
+    return normalizeRole(
+      nestedUser.role
+    );
+  }
+
+  const nestedData =
+    asRecord(root.data);
+
+  if (
+    nestedData?.role !==
+    undefined
+  ) {
+    return normalizeRole(
+      nestedData.role
+    );
+  }
+
+  return "";
+}
+
+function isAllowedAdminRole(
+  role: unknown
+): boolean {
+  return ADMIN_ROLES.has(
+    normalizeRole(role)
+  );
+}
+
+function readAdminAccessFromStorage(): boolean {
+  try {
+    const authenticated =
+      window.localStorage.getItem(
+        "is_authenticated"
+      );
+
+    const rawUser =
+      window.localStorage.getItem(
+        "auth_user"
+      );
+
+    if (
+      authenticated !== "true" ||
+      !rawUser
+    ) {
+      return false;
+    }
+
+    const parsedUser: unknown =
+      JSON.parse(rawUser);
+
+    return isAllowedAdminRole(
+      getStoredUserRole(
+        parsedUser
+      )
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isAuthorizationError(
+  error: unknown
+): boolean {
+  const record =
+    asRecord(error);
+
+  const status =
+    Number(
+      record?.status ??
+        record?.statusCode ??
+        asRecord(record?.response)
+          ?.status
+    );
+
+  if (
+    status === 401 ||
+    status === 403 ||
+    status === 404
+  ) {
+    return true;
+  }
+
+  const message =
+    error instanceof Error
+      ? error.message
+          .toLowerCase()
+      : String(error ?? "")
+          .toLowerCase();
+
+  return (
+    message.includes("401") ||
+    message.includes("403") ||
+    message.includes("forbidden") ||
+    message.includes("unauthorized") ||
+    message.includes("not authorized") ||
+    message.includes("access denied")
+  );
+}
+
+/* =========================================================
    PAGE
 ========================================================= */
 
 export default function AllTransactionsPage() {
   const reduceMotion =
     useReducedMotion();
+
+  const [
+    accessState,
+    setAccessState,
+  ] =
+    useState<AccessState>(
+      "checking"
+    );
 
   const [
     transactions,
@@ -478,6 +647,17 @@ export default function AllTransactionsPage() {
           EMPTY_META
       );
     } catch (error: unknown) {
+      if (
+        isAuthorizationError(
+          error
+        )
+      ) {
+        setAccessState(
+          "denied"
+        );
+        return;
+      }
+
       setErrorMessage(
         error instanceof Error
           ? error.message
@@ -490,6 +670,24 @@ export default function AllTransactionsPage() {
   }
 
   useEffect(() => {
+    const allowed =
+      readAdminAccessFromStorage();
+
+    setAccessState(
+      allowed
+        ? "allowed"
+        : "denied"
+    );
+  }, []);
+
+  useEffect(() => {
+    if (
+      accessState !==
+      "allowed"
+    ) {
+      return;
+    }
+
     const timer =
       window.setTimeout(
         () => {
@@ -504,7 +702,7 @@ export default function AllTransactionsPage() {
       window.clearTimeout(
         timer
       );
-  }, []);
+  }, [accessState]);
 
   /* =======================================================
      ESC CLOSE DRAWER
@@ -673,6 +871,20 @@ export default function AllTransactionsPage() {
     },
     [transactions]
   );
+
+  if (
+    accessState ===
+    "checking"
+  ) {
+    return <AccessCheckingState />;
+  }
+
+  if (
+    accessState ===
+    "denied"
+  ) {
+    return <NotFoundState />;
+  }
 
   if (loading) {
     return <LoadingState />;
@@ -913,6 +1125,93 @@ export default function AllTransactionsPage() {
           />
         )}
       </AnimatePresence>
+    </main>
+  );
+}
+
+/* =========================================================
+   ACCESS STATES
+========================================================= */
+
+function AccessCheckingState() {
+  return (
+    <main className="relative flex min-h-[72vh] items-center justify-center overflow-hidden bg-background px-4 text-foreground">
+      <div className="pointer-events-none absolute h-[360px] w-[360px] rounded-full bg-violet-500/10 blur-[110px]" />
+
+      <motion.div
+        initial={{
+          opacity: 0,
+          y: 8,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        className="relative text-center"
+      >
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[20px] border border-violet-500/15 bg-violet-500/10 text-violet-600">
+          <Loader2 className="h-5 w-5 animate-spin" />
+        </div>
+
+        <p className="mt-4 text-sm font-black tracking-tight">
+          Verifying access
+        </p>
+
+        <p className="mt-1 text-xs text-muted-foreground">
+          Checking administrator permissions…
+        </p>
+      </motion.div>
+    </main>
+  );
+}
+
+function NotFoundState() {
+  return (
+    <main className="relative flex min-h-[78vh] items-center justify-center overflow-hidden bg-background px-4 text-foreground">
+      <div className="pointer-events-none absolute left-1/2 top-1/2 h-[440px] w-[440px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-500/[0.08] blur-[120px]" />
+
+      <motion.section
+        initial={{
+          opacity: 0,
+          y: 18,
+          scale: 0.98,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          scale: 1,
+        }}
+        transition={{
+          duration: 0.5,
+          ease: [
+            0.22,
+            1,
+            0.36,
+            1,
+          ],
+        }}
+        className="relative w-full max-w-xl overflow-hidden rounded-[32px] border border-border bg-card p-8 text-center shadow-[0_28px_90px_rgba(15,23,42,.10)] sm:p-10"
+      >
+        <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-violet-500/[0.08] blur-3xl" />
+
+        <div className="relative">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] border border-violet-500/15 bg-violet-500/10 text-violet-600">
+            <Search className="h-6 w-6" />
+          </div>
+
+          <p className="mt-6 text-[11px] font-black uppercase tracking-[0.22em] text-violet-600">
+            Error 404
+          </p>
+
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">
+            Page not found
+          </h1>
+
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+            The page you are looking for does not exist or is not available.
+          </p>
+        </div>
+      </motion.section>
     </main>
   );
 }

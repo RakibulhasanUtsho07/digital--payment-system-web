@@ -313,7 +313,185 @@ function ReviewDrawer({
   );
 }
 
+/* =========================================================
+   ADMIN / SUPER ADMIN ACCESS
+========================================================= */
+
+type AccessState =
+  | "checking"
+  | "allowed"
+  | "denied";
+
+const ADMIN_ROLES = new Set([
+  "admin",
+  "super_admin",
+]);
+
+function normalizeRole(
+  value: unknown
+): string {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+function getStoredRole(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const rawUser =
+    window.localStorage.getItem(
+      "auth_user"
+    );
+
+  if (!rawUser) {
+    return "";
+  }
+
+  try {
+    const parsed =
+      JSON.parse(rawUser);
+
+    const candidates = [
+      parsed?.role,
+      parsed?.user?.role,
+      parsed?.data?.role,
+      parsed?.profile?.role,
+    ];
+
+    for (const candidate of candidates) {
+      const role =
+        normalizeRole(candidate);
+
+      if (role) {
+        return role;
+      }
+    }
+  } catch {
+    return "";
+  }
+
+  return "";
+}
+
+function hasAdminAccess(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const authenticated =
+    window.localStorage.getItem(
+      "is_authenticated"
+    );
+
+  if (
+    authenticated !== "true" &&
+    authenticated !== "1"
+  ) {
+    return false;
+  }
+
+  return ADMIN_ROLES.has(
+    getStoredRole()
+  );
+}
+
+function isAuthorizationError(
+  error: unknown
+): boolean {
+  const message =
+    error instanceof Error
+      ? error.message
+      : String(error ?? "");
+
+  const normalized =
+    message.toLowerCase();
+
+  return (
+    normalized.includes("401") ||
+    normalized.includes("403") ||
+    normalized.includes(
+      "unauthorized"
+    ) ||
+    normalized.includes(
+      "forbidden"
+    ) ||
+    normalized.includes(
+      "access denied"
+    ) ||
+    normalized.includes(
+      "not authorized"
+    )
+  );
+}
+
+function AccessCheckingState() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 text-slate-900 dark:bg-slate-950 dark:text-white">
+      <div className="text-center">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-500/15 bg-violet-500/10 text-violet-600 dark:text-violet-300">
+          <Loader2 className="h-5 w-5 animate-spin" />
+        </div>
+
+        <p className="mt-4 text-sm font-black">
+          Checking access
+        </p>
+
+        <p className="mt-1 text-xs text-slate-500">
+          Verifying administrator permissions…
+        </p>
+      </div>
+    </main>
+  );
+}
+
+function AdminNotFoundState() {
+  return (
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 px-5 text-slate-950 dark:bg-slate-950 dark:text-white">
+      <div className="pointer-events-none absolute -left-32 top-24 h-80 w-80 rounded-full bg-violet-500/[0.08] blur-[100px]" />
+      <div className="pointer-events-none absolute -right-32 bottom-20 h-80 w-80 rounded-full bg-indigo-500/[0.07] blur-[100px]" />
+
+      <section className="relative w-full max-w-xl overflow-hidden rounded-[32px] border border-slate-200 bg-white p-7 text-center shadow-[0_30px_90px_rgba(15,23,42,.12)] dark:border-slate-800 dark:bg-slate-900 sm:p-10">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.035]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(124,58,237,.7) 1px, transparent 1px), linear-gradient(90deg, rgba(124,58,237,.7) 1px, transparent 1px)",
+            backgroundSize:
+              "32px 32px",
+          }}
+        />
+
+        <div className="relative z-10">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] border border-violet-500/15 bg-violet-500/10 text-violet-600 dark:text-violet-300">
+            <ShieldCheck className="h-7 w-7" />
+          </div>
+
+          <p className="mt-6 text-[10px] font-black uppercase tracking-[0.2em] text-violet-600 dark:text-violet-300">
+            Error 404
+          </p>
+
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">
+            Page not found
+          </h1>
+
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-slate-500">
+            The page you are looking for does not exist or is not available.
+          </p>
+        </div>
+      </section>
+    </main>
+  );
+}
+
 export default function AdminMerchantVerificationsPage() {
+  const [access, setAccess] =
+    useState<AccessState>(
+      "checking"
+    );
+
   const [records, setRecords] =
     useState<MerchantVerificationView[]>([]);
   const [pagination, setPagination] =
@@ -344,8 +522,37 @@ export default function AdminMerchantVerificationsPage() {
   const [acting, setActing] =
     useState(false);
 
+  /* =======================================================
+     ACCESS CHECK
+  ======================================================= */
+
+  useEffect(() => {
+    const timer =
+      window.setTimeout(
+        () => {
+          setAccess(
+            hasAdminAccess()
+              ? "allowed"
+              : "denied"
+          );
+        },
+        0
+      );
+
+    return () =>
+      window.clearTimeout(
+        timer
+      );
+  }, []);
+
   const loadRecords =
     useCallback(async () => {
+      if (
+        access !== "allowed"
+      ) {
+        return;
+      }
+
       try {
         setLoading(true);
         setError("");
@@ -361,6 +568,17 @@ export default function AdminMerchantVerificationsPage() {
         setRecords(result.verifications);
         setPagination(result.pagination);
       } catch (loadError) {
+        if (
+          isAuthorizationError(
+            loadError
+          )
+        ) {
+          setAccess("denied");
+          setRecords([]);
+          setError("");
+          return;
+        }
+
         setError(
           loadError instanceof Error
             ? loadError.message
@@ -370,6 +588,7 @@ export default function AdminMerchantVerificationsPage() {
         setLoading(false);
       }
     }, [
+      access,
       appliedSearch,
       pagination.limit,
       pagination.page,
@@ -377,12 +596,28 @@ export default function AdminMerchantVerificationsPage() {
     ]);
 
   useEffect(() => {
+    if (
+      access !== "allowed"
+    ) {
+      return;
+    }
+
     void loadRecords();
-  }, [loadRecords]);
+  }, [
+    access,
+    loadRecords,
+  ]);
 
   const openReview = async (
     verificationId: string
   ) => {
+    if (
+      access !== "allowed"
+    ) {
+      setAccess("denied");
+      return;
+    }
+
     try {
       setSelectedId(verificationId);
       setDetail(null);
@@ -395,6 +630,18 @@ export default function AdminMerchantVerificationsPage() {
         )
       );
     } catch (detailError) {
+      if (
+        isAuthorizationError(
+          detailError
+        )
+      ) {
+        setSelectedId("");
+        setDetail(null);
+        setAccess("denied");
+        setError("");
+        return;
+      }
+
       setSelectedId("");
       setError(
         detailError instanceof Error
@@ -411,6 +658,13 @@ export default function AdminMerchantVerificationsPage() {
     reason: string,
     internalNote: string
   ) => {
+    if (
+      access !== "allowed"
+    ) {
+      setAccess("denied");
+      return;
+    }
+
     if (!selectedId) {
       return;
     }
@@ -446,6 +700,18 @@ export default function AdminMerchantVerificationsPage() {
       setDetail(null);
       await loadRecords();
     } catch (reviewError) {
+      if (
+        isAuthorizationError(
+          reviewError
+        )
+      ) {
+        setSelectedId("");
+        setDetail(null);
+        setAccess("denied");
+        setError("");
+        return;
+      }
+
       setError(
         reviewError instanceof Error
           ? reviewError.message
@@ -455,6 +721,18 @@ export default function AdminMerchantVerificationsPage() {
       setActing(false);
     }
   };
+
+  if (access === "checking") {
+    return (
+      <AccessCheckingState />
+    );
+  }
+
+  if (access === "denied") {
+    return (
+      <AdminNotFoundState />
+    );
+  }
 
   return (
     <main className="min-h-full bg-slate-50 p-4 dark:bg-slate-950 sm:p-6 lg:p-8">
