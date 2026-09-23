@@ -130,8 +130,8 @@ function AnalystRangeSelect({
   }, []);
 
   return (
-    <div ref={rootRef} className={`relative min-w-[170px] ${open ? "z-[120]" : "z-20"}`}>
-      <span className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+    <div ref={rootRef} className={`relative min-w-[178px] ${open ? "z-[120]" : "z-20"}`}>
+      <span className="sr-only">
         Period
       </span>
 
@@ -140,15 +140,15 @@ function AnalystRangeSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
-        className={`flex h-11 w-full items-center justify-between gap-3 rounded-xl border bg-white/90 px-3 text-left text-xs font-black text-[#17324D] shadow-sm outline-none transition-all dark:bg-slate-950/80 dark:text-white ${
+        className={`flex h-11 w-full items-center justify-between gap-3 rounded-xl border px-4 text-left text-xs font-black text-white shadow-sm outline-none backdrop-blur-md transition-all ${
           open
-            ? "border-[#0B4F52] ring-4 ring-[#0B4F52]/10"
-            : "border-[#D4E4E1] hover:border-[#0B4F52]/40"
+            ? "border-white/35 bg-white/[0.14] ring-4 ring-white/10"
+            : "border-white/[0.14] bg-white/[0.09] hover:border-white/25 hover:bg-white/[0.13]"
         }`}
       >
         <span className="min-w-0 flex-1 truncate">{selected?.label ?? "Last 30 days"}</span>
         <motion.span animate={{ rotate: open ? 180 : 0 }} transition={{ duration: 0.18 }}>
-          <ChevronDown className="h-4 w-4 text-[#0B4F52] dark:text-cyan-300" />
+          <ChevronDown className="h-4 w-4 text-cyan-100" />
         </motion.span>
       </button>
 
@@ -160,7 +160,7 @@ function AnalystRangeSelect({
             exit={{ opacity: 0, y: -5, scale: 0.985 }}
             transition={{ duration: 0.16 }}
             role="listbox"
-            className="absolute left-0 right-0 top-[calc(100%+8px)] z-[130] overflow-hidden rounded-2xl border border-[#0B4F52]/15 bg-white/95 p-1.5 shadow-[0_24px_70px_-20px_rgba(11,79,82,0.35)] backdrop-blur-xl dark:border-white/10 dark:bg-[#091820]/95"
+            className="absolute left-0 right-0 top-[calc(100%+8px)] z-[130] overflow-hidden rounded-2xl border border-[#D8E5E2] bg-white/95 p-1.5 shadow-[0_24px_70px_-20px_rgba(7,47,60,0.35)] backdrop-blur-xl dark:border-white/10 dark:bg-[#091820]/95"
           >
             {RANGE_OPTIONS.map((option) => {
               const active = option.value === value;
@@ -176,7 +176,7 @@ function AnalystRangeSelect({
                   }}
                   className={`flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-bold transition ${
                     active
-                      ? "bg-[#0B4F52]/10 text-[#0B4F52] dark:text-cyan-300"
+                      ? "bg-[#0D5960]/10 text-[#0B4F52] dark:text-cyan-300"
                       : "text-slate-700 hover:bg-slate-100/80 dark:text-slate-200 dark:hover:bg-white/5"
                   }`}
                 >
@@ -197,13 +197,13 @@ function AnalystRangeSelect({
 ========================================================= */
 
 const OPAL_GLOW = {
-  ink: "#17324D",
-  primary: "#0B4F52",
-  primaryStrong: "#0F766E",
-  mint: "#22C7B8",
-  rose: "#38BDF8",
-  sky: "#7DD3FC",
-  canvas: "#F4F8F7",
+  ink: "#0D2335",
+  primary: "#0D5960",
+  primaryStrong: "#0B766D",
+  mint: "#20C7B5",
+  rose: "#7C5CFC",
+  sky: "#08B6D4",
+  canvas: "#F2F5EF",
 } as const;
 
 /* Trend series config — drives both the chart and the
@@ -378,7 +378,7 @@ function GlowTooltip({
               <span className="truncate">{entry.name}</span>
             </span>
 
-            <span className="shrink-0 font-black tabular-nums text-[#17324D] dark:text-slate-100">
+            <span className="shrink-0 font-black tabular-nums text-[#10283A] dark:text-slate-100">
               {formatNumber(Number(entry.value ?? 0))}
             </span>
           </div>
@@ -410,21 +410,21 @@ function Panel({
       viewport={{ once: true, amount: 0.12 }}
       transition={{ duration: 0.42, ease: easeOut }}
       whileHover={{ y: -2 }}
-      className="group relative overflow-hidden rounded-[28px] border border-[#0B4F52]/10 bg-white/[0.82] shadow-[0_20px_65px_-40px_rgba(85,102,242,0.55)] backdrop-blur-xl transition-shadow duration-300 hover:shadow-[0_24px_75px_-38px_rgba(85,102,242,0.7)] dark:border-white/10 dark:bg-slate-950/[0.72]"
+      className="group relative min-w-0 overflow-hidden rounded-[26px] border border-[#DBE6E3] bg-white shadow-[0_18px_55px_-40px_rgba(8,69,82,0.28)] transition-all duration-300 hover:-translate-y-0.5 hover:border-[#BFD9D4] hover:shadow-[0_22px_58px_-38px_rgba(8,69,82,0.34)] dark:border-white/10 dark:bg-slate-950/[0.78]"
     >
-      <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[#0B4F52]/70 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[#20C7B5]/55 to-transparent" />
 
       {/* slow drifting bloom instead of a static blur blob */}
       <motion.div
         aria-hidden
         animate={{ opacity: [0.5, 0.95, 0.5], scale: [1, 1.12, 1] }}
         transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
-        className="pointer-events-none absolute -right-14 -top-16 h-40 w-40 rounded-full bg-[#38BDF8]/10 blur-3xl"
+        className="pointer-events-none absolute -right-14 -top-16 h-40 w-40 rounded-full bg-[#08B6D4]/[0.08] blur-3xl"
       />
 
-      <div className="relative flex flex-col gap-3 border-b border-[#0B4F52]/10 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="relative flex flex-col gap-3 border-b border-[#E4ECEA] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <h2 className="text-base font-extrabold tracking-tight text-[#17324D] dark:text-slate-100">
+          <h2 className="text-base font-extrabold tracking-tight text-[#10283A] dark:text-slate-100">
             {title}
           </h2>
 
@@ -436,7 +436,7 @@ function Panel({
         {action ? <div className="shrink-0">{action}</div> : null}
       </div>
 
-      <div className="relative p-5">{children}</div>
+      <div className="relative min-w-0 p-4 sm:p-5">{children}</div>
     </motion.section>
   );
 }
@@ -506,9 +506,9 @@ function MetricCard({
       viewport={{ once: true, amount: 0.15 }}
       whileHover={{ y: -5, scale: 1.012 }}
       transition={{ type: "spring", stiffness: 240, damping: 24 }}
-      className="group relative isolate flex h-full min-w-0 flex-col overflow-hidden rounded-[24px] border border-[#0B4F52]/10 bg-white/[0.86] p-5 shadow-[0_18px_55px_-38px_rgba(85,102,242,0.55)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/[0.75]"
+      className="group relative isolate flex h-full min-w-0 flex-col overflow-hidden rounded-[24px] border border-[#DCE7E4] bg-white p-5 shadow-[0_16px_44px_-34px_rgba(8,69,82,0.30)] transition-all hover:-translate-y-1 hover:border-[#BFD9D4] hover:shadow-[0_20px_48px_-32px_rgba(8,69,82,0.36)] dark:border-white/10 dark:bg-slate-950/[0.78]"
     >
-      <div className="pointer-events-none absolute -right-10 -top-12 h-28 w-28 rounded-full bg-[#0B4F52]/10 blur-3xl transition-transform duration-500 group-hover:scale-125" />
+      <div className="pointer-events-none absolute -right-10 -top-12 h-28 w-28 rounded-full bg-[#0D5960]/10 blur-3xl transition-transform duration-500 group-hover:scale-125" />
       <div className="pointer-events-none absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-[#22C7B8]/70 to-transparent" />
 
       {/* sheen sweep on hover */}
@@ -528,7 +528,7 @@ function MetricCard({
 
           <AnimatedNumber
             value={value}
-            className="mt-3 block break-words text-2xl font-black [overflow-wrap:anywhere] tabular-nums tracking-tight text-[#17324D] dark:text-slate-50"
+            className="mt-3 block break-words text-2xl font-black [overflow-wrap:anywhere] tabular-nums tracking-tight text-[#10283A] dark:text-slate-50"
           />
         </div>
 
@@ -541,7 +541,7 @@ function MetricCard({
         </motion.div>
       </div>
 
-      <div className="relative mt-auto border-t border-[#0B4F52]/10 pt-3">
+      <div className="relative mt-auto border-t border-[#DCE7E4] pt-3">
         <ChangeBadge metric={metric} />
       </div>
     </motion.div>
@@ -572,7 +572,7 @@ function SummaryCard({
       viewport={{ once: true, amount: 0.15 }}
       whileHover={{ y: -4 }}
       transition={{ duration: 0.34, ease: easeOut }}
-      className="group relative isolate flex h-full min-w-0 overflow-hidden rounded-[24px] border border-[#0B4F52]/10 bg-white/[0.86] p-5 shadow-[0_18px_50px_-38px_rgba(85,102,242,0.5)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/[0.75]"
+      className="group relative isolate flex h-full min-w-0 overflow-hidden rounded-[24px] border border-[#DCE7E4] bg-white p-5 shadow-[0_16px_44px_-34px_rgba(8,69,82,0.28)] transition-all hover:-translate-y-1 hover:border-[#BFD9D4] dark:border-white/10 dark:bg-slate-950/[0.78]"
     >
       <div className="pointer-events-none absolute -bottom-10 -right-10 h-28 w-28 rounded-full bg-[#22C7B8]/10 blur-3xl transition-transform duration-500 group-hover:scale-125" />
 
@@ -582,7 +582,7 @@ function SummaryCard({
             {title}
           </p>
 
-          <p className="mt-3 break-words text-2xl font-black tabular-nums tracking-tight text-[#17324D] dark:text-slate-50">
+          <p className="mt-3 break-words text-2xl font-black tabular-nums tracking-tight text-[#10283A] dark:text-slate-50">
             {value}
           </p>
 
@@ -629,7 +629,7 @@ function RadialRate({
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, amount: 0.3 }}
       whileHover={{ y: -4 }}
-      className="flex h-full flex-col items-center justify-center gap-3 rounded-2xl border border-[#0B4F52]/10 bg-gradient-to-br from-white/90 to-[#0B4F52]/[0.035] p-4 text-center shadow-sm transition hover:border-[#0B4F52]/25 dark:from-slate-950/80 dark:to-[#0B4F52]/[0.04]"
+      className="flex h-full flex-col items-center justify-center gap-3 rounded-2xl border border-[#DCE7E4] bg-white p-4 text-center shadow-sm transition hover:border-[#BFD9D4] dark:from-slate-950/80 dark:to-[#0B4F52]/[0.04]"
     >
       <div className="relative flex h-[92px] w-[92px] items-center justify-center">
         <svg viewBox="0 0 80 80" className="absolute inset-0 h-full w-full -rotate-90">
@@ -663,7 +663,7 @@ function RadialRate({
         <AnimatedNumber
           value={safe}
           format={(current) => `${current.toFixed(1)}%`}
-          className="relative text-sm font-black tabular-nums text-[#17324D] dark:text-slate-100"
+          className="relative text-sm font-black tabular-nums text-[#10283A] dark:text-slate-100"
         />
       </div>
 
@@ -699,12 +699,12 @@ function EmptyData({ text }: { text: string }) {
       <motion.div
         animate={{ y: [0, -5, 0] }}
         transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
-        className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-[#0B4F52]/10 text-[#0F766E]"
+        className="relative flex h-12 w-12 items-center justify-center rounded-2xl bg-[#0D5960]/10 text-[#0F766E]"
       >
         <DatabaseZap className="h-6 w-6" />
       </motion.div>
 
-      <p className="relative mt-3 text-sm font-extrabold text-[#17324D] dark:text-slate-100">
+      <p className="relative mt-3 text-sm font-extrabold text-[#10283A] dark:text-slate-100">
         No wallet activity
       </p>
 
@@ -763,7 +763,7 @@ function InsightCard({
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-extrabold text-[#17324D] dark:text-slate-100">
+            <p className="text-sm font-extrabold text-[#10283A] dark:text-slate-100">
               {insight.title}
             </p>
 
@@ -777,7 +777,7 @@ function InsightCard({
           </p>
 
           <div className="mt-3 rounded-xl border border-white/60 bg-white/60 p-3 shadow-sm backdrop-blur dark:border-white/5 dark:bg-slate-950/[0.35]">
-            <p className="text-[11px] font-bold text-[#17324D] dark:text-slate-200">Evidence</p>
+            <p className="text-[11px] font-bold text-[#10283A] dark:text-slate-200">Evidence</p>
             <p className="mt-1 break-words text-[11px] text-slate-500 dark:text-slate-400">
               {insight.evidence}
             </p>
@@ -976,9 +976,9 @@ export default function AnalystWalletsPage() {
   if (loading && !data) {
     return (
       <div className="relative isolate space-y-5">
-        <div className="h-44 animate-pulse rounded-[30px] border border-[#0B4F52]/10 bg-gradient-to-r from-[#0B4F52]/10 via-[#38BDF8]/10 to-[#22C7B8]/10" />
+        <div className="h-44 animate-pulse rounded-[30px] border border-[#DCE7E4] bg-gradient-to-r from-[#0B4F52]/10 via-[#38BDF8]/10 to-[#22C7B8]/10" />
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, index) => (
             <motion.div
               key={index}
@@ -989,7 +989,7 @@ export default function AnalystWalletsPage() {
                 delay: index * 0.08,
                 ease: "easeInOut",
               }}
-              className="h-40 rounded-[24px] border border-[#0B4F52]/10 bg-white/70 shadow-sm dark:bg-slate-950/60"
+              className="h-40 rounded-[24px] border border-[#DCE7E4] bg-white/70 shadow-sm dark:bg-slate-950/60"
             />
           ))}
         </div>
@@ -1059,24 +1059,18 @@ export default function AnalystWalletsPage() {
   ======================================================= */
 
   return (
-    <div
-      className="relative isolate space-y-6 overflow-hidden rounded-[34px] p-1 pb-10"
-      style={{
-        background:
-          "radial-gradient(circle at 8% 2%, rgba(109,124,255,0.10), transparent 25%), radial-gradient(circle at 92% 8%, rgba(255,139,203,0.09), transparent 22%), radial-gradient(circle at 78% 78%, rgba(85,230,193,0.08), transparent 24%)",
-      }}
-    >
+    <div className="relative isolate min-w-0 space-y-6 overflow-x-clip rounded-[34px] bg-[#F2F5EF] p-1 pb-10 dark:bg-slate-950">
       <motion.div
         aria-hidden
         animate={{ opacity: [0.4, 0.85, 0.4], y: [0, -18, 0] }}
         transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
-        className="pointer-events-none absolute left-[9%] top-16 -z-10 h-40 w-40 rounded-full bg-[#0B4F52]/10 blur-[80px]"
+        className="pointer-events-none absolute left-[9%] top-20 -z-10 h-40 w-40 rounded-full bg-[#20C7B5]/[0.07] blur-[90px]"
       />
       <motion.div
         aria-hidden
         animate={{ opacity: [0.35, 0.8, 0.35], y: [0, 20, 0] }}
         transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
-        className="pointer-events-none absolute right-[6%] top-72 -z-10 h-44 w-44 rounded-full bg-[#38BDF8]/10 blur-[90px]"
+        className="pointer-events-none absolute right-[6%] top-72 -z-10 h-44 w-44 rounded-full bg-[#08B6D4]/[0.06] blur-[95px]"
       />
 
       {/* HEADER */}
@@ -1085,160 +1079,185 @@ export default function AnalystWalletsPage() {
         initial={{ opacity: 0, y: 18 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.55, ease: easeOut }}
-        className="relative overflow-hidden rounded-[30px] border border-[#0B4F52]/[0.15] bg-white/[0.82] p-6 shadow-[0_28px_90px_-52px_rgba(85,102,242,0.68)] backdrop-blur-2xl sm:p-7 dark:border-white/10 dark:bg-slate-950/[0.76]"
+        className="relative overflow-hidden rounded-[30px] border border-[#1B6670]/40 px-5 py-6 text-white shadow-[0_30px_70px_-38px_rgba(6,45,58,0.75)] sm:px-7 sm:py-7 lg:px-8"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle at 80% 22%, rgba(21,196,181,0.18), transparent 26%), radial-gradient(circle at 38% 110%, rgba(10,151,137,0.18), transparent 34%), radial-gradient(rgba(255,255,255,0.075) 1px, transparent 1px), linear-gradient(135deg,#0B2D3C 0%,#0D5B5B 56%,#0B263B 100%)",
+          backgroundSize:
+            "auto, auto, 22px 22px, auto",
+        }}
       >
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(125deg,rgba(109,124,255,0.055),transparent_36%,rgba(255,139,203,0.05)_68%,rgba(85,230,193,0.06))]" />
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.018),transparent_45%,rgba(255,255,255,0.02))]" />
 
         <motion.div
           aria-hidden
-          animate={{ x: [0, 22, 0], y: [0, -14, 0], scale: [1, 1.08, 1] }}
-          transition={{ duration: 11, repeat: Infinity, ease: "easeInOut" }}
-          className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-[#0B4F52]/[0.18] blur-3xl"
+          animate={{
+            opacity: [0.18, 0.42, 0.18],
+            scale: [1, 1.08, 1],
+          }}
+          transition={{
+            duration: 8,
+            repeat: Infinity,
+            ease: "easeInOut",
+          }}
+          className="pointer-events-none absolute right-[20%] top-16 h-28 w-28 rounded-full border border-cyan-200/10"
         />
-        <motion.div
-          aria-hidden
-          animate={{ x: [0, -18, 0], y: [0, 16, 0] }}
-          transition={{ duration: 13, repeat: Infinity, ease: "easeInOut" }}
-          className="pointer-events-none absolute -bottom-24 left-[28%] h-56 w-56 rounded-full bg-[#38BDF8]/[0.14] blur-3xl"
-        />
-        <div className="pointer-events-none absolute bottom-0 right-[18%] h-40 w-40 rounded-full bg-[#22C7B8]/[0.12] blur-3xl" />
 
-        <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap gap-2">
-              <span
-                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-wider shadow-sm backdrop-blur ${statusClass}`}
-              >
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-35" />
-                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-current" />
-                </span>
-                Network {data.status}
+        <div className="relative">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-2 rounded-full border border-cyan-100/20 bg-white/[0.055] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-cyan-50 backdrop-blur-md">
+              <Activity className="h-3.5 w-3.5" />
+              Analyst Command Center
+            </span>
+
+            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200/20 bg-emerald-300/[0.07] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-100">
+              <BadgeCheck className="h-3.5 w-3.5" />
+              Analyst Only
+            </span>
+
+            <span
+              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] ${
+                data.status === "critical"
+                  ? "border-red-300/25 bg-red-400/10 text-red-200"
+                  : data.status === "attention"
+                    ? "border-amber-300/25 bg-amber-400/10 text-amber-200"
+                    : "border-emerald-300/25 bg-emerald-400/10 text-emerald-100"
+              }`}
+            >
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-35" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-current" />
               </span>
-
-              <span className="inline-flex items-center gap-2 rounded-full border border-[#0B4F52]/[0.15] bg-[#0B4F52]/[0.075] px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-[#0F766E] shadow-sm backdrop-blur dark:text-[#A7F3D0]">
-                <motion.span
-                  animate={{ rotate: [0, 12, -12, 0] }}
-                  transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-                >
-                  <Sparkles className="h-3.5 w-3.5" />
-                </motion.span>
-                Opal Glow workspace
-              </span>
-
-              <span className="inline-flex items-center gap-2 rounded-full border border-[#22C7B8]/20 bg-[#22C7B8]/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-[#0F766E] dark:text-[#99F6E4]">
-                <WalletCards className="h-3.5 w-3.5" />
-                Coffer Wallet Network
-              </span>
-            </div>
-
-            <h1 className="mt-4 bg-gradient-to-r from-[#17324D] via-[#0B4F52] to-[#14B8A6] bg-clip-text text-2xl font-black tracking-tight text-transparent sm:text-4xl">
-              Wallet Analytics
-            </h1>
-
-            <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-              Analyze wallet adoption, engagement, P2P usage, funding activity and Coffer Wallet
-              merchant-payment behavior with a softer, luminous operations view.
-            </p>
+              {data.status}
+            </span>
           </div>
 
-          <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-[#0B4F52]/10 bg-white/[0.55] p-2.5 shadow-sm backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/[0.45]">
-            <AnalystRangeSelect
-              value={range}
-              onChange={(nextRange) => {
-                if (!isAnalystRole) {
-                  return;
-                }
+          <div className="mt-5 flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
+            <div className="min-w-0">
+              <h1 className="text-3xl font-black tracking-[-0.04em] text-white sm:text-4xl">
+                Wallet Analytics
+              </h1>
 
-                setRange(nextRange);
-              }}
-            />
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-cyan-50/70">
+                A read-only analyst snapshot of wallet adoption, engagement,
+                P2P usage, funding activity and merchant-payment behavior
+                generated from live Coffer platform records.
+              </p>
+            </div>
 
-            <form onSubmit={applyCurrency}>
-              <span className="mb-1.5 block text-[10px] font-black uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
-                Currency
-              </span>
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+              <div className="inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-white/[0.12] bg-white/[0.07] px-4 text-xs font-black text-cyan-50/85 backdrop-blur-md">
+                <DatabaseZap className="h-4 w-4 text-cyan-300" />
+                Live wallet data
+              </div>
 
-              <div className="flex overflow-hidden rounded-xl shadow-sm ring-1 ring-[#0B4F52]/[0.15] focus-within:ring-4 focus-within:ring-[#0B4F52]/10">
-                <input
-                  value={currencyDraft}
-                  onChange={(event) => {
-                    if (!isAnalystRole) {
-                      return;
-                    }
+              <motion.button
+                type="button"
+                disabled={refreshing}
+                whileTap={{ scale: 0.96 }}
+                onClick={() => {
+                  if (!isAnalystRole) {
+                    return;
+                  }
 
-                    setCurrencyDraft(
-                      event.target.value
-                        .replace(/[^a-z]/gi, "")
-                        .slice(0, 3)
-                        .toUpperCase()
-                    );
-                  }}
-                  aria-label="Currency code"
-                  className="h-11 w-20 border-0 bg-white/[0.85] px-3 text-center text-xs font-black text-[#17324D] outline-none dark:bg-slate-950/70 dark:text-slate-100"
+                  setRefreshKey((value) => value + 1);
+                }}
+                className="group inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-white/[0.14] bg-white/[0.10] px-4 text-xs font-black text-white backdrop-blur-md transition hover:bg-white/[0.16] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <RefreshCcw
+                  className={`h-4 w-4 transition-transform group-hover:rotate-45 ${
+                    refreshing ? "animate-spin" : ""
+                  }`}
                 />
+                Refresh now
+              </motion.button>
+            </div>
+          </div>
+
+          <div className="mt-5 flex flex-wrap items-center gap-2 text-[10px] font-bold text-cyan-50/65">
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/[0.10] bg-white/[0.055] px-3 py-1.5">
+              <Activity className="h-3.5 w-3.5 text-cyan-300" />
+              Updated {formatDate(data.generatedAt)}
+            </span>
+
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/[0.10] bg-white/[0.055] px-3 py-1.5">
+              <WalletCards className="h-3.5 w-3.5 text-emerald-300" />
+              Personal wallets only
+            </span>
+
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/[0.10] bg-white/[0.055] px-3 py-1.5">
+              <CreditCard className="h-3.5 w-3.5 text-violet-300" />
+              Live merchant payments
+            </span>
+          </div>
+
+          <div className="mt-6 flex flex-col gap-4 border-t border-white/[0.10] pt-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <AnalystRangeSelect
+                value={range}
+                onChange={(nextRange) => {
+                  if (!isAnalystRole) {
+                    return;
+                  }
+
+                  setRange(nextRange);
+                }}
+              />
+
+              <form
+                onSubmit={applyCurrency}
+                className="flex min-w-0 items-end gap-2"
+              >
+                <div>
+                  <span className="sr-only">
+                    Currency
+                  </span>
+
+                  <input
+                    value={currencyDraft}
+                    onChange={(event) => {
+                      if (!isAnalystRole) {
+                        return;
+                      }
+
+                      setCurrencyDraft(
+                        event.target.value
+                          .replace(/[^a-z]/gi, "")
+                          .slice(0, 3)
+                          .toUpperCase()
+                      );
+                    }}
+                    aria-label="Currency code"
+                    className="h-11 w-24 rounded-xl border border-white/[0.14] bg-white/[0.09] px-3 text-center text-xs font-black text-white outline-none backdrop-blur-md transition placeholder:text-white/40 focus:border-cyan-200/35 focus:bg-white/[0.13] focus:ring-4 focus:ring-cyan-200/10"
+                  />
+                </div>
 
                 <button
                   type="submit"
-                  className="h-11 border-l border-[#0B4F52]/10 bg-[#0B4F52]/[0.075] px-3 text-[10px] font-black uppercase text-[#0F766E] transition hover:bg-[#0B4F52]/[0.15] dark:text-[#A7F3D0]"
+                  className="h-11 rounded-xl border border-cyan-200/20 bg-cyan-300/[0.10] px-4 text-[10px] font-black uppercase tracking-wide text-cyan-50 transition hover:bg-cyan-300/[0.16]"
                 >
                   Apply
                 </button>
-              </div>
-            </form>
+              </form>
+            </div>
 
-            <motion.button
-              type="button"
-              disabled={refreshing}
-              whileTap={{ scale: 0.96 }}
-              onClick={() => {
-                if (!isAnalystRole) {
-                  return;
-                }
-
-                setRefreshKey((value) => value + 1);
-              }}
-              className="group inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-[#0B4F52] to-[#38BDF8] px-4 text-xs font-black text-white shadow-[0_14px_32px_-16px_rgba(109,124,255,0.9)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_42px_-16px_rgba(109,124,255,1)] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <RefreshCcw
-                className={`h-4 w-4 transition-transform group-hover:rotate-45 ${
-                  refreshing ? "animate-spin" : ""
-                }`}
-              />
-              Refresh
-            </motion.button>
+            <div className="inline-flex items-center gap-2 text-[10px] font-bold text-cyan-50/55">
+              <DatabaseZap className="h-3.5 w-3.5 text-cyan-300" />
+              Source: MongoDB live collections
+            </div>
           </div>
-        </div>
-
-        <div className="relative mt-5 flex flex-wrap gap-2 border-t border-[#0B4F52]/10 pt-4 text-[11px] text-slate-500 dark:text-slate-400">
-          {[
-            `Updated ${formatDate(data.generatedAt)}`,
-            data.filters.currency,
-            "Personal wallets only",
-            "Live merchant payments",
-          ].map((item, index) => (
-            <motion.span
-              key={item}
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 + index * 0.06 }}
-              className="rounded-full border border-[#0B4F52]/10 bg-white/[0.55] px-3 py-1.5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-slate-950/[0.35]"
-            >
-              {item}
-            </motion.span>
-          ))}
         </div>
       </motion.section>
 
       {/* POPULATION */}
 
-      <section className="grid items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid items-stretch gap-4 sm:grid-cols-2 2xl:grid-cols-4">
         <SummaryCard
           title="Total wallets"
           value={<AnimatedNumber value={data.population.totalWallets} />}
           description="Personal Coffer wallets"
           icon={WalletCards}
-          iconClass="bg-[#0B4F52]/10 text-[#0F766E] dark:text-[#99F6E4]"
+          iconClass="bg-[#0D5960]/10 text-[#0F766E] dark:text-[#99F6E4]"
         />
 
         <SummaryCard
@@ -1268,13 +1287,13 @@ export default function AnalystWalletsPage() {
 
       {/* METRICS */}
 
-      <section className="grid items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid items-stretch gap-4 sm:grid-cols-2 2xl:grid-cols-4">
         <MetricCard
           label="Engaged wallets"
           value={data.metrics.engagedWallets.value}
           metric={data.metrics.engagedWallets}
           icon={UserRoundCheck}
-          iconClass="bg-[#0B4F52]/10 text-[#0F766E] dark:text-[#99F6E4]"
+          iconClass="bg-[#0D5960]/10 text-[#0F766E] dark:text-[#99F6E4]"
         />
 
         <MetricCard
@@ -1282,7 +1301,7 @@ export default function AnalystWalletsPage() {
           value={data.metrics.newWallets.value}
           metric={data.metrics.newWallets}
           icon={WalletCards}
-          iconClass="bg-[#22C7B8]/[0.14] text-[#0F766E] dark:text-[#99F6E4]"
+          iconClass="bg-[#20C7B5]/[0.14] text-[#0F766E] dark:text-[#99F6E4]"
         />
 
         <MetricCard
@@ -1290,7 +1309,7 @@ export default function AnalystWalletsPage() {
           value={data.metrics.merchantPayingWallets.value}
           metric={data.metrics.merchantPayingWallets}
           icon={CreditCard}
-          iconClass="bg-[#38BDF8]/[0.12] text-[#D85AA8] dark:text-[#FFA7D8]"
+          iconClass="bg-[#7C5CFC]/[0.11] text-[#6D55E8] dark:text-[#C4B5FD]"
         />
 
         <MetricCard
@@ -1306,7 +1325,7 @@ export default function AnalystWalletsPage() {
           value={data.metrics.repeatEngagedWallets.value}
           metric={data.metrics.repeatEngagedWallets}
           icon={Repeat2}
-          iconClass="bg-[#7DD3FC]/[0.15] text-[#397FAB] dark:text-[#A9E5FF]"
+          iconClass="bg-[#08B6D4]/[0.12] text-[#0789A3] dark:text-[#A5F3FC]"
         />
 
         <MetricCard
@@ -1314,7 +1333,7 @@ export default function AnalystWalletsPage() {
           value={data.metrics.walletActivityEvents.value}
           metric={data.metrics.walletActivityEvents}
           icon={TrendingUp}
-          iconClass="bg-[#22C7B8]/[0.14] text-[#0F766E] dark:text-[#99F6E4]"
+          iconClass="bg-[#20C7B5]/[0.14] text-[#0F766E] dark:text-[#99F6E4]"
         />
 
         <MetricCard
@@ -1322,7 +1341,7 @@ export default function AnalystWalletsPage() {
           value={data.metrics.merchantPaymentCount.value}
           metric={data.metrics.merchantPaymentCount}
           icon={CreditCard}
-          iconClass="bg-[#38BDF8]/[0.12] text-[#D85AA8] dark:text-[#FFA7D8]"
+          iconClass="bg-[#7C5CFC]/[0.11] text-[#6D55E8] dark:text-[#C4B5FD]"
         />
 
         <MetricCard
@@ -1398,7 +1417,7 @@ export default function AnalystWalletsPage() {
                     className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-wide transition ${
                       hidden
                         ? "border-slate-200 bg-transparent text-slate-400 dark:border-white/10"
-                        : "border-[#0B4F52]/15 bg-white/70 text-[#17324D] shadow-sm dark:bg-slate-950/50 dark:text-slate-200"
+                        : "border-[#0B4F52]/15 bg-white/70 text-[#10283A] shadow-sm dark:bg-slate-950/50 dark:text-slate-200"
                     }`}
                   >
                     <motion.span
@@ -1534,7 +1553,7 @@ export default function AnalystWalletsPage() {
 
       {/* FUNNEL + USAGE */}
 
-      <div className="grid items-stretch gap-5 xl:grid-cols-2">
+      <div className="grid items-stretch gap-5 2xl:grid-cols-2">
         <Panel
           title="Wallet engagement funnel"
           description="From provisioned wallets to wallets actively paying Coffer merchants."
@@ -1566,7 +1585,7 @@ export default function AnalystWalletsPage() {
                       delay: index * 0.09,
                       ease: easeOut,
                     }}
-                    className="relative h-full overflow-hidden rounded-full bg-gradient-to-r from-[#0B4F52] via-[#38BDF8] to-[#22C7B8] shadow-[0_0_18px_rgba(109,124,255,0.24)]"
+                    className="relative h-full overflow-hidden rounded-full bg-gradient-to-r from-[#0D5960] via-[#08B6D4] to-[#20C7B5] shadow-[0_0_18px_rgba(109,124,255,0.24)]"
                   >
                     {/* travelling shimmer along the filled bar */}
                     <motion.span
@@ -1664,7 +1683,7 @@ export default function AnalystWalletsPage() {
         title="Wallet engagement"
         description="Adoption and repeat-usage indicators for the Coffer wallet ecosystem."
       >
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-5">
           <RadialRate
             label="Wallet engagement"
             value={data.engagement.walletEngagementRate}
@@ -1698,12 +1717,12 @@ export default function AnalystWalletsPage() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             whileHover={{ y: -4 }}
-            className="flex h-full flex-col justify-center rounded-2xl border border-[#0B4F52]/10 bg-gradient-to-br from-white/90 to-[#0B4F52]/[0.035] p-4 text-center shadow-sm transition hover:border-[#0B4F52]/25 dark:from-slate-950/80 dark:to-[#0B4F52]/[0.04]"
+            className="flex h-full flex-col justify-center rounded-2xl border border-[#DCE7E4] bg-white p-4 text-center shadow-sm transition hover:border-[#BFD9D4] dark:from-slate-950/80 dark:to-[#0B4F52]/[0.04]"
           >
             <motion.div
               animate={{ y: [0, -4, 0] }}
               transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-[#0B4F52]/10 text-[#0F766E] dark:text-[#99F6E4]"
+              className="mx-auto flex h-11 w-11 items-center justify-center rounded-2xl bg-[#0D5960]/10 text-[#0F766E] dark:text-[#99F6E4]"
             >
               <Activity className="h-5 w-5" />
             </motion.div>
@@ -1711,7 +1730,7 @@ export default function AnalystWalletsPage() {
             <AnimatedNumber
               value={Number(data.engagement.transactionsPerEngagedWallet) || 0}
               format={(current) => current.toFixed(2)}
-              className="mt-3 block text-2xl font-black tabular-nums text-[#17324D] dark:text-slate-50"
+              className="mt-3 block text-2xl font-black tabular-nums text-[#10283A] dark:text-slate-50"
             />
 
             <p className="mt-1 text-[10px] font-black uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400">
@@ -1764,7 +1783,7 @@ export default function AnalystWalletsPage() {
             }
             description="Average across matching wallets"
             icon={WalletCards}
-            iconClass="bg-[#0B4F52]/10 text-[#0F766E] dark:text-[#99F6E4]"
+            iconClass="bg-[#0D5960]/10 text-[#0F766E] dark:text-[#99F6E4]"
           />
         </div>
       </Panel>
@@ -1792,7 +1811,7 @@ export default function AnalystWalletsPage() {
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.08 }}
                 whileHover={{ y: -4 }}
-                className="flex h-full flex-col rounded-2xl border border-[#0B4F52]/10 bg-gradient-to-br from-white/90 to-[#0B4F52]/[0.035] p-4 shadow-sm transition hover:border-[#0B4F52]/25 dark:from-slate-950/80 dark:to-[#0B4F52]/[0.04]"
+                className="flex h-full flex-col rounded-2xl border border-[#DCE7E4] bg-white p-4 shadow-sm transition hover:border-[#BFD9D4] dark:from-slate-950/80 dark:to-[#0B4F52]/[0.04]"
               >
                 <span
                   className={`inline-flex w-fit rounded-full px-2.5 py-1 text-[9px] font-black ${className}`}
@@ -1812,7 +1831,7 @@ export default function AnalystWalletsPage() {
                       whileInView={{ width: `${Math.min(item.percentage, 100)}%` }}
                       viewport={{ once: true }}
                       transition={{ duration: 0.9, delay: index * 0.08, ease: easeOut }}
-                      className="h-full rounded-full bg-gradient-to-r from-[#0B4F52] to-[#22C7B8]"
+                      className="h-full rounded-full bg-gradient-to-r from-[#0D5960] to-[#20C7B5]"
                     />
                   </div>
 
@@ -1860,13 +1879,13 @@ export default function AnalystWalletsPage() {
         initial={{ opacity: 0, y: 10 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
-        className="relative overflow-hidden rounded-[24px] border border-[#0B4F52]/10 bg-white/[0.78] p-5 shadow-[0_18px_55px_-40px_rgba(85,102,242,0.5)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70"
+        className="relative overflow-hidden rounded-[24px] border border-[#DCE7E4] bg-white p-5 shadow-[0_16px_44px_-34px_rgba(8,69,82,0.26)] dark:border-white/10 dark:bg-slate-950/70"
       >
         <div className="flex gap-3">
           <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-[#0F766E]" />
 
           <div className="min-w-0">
-            <p className="text-xs font-extrabold text-[#17324D] dark:text-slate-100">
+            <p className="text-xs font-extrabold text-[#10283A] dark:text-slate-100">
               Privacy-safe wallet analytics
             </p>
 
