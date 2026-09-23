@@ -260,10 +260,219 @@ const getTimeLabel = (
 };
 
 /* =========================================================
+   ADMIN / SUPER ADMIN ACCESS
+========================================================= */
+
+type AccessState =
+  | "checking"
+  | "allowed"
+  | "denied";
+
+const ADMIN_ROLES = new Set([
+  "admin",
+  "super_admin",
+]);
+
+function normalizeRole(
+  value: unknown
+): string {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+function getStoredRole(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const rawUser =
+    window.localStorage.getItem(
+      "auth_user"
+    );
+
+  if (!rawUser) {
+    return "";
+  }
+
+  try {
+    const parsed =
+      JSON.parse(rawUser);
+
+    const candidates = [
+      parsed?.role,
+      parsed?.user?.role,
+      parsed?.data?.role,
+      parsed?.profile?.role,
+    ];
+
+    for (const candidate of candidates) {
+      const role =
+        normalizeRole(candidate);
+
+      if (role) {
+        return role;
+      }
+    }
+  } catch {
+    return "";
+  }
+
+  return "";
+}
+
+function hasAdminAccess(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const authenticated =
+    window.localStorage.getItem(
+      "is_authenticated"
+    );
+
+  if (
+    authenticated !== "true" &&
+    authenticated !== "1"
+  ) {
+    return false;
+  }
+
+  return ADMIN_ROLES.has(
+    getStoredRole()
+  );
+}
+
+function isAuthorizationError(
+  error: unknown
+): boolean {
+  const message =
+    error instanceof Error
+      ? error.message
+      : String(error ?? "");
+
+  const normalized =
+    message.toLowerCase();
+
+  return (
+    normalized.includes("401") ||
+    normalized.includes("403") ||
+    normalized.includes(
+      "unauthorized"
+    ) ||
+    normalized.includes(
+      "forbidden"
+    ) ||
+    normalized.includes(
+      "access denied"
+    ) ||
+    normalized.includes(
+      "not authorized"
+    )
+  );
+}
+
+function AccessCheckingState() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 text-foreground">
+      <motion.div
+        initial={{
+          opacity: 0,
+          y: 8,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        className="text-center"
+      >
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-indigo-500/15 bg-indigo-500/10 text-indigo-600">
+          <Loader2 className="h-5 w-5 animate-spin" />
+        </div>
+
+        <p className="mt-4 text-sm font-black">
+          Checking access
+        </p>
+
+        <p className="mt-1 text-xs text-muted-foreground">
+          Verifying administrator permissions…
+        </p>
+      </motion.div>
+    </main>
+  );
+}
+
+function AdminNotFoundState() {
+  return (
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-5 text-foreground">
+      <div className="pointer-events-none absolute -left-32 top-24 h-80 w-80 rounded-full bg-indigo-500/[0.07] blur-[100px]" />
+      <div className="pointer-events-none absolute -right-32 bottom-20 h-80 w-80 rounded-full bg-violet-500/[0.07] blur-[100px]" />
+
+      <motion.section
+        initial={{
+          opacity: 0,
+          y: 18,
+          scale: 0.98,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          scale: 1,
+        }}
+        transition={{
+          duration: 0.45,
+          ease: [
+            0.22,
+            1,
+            0.36,
+            1,
+          ],
+        }}
+        className="relative w-full max-w-xl overflow-hidden rounded-[32px] border border-border bg-card p-7 text-center shadow-[0_30px_90px_rgba(15,23,42,.12)] sm:p-10"
+      >
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.035]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(99,102,241,.7) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,.7) 1px, transparent 1px)",
+            backgroundSize:
+              "32px 32px",
+          }}
+        />
+
+        <div className="relative z-10">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] border border-indigo-500/15 bg-indigo-500/10 text-indigo-600">
+            <ShieldAlert className="h-7 w-7" />
+          </div>
+
+          <p className="mt-6 text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600">
+            Error 404
+          </p>
+
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">
+            Page not found
+          </h1>
+
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+            The page you are looking for does not exist or is not available.
+          </p>
+        </div>
+      </motion.section>
+    </main>
+  );
+}
+
+/* =========================================================
    MAIN PAGE
 ========================================================= */
 
 export default function AnalyticsDashboard() {
+  const [access, setAccess] =
+    useState<AccessState>(
+      "checking"
+    );
+
   const [range, setRange] =
     useState<AnalyticsRange>("7D");
 
@@ -295,6 +504,29 @@ export default function AnalyticsDashboard() {
       icon: React.ElementType;
       tone: AnalyticsTone;
     } | null>(null);
+
+  /* =======================================================
+     ACCESS CHECK
+  ====================================================== */
+
+  useEffect(() => {
+    const timer =
+      window.setTimeout(
+        () => {
+          setAccess(
+            hasAdminAccess()
+              ? "allowed"
+              : "denied"
+          );
+        },
+        0
+      );
+
+    return () =>
+      window.clearTimeout(
+        timer
+      );
+  }, []);
 
   /* =======================================================
      LOAD ANALYTICS
@@ -337,6 +569,17 @@ export default function AnalyticsDashboard() {
       } catch (
         loadError
       ) {
+        if (
+          isAuthorizationError(
+            loadError
+          )
+        ) {
+          setAccess("denied");
+          setDashboard(null);
+          setError("");
+          return;
+        }
+
         const message =
           loadError instanceof Error
             ? loadError.message
@@ -356,11 +599,18 @@ export default function AnalyticsDashboard() {
   );
 
   useEffect(() => {
+    if (
+      access !== "allowed"
+    ) {
+      return;
+    }
+
     void loadAnalytics(
       range,
       false
     );
   }, [
+    access,
     loadAnalytics,
     range,
   ]);
@@ -483,6 +733,17 @@ export default function AnalyticsDashboard() {
       } catch (
         exportError
       ) {
+        if (
+          isAuthorizationError(
+            exportError
+          )
+        ) {
+          setAccess("denied");
+          setDashboard(null);
+          setError("");
+          return;
+        }
+
         setError(
           exportError instanceof Error
             ? exportError.message
@@ -490,6 +751,22 @@ export default function AnalyticsDashboard() {
         );
       }
     };
+
+  /* =======================================================
+     ACCESS STATES
+  ====================================================== */
+
+  if (access === "checking") {
+    return (
+      <AccessCheckingState />
+    );
+  }
+
+  if (access === "denied") {
+    return (
+      <AdminNotFoundState />
+    );
+  }
 
   /* =======================================================
      PAGE
