@@ -11,6 +11,10 @@ import React, {
 import Link from "next/link";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   motion,
 } from "framer-motion";
 
@@ -30,6 +34,14 @@ import {
   X,
   XCircle,
 } from "lucide-react";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   getMerchantDisputes,
@@ -421,7 +433,7 @@ function StatusDropdown({
       ref={
         rootRef
       }
-      className="relative"
+      className={`relative ${open ? "z-[80]" : "z-20"}`}
     >
       <button
         type="button"
@@ -452,7 +464,7 @@ function StatusDropdown({
           hover:bg-violet-500/[0.09]
         "
       >
-        <span>
+        <span className="min-w-0 truncate">
           {
             selected.label
           }
@@ -494,13 +506,17 @@ function StatusDropdown({
             absolute
             left-0
             top-[calc(100%+8px)]
-            z-30
+            z-[90]
             w-full
+            min-w-[220px]
             overflow-hidden
             rounded-2xl
-            bg-white
+            border
+            border-violet-200/60
+            bg-white/95
             p-1.5
-            shadow-[0_22px_55px_rgba(30,15,60,0.17)]
+            shadow-[0_24px_65px_rgba(30,15,60,0.22)]
+            backdrop-blur-xl
 
             dark:bg-slate-950
           "
@@ -550,12 +566,14 @@ function StatusDropdown({
                     }
                   `}
                 >
-                  {
-                    option.label
-                  }
+                  <span className="min-w-0 truncate">
+                    {
+                      option.label
+                    }
+                  </span>
 
                   {active ? (
-                    <Check className="h-4 w-4" />
+                    <Check className="h-4 w-4 shrink-0" />
                   ) : null}
                 </button>
               );
@@ -612,6 +630,7 @@ function SummaryCard({
       }}
       className={`
         relative
+        h-full
         min-w-0
         overflow-hidden
         rounded-[24px]
@@ -647,9 +666,11 @@ function SummaryCard({
           <p
             className={`
               mt-3
-              truncate
+              break-words
               text-xl
               font-black
+              leading-tight
+              [overflow-wrap:anywhere]
               tracking-tight
 
               ${
@@ -695,6 +716,32 @@ function SummaryCard({
 ========================================================= */
 
 export default function MerchantDisputesPage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isMerchantRole =
+    user.role === "merchant";
+
+  useEffect(() => {
+    if (isMerchantRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isMerchantRole,
+    router,
+    user.role,
+  ]);
+
   const [
     disputes,
     setDisputes,
@@ -795,6 +842,15 @@ export default function MerchantDisputesPage() {
       async (
         refresh = false
       ) => {
+        if (!isMerchantRole) {
+          setLoading(false);
+          setRefreshing(false);
+          setDisputes([]);
+          setError(null);
+
+          return;
+        }
+
         try {
           if (
             refresh
@@ -878,6 +934,7 @@ export default function MerchantDisputesPage() {
       },
       [
         from,
+        isMerchantRole,
         page,
         search,
         status,
@@ -887,9 +944,16 @@ export default function MerchantDisputesPage() {
 
   useEffect(
     () => {
+      if (!isMerchantRole) {
+        setLoading(false);
+
+        return;
+      }
+
       void fetchDisputes();
     },
     [
+      isMerchantRole,
       fetchDisputes,
     ]
   );
@@ -900,6 +964,10 @@ export default function MerchantDisputesPage() {
 
   const applySearch =
     () => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       if (
         from &&
         to &&
@@ -921,6 +989,10 @@ export default function MerchantDisputesPage() {
 
   const clearFilters =
     () => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       setSearchInput("");
       setSearch("");
       setStatus("");
@@ -971,6 +1043,26 @@ export default function MerchantDisputesPage() {
         total,
       ]
     );
+
+  if (!isMerchantRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center bg-background px-4 text-foreground">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-500/15 bg-violet-500/10 text-violet-700 shadow-sm dark:text-violet-300">
+            <RefreshCw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Merchant Disputes is available only to merchant accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="merchant-theme relative z-0 isolate min-h-full">
@@ -1057,16 +1149,23 @@ export default function MerchantDisputesPage() {
                   disabled={
                     refreshing
                   }
-                  onClick={() =>
+                  onClick={() => {
+                    if (!isMerchantRole) {
+                      return;
+                    }
+
                     void fetchDisputes(
                       true
-                    )
-                  }
+                    );
+                  }}
                   className="
                     inline-flex
                     h-11
-                    w-fit
+                    w-full
                     items-center
+                    justify-center
+
+                    sm:w-auto
                     gap-2
                     rounded-2xl
                     border
@@ -1123,7 +1222,7 @@ export default function MerchantDisputesPage() {
                     Open amount
                   </p>
 
-                  <p className="mt-1 truncate text-lg font-black">
+                  <p className="mt-1 break-words text-lg font-black leading-tight [overflow-wrap:anywhere]">
                     {formatMoney(
                       summary.disputedAmount,
                       currency
@@ -1214,6 +1313,8 @@ export default function MerchantDisputesPage() {
               y: 0,
             }}
             className="
+              relative
+              z-30
               overflow-visible
               rounded-[28px]
               bg-white/65
@@ -1235,12 +1336,12 @@ export default function MerchantDisputesPage() {
               }}
             >
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/10">
                   <Filter className="h-4 w-4" />
                 </div>
 
-                <div>
-                  <h2 className="font-black">
+                <div className="min-w-0">
+                  <h2 className="break-words font-black leading-tight [overflow-wrap:anywhere]">
                     Dispute filters
                   </h2>
 
@@ -1283,11 +1384,15 @@ export default function MerchantDisputesPage() {
                   }
                   onChange={(
                     event
-                  ) =>
+                  ) => {
+                    if (!isMerchantRole) {
+                      return;
+                    }
+
                     setSearchInput(
                       event.target.value
-                    )
-                  }
+                    );
+                  }}
                   onKeyDown={(
                     event
                   ) => {
@@ -1322,6 +1427,10 @@ export default function MerchantDisputesPage() {
                   <button
                     type="button"
                     onClick={() => {
+                      if (!isMerchantRole) {
+                        return;
+                      }
+
                       setSearchInput("");
                       setSearch("");
                       setPage(1);
@@ -1354,6 +1463,10 @@ export default function MerchantDisputesPage() {
                 onChange={(
                   value
                 ) => {
+                  if (!isMerchantRole) {
+                    return;
+                  }
+
                   setStatus(
                     value
                   );
@@ -1517,11 +1630,15 @@ export default function MerchantDisputesPage() {
 
               <button
                 type="button"
-                onClick={() =>
+                onClick={() => {
+                  if (!isMerchantRole) {
+                    return;
+                  }
+
                   void fetchDisputes(
                     true
-                  )
-                }
+                  );
+                }}
                 className="
                   rounded-xl
                   bg-rose-500/10
@@ -1647,13 +1764,13 @@ export default function MerchantDisputesPage() {
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <p className="truncate font-mono text-xs font-black text-violet-600">
+                            <p className="break-all font-mono text-xs font-black leading-5 text-violet-600">
                               {shortId(
                                 dispute.disputeId
                               )}
                             </p>
 
-                            <p className="mt-1 truncate text-xs merchant-muted">
+                            <p className="mt-1 break-words text-xs leading-5 merchant-muted [overflow-wrap:anywhere]">
                               {dispute.customerName}
                             </p>
                           </div>
@@ -1693,7 +1810,7 @@ export default function MerchantDisputesPage() {
                               Amount
                             </p>
 
-                            <p className="mt-1 truncate text-sm font-black merchant-text">
+                            <p className="mt-1 break-words text-sm font-black leading-tight merchant-text [overflow-wrap:anywhere]">
                               {formatMoney(
                                 dispute.amount,
                                 dispute.currency
@@ -1706,7 +1823,7 @@ export default function MerchantDisputesPage() {
                               Reason
                             </p>
 
-                            <p className="mt-1 truncate text-xs font-black merchant-text">
+                            <p className="mt-1 break-words text-xs font-black leading-tight merchant-text [overflow-wrap:anywhere]">
                               {reasonLabel(
                                 dispute.reason
                               )}
