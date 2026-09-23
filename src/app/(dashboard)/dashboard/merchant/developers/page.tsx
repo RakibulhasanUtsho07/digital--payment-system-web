@@ -1,11 +1,16 @@
 "use client";
 
 import React, {
+  useEffect,
   useMemo,
   useState,
 } from "react";
 
 import Link from "next/link";
+
+import {
+  useRouter,
+} from "next/navigation";
 
 import {
   ArrowRight,
@@ -35,6 +40,14 @@ import {
   AnimatePresence,
   motion,
 } from "framer-motion";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 /* =========================================================
    TYPES
@@ -348,6 +361,7 @@ function CodeBlock({
   return (
     <div
       className="
+        min-w-0
         overflow-hidden
         rounded-[22px]
         bg-[#130A22]
@@ -356,6 +370,7 @@ function CodeBlock({
       <div
         className="
           flex
+          min-w-0
           items-center
           justify-between
           gap-3
@@ -505,7 +520,7 @@ function GuideTab({
       className={`
         relative
         flex
-        min-w-[170px]
+        min-w-[160px]
         flex-1
         items-center
         gap-3
@@ -674,9 +689,12 @@ function StepCard({
           <h3
             className="
               mt-1
+              break-words
               text-sm
               font-black
+              leading-tight
               merchant-text
+              [overflow-wrap:anywhere]
             "
           >
             {title}
@@ -796,7 +814,7 @@ function SectionHeading({
         <Icon className="h-5 w-5" />
       </div>
 
-      <div>
+      <div className="min-w-0">
         <p
           className="
             text-[9px]
@@ -812,10 +830,13 @@ function SectionHeading({
         <h2
           className="
             mt-1
+            break-words
             text-xl
             font-black
+            leading-tight
             tracking-tight
             merchant-text
+            [overflow-wrap:anywhere]
 
             sm:text-2xl
           "
@@ -886,7 +907,7 @@ function SecurityItem({
         <Icon className="h-5 w-5" />
       </div>
 
-      <div>
+      <div className="min-w-0">
         <h3
           className="
             text-sm
@@ -917,6 +938,32 @@ function SecurityItem({
 ========================================================= */
 
 export default function MerchantDevelopersPage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isMerchantRole =
+    user.role === "merchant";
+
+  useEffect(() => {
+    if (isMerchantRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isMerchantRole,
+    router,
+    user.role,
+  ]);
+
   const [
     environment,
     setEnvironment,
@@ -1187,6 +1234,10 @@ export default function MerchantDevelopersPage() {
 
   const startIntegration =
     () => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       setActiveSection(
         "quick-start",
       );
@@ -1203,6 +1254,30 @@ export default function MerchantDevelopersPage() {
             "start",
         });
     };
+
+  /* =======================================================
+     MERCHANT-ONLY REDIRECTING
+  ======================================================== */
+
+  if (!isMerchantRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center bg-background px-4 text-foreground">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-500/15 bg-violet-500/10 text-violet-700 shadow-sm dark:text-violet-300">
+            <RefreshCcw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Merchant Developer Platform is available only to merchant accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   /* =======================================================
      UI
@@ -1272,7 +1347,7 @@ export default function MerchantDevelopersPage() {
                 xl:justify-between
               "
             >
-              <div className="max-w-3xl">
+              <div className="min-w-0 max-w-3xl">
                 <div
                   className="
                     inline-flex
@@ -1299,9 +1374,12 @@ export default function MerchantDevelopersPage() {
                 <h1
                   className="
                     mt-4
+                    break-words
                     text-2xl
                     font-black
+                    leading-tight
                     tracking-tight
+                    [overflow-wrap:anywhere]
 
                     sm:text-3xl
                     lg:text-4xl
@@ -1330,9 +1408,11 @@ export default function MerchantDevelopersPage() {
               <div
                 className="
                   flex
+                  w-full
                   flex-col
                   gap-3
 
+                  sm:w-auto
                   sm:flex-row
                 "
               >
@@ -1341,7 +1421,10 @@ export default function MerchantDevelopersPage() {
                   className="
                     inline-flex
                     h-11
+                    w-full
                     items-center
+
+                    sm:w-auto
                     justify-center
                     gap-2
                     rounded-2xl
@@ -1368,7 +1451,10 @@ export default function MerchantDevelopersPage() {
                   className="
                     inline-flex
                     h-11
+                    w-full
                     items-center
+
+                    sm:w-auto
                     justify-center
                     gap-2
                     rounded-2xl
@@ -1523,10 +1609,13 @@ export default function MerchantDevelopersPage() {
               <div
                 className="
                   flex
+                  w-full
                   shrink-0
                   rounded-2xl
                   bg-violet-500/5
                   p-1
+
+                  sm:w-auto
                 "
               >
                 {(
@@ -1543,16 +1632,23 @@ export default function MerchantDevelopersPage() {
                         mode
                       }
                       type="button"
-                      onClick={() =>
+                      onClick={() => {
+                        if (!isMerchantRole) {
+                          return;
+                        }
+
                         setEnvironment(
                           mode,
-                        )
-                      }
+                        );
+                      }}
                       className={`
                         relative
                         h-10
-                        min-w-[92px]
+                        min-w-0
+                        flex-1
                         rounded-xl
+
+                        sm:min-w-[92px]
                         px-4
                         text-xs
                         font-black
@@ -1704,10 +1800,13 @@ export default function MerchantDevelopersPage() {
             <div
               className="
                 flex
-                items-center
-                justify-between
-                gap-4
+                flex-col
+                gap-3
                 px-1
+
+                sm:flex-row
+                sm:items-center
+                sm:justify-between
               "
             >
               <div>
@@ -1799,11 +1898,15 @@ export default function MerchantDevelopersPage() {
                         activeSection ===
                         section.id
                       }
-                      onClick={() =>
+                      onClick={() => {
+                        if (!isMerchantRole) {
+                          return;
+                        }
+
                         setActiveSection(
                           section.id,
-                        )
-                      }
+                        );
+                      }}
                     />
                   ),
                 )}
@@ -2068,6 +2171,7 @@ export default function MerchantDevelopersPage() {
                                 <code
                                   className="
                                     block
+                                    break-all
                                     text-xs
                                     font-black
                                     text-violet-700
@@ -2485,6 +2589,7 @@ export default function MerchantDevelopersPage() {
                                   header
                                 }
                                 className="
+                                  break-all
                                   rounded-xl
                                   bg-violet-500/10
                                   px-3

@@ -8,6 +8,10 @@ import React, {
 } from "react";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   AlertCircle,
   Check,
   CheckCircle2,
@@ -34,6 +38,14 @@ import {
   AnimatePresence,
   motion,
 } from "framer-motion";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   createMerchantApiKey,
@@ -575,6 +587,8 @@ function ApiStatCard({
 
         group
         relative
+        h-full
+        min-w-0
         overflow-hidden
         rounded-[22px]
         border
@@ -632,15 +646,15 @@ function ApiStatCard({
         "
       />
 
-      <div className="relative flex items-center justify-between gap-4">
-        <div>
+      <div className="relative flex min-w-0 items-center justify-between gap-4">
+        <div className="min-w-0">
           <p className="text-[10px] font-black uppercase tracking-[0.14em] text-violet-600/70 dark:text-violet-300/70">
             {
               label
             }
           </p>
 
-          <p className="mt-2 text-3xl font-black tracking-[-0.05em] text-violet-800 dark:text-violet-100">
+          <p className="mt-2 truncate text-3xl font-black tracking-[-0.05em] tabular-nums text-violet-800 dark:text-violet-100">
             {
               value
             }
@@ -659,6 +673,7 @@ function ApiStatCard({
             flex
             h-11
             w-11
+            shrink-0
             items-center
             justify-center
             rounded-2xl
@@ -994,13 +1009,17 @@ function CreateKeyDialog({
           className="
             fixed
             inset-0
-            z-50
+            z-[80]
             flex
-            items-center
+            items-start
             justify-center
+            overflow-y-auto
             bg-slate-950/70
-            p-4
+            px-4
+            py-6
             backdrop-blur-md
+
+            sm:items-center
           "
         >
           <motion.div
@@ -1029,9 +1048,11 @@ function CreateKeyDialog({
               merchant-border
               merchant-surface
 
-              max-h-[92vh]
+              my-auto
+              max-h-[calc(100vh-3rem)]
               w-full
               max-w-2xl
+              overflow-x-hidden
               overflow-y-auto
               rounded-[28px]
               border
@@ -1053,8 +1074,8 @@ function CreateKeyDialog({
             >
               <PurpleAuroraBackground />
 
-              <div className="relative z-10 flex items-start justify-between gap-4">
-                <div className="flex items-start gap-3">
+              <div className="relative z-10 flex min-w-0 items-start justify-between gap-4">
+                <div className="flex min-w-0 items-start gap-3">
                   <div
                     className="
                       flex
@@ -1073,14 +1094,14 @@ function CreateKeyDialog({
                     <KeyRound className="h-5 w-5" />
                   </div>
 
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-[9px] font-black uppercase tracking-[0.18em] text-fuchsia-100/60">
                       Developer credentials
                     </p>
 
                     <h2
                       id="create-api-key-title"
-                      className="mt-1 text-lg font-black"
+                      className="mt-1 break-words text-lg font-black leading-tight [overflow-wrap:anywhere]"
                     >
                       Create secret API key
                     </h2>
@@ -1104,6 +1125,7 @@ function CreateKeyDialog({
                     flex
                     h-9
                     w-9
+                    shrink-0
                     items-center
                     justify-center
                     rounded-xl
@@ -1509,10 +1531,13 @@ function CreateKeyDialog({
                   }
                   className="
                     h-11
+                    w-full
                     rounded-xl
                     border
                     merchant-border
                     px-4
+
+                    sm:w-auto
                     text-sm
                     font-black
                     text-foreground
@@ -1540,8 +1565,11 @@ function CreateKeyDialog({
                   className="
                     inline-flex
                     h-11
+                    w-full
                     items-center
                     justify-center
+
+                    sm:w-auto
                     gap-2
                     rounded-xl
                     bg-gradient-to-r
@@ -1675,13 +1703,17 @@ function SecretDialog({
       className="
         fixed
         inset-0
-        z-[60]
+        z-[90]
         flex
-        items-center
+        items-start
         justify-center
+        overflow-y-auto
         bg-slate-950/75
-        p-4
+        px-4
+        py-6
         backdrop-blur-md
+
+        sm:items-center
       "
     >
       <motion.div
@@ -1702,9 +1734,12 @@ function SecretDialog({
           merchant-border
           merchant-surface
 
+          my-auto
+          max-h-[calc(100vh-3rem)]
           w-full
           max-w-2xl
-          overflow-hidden
+          overflow-x-hidden
+          overflow-y-auto
           rounded-[28px]
           border
           shadow-[0_30px_90px_rgba(30,10,60,.35)]
@@ -1745,15 +1780,15 @@ function SecretDialog({
 
         <div className="space-y-4 p-5 sm:p-6">
           <div className="rounded-2xl border merchant-border bg-violet-500/[0.035] p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <EnvironmentBadge
                   environment={
                     apiKey.environment
                   }
                 />
 
-                <span className="text-xs font-black merchant-muted">
+                <span className="min-w-0 break-words text-xs font-black leading-tight merchant-muted [overflow-wrap:anywhere]">
                   {apiKey.name ||
                     "Unnamed key"}
                 </span>
@@ -1800,12 +1835,14 @@ function SecretDialog({
               </button>
             </div>
 
-            <div className="mt-4 flex items-stretch gap-2">
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-stretch">
               <code
                 className="
                   min-w-0
+                  w-full
                   flex-1
                   overflow-x-auto
+                  whitespace-nowrap
                   rounded-xl
                   border
                   border-violet-300/20
@@ -1840,8 +1877,11 @@ function SecretDialog({
                 className="
                   inline-flex
                   h-12
+                  w-full
                   shrink-0
                   items-center
+
+                  sm:w-auto
                   justify-center
                   gap-2
                   rounded-xl
@@ -1962,6 +2002,32 @@ function SecretDialog({
 ========================================================= */
 
 export default function MerchantApiKeysPage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isMerchantRole =
+    user.role === "merchant";
+
+  useEffect(() => {
+    if (isMerchantRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isMerchantRole,
+    router,
+    user.role,
+  ]);
+
   const [
     apiKeys,
     setApiKeys,
@@ -2038,6 +2104,15 @@ export default function MerchantApiKeysPage() {
         silent =
           false
       ) => {
+        if (!isMerchantRole) {
+          setLoading(false);
+          setRefreshing(false);
+          setApiKeys([]);
+          setError("");
+
+          return;
+        }
+
         try {
           setError(
             ""
@@ -2080,14 +2155,23 @@ export default function MerchantApiKeysPage() {
           );
         }
       },
-      []
+      [
+        isMerchantRole,
+      ]
     );
 
   useEffect(
     () => {
+      if (!isMerchantRole) {
+        setLoading(false);
+
+        return;
+      }
+
       void loadApiKeys();
     },
     [
+      isMerchantRole,
       loadApiKeys,
     ]
   );
@@ -2175,6 +2259,9 @@ export default function MerchantApiKeysPage() {
       message:
         string
     ) => {
+      if (!isMerchantRole) {
+        return;
+      }
       setCreateOpen(
         false
       );
@@ -2198,6 +2285,9 @@ export default function MerchantApiKeysPage() {
 
   const openCreate =
     () => {
+      if (!isMerchantRole) {
+        return;
+      }
       setNotice(
         ""
       );
@@ -2216,6 +2306,9 @@ export default function MerchantApiKeysPage() {
       apiKey:
         MerchantApiKeySummary
     ) => {
+      if (!isMerchantRole) {
+        return;
+      }
       const confirmed =
         window.confirm(
           `Rotate "${
@@ -2282,6 +2375,9 @@ export default function MerchantApiKeysPage() {
       apiKey:
         MerchantApiKeySummary
     ) => {
+      if (!isMerchantRole) {
+        return;
+      }
       const confirmed =
         window.confirm(
           `Revoke "${
@@ -2335,6 +2431,26 @@ export default function MerchantApiKeysPage() {
       }
     };
 
+  if (!isMerchantRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center bg-background px-4 text-foreground">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-500/15 bg-violet-500/10 text-violet-700 shadow-sm dark:text-violet-300">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Merchant API Keys is available only to merchant accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <>
       <main className="merchant-theme min-h-full">
@@ -2357,9 +2473,6 @@ export default function MerchantApiKeysPage() {
             }}
             transition={{
               duration: 0.55,
-            }}
-            whileHover={{
-              y: -2,
             }}
             className="
               relative
@@ -2388,8 +2501,8 @@ export default function MerchantApiKeysPage() {
                 lg:justify-between
               "
             >
-              <div className="max-w-[800px]">
-                <div className="flex items-center gap-3">
+              <div className="min-w-0 max-w-[800px]">
+                <div className="flex min-w-0 items-center gap-3">
                   <motion.div
                     whileHover={{
                       rotate: -7,
@@ -2411,13 +2524,13 @@ export default function MerchantApiKeysPage() {
                     <Code2 className="h-5 w-5" />
                   </motion.div>
 
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-[9px] font-black uppercase tracking-[0.20em] text-fuchsia-100/55">
                       Developer credentials
                     </p>
 
-                    <div className="mt-1 flex items-center gap-2">
-                      <span className="text-lg font-black sm:text-xl">
+                    <div className="mt-1 flex min-w-0 flex-wrap items-center gap-2">
+                      <span className="break-words text-lg font-black leading-tight sm:text-xl [overflow-wrap:anywhere]">
                         Coffer Gateway
                       </span>
 
@@ -2466,7 +2579,9 @@ export default function MerchantApiKeysPage() {
                     className="
                       mt-3
                       max-w-[760px]
+                      break-words
                       text-[34px]
+                      [overflow-wrap:anywhere]
                       font-black
                       leading-[1.02]
                       tracking-[-0.055em]
@@ -2499,7 +2614,7 @@ export default function MerchantApiKeysPage() {
                 </motion.div>
               </div>
 
-              <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
                 <motion.button
                   type="button"
                   whileHover={{
@@ -2508,18 +2623,25 @@ export default function MerchantApiKeysPage() {
                   whileTap={{
                     scale: 0.98,
                   }}
-                  onClick={() =>
+                  onClick={() => {
+                    if (!isMerchantRole) {
+                      return;
+                    }
+
                     void loadApiKeys(
                       true
-                    )
-                  }
+                    );
+                  }}
                   disabled={
                     refreshing
                   }
                   className="
                     inline-flex
                     h-11
+                    w-full
                     items-center
+
+                    sm:w-auto
                     justify-center
                     gap-2
                     rounded-xl
@@ -2567,7 +2689,10 @@ export default function MerchantApiKeysPage() {
                   className="
                     inline-flex
                     h-11
+                    w-full
                     items-center
+
+                    sm:w-auto
                     justify-center
                     gap-2
                     rounded-xl
@@ -2965,8 +3090,11 @@ export default function MerchantApiKeysPage() {
 
                 <div
                   className="
-                    inline-flex
+                    flex
+                    w-full
+                    max-w-full
                     self-start
+                    overflow-x-auto
                     rounded-xl
                     border
                     border-white/10
@@ -2998,13 +3126,19 @@ export default function MerchantApiKeysPage() {
                           whileTap={{
                             scale: 0.96,
                           }}
-                          onClick={() =>
+                          onClick={() => {
+                            if (!isMerchantRole) {
+                              return;
+                            }
+
                             setFilter(
                               item
-                            )
-                          }
+                            );
+                          }}
                           className={`
                             relative
+                            min-w-[72px]
+                            flex-1
                             rounded-lg
                             px-4
                             py-2
@@ -3153,7 +3287,7 @@ export default function MerchantApiKeysPage() {
                         >
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="truncate text-sm font-black text-foreground">
+                              <h3 className="min-w-0 break-words text-sm font-black leading-tight text-foreground [overflow-wrap:anywhere]">
                                 {apiKey.name ||
                                   "Unnamed API key"}
                               </h3>
@@ -3193,7 +3327,7 @@ export default function MerchantApiKeysPage() {
                             >
                               <KeyRound className="h-4 w-4 shrink-0 text-violet-500" />
 
-                              <code className="min-w-0 flex-1 truncate text-xs font-black text-violet-700 dark:text-violet-200">
+                              <code className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-xs font-black text-violet-700 dark:text-violet-200">
                                 {maskedKey(
                                   apiKey
                                 )}
@@ -3249,6 +3383,8 @@ export default function MerchantApiKeysPage() {
                                       item.label
                                     }
                                     className="
+                                      min-w-0
+                                      overflow-hidden
                                       rounded-xl
                                       bg-muted/25
                                       p-3
@@ -3263,7 +3399,10 @@ export default function MerchantApiKeysPage() {
                                       }
                                     </p>
 
-                                    <p className="mt-1 truncate text-[10px] font-black text-foreground">
+                                    <p
+                                      title={item.value}
+                                      className="mt-1 break-words text-[10px] font-black leading-4 text-foreground [overflow-wrap:anywhere]"
+                                    >
                                       {
                                         item.value
                                       }
@@ -3285,6 +3424,8 @@ export default function MerchantApiKeysPage() {
                                       scope
                                     }
                                     className="
+                                      max-w-full
+                                      break-all
                                       rounded-lg
                                       border
                                       border-violet-300/20
@@ -3310,7 +3451,7 @@ export default function MerchantApiKeysPage() {
                           {/* ACTIONS */}
 
                           {active && (
-                            <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+                            <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row xl:flex-col">
                               <motion.button
                                 type="button"
                                 whileHover={{
@@ -3330,7 +3471,11 @@ export default function MerchantApiKeysPage() {
                                 className="
                                   inline-flex
                                   h-10
+                                  w-full
                                   items-center
+
+                                  sm:w-auto
+                                  xl:w-full
                                   justify-center
                                   gap-2
                                   rounded-xl
@@ -3377,7 +3522,11 @@ export default function MerchantApiKeysPage() {
                                 className="
                                   inline-flex
                                   h-10
+                                  w-full
                                   items-center
+
+                                  sm:w-auto
+                                  xl:w-full
                                   justify-center
                                   gap-2
                                   rounded-xl

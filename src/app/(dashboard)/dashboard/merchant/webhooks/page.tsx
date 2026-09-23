@@ -9,6 +9,10 @@ import {
 } from "react";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   Activity,
   AlertCircle,
   ArrowRight,
@@ -40,6 +44,14 @@ import {
   AnimatePresence,
   motion,
 } from "framer-motion";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   MERCHANT_WEBHOOK_EVENTS,
@@ -569,12 +581,16 @@ function CreateEndpointModal({
       className="
         fixed
         inset-0
-        z-50
+        z-[90]
         flex
-        items-center
+        items-start
         justify-center
+        overflow-y-auto
         bg-[#090311]/70
-        p-4
+        px-4
+        py-6
+
+        sm:items-center
         backdrop-blur-md
       "
     >
@@ -596,9 +612,11 @@ function CreateEndpointModal({
         }}
         className="
           merchant-surface
-          max-h-[92vh]
+          my-auto
+          max-h-[calc(100vh-3rem)]
           w-full
           max-w-2xl
+          overflow-x-hidden
           overflow-y-auto
           rounded-[30px]
           [scrollbar-width:none]
@@ -1182,12 +1200,16 @@ function SecretModal({
       className="
         fixed
         inset-0
-        z-[60]
+        z-[100]
         flex
-        items-center
+        items-start
         justify-center
+        overflow-y-auto
         bg-[#090311]/75
-        p-4
+        px-4
+        py-6
+
+        sm:items-center
         backdrop-blur-md
       "
     >
@@ -1209,9 +1231,12 @@ function SecretModal({
         }}
         className="
           merchant-surface
+          my-auto
+          max-h-[calc(100vh-3rem)]
           w-full
           max-w-lg
-          overflow-hidden
+          overflow-x-hidden
+          overflow-y-auto
           rounded-[30px]
         "
       >
@@ -1457,10 +1482,13 @@ function ConfirmationModal({
       className="
         fixed
         inset-0
-        z-[70]
+        z-[110]
         flex
-        items-center
+        items-start
         justify-center
+        overflow-y-auto
+
+        sm:items-center
         bg-[#090311]/70
         p-4
         backdrop-blur-md
@@ -2080,6 +2108,32 @@ function EndpointCard({
 ========================================================= */
 
 export default function MerchantWebhooksPage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isMerchantRole =
+    user.role === "merchant";
+
+  useEffect(() => {
+    if (isMerchantRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isMerchantRole,
+    router,
+    user.role,
+  ]);
+
   const [
     environment,
     setEnvironment,
@@ -2189,6 +2243,16 @@ export default function MerchantWebhooksPage() {
         page?: number;
         silent?: boolean;
       } = {}) => {
+        if (!isMerchantRole) {
+          setLoading(false);
+          setRefreshing(false);
+          setEndpoints([]);
+          setDeliveries([]);
+          setError("");
+
+          return;
+        }
+
         try {
           if (
             silent
@@ -2257,17 +2321,25 @@ export default function MerchantWebhooksPage() {
       },
       [
         environment,
+        isMerchantRole,
         statusFilter,
       ],
     );
 
   useEffect(
     () => {
+      if (!isMerchantRole) {
+        setLoading(false);
+
+        return;
+      }
+
       void loadDashboard({
         page: 1,
       });
     },
     [
+      isMerchantRole,
       loadDashboard,
     ],
   );
@@ -2338,6 +2410,10 @@ export default function MerchantWebhooksPage() {
       mode:
         MerchantWebhookEnvironment,
     ) => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       if (
         mode ===
         environment
@@ -2382,6 +2458,10 @@ export default function MerchantWebhooksPage() {
       warning:
         string,
     ) => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       setCreateOpen(
         false,
       );
@@ -2426,6 +2506,10 @@ export default function MerchantWebhooksPage() {
       endpoint:
         MerchantWebhookEndpoint,
     ) => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       try {
         setActionId(
           `disable:${endpoint.id}`,
@@ -2471,6 +2555,10 @@ export default function MerchantWebhooksPage() {
       endpoint:
         MerchantWebhookEndpoint,
     ) => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       try {
         setActionId(
           `rotate:${endpoint.id}`,
@@ -2525,6 +2613,10 @@ export default function MerchantWebhooksPage() {
 
   const confirmAction =
     () => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       if (
         !confirmation
       ) {
@@ -2556,6 +2648,10 @@ export default function MerchantWebhooksPage() {
       delivery:
         MerchantWebhookDelivery,
     ) => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       try {
         setActionId(
           `retry:${delivery.eventId}`,
@@ -2587,6 +2683,30 @@ export default function MerchantWebhooksPage() {
         setActionId("");
       }
     };
+
+  /* =======================================================
+     MERCHANT-ONLY REDIRECTING
+  ======================================================== */
+
+  if (!isMerchantRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center bg-background px-4 text-foreground">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-500/15 bg-violet-500/10 text-violet-700 shadow-sm dark:text-violet-300">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Merchant Webhooks is available only to merchant accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   /* =======================================================
      UI
@@ -2648,7 +2768,7 @@ export default function MerchantWebhooksPage() {
                 xl:justify-between
               "
             >
-              <div className="max-w-3xl">
+              <div className="min-w-0 max-w-3xl">
                 <div
                   className="
                     inline-flex
@@ -2675,9 +2795,12 @@ export default function MerchantWebhooksPage() {
                 <h1
                   className="
                     mt-4
+                    break-words
                     text-2xl
                     font-black
+                    leading-tight
                     tracking-tight
+                    [overflow-wrap:anywhere]
 
                     sm:text-3xl
                   "
@@ -2703,9 +2826,11 @@ export default function MerchantWebhooksPage() {
               <div
                 className="
                   flex
+                  w-full
                   flex-col
                   gap-3
 
+                  sm:w-auto
                   sm:flex-row
                   sm:items-center
                 "
@@ -2715,7 +2840,10 @@ export default function MerchantWebhooksPage() {
                 <div
                   className="
                     flex
+                    w-full
                     rounded-2xl
+
+                    sm:w-auto
                     border
                     border-white/15
                     bg-white/10
@@ -2737,15 +2865,22 @@ export default function MerchantWebhooksPage() {
                           mode
                         }
                         type="button"
-                        onClick={() =>
+                        onClick={() => {
+                          if (!isMerchantRole) {
+                            return;
+                          }
+
                           changeEnvironment(
                             mode,
-                          )
-                        }
+                          );
+                        }}
                         className={`
                           h-9
-                          min-w-[84px]
+                          min-w-0
+                          flex-1
                           rounded-xl
+
+                          sm:min-w-[84px]
                           px-4
                           text-xs
                           font-black
@@ -2768,22 +2903,29 @@ export default function MerchantWebhooksPage() {
 
                 <button
                   type="button"
-                  onClick={() =>
+                  onClick={() => {
+                    if (!isMerchantRole) {
+                      return;
+                    }
+
                     void loadDashboard({
                       page:
                         pagination.page,
 
                       silent:
                         true,
-                    })
-                  }
+                    });
+                  }}
                   disabled={
                     refreshing
                   }
                   className="
                     inline-flex
                     h-11
+                    w-full
                     items-center
+
+                    sm:w-auto
                     justify-center
                     gap-2
                     rounded-2xl
@@ -2815,15 +2957,22 @@ export default function MerchantWebhooksPage() {
 
                 <button
                   type="button"
-                  onClick={() =>
+                  onClick={() => {
+                    if (!isMerchantRole) {
+                      return;
+                    }
+
                     setCreateOpen(
                       true,
-                    )
-                  }
+                    );
+                  }}
                   className="
                     inline-flex
                     h-11
+                    w-full
                     items-center
+
+                    sm:w-auto
                     justify-center
                     gap-2
                     rounded-2xl
@@ -3157,7 +3306,7 @@ export default function MerchantWebhooksPage() {
                   <Server className="h-4 w-4" />
                 </div>
 
-                <div>
+                <div className="min-w-0">
                   <h2
                     className="
                       text-lg
@@ -3229,11 +3378,15 @@ export default function MerchantWebhooksPage() {
               title="No webhook endpoints"
               description={`Create your first ${environment} webhook endpoint to start receiving Coffer payment events.`}
               actionLabel="Add endpoint"
-              onAction={() =>
+              onAction={() => {
+                if (!isMerchantRole) {
+                  return;
+                }
+
                 setCreateOpen(
                   true,
-                )
-              }
+                );
+              }}
             />
           ) : (
             <div
@@ -3258,26 +3411,34 @@ export default function MerchantWebhooksPage() {
                     }
                     onRotate={(
                       selected,
-                    ) =>
+                    ) => {
+                      if (!isMerchantRole) {
+                        return;
+                      }
+
                       setConfirmation({
                         type:
                           "rotate",
 
                         endpoint:
                           selected,
-                      })
-                    }
+                      });
+                    }}
                     onDisable={(
                       selected,
-                    ) =>
+                    ) => {
+                      if (!isMerchantRole) {
+                        return;
+                      }
+
                       setConfirmation({
                         type:
                           "disable",
 
                         endpoint:
                           selected,
-                      })
-                    }
+                      });
+                    }}
                   />
                 ),
               )}
@@ -3326,6 +3487,7 @@ export default function MerchantWebhooksPage() {
                   flex
                   h-10
                   w-10
+                  shrink-0
                   items-center
                   justify-center
                   rounded-xl
@@ -3362,9 +3524,11 @@ export default function MerchantWebhooksPage() {
             <div
               className="
                 flex
+                w-full
                 flex-col
                 gap-2
 
+                sm:w-auto
                 sm:flex-row
               "
             >
@@ -3374,18 +3538,25 @@ export default function MerchantWebhooksPage() {
                 }
                 onChange={(
                   event,
-                ) =>
+                ) => {
+                  if (!isMerchantRole) {
+                    return;
+                  }
+
                   setStatusFilter(
                     event.target
                       .value as
                       | MerchantWebhookDeliveryStatus
                       | "all",
-                  )
-                }
+                  );
+                }}
                 className="
                   h-10
+                  w-full
                   rounded-xl
                   border
+
+                  sm:w-auto
                   border-violet-200/70
                   bg-transparent
                   px-3
@@ -3870,8 +4041,11 @@ export default function MerchantWebhooksPage() {
             <div
               className="
                 flex
+                flex-wrap
                 items-center
                 gap-2
+
+                sm:justify-end
               "
             >
               <button
@@ -3882,13 +4056,17 @@ export default function MerchantWebhooksPage() {
                   loading ||
                   refreshing
                 }
-                onClick={() =>
+                onClick={() => {
+                  if (!isMerchantRole) {
+                    return;
+                  }
+
                   void loadDashboard({
                     page:
                       pagination.page -
                       1,
-                  })
-                }
+                  });
+                }}
                 className="
                   inline-flex
                   h-9
@@ -3943,13 +4121,17 @@ export default function MerchantWebhooksPage() {
                   loading ||
                   refreshing
                 }
-                onClick={() =>
+                onClick={() => {
+                  if (!isMerchantRole) {
+                    return;
+                  }
+
                   void loadDashboard({
                     page:
                       pagination.page +
                       1,
-                  })
-                }
+                  });
+                }}
                 className="
                   inline-flex
                   h-9
@@ -4078,7 +4260,8 @@ export default function MerchantWebhooksPage() {
       ==================================================== */}
 
       <AnimatePresence>
-        {createOpen ? (
+        {isMerchantRole &&
+        createOpen ? (
           <CreateEndpointModal
             environment={
               environment
@@ -4096,7 +4279,8 @@ export default function MerchantWebhooksPage() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {secretState ? (
+        {isMerchantRole &&
+        secretState ? (
           <SecretModal
             title={
               secretState.title
@@ -4117,7 +4301,8 @@ export default function MerchantWebhooksPage() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {confirmation ? (
+        {isMerchantRole &&
+        confirmation ? (
           <ConfirmationModal
             action={
               confirmation
@@ -4205,10 +4390,12 @@ function HeroInfo({
         <p
           className="
             mt-0.5
-            truncate
+            break-words
             text-xs
             font-black
+            leading-tight
             text-white
+            [overflow-wrap:anywhere]
           "
         >
           {value}
@@ -4284,8 +4471,8 @@ function EmptyState({
       className="
         mt-5
         flex
-        min-h-[260px]
         flex-col
+        py-12
         items-center
         justify-center
         rounded-[22px]
