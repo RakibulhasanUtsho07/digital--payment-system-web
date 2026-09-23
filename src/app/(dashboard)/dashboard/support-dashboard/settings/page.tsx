@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -43,6 +44,10 @@ import {
   type SupportSettingsPayload,
   type SupportSettingsSection,
 } from "@/lib/api/supportSettingsApi";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
 
 /* =========================================================
    SECTION META
@@ -134,10 +139,144 @@ const SECTION_META: Array<{
 ];
 
 /* =========================================================
+   AUTHORIZATION
+========================================================= */
+
+function isAuthorizationError(
+  error: unknown
+): boolean {
+  const record =
+    error &&
+    typeof error === "object"
+      ? (
+          error as Record<
+            string,
+            unknown
+          >
+        )
+      : null;
+
+  const response =
+    record?.response &&
+    typeof record.response ===
+      "object"
+      ? (
+          record.response as Record<
+            string,
+            unknown
+          >
+        )
+      : null;
+
+  const status =
+    Number(
+      record?.status ??
+        record?.statusCode ??
+        response?.status
+    );
+
+  if (
+    status === 401 ||
+    status === 403
+  ) {
+    return true;
+  }
+
+  const message =
+    error instanceof Error
+      ? error.message.toLowerCase()
+      : String(
+          error ?? ""
+        ).toLowerCase();
+
+  return (
+    message.includes("401") ||
+    message.includes("403") ||
+    message.includes(
+      "unauthorized"
+    ) ||
+    message.includes(
+      "forbidden"
+    ) ||
+    message.includes(
+      "access denied"
+    ) ||
+    message.includes(
+      "not authorized"
+    )
+  );
+}
+
+function SupportNotFoundState() {
+  return (
+    <main className="relative flex min-h-[78vh] items-center justify-center overflow-hidden bg-background px-4 text-foreground">
+      <div className="pointer-events-none absolute left-1/2 top-1/2 h-[440px] w-[440px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-500/[0.08] blur-[120px]" />
+
+      <section className="relative w-full max-w-xl overflow-hidden rounded-[32px] border border-border bg-card p-7 text-center shadow-[0_28px_90px_rgba(15,23,42,.10)] sm:p-10">
+        <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-emerald-500/[0.08] blur-3xl" />
+
+        <div className="relative">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] border border-emerald-500/15 bg-emerald-500/10 text-emerald-600">
+            <LockKeyhole className="h-6 w-6" />
+          </div>
+
+          <p className="mt-6 text-[11px] font-black uppercase tracking-[0.22em] text-emerald-600">
+            Error 404
+          </p>
+
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">
+            Page not found
+          </h1>
+
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+            The page you are looking for does not exist or is not available.
+          </p>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+/* =========================================================
    PAGE
 ========================================================= */
 
 export default function SupportSettingsPage() {
+  const {
+    user,
+  } = useDashboardSession();
+
+  const [
+    accessDenied,
+    setAccessDenied,
+  ] = useState(false);
+
+  const denyAccess =
+    useCallback(() => {
+      setAccessDenied(true);
+    }, []);
+
+  if (
+    accessDenied ||
+    user.role !== "support"
+  ) {
+    return (
+      <SupportNotFoundState />
+    );
+  }
+
+  return (
+    <SupportSettingsContent
+      onUnauthorized={denyAccess}
+    />
+  );
+}
+
+function SupportSettingsContent({
+  onUnauthorized,
+}: {
+  onUnauthorized: () => void;
+}) {
   const [
     activeSection,
     setActiveSection,
@@ -211,75 +350,91 @@ export default function SupportSettingsPage() {
     useState("");
 
   const loadSettings =
-    async (
-      isRefresh = false
-    ) => {
-      if (isRefresh) {
-        setRefreshing(
-          true
-        );
-      } else {
-        setLoading(
-          true
-        );
-      }
-
-      setError("");
-
-      try {
-        const response =
-          await getSupportSettings();
-
-        if (
-          !response.success
-        ) {
-          throw new Error(
-            "Unable to load support settings."
+    useCallback(
+      async (
+        isRefresh = false
+      ) => {
+        if (isRefresh) {
+          setRefreshing(
+            true
+          );
+        } else {
+          setLoading(
+            true
           );
         }
 
-        setSaved(
-          response.settings
-        );
+        setError("");
 
-        setDraft(
-          response.settings
-        );
+        try {
+          const response =
+            await getSupportSettings();
 
-        setRevision(
-          response.meta.revision
-        );
+          if (
+            !response.success
+          ) {
+            throw new Error(
+              "Unable to load support settings."
+            );
+          }
 
-        setUpdatedAt(
-          response.meta.updatedAt
-        );
+          setSaved(
+            response.settings
+          );
 
-        setAuditCount(
-          response.auditItems
-            ?.length ?? 0
-        );
-      } catch (
-        requestError
-      ) {
-        setError(
-          requestError instanceof Error
-            ? requestError.message
-            : "Unable to load support settings."
-        );
-      } finally {
-        setLoading(
-          false
-        );
+          setDraft(
+            response.settings
+          );
 
-        setRefreshing(
-          false
-        );
-      }
-    };
+          setRevision(
+            response.meta.revision
+          );
+
+          setUpdatedAt(
+            response.meta.updatedAt
+          );
+
+          setAuditCount(
+            response.auditItems
+              ?.length ?? 0
+          );
+        } catch (
+          requestError
+        ) {
+          if (
+            isAuthorizationError(
+              requestError
+            )
+          ) {
+            onUnauthorized();
+            return;
+          }
+
+          setError(
+            requestError instanceof Error
+              ? requestError.message
+              : "Unable to load support settings."
+          );
+        } finally {
+          setLoading(
+            false
+          );
+
+          setRefreshing(
+            false
+          );
+        }
+      },
+      [
+        onUnauthorized,
+      ]
+    );
 
   useEffect(() => {
     void loadSettings();
-  }, []);
+  }, [
+    loadSettings,
+  ]);
 
   const currentMeta =
     useMemo(
@@ -454,6 +609,15 @@ export default function SupportSettingsPage() {
     } catch (
       requestError
     ) {
+      if (
+        isAuthorizationError(
+          requestError
+        )
+      ) {
+        onUnauthorized();
+        return;
+      }
+
       setError(
         requestError instanceof Error
           ? requestError.message
@@ -500,7 +664,7 @@ export default function SupportSettingsPage() {
     !saved
   ) {
     return (
-      <main className="min-h-screen bg-transparent p-4 md:p-6">
+      <main className="w-full min-w-0 bg-transparent px-1 pb-8 sm:px-2 md:px-3">
         <div className="mx-auto max-w-3xl rounded-[28px] border border-rose-500/20 bg-card p-8 text-center shadow-sm">
           <AlertTriangle className="mx-auto h-8 w-8 text-rose-500" />
 
@@ -532,8 +696,8 @@ export default function SupportSettingsPage() {
     currentMeta.icon;
 
   return (
-    <main className="min-h-screen bg-transparent p-3 sm:p-4 md:p-6">
-      <div className="mx-auto max-w-[1500px] space-y-5">
+    <main className="w-full min-w-0 overflow-x-clip bg-transparent px-1 pb-8 sm:px-2 md:px-3">
+      <div className="mx-auto w-full max-w-[1500px] space-y-5">
         {/* =================================================
             HERO
         ================================================== */}
@@ -548,10 +712,10 @@ export default function SupportSettingsPage() {
 
             <div className="support-settings-beam absolute -left-40 top-1/2 h-24 w-[500px] -translate-y-1/2 rounded-full bg-white/10 blur-3xl" />
 
-            <div className="support-settings-ring absolute right-10 top-1/2 hidden h-64 w-64 -translate-y-1/2 rounded-full border border-white/10 xl:block" />
+            <div className="support-settings-ring absolute right-10 top-1/2 hidden h-64 w-64 -translate-y-1/2 rounded-full border border-white/10 2xl:block" />
           </div>
 
-          <div className="relative z-10 grid gap-8 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-center lg:p-8">
+          <div className="relative z-10 grid gap-8 p-5 sm:p-6 lg:p-7 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-center xl:p-8 2xl:grid-cols-[minmax(0,1fr)_380px]">
             <div className="max-w-4xl">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3.5 py-2 text-[9px] font-black uppercase tracking-[0.16em] text-white/90 backdrop-blur-md">
@@ -565,7 +729,7 @@ export default function SupportSettingsPage() {
                 </span>
               </div>
 
-              <div className="mt-5 flex items-start gap-4">
+              <div className="mt-5 flex flex-col gap-4 min-[480px]:flex-row min-[480px]:items-start">
                 <div className="support-settings-hero-icon relative flex h-14 w-14 shrink-0 items-center justify-center rounded-[20px] border border-white/15 bg-white/10 text-white shadow-xl backdrop-blur-md sm:h-16 sm:w-16">
                   <Settings2 className="h-7 w-7" />
                   <span className="support-settings-icon-ring absolute inset-0 rounded-[20px] border border-white/20" />
@@ -619,7 +783,7 @@ export default function SupportSettingsPage() {
               </div>
             </div>
 
-            <div className="relative hidden h-[230px] lg:block">
+            <div className="relative hidden h-[230px] xl:block">
               <div className="support-settings-radar absolute left-1/2 top-1/2 h-[210px] w-[210px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/15">
                 <div className="support-settings-radar-inner absolute left-1/2 top-1/2 h-[145px] w-[145px] -translate-x-1/2 -translate-y-1/2 rounded-full border border-dashed border-white/15" />
 
@@ -652,7 +816,7 @@ export default function SupportSettingsPage() {
             <div className="flex items-start gap-3">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-rose-600 dark:text-rose-400" />
 
-              <p className="text-xs font-bold leading-5 text-rose-700 dark:text-rose-300">
+              <p className="min-w-0 break-words [overflow-wrap:anywhere] text-xs font-bold leading-5 text-rose-700 dark:text-rose-300">
                 {error}
               </p>
             </div>
@@ -664,7 +828,7 @@ export default function SupportSettingsPage() {
             <div className="flex items-start gap-3">
               <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700 dark:text-emerald-400" />
 
-              <p className="text-xs font-bold leading-5 text-emerald-800 dark:text-emerald-300">
+              <p className="min-w-0 break-words [overflow-wrap:anywhere] text-xs font-bold leading-5 text-emerald-800 dark:text-emerald-300">
                 {success}
               </p>
             </div>
@@ -675,7 +839,7 @@ export default function SupportSettingsPage() {
             MOBILE NAV
         ================================================== */}
 
-        <div className="overflow-x-auto pb-1 lg:hidden">
+        <div className="support-settings-scroll overflow-x-auto overscroll-x-contain pb-2 xl:hidden">
           <div className="flex min-w-max gap-2">
             {SECTION_META.map(
               (item) => {
@@ -716,10 +880,10 @@ export default function SupportSettingsPage() {
             SETTINGS WORKSPACE
         ================================================== */}
 
-        <div className="grid gap-5 lg:grid-cols-[270px_minmax(0,1fr)]">
+        <div className="grid min-w-0 gap-5 xl:grid-cols-[260px_minmax(0,1fr)] 2xl:grid-cols-[280px_minmax(0,1fr)]">
           {/* DESKTOP SETTINGS NAV */}
 
-          <aside className="hidden lg:block">
+          <aside className="hidden xl:block">
             <div className="sticky top-5 overflow-hidden rounded-[26px] border border-border bg-card shadow-sm">
               <div className="border-b border-border p-4">
                 <p className="text-[9px] font-black uppercase tracking-[0.16em] text-emerald-700 dark:text-emerald-400">
@@ -773,7 +937,7 @@ export default function SupportSettingsPage() {
                             {item.label}
                           </span>
 
-                          <span className="mt-0.5 block truncate text-[8px] text-muted-foreground">
+                          <span className="mt-0.5 block line-clamp-2 text-[8px] leading-4 text-muted-foreground">
                             {item.description}
                           </span>
                         </span>
@@ -789,7 +953,7 @@ export default function SupportSettingsPage() {
 
           {/* MAIN SETTINGS PANEL */}
 
-          <section className="overflow-hidden rounded-[28px] border border-border bg-card shadow-sm">
+          <section className="min-w-0 overflow-hidden rounded-[28px] border border-border bg-card shadow-sm">
             <div className="border-b border-border bg-muted/30 p-4 sm:p-5">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-start gap-3">
@@ -823,7 +987,7 @@ export default function SupportSettingsPage() {
                     refreshing ||
                     saving
                   }
-                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-background px-3 text-[10px] font-black text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50"
+                  className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-border bg-background px-3 text-[10px] font-black text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50 sm:w-auto"
                 >
                   {refreshing ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -857,7 +1021,7 @@ export default function SupportSettingsPage() {
             <div className="sticky bottom-0 border-t border-border bg-card/95 px-4 py-3 backdrop-blur-xl sm:px-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
                     <span
                       className={`h-2 w-2 rounded-full ${
                         dirty
@@ -866,7 +1030,7 @@ export default function SupportSettingsPage() {
                       }`}
                     />
 
-                    <p className="text-[10px] font-black text-foreground">
+                    <p className="break-words text-[10px] font-black leading-5 text-foreground">
                       {dirty
                         ? "Unsaved changes"
                         : "Section is saved"}
@@ -928,6 +1092,38 @@ export default function SupportSettingsPage() {
       <style>{`
         .support-settings-hero {
           isolation: isolate;
+        }
+
+        .support-settings-scroll {
+          scrollbar-width: thin;
+          scrollbar-color:
+            rgba(16, 185, 129, 0.42)
+            transparent;
+        }
+
+        .support-settings-scroll::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+
+        .support-settings-scroll::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        .support-settings-scroll::-webkit-scrollbar-thumb {
+          border: 2px solid transparent;
+          border-radius: 999px;
+          background:
+            rgba(16, 185, 129, 0.36);
+          background-clip:
+            padding-box;
+        }
+
+        .support-settings-scroll::-webkit-scrollbar-thumb:hover {
+          background:
+            rgba(5, 150, 105, 0.54);
+          background-clip:
+            padding-box;
         }
 
         .support-settings-grid {
@@ -1487,7 +1683,7 @@ function SettingsSectionContent({
   ) {
     return (
       <div className="space-y-5">
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
           {(
             [
               [
@@ -2271,7 +2467,7 @@ function SettingsGrid({
     ReactNode;
 }) {
   return (
-    <div className="grid gap-4 md:grid-cols-2">
+    <div className="grid min-w-0 gap-4 lg:grid-cols-2">
       {children}
     </div>
   );
@@ -2291,18 +2487,18 @@ function FieldShell({
 }) {
   return (
     <label
-      className={`block rounded-[22px] border border-border bg-muted/35 ${
+      className={`min-w-0 rounded-[22px] border border-border bg-muted/35 ${
         compact
           ? "p-3"
           : "p-4"
       }`}
     >
-      <p className="text-[10px] font-black text-foreground">
+      <p className="break-words text-[10px] font-black leading-5 text-foreground">
         {label}
       </p>
 
       {hint ? (
-        <p className="mt-1 text-[9px] leading-4 text-muted-foreground">
+        <p className="mt-1 break-words [overflow-wrap:anywhere] text-[9px] leading-4 text-muted-foreground">
           {hint}
         </p>
       ) : null}
@@ -2346,7 +2542,7 @@ function TextField({
               .value
           )
         }
-        className="h-11 w-full rounded-xl border border-border bg-background px-3 text-xs font-bold text-foreground outline-none transition placeholder:text-muted-foreground focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10"
+        className="h-11 min-w-0 w-full rounded-xl border border-border bg-background px-3 text-xs font-bold text-foreground outline-none transition placeholder:text-muted-foreground focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10"
       />
     </FieldShell>
   );
@@ -2410,7 +2606,7 @@ function NumberField({
               );
             }
           }}
-          className="h-11 w-full rounded-xl border border-border bg-background px-3 pr-16 text-xs font-bold text-foreground outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10"
+          className="h-11 min-w-0 w-full rounded-xl border border-border bg-background px-3 pr-20 text-xs font-bold text-foreground outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10"
         />
 
         {suffix ? (
@@ -2463,7 +2659,7 @@ function SelectField({
               .value
           )
         }
-        className="h-11 w-full rounded-xl border border-border bg-background px-3 text-xs font-bold text-foreground outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10"
+        className="h-11 min-w-0 w-full rounded-xl border border-border bg-background px-3 text-xs font-bold text-foreground outline-none transition focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10"
       >
         {options.map(
           ([
@@ -2503,9 +2699,9 @@ function ToggleField({
     ) => void;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 rounded-[22px] border border-border bg-muted/35 p-4">
+    <div className="flex flex-col gap-4 rounded-[22px] border border-border bg-muted/35 p-4 min-[460px]:flex-row min-[460px]:items-start min-[460px]:justify-between">
       <div>
-        <p className="text-[10px] font-black text-foreground">
+        <p className="break-words text-[10px] font-black leading-5 text-foreground">
           {label}
         </p>
 
@@ -2562,11 +2758,11 @@ function HeroMetric({
         </span>
 
         <div className="min-w-0">
-          <p className="truncate text-[8px] font-black uppercase tracking-[0.14em] text-white/55">
+          <p className="break-words text-[8px] font-black uppercase leading-4 tracking-[0.14em] text-white/55">
             {label}
           </p>
 
-          <p className="mt-0.5 truncate text-sm font-black text-white">
+          <p className="mt-0.5 break-words text-sm font-black leading-5 text-white">
             {value}
           </p>
         </div>
@@ -2581,12 +2777,12 @@ function HeroMetric({
 
 function SupportSettingsSkeleton() {
   return (
-    <main className="min-h-screen bg-transparent p-4 md:p-6">
+    <main className="w-full min-w-0 bg-transparent px-1 pb-8 sm:px-2 md:px-3">
       <div className="mx-auto max-w-[1500px] space-y-5">
         <div className="h-[290px] animate-pulse rounded-[30px] bg-emerald-500/15" />
 
-        <div className="grid gap-5 lg:grid-cols-[270px_minmax(0,1fr)]">
-          <div className="hidden h-[620px] animate-pulse rounded-[26px] bg-muted lg:block" />
+        <div className="grid gap-5 xl:grid-cols-[260px_minmax(0,1fr)] 2xl:grid-cols-[280px_minmax(0,1fr)]">
+          <div className="hidden h-[620px] animate-pulse rounded-[26px] bg-muted xl:block" />
 
           <div className="h-[620px] animate-pulse rounded-[28px] bg-muted" />
         </div>
