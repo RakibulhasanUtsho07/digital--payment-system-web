@@ -278,6 +278,14 @@ const searchItems: SearchItem[] = [
     roles: ["user"],
   },
 
+  {
+    id: "user-ai-assistant",
+    title: "Coffer AI",
+    href: "/dashboard/ai-assistant",
+    icon: Bot,
+    roles: ["user"],
+  },
+
   /* =======================================================
      MERCHANT
   ======================================================= */
@@ -512,6 +520,7 @@ const pageTitles: Record<string, string> = {
   "/dashboard/transactions": "Transactions",
   "/dashboard/kyc": "KYC Verification",
   "/dashboard/receipts": "Receipts",
+  "/dashboard/ai-assistant": "Coffer AI",
 
   /* =======================================================
      ADMIN
@@ -2058,17 +2067,60 @@ export default function TopNavbar({
         )}
       </AnimatePresence>
 
-      {(userRole === "user" ||
-        userRole === "merchant") && (
+      {userRole === "merchant" && (
         <CofferAiCopilot
           userName={userName}
-          portal={
-            userRole === "merchant"
-              ? "merchant"
-              : "personal"
-          }
+          portal="merchant"
           role={userRole}
         />
+      )}
+
+      {userRole === "user" && (
+        <motion.button
+          type="button"
+          onClick={() =>
+            router.push(
+              "/dashboard/ai-assistant"
+            )
+          }
+          initial={{ opacity: 0, y: 18, scale: 0.9 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          whileHover={{ y: -3, scale: 1.02 }}
+          whileTap={{ scale: 0.97 }}
+          className="fixed bottom-4 right-4 z-[120] flex h-[58px] items-center gap-3 rounded-[20px] border bg-card px-3.5 outline-none transition hover:bg-muted focus-visible:ring-4 dark:bg-[#0B0F19] sm:bottom-6 sm:right-6"
+          style={{
+            borderColor: roleTheme.border,
+            color: roleTheme.accent,
+            boxShadow: `0 18px 48px ${roleTheme.shadow}`,
+          }}
+          aria-label="Open Coffer AI"
+        >
+          <span
+            className="flex h-9 w-9 items-center justify-center rounded-[13px] border bg-muted/70"
+            style={{
+              borderColor: roleTheme.border,
+              color: roleTheme.accent,
+            }}
+          >
+            <Bot className="h-[19px] w-[19px]" />
+          </span>
+
+          <span className="hidden pr-1 text-left sm:block">
+            <span
+              className="block text-[11px] font-black"
+              style={{ color: roleTheme.accent }}
+            >
+              Coffer AI
+            </span>
+
+            <span
+              className="mt-0.5 block text-[8px] font-bold uppercase tracking-[0.16em]"
+              style={{ color: roleTheme.accentSecondary }}
+            >
+              Personal copilot
+            </span>
+          </span>
+        </motion.button>
       )}
 
       {(userRole === "support" ||
