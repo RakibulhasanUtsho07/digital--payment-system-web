@@ -53,6 +53,10 @@ import {
   type TicketStatus,
 } from "@/lib/api/supportDashboardApi";
 
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
 /* =========================================================
    CONSTANTS
 ========================================================= */
@@ -156,10 +160,172 @@ function statusLabel(
 }
 
 /* =========================================================
-   PAGE
+   SUPPORT-ONLY ACCESS
+========================================================= */
+
+function isAuthorizationError(
+  error: unknown
+): boolean {
+  const maybeRecord =
+    error &&
+    typeof error === "object"
+      ? (
+          error as
+            Record<
+              string,
+              unknown
+            >
+        )
+      : null;
+
+  const response =
+    maybeRecord?.response &&
+    typeof maybeRecord.response ===
+      "object"
+      ? (
+          maybeRecord.response as
+            Record<
+              string,
+              unknown
+            >
+        )
+      : null;
+
+  const status =
+    Number(
+      maybeRecord?.status ??
+        maybeRecord?.statusCode ??
+        response?.status
+    );
+
+  if (
+    status === 401 ||
+    status === 403
+  ) {
+    return true;
+  }
+
+  const message =
+    error instanceof Error
+      ? error.message
+          .toLowerCase()
+      : String(
+          error ?? ""
+        ).toLowerCase();
+
+  return (
+    message.includes("401") ||
+    message.includes("403") ||
+    message.includes(
+      "unauthorized"
+    ) ||
+    message.includes(
+      "forbidden"
+    ) ||
+    message.includes(
+      "access denied"
+    ) ||
+    message.includes(
+      "not authorized"
+    )
+  );
+}
+
+function SupportNotFoundState() {
+  return (
+    <main className="relative flex min-h-[78vh] items-center justify-center overflow-hidden bg-background px-4 text-foreground">
+      <div className="pointer-events-none absolute left-1/2 top-1/2 h-[440px] w-[440px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-500/[0.08] blur-[120px]" />
+
+      <motion.section
+        initial={{
+          opacity: 0,
+          y: 18,
+          scale: 0.98,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          scale: 1,
+        }}
+        transition={{
+          duration: 0.45,
+          ease: [
+            0.22,
+            1,
+            0.36,
+            1,
+          ],
+        }}
+        className="relative w-full max-w-xl overflow-hidden rounded-[32px] border border-border bg-card p-7 text-center shadow-[0_28px_90px_rgba(15,23,42,.10)] sm:p-10"
+      >
+        <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-emerald-500/[0.08] blur-3xl" />
+
+        <div className="relative">
+          <div className="mx-auto grid h-16 w-16 place-items-center rounded-[22px] border border-emerald-500/15 bg-emerald-500/10 text-emerald-600">
+            <MessageSquare className="h-6 w-6" />
+          </div>
+
+          <p className="mt-6 text-[11px] font-black uppercase tracking-[0.22em] text-emerald-600">
+            Error 404
+          </p>
+
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">
+            Page not found
+          </h1>
+
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+            The page you are looking for does not exist or is not available.
+          </p>
+        </div>
+      </motion.section>
+    </main>
+  );
+}
+
+/* =========================================================
+   OUTER ACCESS GATE
 ========================================================= */
 
 export default function SupportConversationsPage() {
+  const {
+    user,
+  } = useDashboardSession();
+
+  const [
+    accessDenied,
+    setAccessDenied,
+  ] = useState(false);
+
+  const denyAccess =
+    useCallback(() => {
+      setAccessDenied(true);
+    }, []);
+
+  if (
+    accessDenied ||
+    user?.role !== "support"
+  ) {
+    return (
+      <SupportNotFoundState />
+    );
+  }
+
+  return (
+    <SupportConversationsContent
+      onUnauthorized={denyAccess}
+    />
+  );
+}
+
+/* =========================================================
+   PAGE CONTENT
+========================================================= */
+
+function SupportConversationsContent({
+  onUnauthorized,
+}: {
+  onUnauthorized: () => void;
+}) {
   const [
     conversations,
     setConversations,
@@ -297,6 +463,15 @@ export default function SupportConversationsPage() {
         } catch (
           requestError
         ) {
+          if (
+            isAuthorizationError(
+              requestError
+            )
+          ) {
+            onUnauthorized();
+            return;
+          }
+
           setError(
             requestError instanceof
               Error
@@ -312,6 +487,7 @@ export default function SupportConversationsPage() {
         page,
         search,
         status,
+        onUnauthorized,
       ]
     );
 
@@ -375,6 +551,15 @@ export default function SupportConversationsPage() {
         } catch (
           requestError
         ) {
+          if (
+            isAuthorizationError(
+              requestError
+            )
+          ) {
+            onUnauthorized();
+            return;
+          }
+
           setDetailError(
             requestError instanceof
               Error
@@ -387,7 +572,9 @@ export default function SupportConversationsPage() {
           );
         }
       },
-      []
+      [
+        onUnauthorized,
+      ]
     );
 
   const closeConversation =
@@ -399,6 +586,48 @@ export default function SupportConversationsPage() {
       setDetail(null);
       setDetailError("");
     };
+
+  useEffect(() => {
+    if (
+      !selectedConversationId
+    ) {
+      return;
+    }
+
+    const previousOverflow =
+      document.body.style.overflow;
+
+    document.body.style.overflow =
+      "hidden";
+
+    function onKeyDown(
+      event: KeyboardEvent
+    ) {
+      if (
+        event.key ===
+        "Escape"
+      ) {
+        closeConversation();
+      }
+    }
+
+    window.addEventListener(
+      "keydown",
+      onKeyDown
+    );
+
+    return () => {
+      document.body.style.overflow =
+        previousOverflow;
+
+      window.removeEventListener(
+        "keydown",
+        onKeyDown
+      );
+    };
+  }, [
+    selectedConversationId,
+  ]);
 
   /* =======================================================
      REAL CURRENT-PAGE ANALYTICS
@@ -566,23 +795,8 @@ export default function SupportConversationsPage() {
   }
 
   return (
-    <main className="support-conversations-page bg-transparent pb-8 text-foreground">
-      <style>{`
-        .support-conversations-page,
-        .support-conversations-page * {
-          scrollbar-width: none;
-          -ms-overflow-style: none;
-        }
-
-        .support-conversations-page::-webkit-scrollbar,
-        .support-conversations-page *::-webkit-scrollbar {
-          width: 0 !important;
-          height: 0 !important;
-          display: none !important;
-        }
-      `}</style>
-
-      <div className="mx-auto max-w-[1600px] space-y-6">
+    <main className="support-conversations-page w-full min-w-0 overflow-x-clip bg-transparent pb-8 text-foreground">
+      <div className="mx-auto w-full max-w-[1600px] space-y-5 px-1 sm:space-y-6 sm:px-0">
         {/* =================================================
             HERO
         ================================================= */}
@@ -854,7 +1068,7 @@ export default function SupportConversationsPage() {
                   refreshing ||
                   loading
                 }
-                className="relative inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-xs font-black text-emerald-800 shadow-[0_12px_32px_rgba(0,0,0,.16)] transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="relative inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white px-5 text-xs font-black text-emerald-800 shadow-[0_12px_32px_rgba(0,0,0,.16)] transition hover:-translate-y-0.5 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
               >
                 <RefreshCw
                   className={`h-4 w-4 ${
@@ -892,7 +1106,7 @@ export default function SupportConversationsPage() {
             METRICS
         ================================================= */}
 
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
           <MetricCard
             icon={Inbox}
             label="Visible Conversations"
@@ -954,7 +1168,7 @@ export default function SupportConversationsPage() {
             CHARTS
         ================================================= */}
 
-        <section className="grid gap-5 xl:grid-cols-[1.35fr_.85fr]">
+        <section className="grid min-w-0 gap-5 2xl:grid-cols-[minmax(0,1.35fr)_minmax(300px,.85fr)]">
           <motion.article
             initial={{
               opacity: 0,
@@ -992,7 +1206,7 @@ export default function SupportConversationsPage() {
               </span>
             </div>
 
-            <div className="h-[300px] p-4 sm:h-[330px] sm:p-5">
+            <div className="h-[320px] min-w-0 p-3 sm:h-[350px] sm:p-5">
               {loading ? (
                 <div className="flex h-full items-center justify-center">
                   <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
@@ -1027,7 +1241,11 @@ export default function SupportConversationsPage() {
                       dataKey="name"
                       axisLine={false}
                       tickLine={false}
-                      interval={0}
+                      interval="preserveStartEnd"
+                      minTickGap={18}
+                      angle={-12}
+                      textAnchor="end"
+                      height={54}
                       tick={{
                         fontSize: 8,
                         fill:
@@ -1264,7 +1482,7 @@ export default function SupportConversationsPage() {
             )}
           </div>
 
-          <div className="grid gap-3 lg:grid-cols-[1fr_300px]">
+          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(240px,320px)]">
             <label>
               <span className="mb-1.5 block px-1 text-[8px] font-black uppercase tracking-[0.14em] text-muted-foreground">
                 Search
@@ -1387,8 +1605,8 @@ export default function SupportConversationsPage() {
             </span>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[1150px]">
+          <div className="support-conversation-scroll overflow-x-auto overscroll-x-contain">
+            <table className="w-full min-w-[1080px]">
               <thead>
                 <tr className="border-b border-border bg-muted/40">
                   {[
@@ -1485,7 +1703,7 @@ export default function SupportConversationsPage() {
               }
             </p>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
               <PageButton
                 label="Previous conversation page"
                 disabled={
@@ -1573,6 +1791,40 @@ export default function SupportConversationsPage() {
           />
         ) : null}
       </AnimatePresence>
+
+      <style jsx global>{`
+        .support-conversation-scroll {
+          scrollbar-width: thin;
+          scrollbar-color:
+            rgba(16, 185, 129, 0.42)
+            transparent;
+        }
+
+        .support-conversation-scroll::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+
+        .support-conversation-scroll::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        .support-conversation-scroll::-webkit-scrollbar-thumb {
+          border: 2px solid transparent;
+          border-radius: 999px;
+          background:
+            rgba(16, 185, 129, 0.36);
+          background-clip:
+            padding-box;
+        }
+
+        .support-conversation-scroll::-webkit-scrollbar-thumb:hover {
+          background:
+            rgba(5, 150, 105, 0.54);
+          background-clip:
+            padding-box;
+        }
+      `}</style>
     </main>
   );
 }
@@ -1927,7 +2179,7 @@ function StatusSelect({
               duration: 0.16,
             }}
             role="listbox"
-            className="absolute left-0 right-0 top-[calc(100%+8px)] z-[100] max-h-72 overflow-y-auto rounded-2xl border border-border bg-card p-1.5 shadow-[0_24px_70px_-20px_rgba(5,150,105,.30)]"
+            className="support-conversation-scroll absolute left-0 right-0 top-[calc(100%+8px)] z-[100] max-h-72 overflow-y-auto overscroll-contain rounded-2xl border border-border bg-card p-1.5 shadow-[0_24px_70px_-20px_rgba(5,150,105,.30)]"
           >
             {options.map(
               (
@@ -2093,7 +2345,7 @@ function ConversationRow({
 
       <td className="px-5 py-4">
         <span
-          className={`inline-flex rounded-full border px-2.5 py-1 text-[9px] font-black ${
+          className={`inline-flex max-w-[150px] whitespace-normal rounded-full border px-2.5 py-1 text-left text-[9px] font-black leading-4 ${
             statusClasses[
               item.status
             ] ??
@@ -2282,7 +2534,7 @@ function ConversationDrawer({
             300,
           damping: 30,
         }}
-        className="absolute right-0 top-0 flex h-full w-full max-w-[680px] flex-col border-l border-border bg-background shadow-2xl"
+        className="absolute right-0 top-0 flex h-full w-full max-w-[760px] flex-col border-l border-border bg-background shadow-[-24px_0_80px_rgba(15,23,42,.28)] 2xl:max-w-[820px]"
       >
         {/* HEADER */}
 
@@ -2310,7 +2562,7 @@ function ConversationDrawer({
             className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-white/15 blur-3xl"
           />
 
-          <div className="relative flex items-center justify-between gap-3">
+          <div className="relative flex min-w-0 items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10 text-white">
                 <MessageSquare className="h-4 w-4" />
@@ -2341,7 +2593,7 @@ function ConversationDrawer({
 
         {/* CONTENT */}
 
-        <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+        <div className="support-conversation-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-10 sm:p-5 sm:pb-12">
           {loading ? (
             <div className="space-y-4">
               <div className="h-28 animate-pulse rounded-2xl bg-muted" />
@@ -2386,7 +2638,7 @@ function ConversationDrawer({
                   </span>
 
                   <span
-                    className={`rounded-full border px-2.5 py-1 text-[9px] font-black ${
+                    className={`max-w-full whitespace-normal rounded-full border px-2.5 py-1 text-left text-[9px] font-black leading-4 ${
                       statusClasses[
                         detail.status
                       ] ??
@@ -2399,7 +2651,7 @@ function ConversationDrawer({
                   </span>
                 </div>
 
-                <h3 className="mt-3 text-lg font-black leading-7 text-foreground">
+                <h3 className="mt-3 break-words text-lg font-black leading-7 text-foreground">
                   {
                     detail.subject
                   }
@@ -2597,7 +2849,7 @@ function ConversationDrawer({
                               </span>
                             </div>
 
-                            <p className="mt-3 whitespace-pre-wrap text-xs leading-6 text-foreground/85">
+                            <p className="mt-3 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-xs leading-6 text-foreground/85">
                               {
                                 message.body
                               }

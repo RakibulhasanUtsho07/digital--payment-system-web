@@ -60,6 +60,10 @@ import {
   type TicketStatus,
 } from "@/lib/api/supportApi";
 
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
 /* =========================================================
    TYPES
 ========================================================= */
@@ -1283,10 +1287,168 @@ function ActionComposer({
 }
 
 /* =========================================================
+   SUPPORT-ONLY ACCESS
+========================================================= */
+
+function isAuthorizationError(
+  error: unknown
+): boolean {
+  const maybeRecord =
+    error &&
+    typeof error === "object"
+      ? (
+          error as
+            Record<
+              string,
+              unknown
+            >
+        )
+      : null;
+
+  const response =
+    maybeRecord?.response &&
+    typeof maybeRecord.response ===
+      "object"
+      ? (
+          maybeRecord.response as
+            Record<
+              string,
+              unknown
+            >
+        )
+      : null;
+
+  const status =
+    Number(
+      maybeRecord?.status ??
+        maybeRecord?.statusCode ??
+        response?.status
+    );
+
+  if (
+    status === 401 ||
+    status === 403
+  ) {
+    return true;
+  }
+
+  const message =
+    error instanceof Error
+      ? error.message
+          .toLowerCase()
+      : String(
+          error ?? ""
+        ).toLowerCase();
+
+  return (
+    message.includes("401") ||
+    message.includes("403") ||
+    message.includes(
+      "unauthorized"
+    ) ||
+    message.includes(
+      "forbidden"
+    ) ||
+    message.includes(
+      "access denied"
+    ) ||
+    message.includes(
+      "not authorized"
+    )
+  );
+}
+
+function SupportNotFoundState() {
+  return (
+    <main className="relative flex min-h-[78vh] items-center justify-center overflow-hidden bg-background px-4 text-foreground">
+      <div className="pointer-events-none absolute left-1/2 top-1/2 h-[440px] w-[440px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-500/[0.08] blur-[120px]" />
+
+      <motion.section
+        initial={{
+          opacity: 0,
+          y: 18,
+          scale: 0.98,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          scale: 1,
+        }}
+        transition={{
+          duration: 0.45,
+          ease: [
+            0.22,
+            1,
+            0.36,
+            1,
+          ],
+        }}
+        className="relative w-full max-w-xl overflow-hidden rounded-[32px] border border-border bg-card p-7 text-center shadow-[0_28px_90px_rgba(15,23,42,.10)] sm:p-10"
+      >
+        <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-emerald-500/[0.08] blur-3xl" />
+
+        <div className="relative">
+          <div className="mx-auto grid h-16 w-16 place-items-center rounded-[22px] border border-emerald-500/15 bg-emerald-500/10 text-emerald-600">
+            <Search className="h-6 w-6" />
+          </div>
+
+          <p className="mt-6 text-[11px] font-black uppercase tracking-[0.22em] text-emerald-600">
+            Error 404
+          </p>
+
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">
+            Page not found
+          </h1>
+
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+            The page you are looking for does not exist or is not available.
+          </p>
+        </div>
+      </motion.section>
+    </main>
+  );
+}
+
+/* =========================================================
    PAGE
 ========================================================= */
 
 export default function SupportAccountIssuesPage() {
+  const {
+    user,
+  } = useDashboardSession();
+
+  const [
+    accessDenied,
+    setAccessDenied,
+  ] = useState(false);
+
+  const denyAccess =
+    useCallback(() => {
+      setAccessDenied(true);
+    }, []);
+
+  if (
+    accessDenied ||
+    user?.role !== "support"
+  ) {
+    return (
+      <SupportNotFoundState />
+    );
+  }
+
+  return (
+    <SupportAccountIssuesContent
+      onUnauthorized={denyAccess}
+    />
+  );
+}
+
+function SupportAccountIssuesContent({
+  onUnauthorized,
+}: {
+  onUnauthorized: () => void;
+}) {
   const [
     search,
     setSearch,
@@ -1529,6 +1691,15 @@ export default function SupportAccountIssuesPage() {
           requestError:
             unknown
         ) {
+          if (
+            isAuthorizationError(
+              requestError
+            )
+          ) {
+            onUnauthorized();
+            return;
+          }
+
           setError(
             messageOf(
               requestError
@@ -1550,6 +1721,7 @@ export default function SupportAccountIssuesPage() {
         priority,
         sla,
         page,
+        onUnauthorized,
       ]
     );
 
@@ -1627,14 +1799,25 @@ export default function SupportAccountIssuesPage() {
               unknown
           ) => {
             if (
-              active
+              !active
             ) {
-              setError(
-                messageOf(
-                  requestError
-                )
-              );
+              return;
             }
+
+            if (
+              isAuthorizationError(
+                requestError
+              )
+            ) {
+              onUnauthorized();
+              return;
+            }
+
+            setError(
+              messageOf(
+                requestError
+              )
+            );
           }
         )
         .finally(
@@ -1656,6 +1839,7 @@ export default function SupportAccountIssuesPage() {
     },
     [
       selectedId,
+      onUnauthorized,
     ]
   );
 
@@ -1874,6 +2058,15 @@ export default function SupportAccountIssuesPage() {
       requestError:
         unknown
     ) {
+      if (
+        isAuthorizationError(
+          requestError
+        )
+      ) {
+        onUnauthorized();
+        return;
+      }
+
       setError(
         messageOf(
           requestError
@@ -1887,7 +2080,7 @@ export default function SupportAccountIssuesPage() {
   }
 
   return (
-    <main className="support-page-no-scrollbar space-y-6 bg-transparent pb-8 text-foreground">
+    <main className="w-full min-w-0 space-y-5 bg-transparent pb-8 text-foreground sm:space-y-6">
       {/* ===================================================
           HERO
       ==================================================== */}
@@ -2265,7 +2458,7 @@ export default function SupportAccountIssuesPage() {
           </button>
         </div>
 
-        <div className="grid gap-3 xl:grid-cols-[1.5fr_1fr_1fr_1fr]">
+        <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-[1.5fr_1fr_1fr_1fr]">
           <div>
             <p className="mb-1.5 px-1 text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
               Ticket / customer search
@@ -2494,7 +2687,7 @@ export default function SupportAccountIssuesPage() {
         }
         initial="hidden"
         animate="show"
-        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5"
+        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5"
       >
         <MetricCard
           label="Total matches"
@@ -2617,7 +2810,7 @@ export default function SupportAccountIssuesPage() {
           </div>
         ) : tickets.length ===
           0 ? (
-          <div className="grid min-h-[340px] place-items-center rounded-[22px] border border-dashed border-emerald-200 bg-emerald-50/30 px-6 text-center ">
+          <div className="grid min-h-[340px] place-items-center rounded-[22px] border border-dashed border-emerald-200 bg-emerald-50/40 px-6 text-center dark:border-emerald-500/20 dark:bg-emerald-500/[0.04]">
             <div>
               <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
                 <Search className="h-6 w-6" />
@@ -2666,9 +2859,9 @@ export default function SupportAccountIssuesPage() {
                           0.18
                         ),
                     }}
-                    className="rounded-[20px] border border-border bg-card p-4"
+                    className="rounded-[20px] border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
                   >
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0">
                         <p className="text-xs font-black text-emerald-700 dark:text-emerald-300">
                           {
@@ -2694,7 +2887,7 @@ export default function SupportAccountIssuesPage() {
                       </div>
 
                       <span
-                        className={`shrink-0 rounded-full border px-2.5 py-1 text-[8px] font-black uppercase tracking-wide ${statusStyle(
+                        className={`max-w-full self-start whitespace-normal rounded-full border px-2.5 py-1 text-left text-[8px] font-black uppercase leading-4 tracking-wide sm:shrink-0 ${statusStyle(
                           ticket.status
                         )}`}
                       >
@@ -2768,7 +2961,7 @@ export default function SupportAccountIssuesPage() {
 
             {/* DESKTOP */}
 
-            <div className="support-scroll-hidden hidden overflow-x-auto lg:block">
+            <div className="support-scrollbar hidden overflow-x-auto overscroll-x-contain rounded-b-[18px] lg:block">
               <table className="w-full min-w-[1160px] text-left">
                 <thead>
                   <tr className="border-b border-border bg-emerald-500/[0.08] text-[9px] font-black uppercase tracking-[0.13em] text-muted-foreground">
@@ -3086,7 +3279,7 @@ export default function SupportAccountIssuesPage() {
               duration:
                 0.18,
             }}
-            className="fixed inset-0 z-[120] bg-slate-950/60 backdrop-blur-sm"
+            className="fixed inset-0 z-[120] bg-slate-950/60 backdrop-blur-[3px]"
             onMouseDown={(
               event
             ) => {
@@ -3121,7 +3314,7 @@ export default function SupportAccountIssuesPage() {
                 damping:
                   30,
               }}
-              className="support-scroll-hidden absolute inset-y-0 right-0 w-full max-w-3xl overflow-y-auto bg-background text-foreground shadow-[-24px_0_80px_rgba(15,23,42,.32)]"
+              className="support-scrollbar absolute inset-y-0 right-0 w-full max-w-[860px] overflow-y-auto overscroll-contain border-l border-border bg-background text-foreground shadow-[-24px_0_80px_rgba(15,23,42,.32)]"
             >
               {/* DRAWER HEADER */}
 
@@ -3274,7 +3467,7 @@ export default function SupportAccountIssuesPage() {
                     duration:
                       0.2,
                   }}
-                  className="space-y-5 p-5 sm:p-6"
+                  className="space-y-5 p-4 pb-10 sm:p-6 sm:pb-12"
                 >
                   {/* =========================================
                       OVERVIEW
@@ -3612,7 +3805,7 @@ export default function SupportAccountIssuesPage() {
 
                       {detail.messages.length ===
                       0 ? (
-                        <div className="rounded-[22px] border border-dashed border-emerald-200 bg-emerald-50/25 p-8 text-center ">
+                        <div className="rounded-[22px] border border-dashed border-emerald-200 bg-emerald-50/40 p-8 text-center dark:border-emerald-500/20 dark:bg-emerald-500/[0.04]">
                           <MessageSquare className="mx-auto h-6 w-6 text-emerald-600" />
 
                           <p className="mt-3 text-xs font-black text-foreground">
@@ -3744,7 +3937,7 @@ export default function SupportAccountIssuesPage() {
                     <div>
                       {detail.activity.length ===
                       0 ? (
-                        <div className="rounded-[22px] border border-dashed border-emerald-200 bg-emerald-50/25 p-8 text-center ">
+                        <div className="rounded-[22px] border border-dashed border-emerald-200 bg-emerald-50/40 p-8 text-center dark:border-emerald-500/20 dark:bg-emerald-500/[0.04]">
                           <Clock3 className="mx-auto h-6 w-6 text-emerald-600" />
 
                           <p className="mt-3 text-xs font-black text-foreground">
@@ -3838,7 +4031,7 @@ export default function SupportAccountIssuesPage() {
                                   className={`rounded-2xl border px-4 py-3 text-left transition disabled:cursor-not-allowed ${
                                     active
                                       ? "border-emerald-500 bg-emerald-500/10"
-                                      : "border-border bg-card hover:border-emerald-300 hover:bg-emerald-50  "
+                                      : "border-border bg-card hover:border-emerald-300 hover:bg-emerald-50 dark:hover:border-emerald-500/30 dark:hover:bg-emerald-500/[0.06]"
                                   }`}
                                 >
                                   <div className="flex items-center justify-between gap-2">
@@ -3911,7 +4104,7 @@ export default function SupportAccountIssuesPage() {
                                   className={`rounded-2xl border px-4 py-3 text-left transition disabled:cursor-not-allowed ${
                                     active
                                       ? "border-emerald-500 bg-emerald-500/10"
-                                      : "border-border bg-card hover:border-emerald-300 hover:bg-emerald-50  "
+                                      : "border-border bg-card hover:border-emerald-300 hover:bg-emerald-50 dark:hover:border-emerald-500/30 dark:hover:bg-emerald-500/[0.06]"
                                   }`}
                                 >
                                   <div className="flex items-center justify-between gap-2">
@@ -4080,19 +4273,6 @@ export default function SupportAccountIssuesPage() {
       ==================================================== */}
 
       <style jsx global>{`
-        .support-page-no-scrollbar,
-        .support-page-no-scrollbar * {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-
-        .support-page-no-scrollbar::-webkit-scrollbar,
-        .support-page-no-scrollbar *::-webkit-scrollbar {
-          width: 0 !important;
-          height: 0 !important;
-          display: none !important;
-        }
-
         .support-scroll-hidden {
           -ms-overflow-style: none;
           scrollbar-width: none;
@@ -4102,6 +4282,38 @@ export default function SupportAccountIssuesPage() {
           width: 0;
           height: 0;
           display: none;
+        }
+
+        .support-scrollbar {
+          scrollbar-width: thin;
+          scrollbar-color:
+            rgba(16, 185, 129, 0.38)
+            transparent;
+        }
+
+        .support-scrollbar::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+
+        .support-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        .support-scrollbar::-webkit-scrollbar-thumb {
+          border: 2px solid transparent;
+          border-radius: 999px;
+          background:
+            rgba(16, 185, 129, 0.34);
+          background-clip:
+            padding-box;
+        }
+
+        .support-scrollbar::-webkit-scrollbar-thumb:hover {
+          background:
+            rgba(5, 150, 105, 0.52);
+          background-clip:
+            padding-box;
         }
       `}</style>
     </main>

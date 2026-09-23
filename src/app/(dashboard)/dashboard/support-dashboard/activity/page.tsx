@@ -51,6 +51,10 @@ import {
   type SupportActivityLog,
 } from "@/lib/api/supportDashboardApi";
 
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
 /* =========================================================
    CONSTANTS
 ========================================================= */
@@ -221,10 +225,168 @@ function eventClass(
 }
 
 /* =========================================================
+   SUPPORT-ONLY ACCESS
+========================================================= */
+
+function isAuthorizationError(
+  error: unknown
+): boolean {
+  const maybeRecord =
+    error &&
+    typeof error === "object"
+      ? (
+          error as
+            Record<
+              string,
+              unknown
+            >
+        )
+      : null;
+
+  const response =
+    maybeRecord?.response &&
+    typeof maybeRecord.response ===
+      "object"
+      ? (
+          maybeRecord.response as
+            Record<
+              string,
+              unknown
+            >
+        )
+      : null;
+
+  const status =
+    Number(
+      maybeRecord?.status ??
+        maybeRecord?.statusCode ??
+        response?.status
+    );
+
+  if (
+    status === 401 ||
+    status === 403
+  ) {
+    return true;
+  }
+
+  const message =
+    error instanceof Error
+      ? error.message
+          .toLowerCase()
+      : String(
+          error ?? ""
+        ).toLowerCase();
+
+  return (
+    message.includes("401") ||
+    message.includes("403") ||
+    message.includes(
+      "unauthorized"
+    ) ||
+    message.includes(
+      "forbidden"
+    ) ||
+    message.includes(
+      "access denied"
+    ) ||
+    message.includes(
+      "not authorized"
+    )
+  );
+}
+
+function SupportNotFoundState() {
+  return (
+    <main className="relative flex min-h-[78vh] items-center justify-center overflow-hidden bg-background px-4 text-foreground">
+      <div className="pointer-events-none absolute left-1/2 top-1/2 h-[440px] w-[440px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-500/[0.08] blur-[120px]" />
+
+      <motion.section
+        initial={{
+          opacity: 0,
+          y: 18,
+          scale: 0.98,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          scale: 1,
+        }}
+        transition={{
+          duration: 0.45,
+          ease: [
+            0.22,
+            1,
+            0.36,
+            1,
+          ],
+        }}
+        className="relative w-full max-w-xl overflow-hidden rounded-[32px] border border-border bg-card p-7 text-center shadow-[0_28px_90px_rgba(15,23,42,.10)] sm:p-10"
+      >
+        <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-emerald-500/[0.08] blur-3xl" />
+
+        <div className="relative">
+          <div className="mx-auto grid h-16 w-16 place-items-center rounded-[22px] border border-emerald-500/15 bg-emerald-500/10 text-emerald-600">
+            <Search className="h-6 w-6" />
+          </div>
+
+          <p className="mt-6 text-[11px] font-black uppercase tracking-[0.22em] text-emerald-600">
+            Error 404
+          </p>
+
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">
+            Page not found
+          </h1>
+
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+            The page you are looking for does not exist or is not available.
+          </p>
+        </div>
+      </motion.section>
+    </main>
+  );
+}
+
+/* =========================================================
    PAGE
 ========================================================= */
 
 export default function SupportActivityPage() {
+  const {
+    user,
+  } = useDashboardSession();
+
+  const [
+    accessDenied,
+    setAccessDenied,
+  ] = useState(false);
+
+  const denyAccess =
+    useCallback(() => {
+      setAccessDenied(true);
+    }, []);
+
+  if (
+    accessDenied ||
+    user?.role !== "support"
+  ) {
+    return (
+      <SupportNotFoundState />
+    );
+  }
+
+  return (
+    <SupportActivityContent
+      onUnauthorized={denyAccess}
+    />
+  );
+}
+
+function SupportActivityContent({
+  onUnauthorized,
+}: {
+  onUnauthorized: () => void;
+}) {
   const [
     activities,
     setActivities,
@@ -344,6 +506,15 @@ export default function SupportActivityPage() {
         } catch (
           requestError
         ) {
+          if (
+            isAuthorizationError(
+              requestError
+            )
+          ) {
+            onUnauthorized();
+            return;
+          }
+
           setError(
             requestError instanceof
               Error
@@ -361,6 +532,7 @@ export default function SupportActivityPage() {
         eventType,
         page,
         search,
+        onUnauthorized,
       ]
     );
 
@@ -516,23 +688,8 @@ export default function SupportActivityPage() {
   }
 
   return (
-    <main className="support-activity-page bg-transparent pb-8 text-foreground">
-      <style>{`
-        .support-activity-page,
-        .support-activity-page * {
-          scrollbar-width: none;
-          -ms-overflow-style: none;
-        }
-
-        .support-activity-page::-webkit-scrollbar,
-        .support-activity-page *::-webkit-scrollbar {
-          width: 0 !important;
-          height: 0 !important;
-          display: none !important;
-        }
-      `}</style>
-
-      <div className="mx-auto max-w-[1600px] space-y-6">
+    <main className="support-activity-page w-full min-w-0 overflow-x-clip bg-transparent pb-8 text-foreground">
+      <div className="mx-auto w-full max-w-[1600px] space-y-5 px-1 sm:space-y-6 sm:px-0">
         {/* =================================================
             HERO
         ================================================= */}
@@ -808,7 +965,7 @@ export default function SupportActivityPage() {
                   refreshing ||
                   loading
                 }
-                className="relative inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-xs font-black text-emerald-800 shadow-[0_12px_32px_rgba(0,0,0,.16)] transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+                className="relative inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white px-5 text-xs font-black text-emerald-800 shadow-[0_12px_32px_rgba(0,0,0,.16)] transition hover:-translate-y-0.5 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
               >
                 <RefreshCw
                   className={`h-4 w-4 ${
@@ -849,7 +1006,7 @@ export default function SupportActivityPage() {
             METRICS
         ================================================= */}
 
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4">
           <MetricCard
             icon={Activity}
             label="Visible Events"
@@ -911,7 +1068,7 @@ export default function SupportActivityPage() {
             CHART + PULSE
         ================================================= */}
 
-        <section className="grid gap-5 xl:grid-cols-[1.55fr_.75fr]">
+        <section className="grid min-w-0 gap-5 2xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,.75fr)]">
           <motion.article
             initial={{
               opacity: 0,
@@ -954,7 +1111,7 @@ export default function SupportActivityPage() {
               </span>
             </div>
 
-            <div className="h-[300px] p-4 sm:h-[330px] sm:p-5">
+            <div className="h-[320px] min-w-0 p-3 sm:h-[350px] sm:p-5">
               {loading ? (
                 <div className="flex h-full items-center justify-center">
                   <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
@@ -1009,11 +1166,12 @@ export default function SupportActivityPage() {
                       tickLine={
                         false
                       }
-                      interval={0}
+                      interval="preserveStartEnd"
+                      minTickGap={18}
                       angle={
                         eventChartData.length >
                         5
-                          ? -22
+                          ? -18
                           : 0
                       }
                       textAnchor={
@@ -1025,7 +1183,7 @@ export default function SupportActivityPage() {
                       height={
                         eventChartData.length >
                         5
-                          ? 70
+                          ? 64
                           : 40
                       }
                       tick={{
@@ -1236,7 +1394,7 @@ export default function SupportActivityPage() {
             )}
           </div>
 
-          <div className="grid gap-3 lg:grid-cols-[1fr_300px]">
+          <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(240px,320px)]">
             <label>
               <span className="mb-1.5 block px-1 text-[8px] font-black uppercase tracking-[0.14em] text-muted-foreground">
                 Search
@@ -1411,12 +1569,12 @@ export default function SupportActivityPage() {
                           0.22
                         ),
                     }}
-                    className="grid gap-4 px-4 py-4 transition hover:bg-emerald-500/[0.04] sm:px-5 lg:grid-cols-[180px_minmax(0,1fr)_240px] lg:items-center"
+                    className="grid min-w-0 gap-4 px-4 py-4 transition hover:bg-emerald-500/[0.04] sm:px-5 xl:grid-cols-[170px_minmax(0,1fr)_220px] xl:items-center 2xl:grid-cols-[180px_minmax(0,1fr)_240px]"
                   >
                     {/* EVENT */}
                     <div>
                       <span
-                        className={`inline-flex rounded-full border px-2.5 py-1 text-[7px] font-black ${eventClass(
+                        className={`inline-flex max-w-full whitespace-normal break-words rounded-full border px-2.5 py-1 text-left text-[7px] font-black leading-4 ${eventClass(
                           item.eventType
                         )}`}
                       >
@@ -1480,7 +1638,7 @@ export default function SupportActivityPage() {
                     </div>
 
                     {/* TICKET */}
-                    <div className="rounded-2xl border border-border bg-muted/40 px-3 py-3">
+                    <div className="min-w-0 rounded-2xl border border-border bg-muted/40 px-3 py-3">
                       <div className="flex items-center justify-between gap-3">
                         <p className="text-[7px] font-black uppercase tracking-[0.12em] text-muted-foreground">
                           Related ticket
@@ -1519,7 +1677,7 @@ export default function SupportActivityPage() {
               }
             </p>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
               <PageButton
                 label="Previous activity page"
                 disabled={
@@ -1582,6 +1740,40 @@ export default function SupportActivityPage() {
           </div>
         </section>
       </div>
+
+      <style jsx global>{`
+        .support-activity-scroll {
+          scrollbar-width: thin;
+          scrollbar-color:
+            rgba(16, 185, 129, 0.4)
+            transparent;
+        }
+
+        .support-activity-scroll::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+
+        .support-activity-scroll::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        .support-activity-scroll::-webkit-scrollbar-thumb {
+          border: 2px solid transparent;
+          border-radius: 999px;
+          background:
+            rgba(16, 185, 129, 0.36);
+          background-clip:
+            padding-box;
+        }
+
+        .support-activity-scroll::-webkit-scrollbar-thumb:hover {
+          background:
+            rgba(5, 150, 105, 0.54);
+          background-clip:
+            padding-box;
+        }
+      `}</style>
     </main>
   );
 }
@@ -1904,7 +2096,7 @@ function EventTypeSelect({
               duration: 0.16,
             }}
             role="listbox"
-            className="absolute left-0 right-0 top-[calc(100%+8px)] z-[100] max-h-72 overflow-y-auto rounded-2xl border border-border bg-card p-1.5 shadow-[0_24px_70px_-20px_rgba(5,150,105,.30)]"
+            className="support-activity-scroll absolute left-0 right-0 top-[calc(100%+8px)] z-[100] max-h-72 overflow-y-auto overscroll-contain rounded-2xl border border-border bg-card p-1.5 shadow-[0_24px_70px_-20px_rgba(5,150,105,.30)]"
           >
             {options.map(
               (

@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useMemo,
   useState,
@@ -44,6 +45,10 @@ import {
   type SupportCustomerRole,
   type SupportCustomerSummary,
 } from "@/lib/api/supportDashboardApi";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
 
 /* =========================================================
    TYPES
@@ -549,10 +554,172 @@ function Panel({
 }
 
 /* =========================================================
-   PAGE
+   SUPPORT-ONLY ACCESS
+========================================================= */
+
+function isAuthorizationError(
+  error: unknown
+): boolean {
+  const maybeRecord =
+    error &&
+    typeof error === "object"
+      ? (
+          error as
+            Record<
+              string,
+              unknown
+            >
+        )
+      : null;
+
+  const response =
+    maybeRecord?.response &&
+    typeof maybeRecord.response ===
+      "object"
+      ? (
+          maybeRecord.response as
+            Record<
+              string,
+              unknown
+            >
+        )
+      : null;
+
+  const status =
+    Number(
+      maybeRecord?.status ??
+        maybeRecord?.statusCode ??
+        response?.status
+    );
+
+  if (
+    status === 401 ||
+    status === 403
+  ) {
+    return true;
+  }
+
+  const message =
+    error instanceof Error
+      ? error.message
+          .toLowerCase()
+      : String(
+          error ?? ""
+        ).toLowerCase();
+
+  return (
+    message.includes("401") ||
+    message.includes("403") ||
+    message.includes(
+      "unauthorized"
+    ) ||
+    message.includes(
+      "forbidden"
+    ) ||
+    message.includes(
+      "access denied"
+    ) ||
+    message.includes(
+      "not authorized"
+    )
+  );
+}
+
+function SupportNotFoundState() {
+  return (
+    <main className="relative flex min-h-[78vh] items-center justify-center overflow-hidden bg-background px-4 text-foreground">
+      <div className="pointer-events-none absolute left-1/2 top-1/2 h-[440px] w-[440px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-500/[0.08] blur-[120px]" />
+
+      <motion.section
+        initial={{
+          opacity: 0,
+          y: 18,
+          scale: 0.98,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          scale: 1,
+        }}
+        transition={{
+          duration: 0.45,
+          ease: [
+            0.22,
+            1,
+            0.36,
+            1,
+          ],
+        }}
+        className="relative w-full max-w-xl overflow-hidden rounded-[32px] border border-border bg-card p-7 text-center shadow-[0_28px_90px_rgba(15,23,42,.10)] sm:p-10"
+      >
+        <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-emerald-500/[0.08] blur-3xl" />
+
+        <div className="relative">
+          <div className="mx-auto grid h-16 w-16 place-items-center rounded-[22px] border border-emerald-500/15 bg-emerald-500/10 text-emerald-600">
+            <Search className="h-6 w-6" />
+          </div>
+
+          <p className="mt-6 text-[11px] font-black uppercase tracking-[0.22em] text-emerald-600">
+            Error 404
+          </p>
+
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">
+            Page not found
+          </h1>
+
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+            The page you are looking for does not exist or is not available.
+          </p>
+        </div>
+      </motion.section>
+    </main>
+  );
+}
+
+/* =========================================================
+   OUTER ACCESS GATE
 ========================================================= */
 
 export default function SupportCustomersPage() {
+  const {
+    user,
+  } = useDashboardSession();
+
+  const [
+    accessDenied,
+    setAccessDenied,
+  ] = useState(false);
+
+  const denyAccess =
+    useCallback(() => {
+      setAccessDenied(true);
+    }, []);
+
+  if (
+    accessDenied ||
+    user?.role !== "support"
+  ) {
+    return (
+      <SupportNotFoundState />
+    );
+  }
+
+  return (
+    <SupportCustomersContent
+      onUnauthorized={denyAccess}
+    />
+  );
+}
+
+/* =========================================================
+   PAGE CONTENT
+========================================================= */
+
+function SupportCustomersContent({
+  onUnauthorized,
+}: {
+  onUnauthorized: () => void;
+}) {
   const [
     search,
     setSearch,
@@ -708,6 +875,16 @@ export default function SupportCustomersPage() {
                   unknown
               ) {
                 if (
+                  active &&
+                  isAuthorizationError(
+                    requestError
+                  )
+                ) {
+                  onUnauthorized();
+                  return;
+                }
+
+                if (
                   active
                 ) {
                   setError(
@@ -748,6 +925,7 @@ export default function SupportCustomersPage() {
     role,
     page,
     refreshKey,
+    onUnauthorized,
   ]);
 
   useEffect(() => {
@@ -797,14 +975,25 @@ export default function SupportCustomersPage() {
             unknown
         ) => {
           if (
-            active
+            !active
           ) {
-            setError(
-              messageOf(
-                requestError
-              )
-            );
+            return;
           }
+
+          if (
+            isAuthorizationError(
+              requestError
+            )
+          ) {
+            onUnauthorized();
+            return;
+          }
+
+          setError(
+            messageOf(
+              requestError
+            )
+          );
         }
       )
       .finally(
@@ -825,6 +1014,7 @@ export default function SupportCustomersPage() {
     };
   }, [
     selectedId,
+    onUnauthorized,
   ]);
 
   useEffect(() => {
@@ -833,6 +1023,12 @@ export default function SupportCustomersPage() {
     ) {
       return;
     }
+
+    const previousOverflow =
+      document.body.style.overflow;
+
+    document.body.style.overflow =
+      "hidden";
 
     function onKeyDown(
       event: KeyboardEvent
@@ -852,11 +1048,15 @@ export default function SupportCustomersPage() {
       onKeyDown
     );
 
-    return () =>
+    return () => {
+      document.body.style.overflow =
+        previousOverflow;
+
       window.removeEventListener(
         "keydown",
         onKeyDown
       );
+    };
   }, [
     selectedId,
   ]);
@@ -909,7 +1109,7 @@ export default function SupportCustomersPage() {
     );
 
   return (
-    <main className="space-y-6">
+    <main className="w-full min-w-0 space-y-5 overflow-x-clip pb-8 sm:space-y-6">
       {/* ===================================================
           HERO
       ==================================================== */}
@@ -932,7 +1132,7 @@ export default function SupportCustomersPage() {
             1,
           ],
         }}
-        className="relative isolate overflow-hidden rounded-[30px] border border-emerald-300/10 bg-[linear-gradient(135deg,#052E2B_0%,#064E3B_48%,#065F46_100%)] p-6 text-white shadow-[0_28px_80px_-42px_rgba(5,150,105,.58)] md:p-7 lg:p-8"
+        className="relative isolate overflow-hidden rounded-[30px] border border-emerald-300/10 bg-[linear-gradient(135deg,#052E2B_0%,#064E3B_48%,#065F46_100%)] p-5 text-white shadow-[0_28px_80px_-42px_rgba(5,150,105,.58)] sm:p-6 md:p-7 lg:p-8"
       >
         <motion.div
           animate={{
@@ -1109,7 +1309,7 @@ export default function SupportCustomersPage() {
             </div>
           </div>
 
-          <div className="relative flex shrink-0 flex-col gap-3 sm:flex-row xl:flex-col">
+          <div className="relative flex w-full shrink-0 flex-col gap-3 sm:w-auto sm:flex-row xl:flex-col">
             <motion.div
               animate={{
                 rotate: 360,
@@ -1139,7 +1339,7 @@ export default function SupportCustomersPage() {
                     1
                 )
               }
-              className="relative inline-flex h-12 items-center justify-center gap-2 rounded-2xl bg-white px-5 text-xs font-black text-emerald-900 shadow-[0_12px_30px_rgba(0,0,0,.16)] transition hover:-translate-y-0.5 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+              className="relative inline-flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-white px-5 text-xs font-black text-emerald-900 shadow-[0_12px_30px_rgba(0,0,0,.16)] transition hover:-translate-y-0.5 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             >
               <RefreshCcw
                 className={`h-4 w-4 ${
@@ -1190,9 +1390,9 @@ export default function SupportCustomersPage() {
           delay: 0.08,
           duration: 0.45,
         }}
-        className="relative z-20 overflow-hidden rounded-[26px] border border-emerald-100 bg-white p-4 shadow-[0_18px_55px_-42px_rgba(5,150,105,.45)] dark:border-white/10 dark:bg-slate-950/70"
+        className="relative z-20 overflow-visible rounded-[26px] border border-emerald-100 bg-white p-4 shadow-[0_18px_55px_-42px_rgba(5,150,105,.45)] dark:border-white/10 dark:bg-slate-950/70"
       >
-        <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
           <div>
             <p className="mb-1.5 px-1 text-[9px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
               Search account
@@ -1247,7 +1447,7 @@ export default function SupportCustomersPage() {
               Account role
             </p>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
               {ROLE_FILTERS.map(
                 (
                   item
@@ -1282,7 +1482,7 @@ export default function SupportCustomersPage() {
                           1
                         );
                       }}
-                      className={`inline-flex h-12 items-center gap-2 rounded-2xl border px-4 text-xs font-black transition ${
+                      className={`inline-flex h-12 min-w-0 items-center justify-center gap-2 rounded-2xl border px-3 text-xs font-black transition sm:px-4 ${
                         active
                           ? "border-emerald-500 bg-emerald-600 text-white shadow-[0_10px_24px_rgba(5,150,105,.18)]"
                           : "border-emerald-100 bg-white text-slate-600 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-300"
@@ -1350,7 +1550,7 @@ export default function SupportCustomersPage() {
         }
         initial="hidden"
         animate="show"
-        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+        className="grid gap-4 sm:grid-cols-2 2xl:grid-cols-4"
       >
         <MetricCard
           label="Matching accounts"
@@ -1500,7 +1700,7 @@ export default function SupportCustomersPage() {
                     }}
                     className="rounded-[20px] border border-emerald-100 bg-emerald-50/20 p-4 dark:border-white/10 dark:bg-white/[0.025]"
                   >
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex flex-col gap-3 min-[460px]:flex-row min-[460px]:items-start min-[460px]:justify-between">
                       <div className="flex min-w-0 items-center gap-3">
                         <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-300">
                           {customer.role ===
@@ -1539,7 +1739,7 @@ export default function SupportCustomersPage() {
                         <p className="font-bold text-slate-400">
                           KYC
                         </p>
-                        <p className="mt-1 truncate font-black text-slate-700 dark:text-slate-200">
+                        <p className="mt-1 break-words font-black leading-4 text-slate-700 dark:text-slate-200">
                           {humanize(
                             customer.kycStatus
                           )}
@@ -1575,8 +1775,8 @@ export default function SupportCustomersPage() {
               )}
             </div>
 
-            <div className="support-scroll-hidden hidden overflow-x-auto lg:block">
-              <table className="w-full min-w-[920px] text-left">
+            <div className="support-customer-scroll hidden overflow-x-auto overscroll-x-contain lg:block">
+              <table className="w-full min-w-[880px] text-left">
                 <thead>
                   <tr className="border-b border-emerald-100 bg-emerald-50/60 text-[9px] font-black uppercase tracking-[0.13em] text-slate-500 dark:border-white/10 dark:bg-white/[0.035] dark:text-slate-400">
                     <th className="px-4 py-3.5">
@@ -1686,7 +1886,7 @@ export default function SupportCustomersPage() {
 
                         <td className="px-4 py-4">
                           <span
-                            className={`inline-flex rounded-full border px-2.5 py-1 text-[9px] font-black uppercase tracking-wide ${kycTone(
+                            className={`inline-flex max-w-[150px] whitespace-normal rounded-full border px-2.5 py-1 text-left text-[9px] font-black uppercase leading-4 tracking-wide ${kycTone(
                               customer.kycStatus
                             )}`}
                           >
@@ -1762,7 +1962,7 @@ export default function SupportCustomersPage() {
                 matches
               </p>
 
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2 sm:flex-nowrap">
                 <button
                   type="button"
                   disabled={
@@ -1829,7 +2029,7 @@ export default function SupportCustomersPage() {
             transition={{
               duration: 0.18,
             }}
-            className="fixed inset-0 z-[120] bg-slate-950/60 backdrop-blur-sm"
+            className="fixed inset-0 z-[120] bg-slate-950/60 backdrop-blur-[3px]"
             onMouseDown={(
               event
             ) => {
@@ -1858,7 +2058,7 @@ export default function SupportCustomersPage() {
                 stiffness: 260,
                 damping: 30,
               }}
-              className="support-scroll-hidden absolute inset-y-0 right-0 w-full max-w-xl overflow-y-auto bg-white text-slate-900 shadow-[-24px_0_80px_rgba(15,23,42,.32)] dark:bg-slate-950 dark:text-white"
+              className="support-customer-scroll absolute inset-y-0 right-0 w-full max-w-[720px] overflow-y-auto overscroll-contain border-l border-emerald-100 bg-white text-slate-900 shadow-[-24px_0_80px_rgba(15,23,42,.32)] dark:border-white/10 dark:bg-slate-950 dark:text-white 2xl:max-w-[780px]"
             >
               <div className="sticky top-0 z-20 overflow-hidden border-b border-white/10 bg-[linear-gradient(135deg,#052E2B_0%,#064E3B_52%,#065F46_100%)] p-5 text-white shadow-lg">
                 <motion.div
@@ -1950,7 +2150,7 @@ export default function SupportCustomersPage() {
                   }
                   initial="hidden"
                   animate="show"
-                  className="space-y-5 p-5 sm:p-6"
+                  className="space-y-5 p-4 pb-10 sm:p-6 sm:pb-12"
                 >
                   <motion.section
                     variants={
@@ -1960,7 +2160,7 @@ export default function SupportCustomersPage() {
                   >
                     <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-emerald-400/10 blur-3xl" />
 
-                    <div className="relative flex items-start gap-4">
+                    <div className="relative flex flex-col gap-4 min-[440px]:flex-row min-[440px]:items-start">
                       <div className="grid h-14 w-14 shrink-0 place-items-center rounded-[20px] bg-emerald-600 text-white shadow-[0_12px_30px_rgba(5,150,105,.18)]">
                         {profile.role ===
                         "merchant" ? (
@@ -1972,7 +2172,7 @@ export default function SupportCustomersPage() {
 
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="truncate text-lg font-black text-slate-950 dark:text-white">
+                          <h3 className="break-words text-lg font-black leading-6 text-slate-950 dark:text-white">
                             {
                               profile.name
                             }
@@ -2282,20 +2482,36 @@ export default function SupportCustomersPage() {
       </AnimatePresence>
 
       <style jsx global>{`
-        .support-scroll-hidden {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
+        .support-customer-scroll {
+          scrollbar-width: thin;
+          scrollbar-color:
+            rgba(16, 185, 129, 0.42)
+            transparent;
         }
 
-        .support-scroll-hidden::-webkit-scrollbar {
-          width: 0;
-          height: 0;
-          display: none;
+        .support-customer-scroll::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
         }
 
-        .support-scroll-hidden::-webkit-scrollbar-thumb,
-        .support-scroll-hidden::-webkit-scrollbar-track {
+        .support-customer-scroll::-webkit-scrollbar-track {
           background: transparent;
+        }
+
+        .support-customer-scroll::-webkit-scrollbar-thumb {
+          border: 2px solid transparent;
+          border-radius: 999px;
+          background:
+            rgba(16, 185, 129, 0.36);
+          background-clip:
+            padding-box;
+        }
+
+        .support-customer-scroll::-webkit-scrollbar-thumb:hover {
+          background:
+            rgba(5, 150, 105, 0.54);
+          background-clip:
+            padding-box;
         }
       `}</style>
     </main>

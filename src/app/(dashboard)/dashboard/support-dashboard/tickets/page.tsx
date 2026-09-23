@@ -42,6 +42,7 @@ import {
   Search,
   Send,
   ShieldAlert,
+  Ticket,
   Users,
   X,
 } from "lucide-react";
@@ -55,6 +56,10 @@ import {
   type TicketPriority,
   type TicketStatus,
 } from "@/lib/api/supportDashboardApi";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
 
 import SupportAiCopilot from "@/components/dashboard/support/SupportAiCopilot";
 
@@ -107,10 +112,136 @@ type SlaFilter =
   (typeof SLA_OPTIONS)[number];
 
 /* =========================================================
+   AUTHORIZATION
+========================================================= */
+
+function isAuthorizationError(
+  error: unknown
+): boolean {
+  const record =
+    error &&
+    typeof error === "object"
+      ? (error as Record<string, unknown>)
+      : null;
+
+  const response =
+    record?.response &&
+    typeof record.response === "object"
+      ? (record.response as Record<string, unknown>)
+      : null;
+
+  const status = Number(
+    record?.status ??
+      record?.statusCode ??
+      response?.status
+  );
+
+  if (
+    status === 401 ||
+    status === 403
+  ) {
+    return true;
+  }
+
+  const message =
+    error instanceof Error
+      ? error.message.toLowerCase()
+      : String(error ?? "").toLowerCase();
+
+  return (
+    message.includes("401") ||
+    message.includes("403") ||
+    message.includes("unauthorized") ||
+    message.includes("forbidden") ||
+    message.includes("access denied") ||
+    message.includes("not authorized")
+  );
+}
+
+function SupportNotFoundState() {
+  return (
+    <main className="relative flex min-h-[78vh] items-center justify-center overflow-hidden bg-background px-4 text-foreground">
+      <div className="pointer-events-none absolute left-1/2 top-1/2 h-[440px] w-[440px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-500/[0.08] blur-[120px]" />
+
+      <motion.section
+        initial={{
+          opacity: 0,
+          y: 18,
+          scale: 0.98,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          scale: 1,
+        }}
+        transition={{
+          duration: 0.45,
+          ease: [0.22, 1, 0.36, 1],
+        }}
+        className="relative w-full max-w-xl overflow-hidden rounded-[32px] border border-border bg-card p-7 text-center shadow-[0_28px_90px_rgba(15,23,42,.10)] sm:p-10"
+      >
+        <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-emerald-500/[0.08] blur-3xl" />
+
+        <div className="relative">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] border border-emerald-500/15 bg-emerald-500/10 text-emerald-600">
+            <Ticket className="h-6 w-6" />
+          </div>
+
+          <p className="mt-6 text-[11px] font-black uppercase tracking-[0.22em] text-emerald-600">
+            Error 404
+          </p>
+
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">
+            Page not found
+          </h1>
+
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+            The page you are looking for does not exist or is not available.
+          </p>
+        </div>
+      </motion.section>
+    </main>
+  );
+}
+
+/* =========================================================
    PAGE
 ========================================================= */
 
 export default function SupportTicketsPage() {
+  const {
+    user,
+  } = useDashboardSession();
+
+  const [
+    accessDenied,
+    setAccessDenied,
+  ] = useState(false);
+
+  const denyAccess =
+    useCallback(() => {
+      setAccessDenied(true);
+    }, []);
+
+  if (
+    accessDenied ||
+    user?.role !== "support"
+  ) {
+    return <SupportNotFoundState />;
+  }
+
+  return (
+    <SupportTicketsContent
+      onUnauthorized={denyAccess}
+    />
+  );
+}
+
+function SupportTicketsContent({
+  onUnauthorized,
+}: {
+  onUnauthorized: () => void;
+}) {
   /* =======================================================
      TICKETS
   ======================================================= */
@@ -322,6 +453,15 @@ export default function SupportTicketsPage() {
         } catch (
           loadError: unknown
         ) {
+          if (
+            isAuthorizationError(
+              loadError
+            )
+          ) {
+            onUnauthorized();
+            return;
+          }
+
           setError(
             loadError instanceof
               Error
@@ -335,7 +475,10 @@ export default function SupportTicketsPage() {
           );
         }
       },
-      [query]
+      [
+        query,
+        onUnauthorized,
+      ]
     );
 
   /* =======================================================
@@ -440,6 +583,15 @@ export default function SupportTicketsPage() {
             return;
           }
 
+          if (
+            isAuthorizationError(
+              detailError
+            )
+          ) {
+            onUnauthorized();
+            return;
+          }
+
           setToast(
             detailError instanceof
               Error
@@ -454,6 +606,7 @@ export default function SupportTicketsPage() {
     };
   }, [
     selectedTicketId,
+    onUnauthorized,
   ]);
 
   /* =======================================================
@@ -513,6 +666,15 @@ export default function SupportTicketsPage() {
       } catch (
         detailError: unknown
       ) {
+        if (
+          isAuthorizationError(
+            detailError
+          )
+        ) {
+          onUnauthorized();
+          return;
+        }
+
         setToast(
           detailError instanceof
             Error
@@ -522,13 +684,50 @@ export default function SupportTicketsPage() {
       }
     };
 
+  useEffect(() => {
+    if (!selectedTicketId) {
+      return;
+    }
+
+    const previousOverflow =
+      document.body.style.overflow;
+
+    document.body.style.overflow =
+      "hidden";
+
+    function onKeyDown(
+      event: KeyboardEvent
+    ) {
+      if (
+        event.key === "Escape"
+      ) {
+        setSelectedTicketId(null);
+      }
+    }
+
+    window.addEventListener(
+      "keydown",
+      onKeyDown
+    );
+
+    return () => {
+      document.body.style.overflow =
+        previousOverflow;
+
+      window.removeEventListener(
+        "keydown",
+        onKeyDown
+      );
+    };
+  }, [selectedTicketId]);
+
   /* =======================================================
      RENDER
   ======================================================= */
 
   return (
-    <main className="support-ticket-page min-h-screen bg-transparent text-foreground">
-      <div className="mx-auto max-w-[1600px]">
+    <main className="support-ticket-page w-full min-w-0 overflow-x-clip bg-transparent pb-8 text-foreground">
+      <div className="mx-auto w-full max-w-[1600px]">
 
         {/* =================================================
             HEADER
@@ -612,7 +811,7 @@ export default function SupportTicketsPage() {
 
           <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-white/20 via-white/90 to-cyan-100/50" />
 
-          <div className="relative flex flex-col gap-5 p-5 md:p-6 xl:flex-row xl:items-center xl:justify-between">
+          <div className="relative flex flex-col gap-5 p-5 sm:p-6 2xl:flex-row 2xl:items-center 2xl:justify-between">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2.5">
 
@@ -646,7 +845,7 @@ export default function SupportTicketsPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:flex-nowrap">
 
               <div className="hidden rounded-2xl border border-white/15 bg-white/10 px-4 py-2.5 backdrop-blur sm:block">
                 <p className="text-[8px] font-black uppercase tracking-[0.14em] text-emerald-50/65">
@@ -666,7 +865,7 @@ export default function SupportTicketsPage() {
                 disabled={
                   isRefreshing
                 }
-                className="inline-flex h-11 items-center gap-2 rounded-2xl border border-white/20 bg-white px-4 text-xs font-black text-emerald-700 shadow-[0_12px_30px_rgba(0,0,0,.14)] transition hover:-translate-y-0.5 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-2xl border border-white/20 bg-white px-4 text-xs font-black text-emerald-700 shadow-[0_12px_30px_rgba(0,0,0,.14)] transition hover:-translate-y-0.5 hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
               >
                 <RefreshCcw
                   className={`h-4 w-4 ${
@@ -686,7 +885,7 @@ export default function SupportTicketsPage() {
             SUMMARY
         ================================================= */}
 
-        <section className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="mt-5 grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
 
           <QueueStat
             label="Visible Tickets"
@@ -764,9 +963,9 @@ export default function SupportTicketsPage() {
 
         <section className="mt-5 overflow-visible rounded-[28px] border border-border bg-card shadow-sm">
 
-          <div className="flex flex-col gap-3 border-b border-border bg-emerald-500/[0.055] p-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-col gap-3 border-b border-border bg-emerald-500/[0.055] p-4 xl:flex-row xl:items-center xl:justify-between">
 
-            <div className="flex min-w-0 flex-1 items-center gap-2">
+            <div className="flex min-w-0 flex-1 flex-col gap-2 min-[520px]:flex-row min-[520px]:items-center">
 
               <div className="relative min-w-0 flex-1">
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -799,7 +998,7 @@ export default function SupportTicketsPage() {
                       !current
                   )
                 }
-                className={`inline-flex h-11 shrink-0 items-center gap-2 rounded-2xl border px-3 text-xs font-black transition ${
+                className={`inline-flex h-11 w-full shrink-0 items-center justify-center gap-2 rounded-2xl border px-3 text-xs font-black transition min-[520px]:w-auto ${
                   showFilters
                     ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
                     : "border-border bg-card text-muted-foreground hover:bg-muted/40 hover:text-emerald-700"
@@ -822,7 +1021,7 @@ export default function SupportTicketsPage() {
               </button>
             </div>
 
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
 
               <p className="text-[10px] font-bold text-muted-foreground">
                 {
@@ -870,7 +1069,7 @@ export default function SupportTicketsPage() {
                 }}
                 className="overflow-visible border-b border-border"
               >
-                <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-3 p-4 md:grid-cols-2 2xl:grid-cols-4">
 
                   <FilterSelect
                     label="Status"
@@ -956,10 +1155,10 @@ export default function SupportTicketsPage() {
 
           {error ? (
             <div className="border-b border-rose-200 bg-rose-50 px-5 py-3 text-xs font-semibold text-rose-700">
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 items-start gap-2">
                 <AlertCircle className="h-4 w-4" />
 
-                {error}
+                <span className="min-w-0 break-words [overflow-wrap:anywhere]">{error}</span>
               </div>
             </div>
           ) : null}
@@ -1044,6 +1243,9 @@ export default function SupportTicketsPage() {
               onUpdated={
                 refreshSelectedTicket
               }
+              onUnauthorized={
+                onUnauthorized
+              }
             />
           </>
         ) : null}
@@ -1068,18 +1270,18 @@ export default function SupportTicketsPage() {
               opacity: 0,
               y: 15,
             }}
-            className="fixed bottom-5 right-5 z-[100] flex max-w-sm items-start gap-3 rounded-2xl border border-emerald-500/20 bg-card p-4 shadow-[0_18px_50px_rgba(15,23,42,0.16)]"
+            className="fixed bottom-4 left-4 right-4 z-[100] flex max-w-sm items-start gap-3 rounded-2xl border border-emerald-500/20 bg-card p-4 shadow-[0_18px_50px_rgba(15,23,42,0.16)] sm:bottom-5 sm:left-auto sm:right-5"
           >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
               <Check className="h-4 w-4" />
             </div>
 
             <div>
-              <p className="text-xs font-black text-foreground">
+              <p className="break-words [overflow-wrap:anywhere] text-xs font-black leading-5 text-foreground">
                 Support Operations
               </p>
 
-              <p className="mt-1 text-[10px] leading-5 text-muted-foreground">
+              <p className="mt-1 break-words [overflow-wrap:anywhere] text-[10px] leading-5 text-muted-foreground">
                 {toast}
               </p>
             </div>
@@ -1088,17 +1290,32 @@ export default function SupportTicketsPage() {
       </AnimatePresence>
 
       <style>{`
-        .support-ticket-page,
-        .support-ticket-page * {
-          scrollbar-width: none;
-          -ms-overflow-style: none;
+        .support-ticket-scroll {
+          scrollbar-width: thin;
+          scrollbar-color:
+            rgba(16, 185, 129, 0.42)
+            transparent;
         }
 
-        .support-ticket-page::-webkit-scrollbar,
-        .support-ticket-page *::-webkit-scrollbar {
-          width: 0 !important;
-          height: 0 !important;
-          display: none !important;
+        .support-ticket-scroll::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+
+        .support-ticket-scroll::-webkit-scrollbar-track {
+          background: transparent;
+        }
+
+        .support-ticket-scroll::-webkit-scrollbar-thumb {
+          border: 2px solid transparent;
+          border-radius: 999px;
+          background: rgba(16, 185, 129, 0.36);
+          background-clip: padding-box;
+        }
+
+        .support-ticket-scroll::-webkit-scrollbar-thumb:hover {
+          background: rgba(5, 150, 105, 0.54);
+          background-clip: padding-box;
         }
       `}</style>
     </main>
@@ -1215,7 +1432,7 @@ function QueueStat({
 
       <div className="relative flex items-center justify-between gap-3">
         <p
-          className={`text-[9px] font-black uppercase tracking-[0.14em] ${theme.label}`}
+          className={`break-words text-[9px] font-black uppercase leading-4 tracking-[0.14em] ${theme.label}`}
         >
           {label}
         </p>
@@ -1228,7 +1445,7 @@ function QueueStat({
       </div>
 
       <p
-        className={`relative mt-3 text-2xl font-black ${theme.value}`}
+        className={`relative mt-3 break-words text-xl font-black leading-7 sm:text-2xl ${theme.value}`}
       >
         {value}
       </p>
@@ -1304,7 +1521,7 @@ function QueueAnalytics({
   ];
 
   return (
-    <section className="mt-5 grid gap-4 xl:grid-cols-[1.15fr_.85fr]">
+    <section className="mt-5 grid gap-4 2xl:grid-cols-[1.15fr_.85fr]">
       <motion.article
         initial={{
           opacity: 0,
@@ -1655,7 +1872,7 @@ function FilterSelect({
             : "border-border hover:border-emerald-500/35"
         }`}
       >
-        <span className="truncate text-xs font-black text-foreground">
+        <span className="min-w-0 break-words text-xs font-black leading-5 text-foreground">
           {value}
         </span>
 
@@ -1697,7 +1914,7 @@ function FilterSelect({
               duration: 0.16,
             }}
             role="listbox"
-            className="support-scrollbar-hidden absolute left-0 right-0 top-[calc(100%+8px)] z-[100] max-h-64 overflow-y-auto rounded-2xl border border-border bg-card p-1.5 shadow-[0_24px_70px_-20px_rgba(5,150,105,.30)] backdrop-blur-xl"
+            className="support-ticket-scroll absolute left-0 right-0 top-[calc(100%+8px)] z-[100] max-h-64 overflow-y-auto overscroll-contain rounded-2xl border border-border bg-card p-1.5 shadow-[0_24px_70px_-20px_rgba(5,150,105,.30)] backdrop-blur-xl"
           >
             {options.map(
               (
@@ -1729,7 +1946,7 @@ function FilterSelect({
                         : "text-foreground hover:bg-emerald-500/10"
                     }`}
                   >
-                    <span className="truncate text-xs font-extrabold">
+                    <span className="min-w-0 break-words text-xs font-extrabold leading-5">
                       {option}
                     </span>
 
@@ -1813,8 +2030,19 @@ function TicketQueue({
   }
 
   return (
-    <div className="support-scrollbar-hidden overflow-x-auto">
-      <table className="w-full min-w-[1080px] border-collapse text-left">
+    <>
+      <div className="space-y-3 p-4 xl:hidden">
+        {tickets.map((ticket) => (
+          <SupportTicketMobileCard
+            key={ticket.id}
+            ticket={ticket}
+            onOpen={onOpen}
+          />
+        ))}
+      </div>
+
+      <div className="support-ticket-scroll hidden overflow-x-auto overscroll-x-contain xl:block">
+        <table className="w-full min-w-[1040px] border-collapse text-left">
 
         <thead>
           <tr className="border-b border-border bg-muted/40">
@@ -1911,13 +2139,13 @@ function TicketQueue({
                     </span>
 
                     <div className="min-w-0">
-                      <p className="max-w-[180px] truncate text-xs font-black text-foreground">
+                      <p className="max-w-[180px] break-words text-xs font-black leading-5 text-foreground">
                         {
                           ticket.customerName
                         }
                       </p>
 
-                      <p className="mt-0.5 max-w-[190px] truncate text-[9px] text-muted-foreground">
+                      <p className="mt-0.5 max-w-[190px] break-all text-[9px] leading-4 text-muted-foreground">
                         {
                           ticket.customerEmail
                         }
@@ -1929,7 +2157,7 @@ function TicketQueue({
                 {/* ISSUE */}
 
                 <td className="px-5 py-4">
-                  <p className="max-w-[260px] truncate text-xs font-bold text-foreground">
+                  <p className="max-w-[260px] break-words text-xs font-bold leading-5 text-foreground">
                     {
                       ticket.subject
                     }
@@ -1966,7 +2194,7 @@ function TicketQueue({
 
                 <td className="px-5 py-4">
                   <p
-                    className={`text-[10px] font-black ${
+                    className={`max-w-[160px] break-words text-[10px] font-black leading-4 ${
                       ticket.assignee
                         .id
                         ? "text-foreground"
@@ -2018,7 +2246,118 @@ function TicketQueue({
             )
           )}
         </tbody>
-      </table>
+        </table>
+      </div>
+    </>
+  );
+}
+
+/* =========================================================
+   MOBILE TICKET CARD
+========================================================= */
+
+function SupportTicketMobileCard({
+  ticket,
+  onOpen,
+}: {
+  ticket: SupportTicketSummary;
+  onOpen: (ticketId: string) => void;
+}) {
+  return (
+    <motion.article
+      initial={{
+        opacity: 0,
+        y: 8,
+      }}
+      animate={{
+        opacity: 1,
+        y: 0,
+      }}
+      className="rounded-[24px] border border-border bg-card p-4 shadow-sm"
+    >
+      <div className="flex flex-col gap-3 min-[480px]:flex-row min-[480px]:items-start min-[480px]:justify-between">
+        <div className="min-w-0">
+          <p className="break-all text-[9px] font-black uppercase tracking-[0.1em] text-emerald-700 dark:text-emerald-400">
+            {ticket.ticketNumber}
+          </p>
+
+          <h3 className="mt-1 break-words text-sm font-black leading-5 text-foreground">
+            {ticket.subject}
+          </h3>
+
+          <p className="mt-1 break-words text-[9px] leading-4 text-muted-foreground">
+            {ticket.category} · {formatRelativeTime(ticket.lastActivityAt)}
+          </p>
+        </div>
+
+        <StatusBadge status={ticket.status} />
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-2 min-[460px]:grid-cols-2">
+        <MobileTicketInfo
+          label="Customer"
+          value={ticket.customerName}
+        />
+
+        <MobileTicketInfo
+          label="Email"
+          value={ticket.customerEmail}
+        />
+
+        <MobileTicketInfo
+          label="Priority"
+          value={ticket.priority}
+        />
+
+        <MobileTicketInfo
+          label="Owner"
+          value={ticket.assignee?.name || "Unassigned"}
+        />
+      </div>
+
+      <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-border bg-muted/45 p-3 min-[520px]:flex-row min-[520px]:items-center min-[520px]:justify-between">
+        <div>
+          <p className="text-[8px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+            SLA
+          </p>
+
+          <div className="mt-1">
+            <SlaBadge
+              minutes={ticket.slaMinutes}
+              breached={ticket.slaBreached}
+            />
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => onOpen(ticket.id)}
+          className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-[10px] font-black text-white transition hover:bg-emerald-700 min-[520px]:w-auto"
+        >
+          Open ticket
+          <ChevronRight className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </motion.article>
+  );
+}
+
+function MobileTicketInfo({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="min-w-0 rounded-2xl bg-muted/55 p-3">
+      <p className="text-[8px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+        {label}
+      </p>
+
+      <p className="mt-1 break-words [overflow-wrap:anywhere] text-[10px] font-bold leading-4 text-foreground">
+        {value || "—"}
+      </p>
     </div>
   );
 }
@@ -2053,7 +2392,7 @@ function QueuePagination({
         {total.toLocaleString()} total tickets
       </p>
 
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
 
         <button
           type="button"
@@ -2109,6 +2448,7 @@ function TicketDrawer({
   ticket,
   onClose,
   onUpdated,
+  onUnauthorized,
 }: {
   ticket:
     | SupportTicketDetail
@@ -2118,6 +2458,8 @@ function TicketDrawer({
 
   onUpdated: () =>
     Promise<void>;
+
+  onUnauthorized: () => void;
 }) {
   const [
     reply,
@@ -2191,6 +2533,15 @@ function TicketDrawer({
       } catch (
         actionError: unknown
       ) {
+        if (
+          isAuthorizationError(
+            actionError
+          )
+        ) {
+          onUnauthorized();
+          return;
+        }
+
         window.alert(
           actionError instanceof
             Error
@@ -2224,7 +2575,7 @@ function TicketDrawer({
         damping: 28,
         stiffness: 230,
       }}
-      className="fixed inset-y-0 right-0 z-[80] flex w-full max-w-3xl flex-col border-l border-border bg-card shadow-[-24px_0_70px_rgba(15,23,42,0.18)]"
+      className="fixed inset-y-0 right-0 z-[80] flex w-full max-w-[820px] flex-col border-l border-border bg-card shadow-[-24px_0_70px_rgba(15,23,42,0.24)]"
     >
       {!ticket ? (
         <div className="flex h-full items-center justify-center">
@@ -2262,13 +2613,13 @@ function TicketDrawer({
                   />
                 </div>
 
-                <h2 className="mt-3 text-xl font-black leading-7 text-foreground">
+                <h2 className="mt-3 break-words [overflow-wrap:anywhere] text-xl font-black leading-7 text-foreground">
                   {
                     ticket.subject
                   }
                 </h2>
 
-                <p className="mt-1 text-[9px] text-muted-foreground">
+                <p className="mt-1 break-words [overflow-wrap:anywhere] text-[9px] leading-4 text-muted-foreground">
                   {
                     ticket.category
                   }{" "}
@@ -2292,7 +2643,7 @@ function TicketDrawer({
 
             {/* CONTEXT */}
 
-            <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-4">
+            <div className="mt-4 grid grid-cols-1 gap-2 min-[460px]:grid-cols-2 md:grid-cols-4">
 
               <ContextCard
                 label="Customer"
@@ -2398,7 +2749,7 @@ function TicketDrawer({
               BODY
           ============================================== */}
 
-          <div className="min-h-0 flex-1 support-scrollbar-hidden overflow-y-auto bg-background p-4 md:p-5">
+          <div className="support-ticket-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain bg-background p-4 pb-10 md:p-5 md:pb-12">
 
             {tab ===
             "conversation" ? (
@@ -2412,7 +2763,7 @@ function TicketDrawer({
                     Customer Issue
                   </p>
 
-                  <p className="mt-2 whitespace-pre-wrap text-xs leading-6 text-muted-foreground">
+                  <p className="mt-2 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-xs leading-6 text-muted-foreground">
                     {
                       ticket.description
                     }
@@ -2601,12 +2952,12 @@ function ContextCard({
           <Icon className="h-3.5 w-3.5" />
         </span>
 
-        <p className="truncate text-[8px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+        <p className="break-words text-[8px] font-black uppercase leading-4 tracking-[0.12em] text-muted-foreground">
           {label}
         </p>
       </div>
 
-      <p className="mt-2 truncate text-[10px] font-black text-foreground">
+      <p className="mt-2 break-words [overflow-wrap:anywhere] text-[10px] font-black leading-4 text-foreground">
         {value || "Not assigned"}
       </p>
     </div>
@@ -2682,7 +3033,7 @@ function MessageBubble({
         </div>
 
         <p
-          className={`mt-2 whitespace-pre-wrap text-xs leading-5 ${
+          className={`mt-2 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-xs leading-5 ${
             isAgent &&
             !isInternal
               ? "text-emerald-50"
@@ -2777,7 +3128,7 @@ function Composer({
         className="mt-3 w-full resize-none rounded-xl border border-border bg-card p-3 text-xs leading-5 text-foreground outline-none transition placeholder:text-muted-foreground focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10"
       />
 
-      <div className="mt-3 flex items-center justify-between gap-3">
+      <div className="mt-3 flex flex-col gap-3 min-[460px]:flex-row min-[460px]:items-center min-[460px]:justify-between">
 
         <span className="text-[8px] text-muted-foreground">
           {
@@ -2795,7 +3146,7 @@ function Composer({
           onClick={
             onSubmit
           }
-          className={`inline-flex h-9 items-center gap-2 rounded-xl px-3 text-[9px] font-black text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${
+          className={`inline-flex h-9 w-full items-center justify-center gap-2 rounded-xl px-3 text-[9px] font-black text-white transition disabled:cursor-not-allowed disabled:opacity-50 min-[460px]:w-auto ${
             internal
               ? "bg-amber-600 hover:bg-amber-700"
               : "bg-emerald-600 hover:bg-emerald-700"
@@ -2880,7 +3231,7 @@ function StatusBadge({
 
   return (
     <span
-      className={`inline-flex max-w-[150px] rounded-full border px-2.5 py-1 text-[8px] font-black ${tone[status]}`}
+      className={`inline-flex max-w-[160px] whitespace-normal rounded-full border px-2.5 py-1 text-left text-[8px] font-black leading-4 ${tone[status]}`}
     >
       {status}
     </span>
