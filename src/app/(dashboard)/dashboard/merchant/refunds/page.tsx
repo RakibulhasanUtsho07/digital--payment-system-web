@@ -11,6 +11,10 @@ import React, {
 import Link from "next/link";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
@@ -37,6 +41,14 @@ import {
 import {
   createPortal,
 } from "react-dom";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   getMerchantRefunds,
@@ -545,7 +557,10 @@ function FilterDropdown({
 
         const width =
           Math.min(
-            rect.width,
+            Math.max(
+              rect.width,
+              220,
+            ),
             window.innerWidth -
               padding *
                 2,
@@ -772,11 +787,13 @@ function FilterDropdown({
                  * Dashboard navbar should remain
                  * above this menu.
                  */
-                zIndex: 30,
+                zIndex: 100,
               }}
               className="
                 overflow-y-auto
                 rounded-2xl
+                border
+                border-violet-200/60
                 bg-white/95
                 p-1.5
                 shadow-[0_22px_60px_rgba(30,15,60,0.18)]
@@ -831,12 +848,12 @@ function FilterDropdown({
                         }
                       `}
                     >
-                      <span>
+                      <span className="min-w-0 truncate">
                         {option.label}
                       </span>
 
                       {active ? (
-                        <Check className="h-4 w-4" />
+                        <Check className="h-4 w-4 shrink-0" />
                       ) : null}
                     </button>
                   );
@@ -978,6 +995,7 @@ function StatCard({
         }}
         className="
           relative
+          h-full
           min-w-0
           overflow-hidden
           rounded-[24px]
@@ -1032,11 +1050,12 @@ function StatCard({
             }
             className={`
               mt-2
-              whitespace-nowrap
+              break-words
               font-black
-              leading-none
+              leading-tight
               tracking-[-0.035em]
               tabular-nums
+              [overflow-wrap:anywhere]
 
               ${textClass}
             `}
@@ -1070,7 +1089,9 @@ function StatCard({
         y: -4,
       }}
       className="
+        h-full
         min-w-0
+        overflow-hidden
         rounded-[24px]
         bg-white/80
         p-5
@@ -1100,12 +1121,13 @@ function StatCard({
         }
         className={`
           mt-2
-          whitespace-nowrap
+          break-words
           font-black
-          leading-none
+          leading-tight
           tracking-[-0.035em]
           merchant-text
           tabular-nums
+          [overflow-wrap:anywhere]
 
           ${textClass}
         `}
@@ -1173,7 +1195,7 @@ function RefundCard({
             )}
           </Link>
 
-          <p className="mt-1 truncate text-xs merchant-muted">
+          <p className="mt-1 break-words text-xs leading-5 merchant-muted [overflow-wrap:anywhere]">
             {refund.merchantReference ||
               "No merchant reference"}
           </p>
@@ -1193,7 +1215,7 @@ function RefundCard({
           Refunded amount
         </p>
 
-        <p className="mt-1 whitespace-nowrap text-lg font-black tracking-tight merchant-text tabular-nums">
+        <p className="mt-1 break-words text-lg font-black leading-tight tracking-tight merchant-text tabular-nums [overflow-wrap:anywhere]">
           {formatMoney(
             refund.amount,
             refund.currency,
@@ -1237,7 +1259,7 @@ function RefundCard({
           href={`/dashboard/merchant/payments/${encodeURIComponent(
             refund.paymentId,
           )}`}
-          className="min-w-0 truncate font-mono text-xs font-semibold text-violet-600"
+          className="min-w-0 break-all font-mono text-xs font-semibold leading-5 text-violet-600"
         >
           {shortId(
             refund.paymentId,
@@ -1280,6 +1302,32 @@ function RefundCard({
 ========================================================= */
 
 export default function MerchantRefundsPage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isMerchantRole =
+    user.role === "merchant";
+
+  useEffect(() => {
+    if (isMerchantRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role,
+      ),
+    );
+  }, [
+    isMerchantRole,
+    router,
+    user.role,
+  ]);
+
   const [
     refunds,
     setRefunds,
@@ -1361,6 +1409,15 @@ export default function MerchantRefundsPage() {
       async (
         silent = false,
       ) => {
+        if (!isMerchantRole) {
+          setLoading(false);
+          setRefreshing(false);
+          setRefunds([]);
+          setError("");
+
+          return;
+        }
+
         try {
           setError("");
 
@@ -1418,6 +1475,7 @@ export default function MerchantRefundsPage() {
         }
       },
       [
+        isMerchantRole,
         mode,
         page,
         search,
@@ -1427,9 +1485,16 @@ export default function MerchantRefundsPage() {
 
   useEffect(
     () => {
+      if (!isMerchantRole) {
+        setLoading(false);
+
+        return;
+      }
+
       void loadRefunds();
     },
     [
+      isMerchantRole,
       loadRefunds,
     ],
   );
@@ -1440,6 +1505,10 @@ export default function MerchantRefundsPage() {
 
   useEffect(
     () => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       const timer =
         window.setTimeout(
           () => {
@@ -1459,6 +1528,7 @@ export default function MerchantRefundsPage() {
       };
     },
     [
+      isMerchantRole,
       searchInput,
     ],
   );
@@ -1537,6 +1607,10 @@ export default function MerchantRefundsPage() {
 
   const clearFilters =
     () => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       setSearchInput("");
       setSearch("");
       setStatus("");
@@ -1561,6 +1635,26 @@ export default function MerchantRefundsPage() {
 
       total,
     );
+
+  if (!isMerchantRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center bg-background px-4 text-foreground">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-500/15 bg-violet-500/10 text-violet-700 shadow-sm dark:text-violet-300">
+            <RefreshCcw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Merchant Refunds is available only to merchant accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     /*
@@ -1598,7 +1692,7 @@ export default function MerchantRefundsPage() {
 
             <div className="relative">
               <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-                <div className="max-w-3xl">
+                <div className="min-w-0 max-w-3xl">
                   <motion.div
                     variants={
                       heroItem
@@ -1630,7 +1724,7 @@ export default function MerchantRefundsPage() {
                     variants={
                       heroItem
                     }
-                    className="mt-4 text-2xl font-black tracking-tight sm:text-3xl"
+                    className="mt-4 break-words text-2xl font-black leading-tight tracking-tight sm:text-3xl [overflow-wrap:anywhere]"
                   >
                     Refunds
                   </motion.h1>
@@ -1658,18 +1752,25 @@ export default function MerchantRefundsPage() {
                     scale: 0.97,
                   }}
                   type="button"
-                  onClick={() =>
+                  onClick={() => {
+                    if (!isMerchantRole) {
+                      return;
+                    }
+
                     void loadRefunds(
                       true,
-                    )
-                  }
+                    );
+                  }}
                   disabled={
                     refreshing
                   }
                   className="
                     inline-flex
                     h-11
+                    w-full
                     items-center
+
+                    sm:w-auto
                     justify-center
                     gap-2
                     self-start
@@ -1845,19 +1946,19 @@ export default function MerchantRefundsPage() {
               />
 
               <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-3">
+                <div className="flex min-w-0 items-start gap-3">
                   <motion.div
                     whileHover={{
                       rotate: 6,
                       scale: 1.06,
                     }}
-                    className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/15 bg-white/10"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/10"
                   >
                     <Filter className="h-4 w-4" />
                   </motion.div>
 
-                  <div>
-                    <h2 className="text-sm font-black sm:text-base">
+                  <div className="min-w-0">
+                    <h2 className="break-words text-sm font-black leading-tight sm:text-base [overflow-wrap:anywhere]">
                       Refund filters
                     </h2>
 
@@ -1899,6 +2000,10 @@ export default function MerchantRefundsPage() {
                   onChange={(
                     event,
                   ) => {
+                    if (!isMerchantRole) {
+                      return;
+                    }
+
                     setSearchInput(
                       event.target.value,
                     );
@@ -1934,6 +2039,10 @@ export default function MerchantRefundsPage() {
                   <button
                     type="button"
                     onClick={() => {
+                      if (!isMerchantRole) {
+                        return;
+                      }
+
                       setSearchInput("");
                       setSearch("");
                       setPage(1);
@@ -1975,6 +2084,10 @@ export default function MerchantRefundsPage() {
                   onChange={(
                     value,
                   ) => {
+                    if (!isMerchantRole) {
+                      return;
+                    }
+
                     setStatus(
                       value as
                         | MerchantRefundStatus
@@ -2000,6 +2113,10 @@ export default function MerchantRefundsPage() {
                   onChange={(
                     value,
                   ) => {
+                    if (!isMerchantRole) {
+                      return;
+                    }
+
                     setMode(
                       value as
                         | MerchantRefundMode
@@ -2050,12 +2167,12 @@ export default function MerchantRefundsPage() {
             <div className="mb-6 flex items-start gap-3 rounded-2xl bg-rose-500/[0.055] p-4">
               <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 merchant-danger" />
 
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm font-bold merchant-text">
                   Unable to load refunds
                 </p>
 
-                <p className="mt-1 text-sm merchant-danger">
+                <p className="mt-1 break-words text-sm leading-5 merchant-danger [overflow-wrap:anywhere]">
                   {error}
                 </p>
               </div>
@@ -2099,13 +2216,13 @@ export default function MerchantRefundsPage() {
               }}
             >
               <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/15 bg-white/10">
+                <div className="flex min-w-0 items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/10">
                     <Receipt className="h-4 w-4" />
                   </div>
 
-                  <div>
-                    <h2 className="text-sm font-black sm:text-base">
+                  <div className="min-w-0">
+                    <h2 className="break-words text-sm font-black leading-tight sm:text-base [overflow-wrap:anywhere]">
                       Refund activity
                     </h2>
 
@@ -2157,7 +2274,7 @@ export default function MerchantRefundsPage() {
               </div>
             ) : refunds.length ===
               0 ? (
-              <div className="flex min-h-[360px] flex-col items-center justify-center px-6 text-center">
+              <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
                 <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-violet-500/10 text-violet-600">
                   <RefreshCcw className="h-8 w-8" />
                 </div>
@@ -2304,7 +2421,7 @@ export default function MerchantRefundsPage() {
                                     )}
                                   </Link>
 
-                                  <p className="mt-1 max-w-[190px] truncate text-xs merchant-muted">
+                                  <p className="mt-1 max-w-[190px] break-words text-xs leading-5 merchant-muted [overflow-wrap:anywhere]">
                                     {refund.merchantReference ||
                                       "No reference"}
                                   </p>
@@ -2418,7 +2535,7 @@ export default function MerchantRefundsPage() {
                       : `Showing ${visibleStart}-${visibleEnd} of ${total}`}
                   </p>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                     <motion.button
                       whileTap={{
                         scale: 0.96,
@@ -2427,7 +2544,11 @@ export default function MerchantRefundsPage() {
                       disabled={
                         page <= 1
                       }
-                      onClick={() =>
+                      onClick={() => {
+                        if (!isMerchantRole) {
+                          return;
+                        }
+
                         setPage(
                           (
                             current,
@@ -2437,8 +2558,8 @@ export default function MerchantRefundsPage() {
                                 1,
                               1,
                             ),
-                        )
-                      }
+                        );
+                      }}
                       className="
                         inline-flex
                         h-9
@@ -2479,7 +2600,11 @@ export default function MerchantRefundsPage() {
                         page >=
                         totalPages
                       }
-                      onClick={() =>
+                      onClick={() => {
+                        if (!isMerchantRole) {
+                          return;
+                        }
+
                         setPage(
                           (
                             current,
@@ -2489,8 +2614,8 @@ export default function MerchantRefundsPage() {
                                 1,
                               totalPages,
                             ),
-                        )
-                      }
+                        );
+                      }}
                       className="
                         inline-flex
                         h-9

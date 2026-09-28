@@ -11,6 +11,7 @@ import Link from "next/link";
 
 import {
   useParams,
+  useRouter,
 } from "next/navigation";
 
 import {
@@ -32,6 +33,14 @@ import {
 import {
   motion,
 } from "framer-motion";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   getMerchantDisputeDetail,
@@ -214,6 +223,32 @@ function PurpleAuroraBackground() {
 ========================================================= */
 
 export default function MerchantDisputeDetailPage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isMerchantRole =
+    user.role === "merchant";
+
+  useEffect(() => {
+    if (isMerchantRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isMerchantRole,
+    router,
+    user.role,
+  ]);
+
   const params =
     useParams<{
       disputeId:
@@ -285,6 +320,15 @@ export default function MerchantDisputeDetailPage() {
       async (
         refresh = false
       ) => {
+        if (!isMerchantRole) {
+          setLoading(false);
+          setRefreshing(false);
+          setData(null);
+          setError(null);
+
+          return;
+        }
+
         if (!disputeId) {
           setError(
             "Dispute ID is missing."
@@ -343,17 +387,45 @@ export default function MerchantDisputeDetailPage() {
       },
       [
         disputeId,
+        isMerchantRole,
       ]
     );
 
   useEffect(
     () => {
+      if (!isMerchantRole) {
+        setLoading(false);
+
+        return;
+      }
+
       void load();
     },
     [
+      isMerchantRole,
       load,
     ]
   );
+
+  if (!isMerchantRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center bg-background px-4 text-foreground">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-500/15 bg-violet-500/10 text-violet-700 shadow-sm dark:text-violet-300">
+            <RefreshCw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Merchant dispute details are available only to merchant accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   if (
     loading &&
@@ -396,9 +468,13 @@ export default function MerchantDisputeDetailPage() {
           <div className="mt-6 flex justify-center gap-3">
             <button
               type="button"
-              onClick={() =>
-                void load()
-              }
+              onClick={() => {
+                if (!isMerchantRole) {
+                  return;
+                }
+
+                void load();
+              }}
               className="rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-bold text-white"
             >
               Try again
@@ -451,16 +527,23 @@ export default function MerchantDisputeDetailPage() {
               disabled={
                 refreshing
               }
-              onClick={() =>
+              onClick={() => {
+                if (!isMerchantRole) {
+                  return;
+                }
+
                 void load(
                   true
-                )
-              }
+                );
+              }}
               className="
                 inline-flex
                 h-10
-                w-fit
+                w-full
                 items-center
+                justify-center
+
+                sm:w-auto
                 gap-2
                 rounded-xl
                 bg-violet-500/[0.07]
@@ -560,10 +643,10 @@ export default function MerchantDisputeDetailPage() {
                     }
                   </h1>
 
-                  <p className="mt-3 text-sm text-violet-100/80">
+                  <p className="mt-3 break-words text-sm leading-6 text-violet-100/80 [overflow-wrap:anywhere]">
                     Related payment{" "}
 
-                    <span className="font-mono font-bold text-white">
+                    <span className="break-all font-mono font-bold text-white">
                       {
                         publicPaymentId
                       }
@@ -576,7 +659,7 @@ export default function MerchantDisputeDetailPage() {
                     Disputed amount
                   </p>
 
-                  <p className="mt-2 whitespace-nowrap text-[clamp(1.5rem,3vw,2.5rem)] font-black">
+                  <p className="mt-2 break-words text-[clamp(1.35rem,3vw,2.5rem)] font-black leading-tight [overflow-wrap:anywhere]">
                     {formatMoney(
                       data.dispute.amount,
                       data.dispute.currency
@@ -746,9 +829,9 @@ export default function MerchantDisputeDetailPage() {
                           key={`${item.title}-${index}`}
                           className="rounded-2xl bg-violet-500/[0.04] p-4"
                         >
-                          <div className="flex items-start justify-between gap-4">
-                            <div>
-                              <p className="text-sm font-black merchant-text">
+                          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                            <div className="min-w-0">
+                              <p className="break-words text-sm font-black leading-tight merchant-text [overflow-wrap:anywhere]">
                                 {
                                   item.title
                                 }
@@ -768,7 +851,7 @@ export default function MerchantDisputeDetailPage() {
                                 }
                                 target="_blank"
                                 rel="noreferrer"
-                                className="inline-flex items-center gap-1.5 text-xs font-black text-violet-600"
+                                className="inline-flex shrink-0 items-center gap-1.5 text-xs font-black text-violet-600"
                               >
                                 Open
 
@@ -817,7 +900,7 @@ export default function MerchantDisputeDetailPage() {
                       />
 
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-black merchant-text">
+                        <p className="break-words text-sm font-black leading-tight merchant-text [overflow-wrap:anywhere]">
                           {
                             data.customer.name
                           }
@@ -1033,12 +1116,12 @@ function HeroMetric({
     string;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.08] p-3">
+    <div className="h-full min-w-0 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.08] p-3">
       <p className="text-[10px] font-black uppercase tracking-wider text-violet-100/65">
         {label}
       </p>
 
-      <p className="mt-1 truncate text-sm font-black text-white">
+      <p className="mt-1 break-words text-sm font-black leading-tight text-white [overflow-wrap:anywhere]">
         {value}
       </p>
     </div>
@@ -1086,9 +1169,9 @@ function SectionTitle({
         <Icon className="h-5 w-5" />
       </div>
 
-      <div>
+      <div className="min-w-0">
         <h2
-          className={`text-base font-black ${
+          className={`break-words text-base font-black leading-tight [overflow-wrap:anywhere] ${
             inverse
               ? "text-white"
               : "merchant-text"
@@ -1098,7 +1181,7 @@ function SectionTitle({
         </h2>
 
         <p
-          className={`mt-0.5 text-xs ${
+          className={`mt-0.5 break-words text-xs leading-5 [overflow-wrap:anywhere] ${
             inverse
               ? "text-violet-100/70"
               : "merchant-muted"
@@ -1127,7 +1210,7 @@ function InfoBox({
         {label}
       </p>
 
-      <p className="mt-1 break-words text-sm font-bold merchant-text">
+      <p className="mt-1 break-words text-sm font-bold leading-5 merchant-text [overflow-wrap:anywhere]">
         {value}
       </p>
     </div>
@@ -1183,7 +1266,7 @@ function TimelineItem({
         ) : null}
       </div>
 
-      <div className="pb-4">
+      <div className="min-w-0 pb-4">
         <p className="text-xs font-black text-white">
           {title}
         </p>

@@ -70,6 +70,15 @@ export interface SupportAiAnalysis {
 
   suggestedReply: string;
 
+  verification: {
+    status:
+      | "verified"
+      | "partially_verified"
+      | "unverified";
+    label: string;
+    evidence: string[];
+  };
+
   safety: {
     humanApprovalRequired: true;
     canExecuteFinancialActions: false;

@@ -14,13 +14,13 @@ import {
   Sparkles,
 } from "lucide-react";
 
-import {
-  apiClient,
-} from "@/lib/api/client";
-
 import type {
   SupportTicketDetail,
-} from "@/lib/api/supportApi";
+} from "@/lib/api/supportDashboardApi";
+
+import {
+  supportDashboardApi,
+} from "@/lib/api/supportDashboardApi";
 
 /* =========================================================
    TYPES
@@ -67,6 +67,15 @@ export interface SupportAiAnalysis {
   suggestedReply:
     string;
 
+  verification: {
+    status:
+      | "verified"
+      | "partially_verified"
+      | "unverified";
+    label: string;
+    evidence: string[];
+  };
+
   safety: {
     humanApprovalRequired: true;
     canExecuteFinancialActions: false;
@@ -84,13 +93,6 @@ export interface SupportAiAnalysis {
       string | null;
     messageCount: number;
   };
-}
-
-interface AnalysisResponse {
-  success: boolean;
-  analysis?:
-    SupportAiAnalysis;
-  message?: string;
 }
 
 /* =========================================================
@@ -142,18 +144,8 @@ export default function SupportAiCopilot({
 
         try {
           const response =
-            await apiClient<AnalysisResponse>(
-              `/support/tickets/${encodeURIComponent(
-                ticket.id
-              )}/ai-analysis`,
-              {
-                method: "POST",
-
-                headers: {
-                  "Content-Type":
-                    "application/json",
-                },
-              }
+            await supportDashboardApi.analyzeTicket(
+              ticket.id
             );
 
           if (
@@ -337,6 +329,36 @@ export default function SupportAiCopilot({
             value={`${analysis.confidence}%`}
             badge
           />
+
+          <CopilotRow
+            label="Evidence Status"
+            value={`${analysis.verification.status.replace(
+              "_",
+              " "
+            )} · ${analysis.verification.label}`}
+          />
+
+          {analysis.verification.evidence.length > 0 ? (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3">
+              <p className="text-[8px] font-black uppercase tracking-[0.12em] text-emerald-700">
+                Verified backend evidence
+              </p>
+
+              <ul className="mt-2 space-y-1.5">
+                {analysis.verification.evidence.map(
+                  (item) => (
+                    <li
+                      key={item}
+                      className="flex gap-2 text-[10px] leading-5 text-emerald-900/80"
+                    >
+                      <CheckCircle2 className="mt-1 h-3 w-3 shrink-0 text-emerald-600" />
+                      <span>{item}</span>
+                    </li>
+                  )
+                )}
+              </ul>
+            </div>
+          ) : null}
 
           <CopilotRow
             label="Ticket Summary"

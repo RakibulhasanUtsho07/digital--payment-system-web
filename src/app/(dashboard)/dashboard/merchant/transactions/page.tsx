@@ -11,6 +11,10 @@ import React, {
 import Link from "next/link";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   Activity,
   AlertCircle,
   ArrowDownLeft,
@@ -44,6 +48,14 @@ import {
 import {
   createPortal,
 } from "react-dom";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   getMerchantTransactions,
@@ -851,7 +863,10 @@ function FilterDropdown({
 
         const width =
           Math.min(
-            rect.width,
+            Math.max(
+              rect.width,
+              220,
+            ),
             window.innerWidth -
               viewportPadding *
                 2,
@@ -1124,11 +1139,13 @@ function FilterDropdown({
                   position.maxHeight,
 
                 zIndex:
-                  20,
+                  100,
               }}
               className="
                 overflow-y-auto
                 rounded-2xl
+                border
+                border-violet-200/60
                 bg-white/95
                 p-1.5
                 shadow-[0_22px_60px_rgba(30,15,60,0.18)]
@@ -1185,14 +1202,14 @@ function FilterDropdown({
                         }
                       `}
                     >
-                      <span>
+                      <span className="min-w-0 truncate">
                         {
                           option.label
                         }
                       </span>
 
                       {active ? (
-                        <Check className="h-4 w-4" />
+                        <Check className="h-4 w-4 shrink-0" />
                       ) : null}
                     </button>
                   );
@@ -1569,9 +1586,10 @@ function ProtectedMoney({
           }
           className={`
             max-w-full
-            overflow-hidden
-            whitespace-nowrap
+            break-words
+            whitespace-normal
             font-black
+            [overflow-wrap:anywhere]
             leading-[1.05]
             tracking-[-0.035em]
             tabular-nums
@@ -1679,6 +1697,7 @@ function SummaryCard({
         }}
         className="
           relative
+          h-full
           min-w-0
           overflow-hidden
           rounded-[24px]
@@ -1825,6 +1844,7 @@ function SummaryCard({
       }}
       className="
         relative
+        h-full
         min-w-0
         overflow-hidden
         rounded-[24px]
@@ -2118,7 +2138,7 @@ function MobileTransactionCard({
         dark:bg-slate-950/50
       "
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <Link
             href={`/dashboard/merchant/transactions/${encodeURIComponent(
@@ -2153,7 +2173,7 @@ function MobileTransactionCard({
         />
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3">
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <div className="rounded-2xl bg-violet-500/[0.045] p-3">
           <p className="text-[10px] font-bold uppercase tracking-wide merchant-muted">
             Direction
@@ -2174,7 +2194,7 @@ function MobileTransactionCard({
           </p>
 
           <p
-            className={`mt-2 text-sm font-black tabular-nums ${
+            className={`mt-2 break-words text-sm font-black leading-tight tabular-nums [overflow-wrap:anywhere] ${
               positive
                 ? "text-emerald-600"
                 : "text-rose-600"
@@ -2196,10 +2216,15 @@ function MobileTransactionCard({
         className="
           mt-3
           flex
-          items-center
-          justify-between
+          min-w-0
+          flex-col
+          items-stretch
           gap-3
           rounded-2xl
+
+          sm:flex-row
+          sm:items-center
+          sm:justify-between
           bg-violet-500/[0.045]
           p-3
         "
@@ -2209,7 +2234,7 @@ function MobileTransactionCard({
             Reference
           </p>
 
-          <p className="mt-1 truncate font-mono text-xs font-semibold merchant-text">
+          <p className="mt-1 break-all font-mono text-xs font-semibold leading-5 merchant-text">
             {
               transaction.referenceId
             }
@@ -2260,6 +2285,32 @@ function MobileTransactionCard({
 ========================================================= */
 
 export default function MerchantTransactionsPage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isMerchantRole =
+    user.role === "merchant";
+
+  useEffect(() => {
+    if (isMerchantRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role,
+      ),
+    );
+  }, [
+    isMerchantRole,
+    router,
+    user.role,
+  ]);
+
   const [
     transactions,
     setTransactions,
@@ -2422,6 +2473,16 @@ export default function MerchantTransactionsPage() {
         fullLoader =
           true,
       ) => {
+        if (!isMerchantRole) {
+          setLoading(false);
+          setRefreshing(false);
+          setTransactions([]);
+          setSummary(EMPTY_SUMMARY);
+          setError("");
+
+          return;
+        }
+
         try {
           setError(
             "",
@@ -2511,6 +2572,7 @@ export default function MerchantTransactionsPage() {
         }
       },
       [
+        isMerchantRole,
         page,
         search,
         type,
@@ -2524,11 +2586,18 @@ export default function MerchantTransactionsPage() {
 
   useEffect(
     () => {
+      if (!isMerchantRole) {
+        setLoading(false);
+
+        return;
+      }
+
       void loadTransactions(
         true,
       );
     },
     [
+      isMerchantRole,
       loadTransactions,
     ],
   );
@@ -2539,6 +2608,10 @@ export default function MerchantTransactionsPage() {
 
   useEffect(
     () => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       const timer =
         window.setTimeout(
           () => {
@@ -2560,6 +2633,7 @@ export default function MerchantTransactionsPage() {
       };
     },
     [
+      isMerchantRole,
       searchInput,
     ],
   );
@@ -2581,6 +2655,10 @@ export default function MerchantTransactionsPage() {
 
   const clearFilters =
     () => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       setSearchInput(
         "",
       );
@@ -2760,6 +2838,26 @@ export default function MerchantTransactionsPage() {
       },
     ];
 
+  if (!isMerchantRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center bg-background px-4 text-foreground">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-500/15 bg-violet-500/10 text-violet-700 shadow-sm dark:text-violet-300">
+            <RefreshCw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Merchant Transactions is available only to merchant accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main
       className="
@@ -2798,7 +2896,7 @@ export default function MerchantTransactionsPage() {
         >
           <PurpleAuroraBackground />
 
-          <div className="relative">
+          <div className="relative z-10 min-w-0">
             <div
               className="
                 flex
@@ -2810,7 +2908,7 @@ export default function MerchantTransactionsPage() {
                 lg:justify-between
               "
             >
-              <div className="max-w-3xl">
+              <div className="min-w-0 max-w-3xl">
                 <motion.div
                   variants={
                     heroItem
@@ -2844,9 +2942,12 @@ export default function MerchantTransactionsPage() {
                   }
                   className="
                     mt-4
+                    break-words
                     text-2xl
                     font-black
+                    leading-tight
                     tracking-tight
+                    [overflow-wrap:anywhere]
 
                     sm:text-3xl
                   "
@@ -2891,16 +2992,23 @@ export default function MerchantTransactionsPage() {
                 disabled={
                   refreshing
                 }
-                onClick={() =>
+                onClick={() => {
+                  if (!isMerchantRole) {
+                    return;
+                  }
+
                   void loadTransactions(
                     false,
-                  )
-                }
+                  );
+                }}
                 className="
                   inline-flex
                   h-11
+                  w-full
                   items-center
                   justify-center
+
+                  sm:w-auto
                   gap-2
                   self-start
                   rounded-2xl
@@ -3277,14 +3385,18 @@ export default function MerchantTransactionsPage() {
                   scale:
                     0.96,
                 }}
-                onClick={() =>
+                onClick={() => {
+                  if (!isMerchantRole) {
+                    return;
+                  }
+
                   setRevealBalances(
                     (
                       current,
                     ) =>
                       !current,
-                  )
-                }
+                  );
+                }}
                 className="
                   inline-flex
                   h-9
@@ -3590,11 +3702,15 @@ export default function MerchantTransactionsPage() {
                 }
                 onChange={(
                   event,
-                ) =>
+                ) => {
+                  if (!isMerchantRole) {
+                    return;
+                  }
+
                   setSearchInput(
                     event.target.value,
-                  )
-                }
+                  );
+                }}
                 placeholder="Transaction ID, payment, refund, payout or reference..."
                 className="
                   merchant-text
@@ -3638,6 +3754,10 @@ export default function MerchantTransactionsPage() {
                 onChange={(
                   value,
                 ) => {
+                  if (!isMerchantRole) {
+                    return;
+                  }
+
                   setType(
                     value as
                       | MerchantTransactionType
@@ -3665,6 +3785,10 @@ export default function MerchantTransactionsPage() {
                 onChange={(
                   value,
                 ) => {
+                  if (!isMerchantRole) {
+                    return;
+                  }
+
                   setDirection(
                     value as
                       | MerchantTransactionDirection
@@ -3692,6 +3816,10 @@ export default function MerchantTransactionsPage() {
                 onChange={(
                   value,
                 ) => {
+                  if (!isMerchantRole) {
+                    return;
+                  }
+
                   setStatus(
                     value as
                       | MerchantTransactionStatus
@@ -3719,6 +3847,10 @@ export default function MerchantTransactionsPage() {
                 onChange={(
                   value,
                 ) => {
+                  if (!isMerchantRole) {
+                    return;
+                  }
+
                   setCurrency(
                     value,
                   );
@@ -3745,6 +3877,10 @@ export default function MerchantTransactionsPage() {
                 onChange={(
                   value,
                 ) => {
+                  if (!isMerchantRole) {
+                    return;
+                  }
+
                   setFrom(
                     value,
                   );
@@ -3771,6 +3907,10 @@ export default function MerchantTransactionsPage() {
                 onChange={(
                   value,
                 ) => {
+                  if (!isMerchantRole) {
+                    return;
+                  }
+
                   setTo(
                     value,
                   );
@@ -3812,8 +3952,8 @@ export default function MerchantTransactionsPage() {
           }}
           className="
             relative
-            z-0
-            overflow-hidden
+            z-30
+            overflow-visible
             rounded-[28px]
             bg-white/65
             shadow-[0_12px_38px_rgba(109,40,217,0.04)]
@@ -4014,6 +4154,8 @@ export default function MerchantTransactionsPage() {
               <div
                 className="
                   hidden
+                  min-w-0
+                  max-w-full
                   overflow-x-auto
                   scroll-smooth
                   overscroll-x-contain
@@ -4290,7 +4432,7 @@ export default function MerchantTransactionsPage() {
                   </span>
                 </p>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                   <motion.button
                     whileTap={{
                       scale:
@@ -4301,7 +4443,11 @@ export default function MerchantTransactionsPage() {
                       !pagination.hasPreviousPage ||
                       loading
                     }
-                    onClick={() =>
+                    onClick={() => {
+                      if (!isMerchantRole) {
+                        return;
+                      }
+
                       setPage(
                         (
                           current,
@@ -4311,8 +4457,8 @@ export default function MerchantTransactionsPage() {
                             current -
                               1,
                           ),
-                      )
-                    }
+                      );
+                    }}
                     className="
                       inline-flex
                       h-9
@@ -4370,7 +4516,11 @@ export default function MerchantTransactionsPage() {
                       !pagination.hasNextPage ||
                       loading
                     }
-                    onClick={() =>
+                    onClick={() => {
+                      if (!isMerchantRole) {
+                        return;
+                      }
+
                       setPage(
                         (
                           current,
@@ -4380,8 +4530,8 @@ export default function MerchantTransactionsPage() {
                             current +
                               1,
                           ),
-                      )
-                    }
+                      );
+                    }}
                     className="
                       inline-flex
                       h-9

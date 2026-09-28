@@ -23,15 +23,65 @@ export interface AdminEKYCVerification extends EKYCVerification {
     role: string;
     kycStatus: string;
   };
+
   providerName?: string;
   faceScore: number | null;
   faceQualityScore?: number | null;
   nameScore: number | null;
   livenessPassed: boolean | null;
+  phoneVerifiedAt?: string;
+  deviceBiometricVerified: boolean;
   possibleDuplicateVectorId?: string;
   possibleDuplicateScore: number | null;
   processingStartedAt?: string;
   hasReviewBiometricTemplate: boolean;
+
+  identity?: {
+    claimedName: string;
+    nid: string;
+    dateOfBirth: string;
+    verifiedPhone: string;
+  };
+}
+
+export type PhoneOtpChannel =
+  | "sms"
+  | "whatsapp";
+
+export interface PhoneOtpChallenge {
+  id?: string;
+  challengeId: string;
+  channel: PhoneOtpChannel;
+  provider?: string;
+  maskedPhone: string;
+  expiresAt: string;
+  resendAvailableAt?: string;
+  resendAfterSeconds: number;
+}
+
+export interface PhoneOtpVerification {
+  challengeId: string;
+  verified: true;
+  phone: string;
+  maskedPhone: string;
+  channel: PhoneOtpChannel;
+  verifiedAt: string;
+  validUntil: string;
+}
+
+export interface NIDDocumentValidation {
+  validationId: string;
+  expiresAt: string;
+  frontSignals: number;
+  backSignals: number;
+}
+
+export interface DeviceBiometricProof {
+  sessionId: string;
+  credentialId: string;
+  deviceType: "singleDevice" | "multiDevice";
+  backedUp: boolean;
+  verifiedAt: string;
 }
 
 export interface EKYCOverview {

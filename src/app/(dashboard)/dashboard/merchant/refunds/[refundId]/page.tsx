@@ -10,6 +10,7 @@ import Link from "next/link";
 
 import {
   useParams,
+  useRouter,
 } from "next/navigation";
 
 import {
@@ -33,6 +34,14 @@ import {
   AnimatePresence,
   motion,
 } from "framer-motion";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   getMerchantRefund,
@@ -453,8 +462,9 @@ function DetailRow({
         py-4
 
         sm:flex-row
-        sm:items-center
+        sm:items-start
         sm:justify-between
+        sm:gap-6
       "
     >
       <div className="min-w-0">
@@ -462,7 +472,7 @@ function DetailRow({
           {label}
         </p>
 
-        <p className="mt-1 break-all text-sm font-semibold merchant-text">
+        <p className="mt-1 break-words text-sm font-semibold leading-5 merchant-text [overflow-wrap:anywhere]">
           {value}
         </p>
       </div>
@@ -504,8 +514,9 @@ function PurpleDetailRow({
         p-3.5
 
         sm:flex-row
-        sm:items-center
+        sm:items-start
         sm:justify-between
+        sm:gap-6
       "
     >
       <div className="min-w-0">
@@ -513,7 +524,7 @@ function PurpleDetailRow({
           {label}
         </p>
 
-        <p className="mt-1 break-all text-sm font-bold text-white">
+        <p className="mt-1 break-words text-sm font-bold leading-5 text-white [overflow-wrap:anywhere]">
           {value}
         </p>
       </div>
@@ -537,6 +548,32 @@ function PurpleDetailRow({
 ========================================================= */
 
 export default function MerchantRefundDetailsPage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isMerchantRole =
+    user.role === "merchant";
+
+  useEffect(() => {
+    if (isMerchantRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role,
+      ),
+    );
+  }, [
+    isMerchantRole,
+    router,
+    user.role,
+  ]);
+
   const params =
     useParams();
 
@@ -584,6 +621,15 @@ export default function MerchantRefundDetailsPage() {
       async (
         silent = false,
       ) => {
+        if (!isMerchantRole) {
+          setLoading(false);
+          setRefreshing(false);
+          setRefund(null);
+          setError("");
+
+          return;
+        }
+
         if (!refundId) {
           setError(
             "Refund ID is required.",
@@ -622,18 +668,50 @@ export default function MerchantRefundDetailsPage() {
         }
       },
       [
+        isMerchantRole,
         refundId,
       ],
     );
 
   useEffect(
     () => {
+      if (!isMerchantRole) {
+        setLoading(false);
+
+        return;
+      }
+
       void loadRefund();
     },
     [
+      isMerchantRole,
       loadRefund,
     ],
   );
+
+  /* =======================================================
+     MERCHANT-ONLY REDIRECTING
+  ======================================================== */
+
+  if (!isMerchantRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center bg-background px-4 text-foreground">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-500/15 bg-violet-500/10 text-violet-700 shadow-sm dark:text-violet-300">
+            <RefreshCcw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Merchant refund details are available only to merchant accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   /* =======================================================
      LOADING
@@ -777,12 +855,12 @@ export default function MerchantRefundDetailsPage() {
             <div className="mb-5 flex items-start gap-3 rounded-2xl bg-rose-500/[0.055] p-4">
               <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 merchant-danger" />
 
-              <div>
+              <div className="min-w-0">
                 <p className="text-sm font-bold merchant-text">
                   Refresh failed
                 </p>
 
-                <p className="mt-1 text-sm merchant-danger">
+                <p className="mt-1 break-words text-sm leading-5 merchant-danger [overflow-wrap:anywhere]">
                   {error}
                 </p>
               </div>
@@ -815,7 +893,7 @@ export default function MerchantRefundDetailsPage() {
           >
             <PurpleAuroraBackground />
 
-            <div className="relative">
+            <div className="relative z-10 min-w-0">
               <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0 max-w-3xl">
                   <motion.div
@@ -875,11 +953,11 @@ export default function MerchantRefundDetailsPage() {
                     variants={
                       heroItem
                     }
-                    className="mt-3 text-sm text-violet-100/80"
+                    className="mt-3 break-words text-sm leading-6 text-violet-100/80 [overflow-wrap:anywhere]"
                   >
                     Refund linked to payment{" "}
 
-                    <span className="font-mono font-bold text-white">
+                    <span className="break-all font-mono font-bold text-white">
                       {shortId(
                         refund.paymentId,
                       )}
@@ -899,18 +977,25 @@ export default function MerchantRefundDetailsPage() {
                     scale: 0.97,
                   }}
                   type="button"
-                  onClick={() =>
+                  onClick={() => {
+                    if (!isMerchantRole) {
+                      return;
+                    }
+
                     void loadRefund(
                       true,
-                    )
-                  }
+                    );
+                  }}
                   disabled={
                     refreshing
                   }
                   className="
                     inline-flex
                     h-11
+                    w-full
                     items-center
+
+                    sm:w-auto
                     justify-center
                     gap-2
                     self-start
@@ -959,10 +1044,12 @@ export default function MerchantRefundDetailsPage() {
                   <p
                     className={`
                       mt-1
-                      whitespace-nowrap
+                      break-words
                       font-black
+                      leading-tight
                       tracking-tight
                       tabular-nums
+                      [overflow-wrap:anywhere]
 
                       ${getMoneyTextClass(
                         amountText,
@@ -1031,13 +1118,13 @@ export default function MerchantRefundDetailsPage() {
                   dark:bg-slate-950/45
                 "
               >
-                <div className="mb-2 flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600">
+                <div className="mb-2 flex min-w-0 items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600">
                     <Receipt className="h-5 w-5" />
                   </div>
 
-                  <div>
-                    <h2 className="text-base font-black merchant-text">
+                  <div className="min-w-0">
+                    <h2 className="break-words text-base font-black leading-tight merchant-text [overflow-wrap:anywhere]">
                       Refund information
                     </h2>
 
@@ -1148,7 +1235,7 @@ export default function MerchantRefundDetailsPage() {
                       </p>
                     </div>
 
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-white/10">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10">
                       <Hash className="h-5 w-5" />
                     </div>
                   </div>
@@ -1312,7 +1399,7 @@ export default function MerchantRefundDetailsPage() {
                       </p>
                     </div>
 
-                    <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-white/15 bg-white/10">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10">
                       <FileText className="h-5 w-5" />
                     </div>
                   </div>

@@ -12,6 +12,10 @@ import {
 } from "framer-motion";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   Activity,
   AlertTriangle,
   ArrowDownRight,
@@ -47,6 +51,14 @@ import {
 } from "recharts";
 
 import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
+
+import {
   getAnalystLivePulse,
   type AnalystLivePulseData,
   type AnalystMode,
@@ -54,6 +66,42 @@ import {
   type AnalystPulseScore,
   type AnalystPulseStatus,
 } from "@/lib/api/analystApi";
+
+const ANALYST = {
+  navy: "#10243A",
+  tealDeep: "#0B4F52",
+  navySoft: "#10273A",
+  teal: "#0D9488",
+  tealBright: "#14B8A6",
+  cyan: "#22C7D6",
+  sky: "#38BDF8",
+  emerald: "#10B981",
+  amber: "#F59E0B",
+  red: "#EF4444",
+  violet: "#8B5CF6",
+};
+
+const reveal = {
+  hidden: {
+    opacity: 0,
+    y: 16,
+    filter: "blur(7px)",
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    filter: "blur(0px)",
+  },
+};
+
+const stagger = {
+  hidden: {},
+  show: {
+    transition: {
+      staggerChildren: 0.055,
+    },
+  },
+};
 
 /* =========================================================
    OPTIONS
@@ -316,40 +364,49 @@ function MetricCard({
 }) {
   return (
     <motion.div
-      initial={{
-        opacity: 0,
-        y: 12,
+      variants={reveal}
+      whileHover={{
+        y: -4,
+        scale: 1.008,
       }}
-      animate={{
-        opacity: 1,
-        y: 0,
+      transition={{
+        type: "spring",
+        stiffness: 280,
+        damping: 22,
       }}
-      className="rounded-2xl border border-border bg-card p-5 shadow-sm"
+      className="group relative overflow-hidden rounded-[22px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_18px_50px_-38px_rgba(15,118,110,0.48)] backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/70"
     >
-      <div className="flex items-start justify-between gap-4">
+      <div className="pointer-events-none absolute -right-12 -top-12 h-32 w-32 rounded-full bg-teal-500/10 blur-3xl" />
+      <div className="pointer-events-none absolute inset-x-7 top-0 h-px bg-gradient-to-r from-transparent via-teal-400/60 to-transparent" />
+
+      <div className="relative flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+          <p className="text-[10px] font-black uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">
             {label}
           </p>
 
-          <p className="mt-3 truncate text-2xl font-black tracking-tight text-card-foreground">
+          <p className="mt-3 truncate text-2xl font-black tracking-tight text-slate-950 dark:text-white">
             {value}
           </p>
 
-          <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
+          <p className="mt-1 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
             {description}
           </p>
         </div>
 
-        <div
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${iconClass}`}
+        <motion.div
+          whileHover={{
+            rotate: 9,
+            scale: 1.08,
+          }}
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/50 shadow-sm ${iconClass}`}
         >
           <Icon className="h-5 w-5" />
-        </div>
+        </motion.div>
       </div>
 
       {children && (
-        <div className="mt-4 border-t border-border/70 pt-3">
+        <div className="relative mt-4 border-t border-slate-200/70 pt-3 dark:border-white/10">
           {children}
         </div>
       )}
@@ -369,16 +426,43 @@ function Panel({
   action?: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-border bg-card shadow-sm">
-      <div className="flex flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-base font-extrabold text-card-foreground">
-            {title}
-          </h2>
+    <motion.section
+      variants={reveal}
+      initial="hidden"
+      whileInView="show"
+      viewport={{
+        once: true,
+        amount: 0.08,
+      }}
+      transition={{
+        duration: 0.45,
+        ease: [0.22, 1, 0.36, 1],
+      }}
+      className="group relative overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/90 shadow-[0_18px_55px_-35px_rgba(15,118,110,0.40)] backdrop-blur-xl transition duration-300 hover:-translate-y-0.5 dark:border-white/10 dark:bg-slate-950/70"
+    >
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-teal-400/70 to-transparent" />
 
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            {description}
-          </p>
+      <div className="flex flex-col gap-3 border-b border-slate-200/70 px-5 py-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/10">
+        <div className="flex items-start gap-3">
+          <motion.div
+            whileHover={{
+              rotate: 8,
+              scale: 1.06,
+            }}
+            className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-teal-500/15 bg-gradient-to-br from-teal-500/12 to-cyan-500/10 text-teal-700 dark:text-teal-300"
+          >
+            <Activity className="h-5 w-5" />
+          </motion.div>
+
+          <div>
+            <h2 className="text-base font-black tracking-tight text-slate-950 dark:text-white">
+              {title}
+            </h2>
+
+            <p className="mt-1 max-w-3xl text-xs leading-5 text-slate-500 dark:text-slate-400">
+              {description}
+            </p>
+          </div>
         </div>
 
         {action}
@@ -387,7 +471,7 @@ function Panel({
       <div className="p-5">
         {children}
       </div>
-    </section>
+    </motion.section>
   );
 }
 
@@ -424,7 +508,14 @@ function ScoreCard({
         : Activity;
 
   return (
-    <div className="rounded-2xl border border-border bg-background/60 p-4">
+    <motion.div
+      whileHover={{
+        y: -3,
+        scale: 1.01,
+      }}
+      className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white/75 p-4 shadow-sm dark:border-white/10 dark:bg-black/10"
+    >
+      <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-teal-400/55 to-transparent" />
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-xs font-extrabold text-foreground">
@@ -446,19 +537,29 @@ function ScoreCard({
       </div>
 
       <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
-        <div
-          className={`h-full rounded-full transition-all duration-700 ${SCORE_BAR_STYLES[score.status]}`}
-          style={{
+        <motion.div
+          initial={{
+            width: 0,
+          }}
+          whileInView={{
             width:
               `${score.score}%`,
           }}
+          viewport={{
+            once: true,
+          }}
+          transition={{
+            duration: 0.75,
+            ease: "easeOut",
+          }}
+          className={`h-full rounded-full ${SCORE_BAR_STYLES[score.status]}`}
         />
       </div>
 
       <p className="mt-3 text-[11px] leading-5 text-muted-foreground">
         {score.basis}
       </p>
-    </div>
+    </motion.div>
   );
 }
 
@@ -488,7 +589,24 @@ function AlertCard({
           : Activity;
 
   return (
-    <div className={`rounded-2xl border p-4 ${styles}`}>
+    <motion.div
+      initial={{
+        opacity: 0,
+        y: 10,
+      }}
+      whileInView={{
+        opacity: 1,
+        y: 0,
+      }}
+      viewport={{
+        once: true,
+      }}
+      whileHover={{
+        y: -3,
+      }}
+      className={`relative overflow-hidden rounded-[20px] border p-4 shadow-sm ${styles}`}
+    >
+      <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-teal-400/45 to-transparent" />
       <div className="flex items-start gap-3">
         <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-current/10">
           <Icon className="h-4.5 w-4.5" />
@@ -514,7 +632,7 @@ function AlertCard({
           </p>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -523,6 +641,32 @@ function AlertCard({
 ========================================================= */
 
 export default function AnalystLivePulsePage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isAnalystRole =
+    user.role === "analyst";
+
+  useEffect(() => {
+    if (isAnalystRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isAnalystRole,
+    router,
+    user.role,
+  ]);
+
   const [mode, setMode] =
     useState<AnalystMode>(
       "all"
@@ -555,7 +699,10 @@ export default function AnalystLivePulsePage() {
     useState(0);
 
   useEffect(() => {
-    if (!autoRefresh) {
+    if (
+      !isAnalystRole ||
+      !autoRefresh
+    ) {
       return;
     }
 
@@ -575,9 +722,21 @@ export default function AnalystLivePulsePage() {
         interval
       );
     };
-  }, [autoRefresh]);
+  }, [
+    autoRefresh,
+    isAnalystRole,
+  ]);
 
   useEffect(() => {
+    if (!isAnalystRole) {
+      setLoading(false);
+      setRefreshing(false);
+      setData(null);
+      setError("");
+
+      return;
+    }
+
     const controller =
       new AbortController();
 
@@ -628,6 +787,7 @@ export default function AnalystLivePulsePage() {
       controller.abort();
     };
   }, [
+    isAnalystRole,
     mode,
     currency,
     refreshKey,
@@ -662,6 +822,10 @@ export default function AnalystLivePulsePage() {
   ) => {
     event.preventDefault();
 
+    if (!isAnalystRole) {
+      return;
+    }
+
     const normalized =
       currencyDraft
         .trim()
@@ -684,112 +848,230 @@ export default function AnalystLivePulsePage() {
     );
   };
 
+  if (!isAnalystRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center px-4">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-teal-500/15 bg-teal-500/10 text-teal-700 shadow-sm dark:text-teal-300">
+            <RefreshCcw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening analyst workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Live Platform Pulse is available only to analyst accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <div className="min-h-full bg-background">
       <div className="mx-auto w-full max-w-[1600px] space-y-6 p-4 sm:p-6 xl:p-8">
-        <section className="overflow-hidden rounded-3xl border border-border bg-card shadow-sm">
-          <div className="relative px-5 py-6 sm:px-7">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.16),transparent_36%),radial-gradient(circle_at_bottom_left,rgba(6,182,212,0.12),transparent_32%)]" />
+        <motion.section
+          initial={{
+            opacity: 0,
+            y: 14,
+          }}
+          animate={{
+            opacity: 1,
+            y: 0,
+          }}
+          transition={{
+            duration: 0.55,
+            ease: [0.22, 1, 0.36, 1],
+          }}
+          className="relative isolate overflow-hidden rounded-[30px] border border-white/10 bg-gradient-to-br from-[#10243A] via-[#0B4F52] to-[#10273A] p-6 text-white shadow-[0_30px_90px_-45px_rgba(13,148,136,0.65)] md:p-7 lg:p-8"
+        >
+          <motion.div
+            animate={{
+              x: [0, 34, -12, 0],
+              y: [0, -16, 12, 0],
+              scale: [1, 1.12, 0.96, 1],
+            }}
+            transition={{
+              duration: 12,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+            className="pointer-events-none absolute -right-20 -top-24 h-80 w-80 rounded-full bg-cyan-400/15 blur-[90px]"
+          />
 
-            <div className="relative flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
-              <div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500 via-blue-600 to-violet-600 text-white shadow-lg shadow-blue-500/20">
-                    <Activity className="h-5 w-5" />
-                  </div>
+          <motion.div
+            animate={{
+              x: [0, -24, 18, 0],
+              y: [0, 18, -10, 0],
+            }}
+            transition={{
+              duration: 14,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+            className="pointer-events-none absolute -bottom-28 left-[20%] h-72 w-72 rounded-full bg-teal-300/15 blur-[100px]"
+          />
 
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-blue-600 dark:text-blue-400">
-                      Analyst Command Center
-                    </p>
+          <div className="pointer-events-none absolute inset-0 opacity-[0.08] [background-image:radial-gradient(circle_at_center,white_1px,transparent_1px)] [background-size:22px_22px]" />
 
-                    <h1 className="mt-1 text-2xl font-black tracking-tight text-foreground sm:text-3xl">
-                      Live Platform Pulse
-                    </h1>
-                  </div>
+          <motion.div
+            animate={{
+              x: ["-30%", "130%"],
+            }}
+            transition={{
+              duration: 5.5,
+              repeat: Infinity,
+              repeatDelay: 2.5,
+              ease: "easeInOut",
+            }}
+            className="pointer-events-none absolute top-0 h-px w-1/3 bg-gradient-to-r from-transparent via-cyan-300 to-transparent shadow-[0_0_18px_rgba(34,211,238,0.9)]"
+          />
 
-                  {data && (
-                    <StatusBadge
-                      status={data.status}
-                    />
-                  )}
+          <div className="relative z-10 flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
+            <div className="max-w-4xl">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center gap-2 rounded-full border border-cyan-200/15 bg-white/[0.07] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.17em] text-cyan-100 backdrop-blur-md">
+                  <Activity className="h-3.5 w-3.5" />
+                  Analyst Command Center
                 </div>
 
-                <p className="mt-4 max-w-3xl text-sm leading-6 text-muted-foreground">
-                  A read-only operational snapshot generated from current MongoDB payment, wallet transaction, and payout records. No mock data or paid intelligence provider is used.
-                </p>
-              </div>
+                <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200/15 bg-emerald-300/[0.08] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-100">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
+                  Analyst only
+                </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setAutoRefresh(
-                      (current) =>
-                        !current
-                    )
-                  }
-                  className={`inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-xs font-bold transition ${
-                    autoRefresh
-                      ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                      : "border-border bg-background text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {autoRefresh
-                    ? (
-                      <PauseCircle className="h-4 w-4" />
-                    )
-                    : (
-                      <PlayCircle className="h-4 w-4" />
-                    )}
-
-                  {autoRefresh
-                    ? "Auto-refresh on"
-                    : "Auto-refresh off"}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    setRefreshKey(
-                      (current) =>
-                        current + 1
-                    )
-                  }
-                  disabled={refreshing}
-                  className="inline-flex h-10 items-center gap-2 rounded-xl bg-primary px-4 text-xs font-bold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <RefreshCcw
-                    className={`h-4 w-4 ${
-                      refreshing
-                        ? "animate-spin"
-                        : ""
-                    }`}
+                {data && (
+                  <StatusBadge
+                    status={data.status}
                   />
-
-                  Refresh now
-                </button>
+                )}
               </div>
+
+              <h1 className="mt-4 max-w-3xl text-2xl font-black tracking-[-0.03em] md:text-3xl lg:text-[36px] lg:leading-[1.08]">
+                Live Platform Pulse
+              </h1>
+
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-200/80">
+                A read-only operational snapshot generated from current MongoDB payment,
+                wallet transaction, and payout records with live analyst-grade monitoring.
+              </p>
+
+              <div className="mt-5 flex flex-wrap items-center gap-2 text-[10px] font-semibold text-slate-200/75">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 backdrop-blur">
+                  <Clock3 className="h-3.5 w-3.5 text-cyan-300" />
+                  {data
+                    ? `Updated ${formatDateTime(data.generatedAt)}`
+                    : "Waiting for first snapshot"}
+                </span>
+
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 backdrop-blur">
+                  <TimerReset className="h-3.5 w-3.5 text-teal-300" />
+                  {autoRefresh
+                    ? `Auto refresh · ${data?.refreshAfterSeconds ?? 20}s`
+                    : "Auto refresh paused"}
+                </span>
+              </div>
+            </div>
+
+            <div className="relative flex shrink-0 flex-wrap items-center gap-2">
+              <div className="pointer-events-none absolute -inset-6 rounded-full bg-cyan-300/10 blur-3xl" />
+
+              <motion.div
+                animate={{
+                  rotate: 360,
+                }}
+                transition={{
+                  duration: 18,
+                  repeat: Infinity,
+                  ease: "linear",
+                }}
+                className="pointer-events-none absolute -left-5 -top-5 hidden h-24 w-24 rounded-full border border-dashed border-cyan-200/20 lg:block"
+              >
+                <span className="absolute left-1/2 top-[-3px] h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-cyan-300 shadow-[0_0_12px_rgba(103,232,249,0.9)]" />
+              </motion.div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isAnalystRole) {
+                    return;
+                  }
+
+                  setAutoRefresh(
+                    (current) =>
+                      !current
+                  );
+                }}
+                className={`relative inline-flex h-11 items-center gap-2 rounded-2xl border px-4 text-xs font-black shadow-lg backdrop-blur-xl transition hover:-translate-y-0.5 ${
+                  autoRefresh
+                    ? "border-emerald-200/20 bg-emerald-300/[0.10] text-emerald-100"
+                    : "border-white/10 bg-white/[0.08] text-white hover:bg-white/[0.12]"
+                }`}
+              >
+                {autoRefresh ? (
+                  <PauseCircle className="h-4 w-4" />
+                ) : (
+                  <PlayCircle className="h-4 w-4" />
+                )}
+
+                {autoRefresh
+                  ? "Auto-refresh on"
+                  : "Auto-refresh off"}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (!isAnalystRole) {
+                    return;
+                  }
+
+                  setRefreshKey(
+                    (current) =>
+                      current + 1
+                  );
+                }}
+                disabled={refreshing}
+                className="relative inline-flex h-11 items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.08] px-4 text-xs font-black text-white shadow-lg backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/[0.12] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <RefreshCcw
+                  className={`h-4 w-4 ${
+                    refreshing
+                      ? "animate-spin"
+                      : ""
+                  }`}
+                />
+
+                {refreshing
+                  ? "Refreshing"
+                  : "Refresh now"}
+              </button>
             </div>
           </div>
 
-          <div className="relative flex flex-col gap-3 border-t border-border bg-muted/20 px-5 py-4 lg:flex-row lg:items-center lg:justify-between sm:px-7">
+          <div className="relative z-10 mt-6 flex flex-col gap-3 border-t border-white/10 pt-4 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-wrap items-center gap-2">
               <select
                 value={mode}
-                onChange={(event) =>
+                onChange={(event) => {
+                  if (!isAnalystRole) {
+                    return;
+                  }
+
                   setMode(
                     event.target.value as AnalystMode
-                  )
-                }
+                  );
+                }}
                 aria-label="Payment mode"
-                className="h-10 rounded-xl border border-border bg-background px-3 text-xs font-bold text-foreground outline-none ring-primary/20 focus:ring-4"
+                className="h-10 rounded-xl border border-white/10 bg-white/[0.08] px-3 text-xs font-black text-white outline-none backdrop-blur transition focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-300/10"
               >
                 {MODE_OPTIONS.map(
                   (option) => (
                     <option
                       key={option.value}
                       value={option.value}
+                      className="bg-[#10243A] text-white"
                     >
                       {option.label}
                     </option>
@@ -819,38 +1101,53 @@ export default function AnalystLivePulsePage() {
                   }
                   aria-label="Currency"
                   maxLength={3}
-                  className="h-10 w-24 rounded-xl border border-border bg-background px-3 text-center text-xs font-black uppercase text-foreground outline-none ring-primary/20 focus:ring-4"
+                  className="h-10 w-24 rounded-xl border border-white/10 bg-white/[0.08] px-3 text-center text-xs font-black uppercase text-white outline-none placeholder:text-slate-300 backdrop-blur transition focus:border-cyan-300/50 focus:ring-4 focus:ring-cyan-300/10"
                 />
 
                 <button
                   type="submit"
-                  className="h-10 rounded-xl border border-border bg-background px-3 text-xs font-bold text-foreground transition hover:bg-muted"
+                  className="h-10 rounded-xl border border-cyan-200/15 bg-cyan-300/[0.10] px-3 text-xs font-black text-cyan-100 transition hover:bg-cyan-300/[0.15]"
                 >
                   Apply
                 </button>
               </form>
             </div>
 
-            <div className="flex flex-wrap items-center gap-4 text-[11px] font-semibold text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5">
-                <Clock3 className="h-3.5 w-3.5" />
-                {data
-                  ? `Updated ${formatDateTime(data.generatedAt)}`
-                  : "Waiting for first snapshot"}
-              </span>
-
-              <span className="inline-flex items-center gap-1.5">
-                <TimerReset className="h-3.5 w-3.5" />
-                {autoRefresh
-                  ? `Refreshes every ${data?.refreshAfterSeconds ?? 20}s`
-                  : "Automatic refresh paused"}
-              </span>
-            </div>
+            <span className="inline-flex items-center gap-2 text-[10px] font-semibold text-slate-200/70">
+              <DatabaseZap className="h-3.5 w-3.5 text-teal-300" />
+              Source: MongoDB live collections
+            </span>
           </div>
-        </section>
+
+          {refreshing && (
+            <motion.div
+              initial={{
+                scaleX: 0,
+              }}
+              animate={{
+                scaleX: 1,
+              }}
+              transition={{
+                duration: 1.15,
+                repeat: Infinity,
+              }}
+              className="absolute bottom-0 left-0 h-[2px] w-full origin-left bg-gradient-to-r from-transparent via-cyan-300 to-transparent"
+            />
+          )}
+        </motion.section>
 
         {error && (
-          <div className="flex items-start gap-3 rounded-2xl border border-red-500/25 bg-red-500/5 p-4 text-red-600 dark:text-red-400">
+          <motion.div
+            initial={{
+              opacity: 0,
+              y: -8,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+            }}
+            className="flex items-start gap-3 rounded-[22px] border border-red-500/20 bg-red-500/[0.06] p-4 text-red-600 shadow-sm dark:text-red-400"
+          >
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
 
             <div className="min-w-0 flex-1">
@@ -862,26 +1159,68 @@ export default function AnalystLivePulsePage() {
                 {error}
               </p>
             </div>
-          </div>
+          </motion.div>
         )}
 
         {loading && !data ? (
-          <div className="grid min-h-[420px] place-items-center rounded-3xl border border-border bg-card">
+          <div className="grid min-h-[420px] place-items-center rounded-[28px] border border-slate-200/80 bg-white/80 shadow-sm dark:border-white/10 dark:bg-slate-950/60">
             <div className="text-center">
-              <RefreshCcw className="mx-auto h-8 w-8 animate-spin text-primary" />
+              <div className="relative mx-auto h-20 w-20">
+                <motion.div
+                  animate={{
+                    rotate: 360,
+                  }}
+                  transition={{
+                    duration: 7,
+                    repeat: Infinity,
+                    ease: "linear",
+                  }}
+                  className="absolute inset-0 rounded-full border border-dashed border-teal-500/35"
+                />
 
-              <p className="mt-4 text-sm font-bold text-foreground">
+                <motion.div
+                  animate={{
+                    rotate: -360,
+                  }}
+                  transition={{
+                    duration: 4,
+                    repeat: Infinity,
+                    ease: "linear",
+                  }}
+                  className="absolute inset-2 rounded-full border border-cyan-500/30"
+                />
+
+                <motion.div
+                  animate={{
+                    scale: [1, 1.08, 1],
+                  }}
+                  transition={{
+                    duration: 1.8,
+                    repeat: Infinity,
+                  }}
+                  className="absolute inset-4 flex items-center justify-center rounded-2xl bg-gradient-to-br from-teal-500 via-cyan-500 to-sky-500 text-white shadow-lg shadow-teal-500/20"
+                >
+                  <Activity className="h-6 w-6" />
+                </motion.div>
+              </div>
+
+              <p className="mt-5 text-sm font-black text-slate-900 dark:text-white">
                 Reading live platform activity
               </p>
 
-              <p className="mt-1 text-xs text-muted-foreground">
-                Aggregating current MongoDB records…
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Aggregating current MongoDB records...
               </p>
             </div>
           </div>
         ) : data ? (
           <>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <motion.div
+              variants={stagger}
+              initial="hidden"
+              animate="show"
+              className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+            >
               <MetricCard
                 label="Attempts · 5 min"
                 value={formatNumber(
@@ -971,7 +1310,7 @@ export default function AnalystLivePulsePage() {
                 icon={Banknote}
                 iconClass="bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400"
               />
-            </div>
+            </motion.div>
 
             <div className="grid gap-6 2xl:grid-cols-[1.55fr_1fr]">
               <Panel
@@ -984,8 +1323,11 @@ export default function AnalystLivePulsePage() {
                 }
               >
                 {hasTimelineActivity ? (
-                  <div className="h-[330px] w-full">
-                    <ResponsiveContainer
+                  <div className="relative overflow-hidden rounded-[22px] border border-white/10 bg-gradient-to-br from-[#0A2028] via-[#0A2A2D] to-[#0A1B26] p-3 shadow-inner">
+                    <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-cyan-400/10 blur-[90px]" />
+
+                    <div className="relative h-[330px] w-full">
+                      <ResponsiveContainer
                       width="100%"
                       height="100%"
                     >
@@ -1091,7 +1433,7 @@ export default function AnalystLivePulsePage() {
                           type="monotone"
                           dataKey="attemptCount"
                           name="Attempts"
-                          stroke="#3b82f6"
+                          stroke="#22C7D6"
                           strokeWidth={3}
                           dot={false}
                           activeDot={{
@@ -1104,7 +1446,7 @@ export default function AnalystLivePulsePage() {
                           type="monotone"
                           dataKey="completedCount"
                           name="Completed"
-                          stroke="#10b981"
+                          stroke="#10B981"
                           strokeWidth={2}
                           dot={false}
                         />
@@ -1114,13 +1456,14 @@ export default function AnalystLivePulsePage() {
                           type="monotone"
                           dataKey="volumeMajor"
                           name="Completed volume"
-                          stroke="#8b5cf6"
-                          fill="#8b5cf6"
+                          stroke="#38BDF8"
+                          fill="#38BDF8"
                           fillOpacity={0.08}
                           strokeWidth={2}
                         />
                       </ComposedChart>
-                    </ResponsiveContainer>
+                      </ResponsiveContainer>
+                    </div>
                   </div>
                 ) : (
                   <EmptyState message="No gateway payment attempt exists in the selected currency and mode during the last 60 minutes." />
@@ -1182,9 +1525,9 @@ export default function AnalystLivePulsePage() {
                           (provider) => (
                             <tr
                               key={provider.provider}
-                              className="text-xs"
+                              className="text-xs transition hover:bg-teal-500/[0.04]"
                             >
-                              <td className="border-b border-border/60 px-3 py-3.5">
+                              <td className="border-b border-slate-200/70 dark:border-white/10 px-3 py-3.5">
                                 <div className="flex items-center gap-2">
                                   <span
                                     className={`h-2.5 w-2.5 rounded-full ${SCORE_BAR_STYLES[provider.status]}`}
@@ -1198,23 +1541,23 @@ export default function AnalystLivePulsePage() {
                                 </div>
                               </td>
 
-                              <td className="border-b border-border/60 px-3 py-3.5 text-right font-bold text-foreground">
+                              <td className="border-b border-slate-200/70 dark:border-white/10 px-3 py-3.5 text-right font-bold text-foreground">
                                 {formatNumber(
                                   provider.attemptCount
                                 )}
                               </td>
 
-                              <td className="border-b border-border/60 px-3 py-3.5 text-right font-bold text-red-600 dark:text-red-400">
+                              <td className="border-b border-slate-200/70 dark:border-white/10 px-3 py-3.5 text-right font-bold text-red-600 dark:text-red-400">
                                 {formatNumber(
                                   provider.failedCount
                                 )}
                               </td>
 
-                              <td className="border-b border-border/60 px-3 py-3.5 text-right font-bold text-foreground">
+                              <td className="border-b border-slate-200/70 dark:border-white/10 px-3 py-3.5 text-right font-bold text-foreground">
                                 {provider.successRate.toFixed(2)}%
                               </td>
 
-                              <td className="border-b border-border/60 px-3 py-3.5 text-right font-bold text-foreground">
+                              <td className="border-b border-slate-200/70 dark:border-white/10 px-3 py-3.5 text-right font-bold text-foreground">
                                 {formatCompactMoney(
                                   provider.volumeMinor,
                                   data.filters.currency
@@ -1275,8 +1618,7 @@ export default function AnalystLivePulsePage() {
                           <CartesianGrid
                             strokeDasharray="4 4"
                             vertical={false}
-                            stroke="currentColor"
-                            className="text-border"
+                            stroke="rgba(148,163,184,0.14)"
                           />
 
                           <XAxis
@@ -1341,7 +1683,7 @@ export default function AnalystLivePulsePage() {
                         (reason) => (
                           <div
                             key={reason.code}
-                            className="rounded-xl border border-border bg-background/60 p-3"
+                            className="rounded-2xl border border-slate-200/80 bg-white/75 p-3 shadow-sm transition hover:-translate-y-0.5 dark:border-white/10 dark:bg-black/10"
                           >
                             <div className="flex items-center justify-between gap-3 text-xs">
                               <span className="truncate font-bold text-foreground">
@@ -1397,7 +1739,7 @@ export default function AnalystLivePulsePage() {
                                 className={`h-2.5 w-2.5 rounded-full ${
                                   item.mode === "live"
                                     ? "bg-emerald-500"
-                                    : "bg-blue-500"
+                                    : "bg-cyan-500"
                                 }`}
                               />
 
@@ -1420,7 +1762,7 @@ export default function AnalystLivePulsePage() {
                               className={`h-full rounded-full transition-all duration-700 ${
                                 item.mode === "live"
                                   ? "bg-emerald-500"
-                                  : "bg-blue-500"
+                                  : "bg-cyan-500"
                               }`}
                               style={{
                                 width:
@@ -1464,27 +1806,45 @@ export default function AnalystLivePulsePage() {
               </Panel>
             </div>
 
-            <section className="rounded-2xl border border-border bg-card px-5 py-4 shadow-sm">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <motion.section
+              initial={{
+                opacity: 0,
+                y: 12,
+              }}
+              whileInView={{
+                opacity: 1,
+                y: 0,
+              }}
+              viewport={{
+                once: true,
+              }}
+              className="relative overflow-hidden rounded-[24px] border border-teal-500/20 bg-gradient-to-br from-teal-500/[0.07] via-cyan-500/[0.04] to-transparent p-5 shadow-[0_18px_55px_-42px_rgba(15,118,110,0.50)]"
+            >
+              <div className="pointer-events-none absolute -right-16 -top-16 h-44 w-44 rounded-full bg-cyan-500/10 blur-[70px]" />
+
+              <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-start gap-3">
-                  <CreditCard className="mt-0.5 h-5 w-5 text-primary" />
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-500/10 text-teal-700 dark:text-teal-300">
+                    <CreditCard className="h-4 w-4" />
+                  </div>
 
                   <div>
-                    <p className="text-sm font-extrabold text-foreground">
-                      Read-only operational intelligence
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-700 dark:text-slate-200">
+                      Read-only analyst boundary
                     </p>
 
-                    <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                      This page reads aggregated operational facts only. It cannot create payments, change wallets, process payouts, approve verification, or reveal merchant secrets.
+                    <p className="mt-1 max-w-4xl text-[11px] leading-5 text-slate-500 dark:text-slate-400">
+                      This page reads aggregated operational facts only. It cannot create payments,
+                      change wallets, process payouts, approve verification, or reveal merchant secrets.
                     </p>
                   </div>
                 </div>
 
-                <span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                <span className="shrink-0 rounded-full border border-teal-500/15 bg-teal-500/[0.06] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-teal-700 dark:text-teal-300">
                   Source: MongoDB live collections
                 </span>
               </div>
-            </section>
+            </motion.section>
           </>
         ) : null}
       </div>

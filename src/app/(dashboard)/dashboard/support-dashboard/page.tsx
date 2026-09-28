@@ -108,6 +108,99 @@ const EMPTY_ATTENTION: SupportAttention = {
 };
 
 /* =========================================================
+   AUTHORIZATION
+========================================================= */
+
+function isAuthorizationError(
+  error: unknown
+): boolean {
+  const record =
+    error &&
+    typeof error === "object"
+      ? (error as Record<string, unknown>)
+      : null;
+
+  const response =
+    record?.response &&
+    typeof record.response === "object"
+      ? (record.response as Record<string, unknown>)
+      : null;
+
+  const status = Number(
+    record?.status ??
+      record?.statusCode ??
+      response?.status
+  );
+
+  if (
+    status === 401 ||
+    status === 403
+  ) {
+    return true;
+  }
+
+  const message =
+    error instanceof Error
+      ? error.message.toLowerCase()
+      : String(error ?? "").toLowerCase();
+
+  return (
+    message.includes("401") ||
+    message.includes("403") ||
+    message.includes("unauthorized") ||
+    message.includes("forbidden") ||
+    message.includes("access denied") ||
+    message.includes("not authorized")
+  );
+}
+
+function SupportNotFoundState() {
+  return (
+    <main className="relative flex min-h-[78vh] items-center justify-center overflow-hidden bg-background px-4 text-foreground">
+      <div className="pointer-events-none absolute left-1/2 top-1/2 h-[440px] w-[440px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-emerald-500/[0.08] blur-[120px]" />
+
+      <motion.section
+        initial={{
+          opacity: 0,
+          y: 18,
+          scale: 0.98,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          scale: 1,
+        }}
+        transition={{
+          duration: 0.45,
+          ease: [0.22, 1, 0.36, 1],
+        }}
+        className="relative w-full max-w-xl overflow-hidden rounded-[32px] border border-border bg-card p-7 text-center shadow-[0_28px_90px_rgba(15,23,42,.10)] sm:p-10"
+      >
+        <div className="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-emerald-500/[0.08] blur-3xl" />
+
+        <div className="relative">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] border border-emerald-500/15 bg-emerald-500/10 text-2xl font-black text-emerald-600">
+            404
+          </div>
+
+          <p className="mt-6 text-[11px] font-black uppercase tracking-[0.22em] text-emerald-600">
+            Support Console
+          </p>
+
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">
+            Page not found
+          </h1>
+
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+            The page you are looking for does not exist or is not available.
+          </p>
+        </div>
+      </motion.section>
+    </main>
+  );
+}
+
+/* =========================================================
    PAGE
 ========================================================= */
 
@@ -209,6 +302,12 @@ export default function SupportDashboardPage() {
     error,
     setError,
   ] = useState("");
+
+
+  const [
+    accessDenied,
+    setAccessDenied,
+  ] = useState(false);
 
   const [
     filtersOpen,
@@ -314,6 +413,15 @@ export default function SupportDashboardPage() {
         } catch (
           dashboardError: unknown
         ) {
+          if (
+            isAuthorizationError(
+              dashboardError
+            )
+          ) {
+            setAccessDenied(true);
+            return;
+          }
+
           setError(
             dashboardError instanceof
               Error
@@ -430,6 +538,15 @@ export default function SupportDashboardPage() {
           ticketError: unknown
         ) => {
           if (!active) {
+            return;
+          }
+
+          if (
+            isAuthorizationError(
+              ticketError
+            )
+          ) {
+            setAccessDenied(true);
             return;
           }
 
@@ -585,27 +702,83 @@ export default function SupportDashboardPage() {
     async (
       ticketId: string
     ) => {
-      const response =
-        await supportDashboardApi.getTicket(
-          ticketId
+      try {
+        const response =
+          await supportDashboardApi.getTicket(
+            ticketId
+          );
+
+        setSelectedTicket(
+          response.ticket
         );
 
-      setSelectedTicket(
-        response.ticket
-      );
+        await loadDashboard(
+          "refresh"
+        );
+      } catch (
+        ticketError: unknown
+      ) {
+        if (
+          isAuthorizationError(
+            ticketError
+          )
+        ) {
+          setAccessDenied(true);
+          return;
+        }
 
-      await loadDashboard(
-        "refresh"
+        throw ticketError;
+      }
+    };
+
+  useEffect(() => {
+    if (!selectedTicketId) {
+      return;
+    }
+
+    const previousOverflow =
+      document.body.style.overflow;
+
+    document.body.style.overflow =
+      "hidden";
+
+    function onKeyDown(
+      event: KeyboardEvent
+    ) {
+      if (
+        event.key === "Escape"
+      ) {
+        setSelectedTicketId(null);
+      }
+    }
+
+    window.addEventListener(
+      "keydown",
+      onKeyDown
+    );
+
+    return () => {
+      document.body.style.overflow =
+        previousOverflow;
+
+      window.removeEventListener(
+        "keydown",
+        onKeyDown
       );
     };
+  }, [selectedTicketId]);
 
   /* =======================================================
      RENDER
   ======================================================= */
 
+  if (accessDenied) {
+    return <SupportNotFoundState />;
+  }
+
   return (
-    <main className="min-h-screen bg-background px-4 py-5 text-card-foreground sm:px-6 md:px-8">
-      <div className="mx-auto max-w-[1600px]">
+    <main className="w-full min-w-0 overflow-x-clip bg-transparent pb-8 text-card-foreground">
+      <div className="mx-auto w-full max-w-[1600px]">
 
         {/* =================================================
             HEADER
@@ -626,7 +799,7 @@ export default function SupportDashboardPage() {
             OPERATIONS SNAPSHOT
         ================================================= */}
 
-        <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <section className="mt-6 grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
           <MetricCard
             title="Open Tickets"
             value={
@@ -684,7 +857,7 @@ export default function SupportDashboardPage() {
             SUPPORT STATUS
         ================================================= */}
 
-        <section className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <section className="mt-5 grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
           <SmallMetric
             label="SLA Breached"
             value={
@@ -763,7 +936,7 @@ export default function SupportDashboardPage() {
             </h2>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
             <AttentionCard
               title="SLA Due Soon"
               value={
@@ -840,13 +1013,13 @@ export default function SupportDashboardPage() {
 
         <section
           id="support-agent-queue"
-          className="mt-6 overflow-hidden rounded-[26px] border border-border bg-card shadow-[0_12px_42px_rgba(15,39,69,0.06)]"
+          className="mt-6 min-w-0 overflow-hidden rounded-[26px] border border-border bg-card shadow-[0_12px_42px_rgba(15,39,69,0.06)]"
         >
           <div className="border-b border-border bg-muted p-4">
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+            <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
 
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
                   <Inbox className="h-4 w-4 text-emerald-600" />
 
                   <h2 className="text-sm font-black">
@@ -860,8 +1033,8 @@ export default function SupportDashboardPage() {
                 </p>
               </div>
 
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <label className="relative min-w-0 sm:w-[320px]">
+              <div className="flex flex-col gap-2 md:flex-row">
+                <label className="relative min-w-0 md:w-[320px]">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
 
                   <input
@@ -980,7 +1153,7 @@ export default function SupportDashboardPage() {
                 }}
                 className="overflow-hidden border-b border-border bg-card"
               >
-                <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-3 p-4 md:grid-cols-2 2xl:grid-cols-4">
 
                   <FilterSelect
                     label="Status"
@@ -1082,7 +1255,9 @@ export default function SupportDashboardPage() {
                 text-rose-700
               "
             >
-              {error}
+              <span className="break-words [overflow-wrap:anywhere]">
+                {error}
+              </span>
             </div>
           ) : null}
 
@@ -1245,6 +1420,9 @@ export default function SupportDashboardPage() {
                   ticketId
                 );
               }}
+              onUnauthorized={() =>
+                setAccessDenied(true)
+              }
             />
           </>
         ) : null}
@@ -1273,8 +1451,10 @@ export default function SupportDashboardPage() {
             }}
             className="
               fixed
+              left-4
               right-4
               top-4
+              sm:left-auto
               z-[120]
               w-[calc(100%-2rem)]
               max-w-sm
@@ -1289,12 +1469,12 @@ export default function SupportDashboardPage() {
             <div className="flex items-start gap-3">
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-500" />
 
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs font-black">
                   Support Workspace
                 </p>
 
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                <p className="mt-1 break-words [overflow-wrap:anywhere] text-xs leading-5 text-muted-foreground">
                   {toast}
                 </p>
               </div>
@@ -1339,7 +1519,7 @@ function SupportAgentHeader({
 
       <div className="pointer-events-none absolute -bottom-24 left-1/3 h-64 w-64 rounded-full bg-cyan-300/10 blur-3xl" />
 
-      <div className="relative z-10 flex flex-col gap-5 xl:flex-row xl:items-center xl:justify-between">
+      <div className="relative z-10 flex flex-col gap-5 2xl:flex-row 2xl:items-center 2xl:justify-between">
         <div>
           <div className="flex flex-wrap items-center gap-2">
 
@@ -1416,6 +1596,7 @@ function SupportAgentHeader({
             text-white
             transition
             hover:bg-white/15
+            sm:w-auto
           "
         >
           <RefreshCw
@@ -1853,8 +2034,19 @@ function SupportQueue({
   }
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[1000px] text-left">
+    <>
+      <div className="space-y-3 p-4 xl:hidden">
+        {tickets.map((ticket) => (
+          <SupportQueueMobileCard
+            key={ticket.id}
+            ticket={ticket}
+            onOpen={onOpen}
+          />
+        ))}
+      </div>
+
+      <div className="support-dashboard-scroll hidden overflow-x-auto overscroll-x-contain xl:block">
+        <table className="w-full min-w-[1000px] text-left">
         <thead>
           <tr className="border-b border-border bg-muted">
             {[
@@ -1941,13 +2133,13 @@ function SupportQueue({
                     </span>
 
                     <div className="min-w-0">
-                      <p className="max-w-[180px] truncate text-xs font-black">
+                      <p className="max-w-[180px] break-words text-xs font-black leading-5">
                         {
                           ticket.customerName
                         }
                       </p>
 
-                      <p className="mt-0.5 max-w-[190px] truncate text-[9px] text-muted-foreground">
+                      <p className="mt-0.5 max-w-[190px] break-all text-[9px] leading-4 text-muted-foreground">
                         {
                           ticket.customerEmail
                         }
@@ -1957,7 +2149,7 @@ function SupportQueue({
                 </td>
 
                 <td className="px-5 py-4">
-                  <p className="max-w-[300px] truncate text-xs font-bold">
+                  <p className="max-w-[300px] break-words text-xs font-bold leading-5">
                     {
                       ticket.subject
                     }
@@ -1988,7 +2180,7 @@ function SupportQueue({
 
                 <td className="px-5 py-4">
                   <span
-                    className={`text-[10px] font-black ${
+                    className={`max-w-[160px] break-words text-[10px] font-black leading-4 ${
                       ticket.assignee.id
                         ? "text-card-foreground"
                         : "text-amber-700"
@@ -2016,7 +2208,110 @@ function SupportQueue({
             )
           )}
         </tbody>
-      </table>
+        </table>
+      </div>
+    </>
+  );
+}
+
+/* =========================================================
+   MOBILE QUEUE CARD
+========================================================= */
+
+function SupportQueueMobileCard({
+  ticket,
+  onOpen,
+}: {
+  ticket: SupportTicketSummary;
+  onOpen: (id: string) => void;
+}) {
+  return (
+    <motion.article
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="rounded-[22px] border border-border bg-card p-4 shadow-sm"
+    >
+      <div className="flex flex-col gap-3 min-[480px]:flex-row min-[480px]:items-start min-[480px]:justify-between">
+        <div className="min-w-0">
+          <p className="break-all text-[9px] font-black uppercase tracking-[0.1em] text-emerald-700">
+            {ticket.ticketNumber}
+          </p>
+
+          <h3 className="mt-1 break-words text-sm font-black leading-5">
+            {ticket.subject}
+          </h3>
+
+          <p className="mt-1 break-words text-[9px] leading-4 text-muted-foreground">
+            {ticket.category} · {formatRelativeTime(ticket.lastActivityAt)}
+          </p>
+        </div>
+
+        <StatusBadge status={ticket.status} />
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-2 min-[460px]:grid-cols-2">
+        <MobileQueueInfo
+          label="Customer"
+          value={ticket.customerName}
+        />
+
+        <MobileQueueInfo
+          label="Email"
+          value={ticket.customerEmail}
+        />
+
+        <MobileQueueInfo
+          label="Priority"
+          value={ticket.priority}
+        />
+
+        <MobileQueueInfo
+          label="Owner"
+          value={ticket.assignee?.name || "Unassigned"}
+        />
+      </div>
+
+      <div className="mt-4 flex flex-col gap-3 rounded-2xl bg-muted/55 p-3 min-[520px]:flex-row min-[520px]:items-center min-[520px]:justify-between">
+        <div>
+          <p className="text-[8px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+            SLA
+          </p>
+          <div className="mt-1">
+            <SlaBadge
+              minutes={ticket.slaMinutes}
+              breached={ticket.slaBreached}
+            />
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => onOpen(ticket.id)}
+          className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-[10px] font-black text-white transition hover:bg-emerald-700 min-[520px]:w-auto"
+        >
+          Open ticket
+          <ArrowRight className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </motion.article>
+  );
+}
+
+function MobileQueueInfo({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="min-w-0 rounded-2xl bg-muted/55 p-3">
+      <p className="text-[8px] font-black uppercase tracking-[0.12em] text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-1 break-words [overflow-wrap:anywhere] text-[10px] font-bold leading-4">
+        {value || "—"}
+      </p>
     </div>
   );
 }
@@ -2029,6 +2324,7 @@ function SupportTicketDrawer({
   ticket,
   onClose,
   onUpdated,
+  onUnauthorized,
 }: {
   ticket:
     | SupportTicketDetail
@@ -2040,6 +2336,8 @@ function SupportTicketDrawer({
     ticketId: string,
     message: string
   ) => Promise<void>;
+
+  onUnauthorized: () => void;
 }) {
   const [
     reply,
@@ -2073,9 +2371,9 @@ function SupportTicketDrawer({
       work: () =>
         Promise<unknown>,
       successMessage: string
-    ) => {
+    ): Promise<boolean> => {
       if (!ticket) {
-        return;
+        return false;
       }
 
       setBusy(
@@ -2089,15 +2387,28 @@ function SupportTicketDrawer({
           ticket.id,
           successMessage
         );
+
+        return true;
       } catch (
         actionError: unknown
       ) {
+        if (
+          isAuthorizationError(
+            actionError
+          )
+        ) {
+          onUnauthorized();
+          return false;
+        }
+
         window.alert(
           actionError instanceof
             Error
             ? actionError.message
             : "Support action failed."
         );
+
+        return false;
       } finally {
         setBusy(
           null
@@ -2125,8 +2436,11 @@ function SupportTicketDrawer({
 
         "Reply sent successfully."
       ).then(
-        () =>
-          setReply("")
+        (success) => {
+          if (success) {
+            setReply("");
+          }
+        }
       );
     };
 
@@ -2150,8 +2464,11 @@ function SupportTicketDrawer({
 
         "Internal note added."
       ).then(
-        () =>
-          setNote("")
+        (success) => {
+          if (success) {
+            setNote("");
+          }
+        }
       );
     };
 
@@ -2167,7 +2484,7 @@ function SupportTicketDrawer({
         exit={{
           x: "100%",
         }}
-        className="fixed inset-y-0 right-0 z-50 flex w-full max-w-3xl items-center justify-center bg-card shadow-2xl"
+        className="fixed inset-y-0 right-0 z-50 flex w-full max-w-[820px] items-center justify-center border-l border-border bg-card shadow-2xl"
       >
         <Loader2 className="h-6 w-6 animate-spin text-emerald-600" />
       </motion.aside>
@@ -2197,7 +2514,9 @@ function SupportTicketDrawer({
         z-50
         flex
         w-full
-        max-w-3xl
+        max-w-[820px]
+        border-l
+        border-border
         flex-col
         bg-card
         shadow-[-20px_0_60px_rgba(15,39,69,0.16)]
@@ -2228,7 +2547,7 @@ function SupportTicketDrawer({
               />
             </div>
 
-            <h2 className="mt-3 text-xl font-black">
+            <h2 className="mt-3 break-words [overflow-wrap:anywhere] text-xl font-black leading-7">
               {
                 ticket.subject
               }
@@ -2260,7 +2579,7 @@ function SupportTicketDrawer({
 
       {/* CONTEXT */}
 
-      <div className="grid gap-3 border-b border-border p-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 border-b border-border p-4 min-[520px]:grid-cols-2 lg:grid-cols-3">
         <ContextCard
           label="Customer"
           value={
@@ -2352,7 +2671,7 @@ function SupportTicketDrawer({
 
       {/* CONTENT */}
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+      <div className="support-dashboard-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-10 sm:p-5 sm:pb-12">
         {tab ===
         "conversation" ? (
           <div className="space-y-3">
@@ -2362,7 +2681,7 @@ function SupportTicketDrawer({
                 Customer issue
               </p>
 
-              <p className="mt-2 whitespace-pre-wrap text-xs leading-6">
+              <p className="mt-2 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-xs leading-6">
                 {
                   ticket.description
                 }
@@ -2395,7 +2714,7 @@ function SupportTicketDrawer({
                             : "border-border bg-card"
                       }`}
                     >
-                      <div className="flex items-center justify-between gap-3">
+                      <div className="flex flex-col gap-2 min-[460px]:flex-row min-[460px]:items-center min-[460px]:justify-between">
                         <p className="text-[9px] font-black">
                           {
                             message.authorName
@@ -2415,7 +2734,7 @@ function SupportTicketDrawer({
                         </span>
                       ) : null}
 
-                      <p className="mt-2 whitespace-pre-wrap text-[10px] leading-5 text-muted-foreground">
+                      <p className="mt-2 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[10px] leading-5 text-muted-foreground">
                         {
                           message.body
                         }
@@ -2464,7 +2783,7 @@ function SupportTicketDrawer({
                 "
               />
 
-              <div className="mt-3 flex justify-end">
+              <div className="mt-3 flex justify-stretch min-[460px]:justify-end">
                 <button
                   type="button"
                   disabled={
@@ -2478,7 +2797,9 @@ function SupportTicketDrawer({
                   className="
                     inline-flex
                     h-9
+                    w-full
                     items-center
+                    justify-center
                     gap-2
                     rounded-xl
                     bg-[#16A66A]
@@ -2488,6 +2809,7 @@ function SupportTicketDrawer({
                     text-white
                     hover:bg-[#128D59]
                     disabled:opacity-50
+                    min-[460px]:w-auto
                   "
                 >
                   {busy ===
@@ -2540,7 +2862,7 @@ function SupportTicketDrawer({
                 "
               />
 
-              <div className="mt-3 flex justify-end">
+              <div className="mt-3 flex justify-stretch min-[460px]:justify-end">
                 <button
                   type="button"
                   disabled={
@@ -2554,7 +2876,9 @@ function SupportTicketDrawer({
                   className="
                     inline-flex
                     h-9
+                    w-full
                     items-center
+                    justify-center
                     gap-2
                     rounded-xl
                     bg-amber-600
@@ -2564,6 +2888,7 @@ function SupportTicketDrawer({
                     text-white
                     hover:bg-amber-700
                     disabled:opacity-50
+                    min-[460px]:w-auto
                   "
                 >
                   {busy ===
@@ -2655,11 +2980,11 @@ function ContextCard({
             {label}
           </p>
 
-          <p className="mt-0.5 truncate text-[10px] font-black">
+          <p className="mt-0.5 break-words [overflow-wrap:anywhere] text-[10px] font-black leading-4">
             {value}
           </p>
 
-          <p className="mt-0.5 truncate text-[9px] text-muted-foreground">
+          <p className="mt-0.5 break-words [overflow-wrap:anywhere] text-[9px] leading-4 text-muted-foreground">
             {subvalue}
           </p>
         </div>
@@ -2734,7 +3059,7 @@ function StatusBadge({
 
   return (
     <span
-      className={`rounded-full px-2.5 py-1 text-[8px] font-black ${config[status]}`}
+      className={`inline-flex max-w-[160px] whitespace-normal rounded-full px-2.5 py-1 text-left text-[8px] font-black leading-4 ${config[status]}`}
     >
       {status}
     </span>

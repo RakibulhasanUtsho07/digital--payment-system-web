@@ -3,10 +3,17 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
+  type ReactNode,
 } from "react";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
+  AnimatePresence,
   motion,
 } from "framer-motion";
 
@@ -17,27 +24,30 @@ import {
   ArrowUpRight,
   BadgeCheck,
   BrainCircuit,
+  Check,
+  ChevronDown,
+  CircleCheckBig,
   CircleUserRound,
-  DatabaseZap,
+  Gauge,
+  Loader2,
   RefreshCcw,
-  RotateCcw,
   ShieldAlert,
+  ShieldCheck,
   Sparkles,
   TrendingUp,
   UserCheck,
-  UserPlus,
+  UserRoundX,
   Users,
   WalletCards,
+  WalletMinimal,
+  X,
   type LucideIcon,
 } from "lucide-react";
 
 import {
   Area,
-  Bar,
-  BarChart,
+  AreaChart,
   CartesianGrid,
-  Cell,
-  ComposedChart,
   Line,
   ResponsiveContainer,
   Tooltip,
@@ -46,93 +56,98 @@ import {
 } from "recharts";
 
 import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
+
+import {
   getAnalystUserAnalytics,
+  type AnalystInsightSeverity,
+  type AnalystPulseStatus,
   type AnalystRange,
   type AnalystUserAnalyticsData,
   type AnalystUserInsight,
   type AnalystUserMetric,
+  type AnalystUserTrendPoint,
 } from "@/lib/api/analystApi";
 
-import {
-  isApiAbortError,
-} from "@/lib/api/client";
-
 /* =========================================================
-   OPTIONS
+   TOKENS
 ========================================================= */
 
-const RANGE_OPTIONS: Array<{
-  value:
-    AnalystRange;
+const COLORS = {
+  navy: "#10283F",
+  deep: "#10273A",
+  teal: "#0B4F52",
+  tealSoft: "#0F766E",
+  cyan: "#22C7B8",
+  sky: "#38BDF8",
+  canvas: "#F4F8F7",
+  grid: "#DCE7E5",
+  muted: "#64778A",
+  red: "#DC2626",
+  amber: "#D97706",
+  emerald: "#059669",
+  white: "#FFFFFF",
+};
 
-  label:
-    string;
+const RANGE_OPTIONS: ReadonlyArray<{
+  value: AnalystRange;
+  label: string;
 }> = [
   {
-    value:
-      "24h",
-
-    label:
-      "Last 24 hours",
+    value: "24h",
+    label: "24 hours",
   },
-
   {
-    value:
-      "7d",
-
-    label:
-      "Last 7 days",
+    value: "7d",
+    label: "7 days",
   },
-
   {
-    value:
-      "30d",
-
-    label:
-      "Last 30 days",
+    value: "30d",
+    label: "30 days",
   },
-
   {
-    value:
-      "90d",
-
-    label:
-      "Last 90 days",
+    value: "90d",
+    label: "90 days",
   },
 ];
 
-/* =========================================================
-   COLORS
-========================================================= */
-
-const KYC_COLORS:
-  Record<string, string> = {
-  verified:
-    "#10b981",
-
-  pending:
-    "#f59e0b",
-
-  rejected:
-    "#ef4444",
-
-  not_started:
-    "#64748b",
-
-  unknown:
-    "#94a3b8",
+const containerVariants = {
+  hidden: {},
+  show: {
+    transition: {
+      staggerChildren: 0.055,
+      delayChildren: 0.03,
+    },
+  },
 };
 
-const RISK_COLORS:
-  Record<string, string> = {
-  LOW:
-    "#10b981",
-
-  MEDIUM:
-    "#f59e0b",
-
-  HIGH:
-    "#ef4444",
+const itemVariants = {
+  hidden: {
+    opacity: 0,
+    y: 18,
+    scale: 0.99,
+    filter: "blur(6px)",
+  },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    filter: "blur(0px)",
+    transition: {
+      duration: 0.46,
+      ease: [
+        0.22,
+        1,
+        0.36,
+        1,
+      ] as const,
+    },
+  },
 };
 
 /* =========================================================
@@ -140,67 +155,43 @@ const RISK_COLORS:
 ========================================================= */
 
 function formatNumber(
-  value:
-    number
+  value: number
 ): string {
   return new Intl.NumberFormat(
-    "en-BD"
-  ).format(
-    value
-  );
+    "en-US"
+  ).format(value);
+}
+
+function formatCompact(
+  value: number
+): string {
+  return new Intl.NumberFormat(
+    "en-US",
+    {
+      notation: "compact",
+      maximumFractionDigits: 1,
+    }
+  ).format(value);
 }
 
 function formatPercent(
-  value:
-    number
+  value: number
 ): string {
-  return `${value.toFixed(
-    1
-  )}%`;
+  return `${value.toFixed(2)}%`;
 }
 
 function formatDateTime(
   value:
-    string
+    | string
+    | null
+    | undefined
 ): string {
-  const date =
-    new Date(
-      value
-    );
-
-  if (
-    Number.isNaN(
-      date.getTime()
-    )
-  ) {
-    return "Unavailable";
+  if (!value) {
+    return "Not available";
   }
 
-  return new Intl.DateTimeFormat(
-    "en-BD",
-    {
-      dateStyle:
-        "medium",
-
-      timeStyle:
-        "short",
-    }
-  ).format(
-    date
-  );
-}
-
-function formatBucket(
-  value:
-    string,
-
-  range:
-    AnalystRange
-): string {
   const date =
-    new Date(
-      value
-    );
+    new Date(value);
 
   if (
     Number.isNaN(
@@ -210,433 +201,1290 @@ function formatBucket(
     return value;
   }
 
-  if (
-    range ===
-    "24h"
-  ) {
-    return new Intl.DateTimeFormat(
-      "en-BD",
-      {
-        hour:
-          "numeric",
+  return date.toLocaleString();
+}
 
-        hour12:
-          true,
-      }
-    ).format(
-      date
-    );
+function formatBucketShort(
+  value: string
+): string {
+  const date =
+    new Date(value);
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return value;
   }
 
-  return new Intl.DateTimeFormat(
-    "en-BD",
+  return date.toLocaleString(
+    undefined,
     {
-      month:
-        "short",
-
-      day:
-        "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
     }
-  ).format(
-    date
   );
 }
 
-function prettify(
-  value:
-    string
+function readableLabel(
+  value: string
 ): string {
   return value
     .replace(
-      /_/g,
+      /[_-]+/g,
       " "
     )
     .replace(
       /\b\w/g,
-      (
-        character
-      ) =>
+      (character) =>
         character.toUpperCase()
     );
 }
 
 /* =========================================================
-   CHANGE BADGE
+   STATUS / SEMANTIC HELPERS
 ========================================================= */
 
-function ChangeBadge({
-  metric,
-  inverse = false,
-}: {
-  metric:
-    AnalystUserMetric;
+function statusConfig(
+  status: AnalystPulseStatus
+): {
+  className: string;
+  dotClassName: string;
+  label: string;
+} {
+  switch (status) {
+    case "critical":
+      return {
+        className:
+          "border-red-200 bg-red-50 text-red-700 dark:border-red-900/60 dark:bg-red-950/35 dark:text-red-300",
+        dotClassName:
+          "bg-red-500",
+        label:
+          "Critical",
+      };
 
-  inverse?:
-    boolean;
-}) {
+    case "attention":
+      return {
+        className:
+          "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/35 dark:text-amber-300",
+        dotClassName:
+          "bg-amber-500",
+        label:
+          "Attention",
+      };
+
+    case "healthy":
+      return {
+        className:
+          "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/35 dark:text-emerald-300",
+        dotClassName:
+          "bg-emerald-500",
+        label:
+          "Healthy",
+      };
+  }
+}
+
+function severityClasses(
+  severity: AnalystInsightSeverity
+): string {
+  switch (severity) {
+    case "critical":
+      return "border-red-200 bg-red-50/80 dark:border-red-900/60 dark:bg-red-950/25";
+
+    case "high":
+      return "border-amber-200 bg-amber-50/80 dark:border-amber-900/60 dark:bg-amber-950/25";
+
+    case "medium":
+      return "border-amber-200/80 bg-amber-50/[0.55] dark:border-amber-900/50 dark:bg-amber-950/15";
+
+    case "positive":
+      return "border-emerald-200 bg-emerald-50/80 dark:border-emerald-900/60 dark:bg-emerald-950/25";
+
+    case "info":
+      return "border-cyan-200 bg-cyan-50/80 dark:border-cyan-900/60 dark:bg-cyan-950/25";
+  }
+}
+
+function metricChange(
+  metric: AnalystUserMetric
+): string {
+  if (
+    metric.changePercent ===
+    null
+  ) {
+    return metric.value === 0
+      ? "No change"
+      : "New activity";
+  }
+
+  if (
+    metric.changePercent ===
+    0
+  ) {
+    return "No change";
+  }
+
+  const prefix =
+    metric.changePercent > 0
+      ? "+"
+      : "";
+
+  return `${prefix}${metric.changePercent.toFixed(
+    2
+  )}% vs previous`;
+}
+
+function metricTrend(
+  metric: AnalystUserMetric,
+  intent:
+    | "higher-better"
+    | "lower-better"
+    | "neutral" =
+    "higher-better"
+): {
+  className: string;
+  Icon: LucideIcon;
+} {
   const change =
     metric.changePercent;
 
   if (
-    change ===
-    null
+    change === null ||
+    change === 0 ||
+    intent === "neutral"
   ) {
-    return (
-      <span className="text-[11px] font-semibold text-muted-foreground">
-        New vs previous period
-      </span>
-    );
+    return {
+      className:
+        "text-slate-500 dark:text-slate-400",
+      Icon:
+        TrendingUp,
+    };
   }
 
-  const rising =
-    change >
-    0;
+  const good =
+    intent === "higher-better"
+      ? change > 0
+      : change < 0;
 
-  const neutral =
-    change ===
-    0;
+  return good
+    ? {
+        className:
+          "text-emerald-600 dark:text-emerald-400",
+        Icon:
+          change > 0
+            ? ArrowUpRight
+            : ArrowDownRight,
+      }
+    : {
+        className:
+          "text-red-600 dark:text-red-400",
+        Icon:
+          change > 0
+            ? ArrowUpRight
+            : ArrowDownRight,
+      };
+}
 
-  const positive =
-    neutral ||
-    (
-      inverse
-        ? !rising
-        : rising
-    );
+/* =========================================================
+   SHARED UI
+========================================================= */
 
-  const Icon =
-    rising
-      ? ArrowUpRight
-      : ArrowDownRight;
+function Surface({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <motion.section
+      variants={
+        itemVariants
+      }
+      className={`
+        min-w-0
+        rounded-[26px]
+        border
+        border-[#DCE7E5]
+        bg-white/95
+        shadow-[0_14px_42px_rgba(23,50,77,0.055)]
+        ring-1
+        ring-white/70
+        backdrop-blur-xl
+        transition-[border-color,box-shadow,transform]
+        duration-300
+
+        hover:border-[#B9E8E1]
+        hover:shadow-[0_18px_48px_rgba(11,79,82,0.075)]
+
+        dark:border-slate-800
+        dark:bg-slate-950/95
+        dark:ring-white/5
+
+        ${className}
+      `}
+    >
+      {children}
+    </motion.section>
+  );
+}
+
+function SectionHeading({
+  eyebrow,
+  title,
+  description,
+  icon: Icon,
+  trailing,
+}: {
+  eyebrow?: string;
+  title: string;
+  description?: string;
+  icon?: LucideIcon;
+  trailing?: ReactNode;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex min-w-0 items-start gap-3">
+        {Icon ? (
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#0B4F52]/[0.08] text-[#0B4F52] dark:bg-cyan-400/[0.08] dark:text-cyan-200">
+            <Icon className="h-5 w-5" />
+          </div>
+        ) : null}
+
+        <div className="min-w-0">
+          {eyebrow ? (
+            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0B4F52] dark:text-cyan-300">
+              {eyebrow}
+            </p>
+          ) : null}
+
+          <h2 className="mt-0.5 break-words text-lg font-black tracking-[-0.025em] text-[#17324D] dark:text-white sm:text-xl">
+            {title}
+          </h2>
+
+          {description ? (
+            <p className="mt-1 max-w-3xl break-words text-sm leading-6 text-slate-500 dark:text-slate-400">
+              {description}
+            </p>
+          ) : null}
+        </div>
+      </div>
+
+      {trailing ? (
+        <div className="min-w-0 shrink-0">
+          {trailing}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function StatusPill({
+  status,
+}: {
+  status: AnalystPulseStatus;
+}) {
+  const config =
+    statusConfig(status);
 
   return (
     <span
-      className={`inline-flex items-center gap-1 text-[11px] font-bold ${
-        neutral
-          ? "text-muted-foreground"
-          : positive
-            ? "text-emerald-600 dark:text-emerald-400"
-            : "text-red-600 dark:text-red-400"
-      }`}
+      className={`
+        inline-flex
+        items-center
+        gap-2
+        rounded-full
+        border
+        px-3
+        py-1.5
+        text-xs
+        font-bold
+
+        ${config.className}
+      `}
     >
-      {!neutral && (
-        <Icon className="h-3.5 w-3.5" />
-      )}
+      <span className="relative flex h-2 w-2">
+        <span
+          className={`
+            absolute
+            inline-flex
+            h-full
+            w-full
+            animate-ping
+            rounded-full
+            opacity-50
 
-      {Math.abs(
-        change
-      ).toFixed(
-        2
-      )}
-      %
+            ${config.dotClassName}
+          `}
+        />
 
-      <span className="font-medium text-muted-foreground">
-        vs previous
+        <span
+          className={`
+            relative
+            inline-flex
+            h-2
+            w-2
+            rounded-full
+
+            ${config.dotClassName}
+          `}
+        />
       </span>
+
+      {config.label}
     </span>
   );
 }
 
-/* =========================================================
-   METRIC CARD
-========================================================= */
+interface AnalystSelectOption {
+  value: AnalystRange;
+  label: string;
+}
+
+function AnalystSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: AnalystRange;
+  options:
+    ReadonlyArray<AnalystSelectOption>;
+  onChange:
+    (
+      value: AnalystRange
+    ) => void;
+}) {
+  const [
+    open,
+    setOpen,
+  ] = useState(false);
+
+  const rootRef =
+    useRef<HTMLDivElement | null>(
+      null
+    );
+
+  const selected =
+    options.find(
+      (option) =>
+        option.value ===
+        value
+    ) ?? options[0];
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const handleOutside = (
+      event: MouseEvent
+    ) => {
+      const target =
+        event.target as Node;
+
+      if (
+        rootRef.current &&
+        !rootRef.current.contains(
+          target
+        )
+      ) {
+        setOpen(false);
+      }
+    };
+
+    const handleEscape = (
+      event: KeyboardEvent
+    ) => {
+      if (
+        event.key ===
+        "Escape"
+      ) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener(
+      "mousedown",
+      handleOutside
+    );
+
+    window.addEventListener(
+      "keydown",
+      handleEscape
+    );
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        handleOutside
+      );
+
+      window.removeEventListener(
+        "keydown",
+        handleEscape
+      );
+    };
+  }, [open]);
+
+  return (
+    <div
+      ref={rootRef}
+      className={`
+        relative
+        min-w-0
+
+        ${
+          open
+            ? "z-[120]"
+            : "z-20"
+        }
+      `}
+    >
+      <span className="mb-2 block text-[10px] font-black uppercase tracking-[0.15em] text-slate-500 dark:text-slate-400">
+        {label}
+      </span>
+
+      <button
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() =>
+          setOpen(
+            (current) =>
+              !current
+          )
+        }
+        className={`
+          group
+          flex
+          h-12
+          w-full
+          min-w-0
+          items-center
+          justify-between
+          gap-3
+          rounded-[15px]
+          border
+          bg-white
+          px-3.5
+          text-left
+          text-sm
+          font-bold
+          text-[#17324D]
+          shadow-[0_5px_18px_rgba(23,50,77,0.035)]
+          outline-none
+          transition-all
+          duration-200
+
+          hover:bg-[#FBFDFC]
+
+          focus-visible:ring-4
+          focus-visible:ring-[#0B4F52]/10
+
+          dark:bg-slate-900
+          dark:text-white
+
+          ${
+            open
+              ? "border-[#0B4F52] ring-4 ring-[#0B4F52]/10 dark:border-cyan-700 dark:ring-cyan-500/10"
+              : "border-[#D4E4E1] hover:border-[#AFCFC9] dark:border-slate-700 dark:hover:border-slate-600"
+          }
+        `}
+      >
+        <span className="min-w-0 flex-1 truncate">
+          {
+            selected?.label ??
+            "30 days"
+          }
+        </span>
+
+        <span
+          className={`
+            flex
+            h-7
+            w-7
+            shrink-0
+            items-center
+            justify-center
+            rounded-lg
+            bg-[#0B4F52]/[0.07]
+            text-[#0B4F52]
+            transition-all
+            duration-200
+
+            dark:bg-cyan-400/[0.08]
+            dark:text-cyan-200
+
+            ${
+              open
+                ? "rotate-180 bg-[#0B4F52]/[0.12]"
+                : "rotate-0"
+            }
+          `}
+        >
+          <ChevronDown className="h-4 w-4" />
+        </span>
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{
+              opacity: 0,
+              y: -6,
+              scale: 0.985,
+            }}
+            animate={{
+              opacity: 1,
+              y: 0,
+              scale: 1,
+            }}
+            exit={{
+              opacity: 0,
+              y: -5,
+              scale: 0.985,
+            }}
+            transition={{
+              duration: 0.16,
+              ease: [
+                0.22,
+                1,
+                0.36,
+                1,
+              ],
+            }}
+            role="listbox"
+            aria-label={label}
+            className="
+              absolute
+              left-0
+              right-0
+              top-[calc(100%+8px)]
+              z-[100]
+              max-h-64
+              overflow-y-auto
+              rounded-[16px]
+              border
+              border-[#D4E4E1]
+              bg-white
+              p-1.5
+              shadow-[0_18px_50px_rgba(23,50,77,0.16)]
+              ring-1
+              ring-white/80
+              backdrop-blur-xl
+
+              dark:border-slate-700
+              dark:bg-slate-900
+              dark:ring-white/5
+            "
+          >
+            {options.map(
+              (
+                option,
+                index
+              ) => {
+                const active =
+                  option.value ===
+                  value;
+
+                return (
+                  <motion.button
+                    key={
+                      option.value
+                    }
+                    type="button"
+                    role="option"
+                    aria-selected={
+                      active
+                    }
+                    initial={{
+                      opacity: 0,
+                      y: 3,
+                    }}
+                    animate={{
+                      opacity: 1,
+                      y: 0,
+                    }}
+                    transition={{
+                      delay:
+                        index * 0.018,
+                      duration:
+                        0.14,
+                    }}
+                    onClick={() => {
+                      onChange(
+                        option.value
+                      );
+
+                      setOpen(
+                        false
+                      );
+                    }}
+                    className={`
+                      flex
+                      w-full
+                      min-w-0
+                      items-center
+                      justify-between
+                      gap-3
+                      rounded-[11px]
+                      px-3
+                      py-2.5
+                      text-left
+                      text-sm
+                      font-bold
+                      transition-all
+                      duration-150
+
+                      ${
+                        active
+                          ? "bg-[#0B4F52]/[0.09] text-[#0B4F52] dark:bg-cyan-400/[0.10] dark:text-cyan-100"
+                          : "text-slate-600 hover:bg-slate-100/80 hover:text-[#0B4F52] dark:text-slate-300 dark:hover:bg-white/[0.06] dark:hover:text-cyan-100"
+                      }
+                    `}
+                  >
+                    <span className="min-w-0 flex-1 truncate">
+                      {
+                        option.label
+                      }
+                    </span>
+
+                    {active && (
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-[#0B4F52] text-white shadow-[0_5px_14px_rgba(11,79,82,.20)] dark:bg-cyan-700">
+                        <Check className="h-3.5 w-3.5" />
+                      </span>
+                    )}
+                  </motion.button>
+                );
+              }
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 function MetricCard({
   label,
   value,
   metric,
   icon: Icon,
-  iconClass,
-  inverse,
+  intent =
+    "higher-better",
 }: {
-  label:
-    string;
-
-  value:
-    string;
-
-  metric:
-    AnalystUserMetric;
-
-  icon:
-    LucideIcon;
-
-  iconClass:
-    string;
-
-  inverse?:
-    boolean;
+  label: string;
+  value: string;
+  metric: AnalystUserMetric;
+  icon: LucideIcon;
+  intent?:
+    | "higher-better"
+    | "lower-better"
+    | "neutral";
 }) {
+  const trend =
+    metricTrend(
+      metric,
+      intent
+    );
+
+  const TrendIcon =
+    trend.Icon;
+
   return (
     <motion.div
-      initial={{
-        opacity:
-          0,
-
-        y:
-          12,
+      variants={
+        itemVariants
+      }
+      whileHover={{
+        y: -3,
       }}
-      animate={{
-        opacity:
-          1,
-
-        y:
-          0,
+      transition={{
+        duration: 0.18,
       }}
-      className="rounded-2xl border border-border bg-card p-5 shadow-sm"
+      className="
+        group
+        relative
+        min-w-0
+        overflow-hidden
+        rounded-[24px]
+        border
+        border-[#DCE7E5]
+        bg-white/95
+        p-5
+        shadow-[0_10px_30px_rgba(23,50,77,0.05)]
+        ring-1
+        ring-white/80
+        backdrop-blur-xl
+        transition-[border-color,box-shadow]
+        duration-300
+
+        hover:border-[#B9E8E1]
+        hover:shadow-[0_18px_46px_rgba(11,79,82,0.09)]
+
+        dark:border-slate-800
+        dark:bg-slate-950/95
+        dark:ring-white/5
+      "
     >
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
+      <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#10283F_0%,#0B4F52_50%,#22C7B8_100%)]" />
+
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-10 -top-12 h-28 w-28 rounded-full bg-[#22C7B8]/10 blur-3xl"
+      />
+
+      <div className="flex min-w-0 items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="break-words text-sm font-semibold text-slate-500 dark:text-slate-400">
             {label}
           </p>
 
-          <p className="mt-3 truncate text-2xl font-black tracking-tight text-card-foreground">
+          <p className="mt-3 break-all text-2xl font-black tracking-tight text-[#17324D] dark:text-white sm:break-words">
             {value}
           </p>
         </div>
 
-        <div
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${iconClass}`}
-        >
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#0B4F52]/[0.08] text-[#0B4F52] transition-transform duration-300 group-hover:scale-105 dark:bg-cyan-400/[0.08] dark:text-cyan-200">
           <Icon className="h-5 w-5" />
         </div>
       </div>
 
-      <div className="mt-4 border-t border-border/70 pt-3">
-        <ChangeBadge
-          metric={
+      <div className="mt-4 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
+        <span
+          className={`
+            inline-flex
+            min-w-0
+            items-center
+            gap-1
+            break-words
+            text-xs
+            font-bold
+
+            ${trend.className}
+          `}
+        >
+          <TrendIcon className="h-3.5 w-3.5 shrink-0" />
+          {metricChange(
             metric
-          }
-          inverse={
-            inverse
-          }
-        />
+          )}
+        </span>
       </div>
     </motion.div>
   );
 }
 
-/* =========================================================
-   POPULATION CARD
-========================================================= */
-
-function PopulationCard({
+function ProgressRow({
   label,
   value,
-  detail,
-  icon: Icon,
-  iconClass,
+  helper,
+  tone =
+    "teal",
 }: {
-  label:
-    string;
-
-  value:
-    string;
-
-  detail:
-    string;
-
-  icon:
-    LucideIcon;
-
-  iconClass:
-    string;
+  label: string;
+  value: number;
+  helper?: string;
+  tone?:
+    | "teal"
+    | "cyan"
+    | "navy"
+    | "red";
 }) {
+  const width =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        value
+      )
+    );
+
+  const fillClass = {
+    teal:
+      "bg-[#0B4F52]",
+    cyan:
+      "bg-[#22C7B8]",
+    navy:
+      "bg-[#10283F]",
+    red:
+      "bg-red-500",
+  }[tone];
+
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.12em] text-muted-foreground">
+    <div className="min-w-0">
+      <div className="mb-2 flex min-w-0 items-start justify-between gap-3 text-sm">
+        <div className="min-w-0">
+          <p className="break-words font-semibold text-slate-600 dark:text-slate-300">
             {label}
           </p>
 
-          <p className="mt-3 text-2xl font-black tracking-tight text-card-foreground">
-            {value}
-          </p>
-
-          <p className="mt-2 text-[11px] font-medium text-muted-foreground">
-            {detail}
-          </p>
+          {helper ? (
+            <p className="mt-0.5 break-words text-[11px] text-slate-400 dark:text-slate-500">
+              {helper}
+            </p>
+          ) : null}
         </div>
 
-        <div
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${iconClass}`}
-        >
-          <Icon className="h-5 w-5" />
-        </div>
+        <span className="shrink-0 font-black tabular-nums text-[#17324D] dark:text-white">
+          {formatPercent(
+            value
+          )}
+        </span>
+      </div>
+
+      <div className="h-2.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+        <motion.div
+          initial={{
+            width: 0,
+          }}
+          animate={{
+            width:
+              `${width}%`,
+          }}
+          transition={{
+            duration: 0.7,
+            ease: [
+              0.22,
+              1,
+              0.36,
+              1,
+            ],
+          }}
+          className={`
+            h-full
+            rounded-full
+
+            ${fillClass}
+          `}
+        />
       </div>
     </div>
   );
 }
 
-/* =========================================================
-   PANEL
-========================================================= */
-
-function Panel({
-  title,
-  description,
-  children,
-  action,
-}: {
-  title:
-    string;
-
-  description:
-    string;
-
-  children:
-    React.ReactNode;
-
-  action?:
-    React.ReactNode;
-}) {
-  return (
-    <section className="rounded-2xl border border-border bg-card shadow-sm">
-      <div className="flex flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-base font-extrabold text-card-foreground">
-            {title}
-          </h2>
-
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            {description}
-          </p>
-        </div>
-
-        {action}
-      </div>
-
-      <div className="p-5">
-        {children}
-      </div>
-    </section>
-  );
-}
-
-/* =========================================================
-   EMPTY
-========================================================= */
-
-function EmptyData({
-  message,
-}: {
-  message:
-    string;
-}) {
-  return (
-    <div className="flex min-h-[240px] flex-col items-center justify-center rounded-xl border border-dashed border-border bg-muted/20 px-5 text-center">
-      <DatabaseZap className="h-8 w-8 text-muted-foreground/60" />
-
-      <p className="mt-3 text-sm font-bold text-foreground">
-        No real data recorded
-      </p>
-
-      <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">
-        {message}
-      </p>
-    </div>
-  );
-}
-
-/* =========================================================
-   BREAKDOWN
-========================================================= */
+type BreakdownListItem = {
+  count: number;
+  percentage: number;
+  status?: string;
+  risk?: string;
+};
 
 function BreakdownList({
   items,
+  labelKey,
+  emptyLabel,
+  tone =
+    "teal",
 }: {
-  items:
-    Array<{
-      key:
-        string;
-
-      label:
-        string;
-
-      count:
-        number;
-
-      percentage:
-        number;
-
-      color:
-        string;
-    }>;
+  items: ReadonlyArray<BreakdownListItem>;
+  labelKey:
+    | "status"
+    | "risk";
+  emptyLabel: string;
+  tone?:
+    | "teal"
+    | "cyan"
+    | "navy"
+    | "red";
 }) {
   if (
-    items.length ===
-    0
+    items.length === 0
   ) {
     return (
-      <EmptyData
-        message="No records are available for this breakdown."
-      />
+      <div className="rounded-2xl border border-dashed border-[#D4E5E2] p-6 text-center text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">
+        {emptyLabel}
+      </div>
     );
   }
 
+  const fillClass = {
+    teal:
+      "bg-[#0B4F52]",
+    cyan:
+      "bg-[#22C7B8]",
+    navy:
+      "bg-[#10283F]",
+    red:
+      "bg-red-500",
+  }[tone];
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {items.map(
         (
-          item
-        ) => (
-          <div
-            key={
-              item.key
-            }
-          >
-            <div className="mb-2 flex items-center justify-between gap-4">
-              <div className="flex min-w-0 items-center gap-2">
-                <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{
-                    backgroundColor:
-                      item.color,
-                  }}
-                />
+          item,
+          index
+        ) => {
+          const label =
+            String(
+              item[
+                labelKey
+              ] ?? ""
+            );
 
-                <span className="truncate text-xs font-bold text-foreground">
-                  {item.label}
+          return (
+            <motion.div
+              key={`${label}-${index}`}
+              initial={{
+                opacity: 0,
+                x: -7,
+              }}
+              animate={{
+                opacity: 1,
+                x: 0,
+              }}
+              transition={{
+                delay:
+                  index *
+                  0.03,
+              }}
+              className="min-w-0"
+            >
+              <div className="mb-2 flex min-w-0 items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="break-words text-sm font-bold text-[#17324D] dark:text-slate-100">
+                    {readableLabel(
+                      label
+                    )}
+                  </p>
+
+                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                    {formatNumber(
+                      item.count
+                    )}{" "}
+                    records
+                  </p>
+                </div>
+
+                <span className="shrink-0 text-sm font-black tabular-nums text-[#17324D] dark:text-white">
+                  {formatPercent(
+                    item.percentage
+                  )}
                 </span>
               </div>
 
-              <span className="shrink-0 text-xs font-bold text-muted-foreground">
-                {formatNumber(
-                  item.count
-                )}{" "}
-                ·{" "}
-                {formatPercent(
-                  item.percentage
-                )}
-              </span>
-            </div>
+              <div className="h-2 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                <motion.div
+                  initial={{
+                    width: 0,
+                  }}
+                  animate={{
+                    width:
+                      `${Math.max(
+                        0,
+                        Math.min(
+                          100,
+                          item.percentage
+                        )
+                      )}%`,
+                  }}
+                  transition={{
+                    duration:
+                      0.65,
+                    delay:
+                      index *
+                      0.03,
+                  }}
+                  className={`
+                    h-full
+                    rounded-full
 
-            <div className="h-2 overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full transition-all duration-500"
-                style={{
-                  width:
-                    `${Math.min(
-                      item.percentage,
-                      100
-                    )}%`,
-
-                  backgroundColor:
-                    item.color,
-                }}
-              />
-            </div>
-          </div>
-        )
+                    ${fillClass}
+                  `}
+                />
+              </div>
+            </motion.div>
+          );
+        }
       )}
     </div>
   );
 }
 
 /* =========================================================
-   INSIGHT CARD
+   CHART
+========================================================= */
+
+interface UserChartTooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    name?: string;
+    dataKey?: string;
+    value?: number;
+    color?: string;
+  }>;
+  label?: string;
+}
+
+function UserChartTooltip({
+  active,
+  payload,
+  label,
+}: UserChartTooltipProps) {
+  if (
+    !active ||
+    !payload?.length
+  ) {
+    return null;
+  }
+
+  return (
+    <div className="max-w-[260px] rounded-2xl border border-[#CDEAE5] bg-white/95 p-3 shadow-[0_16px_42px_rgba(23,50,77,0.14)] backdrop-blur-xl dark:border-slate-700 dark:bg-slate-950/95">
+      <p className="mb-2 break-words text-xs font-bold text-slate-500 dark:text-slate-400">
+        {
+          label
+            ? formatBucketShort(
+                label
+              )
+            : ""
+        }
+      </p>
+
+      <div className="space-y-1.5">
+        {payload.map(
+          (
+            entry
+          ) => (
+            <div
+              key={
+                String(
+                  entry.dataKey
+                )
+              }
+              className="flex min-w-0 items-center justify-between gap-5 text-xs"
+            >
+              <span className="inline-flex min-w-0 items-center gap-2 text-slate-600 dark:text-slate-300">
+                <span
+                  className="h-2 w-2 shrink-0 rounded-full"
+                  style={{
+                    backgroundColor:
+                      entry.color,
+                  }}
+                />
+
+                <span className="truncate">
+                  {entry.name}
+                </span>
+              </span>
+
+              <span className="shrink-0 font-black text-[#17324D] dark:text-white">
+                {formatNumber(
+                  Number(
+                    entry.value ??
+                      0
+                  )
+                )}
+              </span>
+            </div>
+          )
+        )}
+      </div>
+    </div>
+  );
+}
+
+function UserActivityChart({
+  points,
+}: {
+  points:
+    AnalystUserTrendPoint[];
+}) {
+  if (
+    points.length === 0
+  ) {
+    return (
+      <div className="flex h-[260px] items-center justify-center rounded-2xl border border-dashed border-[#D4E5E2] px-4 text-center text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400 sm:h-[320px]">
+        No user trend data is available for this period.
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-[270px] w-full sm:h-[320px] lg:h-[350px]">
+      <ResponsiveContainer
+        width="100%"
+        height="100%"
+      >
+        <AreaChart
+          data={
+            points
+          }
+          margin={{
+            top: 12,
+            right: 8,
+            bottom: 4,
+            left: -12,
+          }}
+        >
+          <defs>
+            <linearGradient
+              id="userActiveFill"
+              x1="0"
+              y1="0"
+              x2="0"
+              y2="1"
+            >
+              <stop
+                offset="0%"
+                stopColor={
+                  COLORS.teal
+                }
+                stopOpacity={
+                  0.24
+                }
+              />
+
+              <stop
+                offset="100%"
+                stopColor={
+                  COLORS.teal
+                }
+                stopOpacity={
+                  0.015
+                }
+              />
+            </linearGradient>
+          </defs>
+
+          <CartesianGrid
+            stroke={
+              COLORS.grid
+            }
+            strokeDasharray="4 6"
+            vertical={
+              false
+            }
+          />
+
+          <XAxis
+            dataKey="bucket"
+            tickFormatter={
+              formatBucketShort
+            }
+            tick={{
+              fill:
+                COLORS.muted,
+              fontSize: 10,
+            }}
+            axisLine={
+              false
+            }
+            tickLine={
+              false
+            }
+            minTickGap={
+              24
+            }
+          />
+
+          <YAxis
+            tickFormatter={
+              formatCompact
+            }
+            tick={{
+              fill:
+                COLORS.muted,
+              fontSize: 10,
+            }}
+            axisLine={
+              false
+            }
+            tickLine={
+              false
+            }
+            width={
+              42
+            }
+          />
+
+          <Tooltip
+            cursor={{
+              stroke:
+                COLORS.grid,
+              strokeWidth:
+                1,
+            }}
+            content={
+              <UserChartTooltip />
+            }
+          />
+
+          <Area
+            type="monotone"
+            dataKey="activeUsers"
+            name="Active users"
+            stroke={
+              COLORS.teal
+            }
+            fill="url(#userActiveFill)"
+            strokeWidth={
+              2.5
+            }
+            activeDot={{
+              r: 4,
+              fill:
+                COLORS.teal,
+              strokeWidth:
+                0,
+            }}
+          />
+
+          <Line
+            type="monotone"
+            dataKey="newUsers"
+            name="New users"
+            stroke={
+              COLORS.sky
+            }
+            strokeWidth={
+              2.1
+            }
+            dot={
+              false
+            }
+            activeDot={{
+              r: 4,
+              fill:
+                COLORS.sky,
+              strokeWidth:
+                0,
+            }}
+          />
+
+          <Line
+            type="monotone"
+            dataKey="highRiskTransactionCount"
+            name="High-risk transactions"
+            stroke={
+              COLORS.red
+            }
+            strokeWidth={
+              1.8
+            }
+            dot={
+              false
+            }
+            activeDot={{
+              r: 4,
+              fill:
+                COLORS.red,
+              strokeWidth:
+                0,
+            }}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+/* =========================================================
+   INSIGHT
 ========================================================= */
 
 function InsightCard({
@@ -645,384 +1493,97 @@ function InsightCard({
   insight:
     AnalystUserInsight;
 }) {
-  const style =
-    {
-      critical:
-        "border-red-500/25 bg-red-500/5 text-red-600 dark:text-red-400",
-
-      high:
-        "border-orange-500/25 bg-orange-500/5 text-orange-600 dark:text-orange-400",
-
-      medium:
-        "border-amber-500/25 bg-amber-500/5 text-amber-600 dark:text-amber-400",
-
-      info:
-        "border-blue-500/25 bg-blue-500/5 text-blue-600 dark:text-blue-400",
-
-      positive:
-        "border-emerald-500/25 bg-emerald-500/5 text-emerald-600 dark:text-emerald-400",
-    }[
-      insight.severity
-    ];
-
-  const Icon =
-    insight.severity ===
-    "positive"
-      ? BadgeCheck
-      : insight.severity ===
-          "info"
-        ? Sparkles
-        : AlertTriangle;
-
   return (
-    <div
-      className={`rounded-2xl border p-4 ${style}`}
+    <motion.div
+      variants={
+        itemVariants
+      }
+      className={`
+        min-w-0
+        rounded-[22px]
+        border
+        p-4
+        sm:p-5
+
+        ${severityClasses(
+          insight.severity
+        )}
+      `}
     >
-      <div className="flex items-start gap-3">
-        <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-current/10">
-          <Icon className="h-4 w-4" />
+      <div className="flex min-w-0 items-start gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-black/[0.04] bg-white/70 text-[#0B4F52] shadow-sm dark:border-white/[0.06] dark:bg-white/[0.06] dark:text-cyan-200">
+          {insight.severity ===
+          "critical" ? (
+            <ShieldAlert className="h-4 w-4 text-red-600 dark:text-red-300" />
+          ) : insight.severity ===
+            "positive" ? (
+            <CircleCheckBig className="h-4 w-4 text-emerald-600 dark:text-emerald-300" />
+          ) : (
+            <Sparkles className="h-4 w-4" />
+          )}
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-extrabold text-foreground">
-              {insight.title}
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <p className="break-words text-sm font-black text-[#17324D] dark:text-white">
+              {
+                insight.title
+              }
             </p>
 
-            <span className="rounded-full border border-current/20 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider">
-              {insight.severity}
+            <span className="rounded-full border border-black/[0.06] bg-white/70 px-2 py-1 text-[9px] font-black uppercase tracking-[0.12em] text-slate-500 dark:border-white/[0.08] dark:bg-white/[0.05] dark:text-slate-300">
+              {
+                insight.severity
+              }
             </span>
           </div>
 
-          <p className="mt-2 text-xs leading-5 text-muted-foreground">
-            {insight.description}
+          <p className="mt-2 break-words text-xs leading-5 text-slate-600 dark:text-slate-300">
+            {
+              insight.description
+            }
           </p>
 
-          <div className="mt-3 rounded-xl bg-background/70 p-3">
-            <p className="text-[11px] font-bold text-foreground">
-              Evidence
-            </p>
+          <div className="mt-3 grid min-w-0 gap-2 lg:grid-cols-2">
+            <div className="min-w-0 rounded-xl border border-black/[0.05] bg-white/55 p-3 dark:border-white/[0.06] dark:bg-white/[0.035]">
+              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
+                Evidence
+              </p>
 
-            <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
-              {insight.evidence}
-            </p>
+              <p className="mt-1 break-words text-[11px] leading-5 text-slate-600 dark:text-slate-300">
+                {
+                  insight.evidence
+                }
+              </p>
+            </div>
+
+            <div className="min-w-0 rounded-xl border border-black/[0.05] bg-white/55 p-3 dark:border-white/[0.06] dark:bg-white/[0.035]">
+              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-slate-400">
+                Recommended review
+              </p>
+
+              <p className="mt-1 break-words text-[11px] leading-5 text-slate-600 dark:text-slate-300">
+                {
+                  insight.recommendedReview
+                }
+              </p>
+            </div>
           </div>
-
-          <p className="mt-3 text-[11px] leading-5 text-foreground/80">
-            <span className="font-extrabold">
-              Recommended review:
-            </span>{" "}
-            {insight.recommendedReview}
-          </p>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
 /* =========================================================
-   PAGE
+   SKELETON
 ========================================================= */
 
-export default function AnalystUsersPage() {
-  const [
-    range,
-    setRange,
-  ] =
-    useState<AnalystRange>(
-      "30d"
-    );
-
-  const [
-    data,
-    setData,
-  ] =
-    useState<
-      AnalystUserAnalyticsData |
-      null
-    >(
-      null
-    );
-
-  const [
-    loading,
-    setLoading,
-  ] =
-    useState(
-      true
-    );
-
-  const [
-    refreshing,
-    setRefreshing,
-  ] =
-    useState(
-      false
-    );
-
-  const [
-    error,
-    setError,
-  ] =
-    useState(
-      ""
-    );
-
-  const [
-    refreshKey,
-    setRefreshKey,
-  ] =
-    useState(
-      0
-    );
-
-  /* =======================================================
-     LOAD
-  ======================================================= */
-
-  useEffect(
-    () => {
-      const controller =
-        new AbortController();
-
-      let active =
-        true;
-
-      const load =
-        async () => {
-          setRefreshing(
-            true
-          );
-
-          setError(
-            ""
-          );
-
-          try {
-            const result =
-              await getAnalystUserAnalytics(
-                range,
-                controller.signal
-              );
-
-            if (
-              !active ||
-              controller.signal.aborted
-            ) {
-              return;
-            }
-
-            setData(
-              result
-            );
-          } catch (
-            loadError:
-              unknown
-          ) {
-            if (
-              !active ||
-              controller.signal.aborted ||
-              isApiAbortError(
-                loadError
-              )
-            ) {
-              return;
-            }
-
-            setError(
-              loadError instanceof
-                Error
-                ? loadError.message
-                : "Unable to load user analytics."
-            );
-          } finally {
-            if (
-              active &&
-              !controller.signal.aborted
-            ) {
-              setLoading(
-                false
-              );
-
-              setRefreshing(
-                false
-              );
-            }
-          }
-        };
-
-      void load();
-
-      return () => {
-        active =
-          false;
-
-        if (
-          !controller.signal.aborted
-        ) {
-          controller.abort();
-        }
-      };
-    },
-    [
-      range,
-      refreshKey,
-    ]
-  );
-
-  /* =======================================================
-     CHART
-  ======================================================= */
-
-  const trend =
-    useMemo(
-      () =>
-        data?.trend.map(
-          (
-            point
-          ) => ({
-            name:
-              formatBucket(
-                point.bucket,
-                data.filters.range
-              ),
-
-            activeUsers:
-              point.activeUsers,
-
-            newUsers:
-              point.newUsers,
-
-            transactions:
-              point.transactionCount,
-
-            failed:
-              point.failedTransactionCount,
-
-            highRisk:
-              point.highRiskTransactionCount,
-          })
-        ) ??
-        [],
-      [
-        data,
-      ]
-    );
-
-  const kycItems =
-    useMemo(
-      () =>
-        data?.kycBreakdown.map(
-          (
-            item
-          ) => ({
-            key:
-              item.status,
-
-            label:
-              prettify(
-                item.status
-              ),
-
-            count:
-              item.count,
-
-            percentage:
-              item.percentage,
-
-            color:
-              KYC_COLORS[
-                item.status
-              ] ??
-              KYC_COLORS.unknown,
-          })
-        ) ??
-        [],
-      [
-        data,
-      ]
-    );
-
-  const walletItems =
-    useMemo(
-      () =>
-        data?.walletBreakdown.map(
-          (
-            item,
-            index
-          ) => ({
-            key:
-              item.status,
-
-            label:
-              prettify(
-                item.status
-              ),
-
-            count:
-              item.count,
-
-            percentage:
-              item.percentage,
-
-            color:
-              [
-                "#10b981",
-                "#f59e0b",
-                "#ef4444",
-                "#64748b",
-                "#3b82f6",
-              ][
-                index %
-                  5
-              ],
-          })
-        ) ??
-        [],
-      [
-        data,
-      ]
-    );
-
-  const riskChart =
-    useMemo(
-      () =>
-        data?.riskBreakdown.map(
-          (
-            item
-          ) => ({
-            name:
-              prettify(
-                item.risk
-              ),
-
-            count:
-              item.count,
-
-            fill:
-              RISK_COLORS[
-                item.risk
-              ] ??
-              "#64748b",
-          })
-        ) ??
-        [],
-      [
-        data,
-      ]
-    );
-
-  /* =======================================================
-     LOADING
-  ======================================================= */
-
-  if (
-    loading &&
-    !data
-  ) {
-    return (
-      <div className="space-y-5">
-        <div className="h-44 animate-pulse rounded-3xl bg-muted" />
+function DashboardSkeleton() {
+  return (
+    <div className="min-h-screen bg-[#F4F8F7] p-4 dark:bg-slate-950 sm:p-6 lg:p-8">
+      <div className="mx-auto max-w-[1500px] space-y-5 sm:space-y-6">
+        <div className="h-56 animate-pulse rounded-[30px] bg-[#DDEAE7]/85 dark:bg-slate-800" />
 
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {Array.from({
@@ -1037,1035 +1598,1159 @@ export default function AnalystUsersPage() {
                 key={
                   index
                 }
-                className="h-40 animate-pulse rounded-2xl bg-muted"
+                className="h-36 animate-pulse rounded-[22px] bg-[#DDEAE7]/85 dark:bg-slate-800"
               />
             )
           )}
         </div>
 
-        <div className="grid gap-5 xl:grid-cols-3">
-          <div className="h-[420px] animate-pulse rounded-2xl bg-muted xl:col-span-2" />
-
-          <div className="h-[420px] animate-pulse rounded-2xl bg-muted" />
+        <div className="grid gap-5 xl:grid-cols-[1.4fr_.8fr]">
+          <div className="h-[390px] animate-pulse rounded-[24px] bg-[#DDEAE7]/85 dark:bg-slate-800" />
+          <div className="h-[390px] animate-pulse rounded-[24px] bg-[#DDEAE7]/85 dark:bg-slate-800" />
         </div>
       </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   PAGE
+========================================================= */
+
+export default function AnalystUsersPage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isAnalystRole =
+    user.role === "analyst";
+
+  useEffect(() => {
+    if (isAnalystRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
     );
-  }
+  }, [
+    isAnalystRole,
+    router,
+    user.role,
+  ]);
 
-  /* =======================================================
-     INITIAL ERROR
-  ======================================================= */
+  const [
+    range,
+    setRange,
+  ] =
+    useState<AnalystRange>(
+      "30d"
+    );
 
-  if (
-    !data &&
-    error
-  ) {
+  const [
+    data,
+    setData,
+  ] =
+    useState<AnalystUserAnalyticsData | null>(
+      null
+    );
+
+  const [
+    loading,
+    setLoading,
+  ] =
+    useState(true);
+
+  const [
+    error,
+    setError,
+  ] =
+    useState<
+      string | null
+    >(null);
+
+  const [
+    refreshKey,
+    setRefreshKey,
+  ] =
+    useState(0);
+
+  useEffect(() => {
+    if (!isAnalystRole) {
+      setLoading(false);
+      setData(null);
+      setError(null);
+      return;
+    }
+
+    const controller =
+      new AbortController();
+
+    setLoading(true);
+    setError(null);
+
+    void getAnalystUserAnalytics(
+      range,
+      controller.signal
+    )
+      .then(
+        (
+          response
+        ) => {
+          setData(
+            response
+          );
+        }
+      )
+      .catch(
+        (
+          requestError:
+            unknown
+        ) => {
+          if (
+            controller.signal
+              .aborted
+          ) {
+            return;
+          }
+
+          setError(
+            requestError instanceof
+              Error
+              ? requestError.message
+              : "Unable to load user analytics."
+          );
+        }
+      )
+      .finally(
+        () => {
+          if (
+            !controller.signal
+              .aborted
+          ) {
+            setLoading(
+              false
+            );
+          }
+        }
+      );
+
+    return () =>
+      controller.abort();
+  }, [
+    isAnalystRole,
+    range,
+    refreshKey,
+  ]);
+
+  const highPriorityInsights =
+    useMemo(
+      () =>
+        data?.insights.filter(
+          (
+            insight
+          ) =>
+            insight.severity ===
+              "critical" ||
+            insight.severity ===
+              "high"
+        ).length ??
+        0,
+      [
+        data?.insights,
+      ]
+    );
+
+  if (!isAnalystRole) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="w-full max-w-lg rounded-3xl border border-red-500/20 bg-card p-8 text-center shadow-sm">
-          <AlertTriangle className="mx-auto h-10 w-10 text-red-500" />
-
-          <h1 className="mt-4 text-xl font-black text-card-foreground">
-            User analytics unavailable
-          </h1>
-
-          <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            {error}
-          </p>
-
-          <button
-            type="button"
-            onClick={() =>
-              setRefreshKey(
-                (
-                  current
-                ) =>
-                  current +
-                  1
-              )
-            }
-            className="mt-6 inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-bold text-primary-foreground transition hover:opacity-90"
-          >
-            <RotateCcw className="h-4 w-4" />
-
-            Try again
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (
-    !data
-  ) {
-    return null;
-  }
-
-  const statusStyle =
-    {
-      healthy:
-        "border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-
-      attention:
-        "border-amber-500/20 bg-amber-500/10 text-amber-600 dark:text-amber-400",
-
-      critical:
-        "border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-400",
-    }[
-      data.status
-    ];
-
-  /* =======================================================
-     RENDER
-  ======================================================= */
-
-  return (
-    <div className="space-y-6 pb-8">
-      {/* HEADER */}
-
-      <section className="relative overflow-hidden rounded-3xl border border-border bg-card p-6 shadow-sm sm:p-7">
-        <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-blue-500/10 blur-3xl" />
-
-        <div className="pointer-events-none absolute bottom-0 right-1/3 h-48 w-48 rounded-full bg-violet-500/10 blur-3xl" />
-
-        <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span
-                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] ${statusStyle}`}
-              >
-                <span className="h-2 w-2 rounded-full bg-current" />
-
-                User health{" "}
-                {data.status}
-              </span>
-
-              <span className="inline-flex items-center gap-2 rounded-full border border-blue-500/20 bg-blue-500/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-blue-600 dark:text-blue-400">
-                <Users className="h-3.5 w-3.5" />
-
-                Platform wallet users
-              </span>
-            </div>
-
-            <h1 className="mt-4 text-2xl font-black tracking-tight text-card-foreground sm:text-3xl">
-              User Analytics
-            </h1>
-
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-              Analyze Coffer personal wallet users, activation,
-              transactions, KYC, wallet coverage, financial
-              planning adoption and risk signals.
-            </p>
+      <main className="grid min-h-[70vh] place-items-center px-4">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-teal-500/15 bg-teal-500/10 text-teal-700 shadow-sm dark:text-teal-300">
+            <RefreshCcw className="h-6 w-6 animate-spin" />
           </div>
 
-          <div className="flex flex-wrap items-end gap-3">
-            <label>
-              <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                Period
-              </span>
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening analyst workspace
+          </p>
 
-              <select
-                value={
-                  range
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Users Analytics is available only to analyst accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (
+    loading &&
+    !data
+  ) {
+    return (
+      <DashboardSkeleton />
+    );
+  }
+
+  return (
+    <div className="relative min-h-screen overflow-hidden bg-[#F4F8F7] text-[#17324D] dark:bg-slate-950 dark:text-slate-100">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed left-[17%] top-20 h-80 w-80 rounded-full bg-[#5EEAD4]/10 blur-3xl dark:opacity-30"
+      />
+
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed bottom-[-90px] right-[7%] h-96 w-96 rounded-full bg-[#7DD3FC]/10 blur-3xl dark:opacity-20"
+      />
+
+      <motion.main
+        variants={
+          containerVariants
+        }
+        initial="hidden"
+        animate="show"
+        className="relative z-10 mx-auto max-w-[1500px] space-y-5 p-4 sm:space-y-6 sm:p-6 lg:p-8"
+      >
+        {/* ===================================================
+            HERO
+        ==================================================== */}
+
+        <motion.section
+          variants={
+            itemVariants
+          }
+          className="relative overflow-hidden rounded-[30px] border border-white/10 bg-[linear-gradient(135deg,#10283F_0%,#0B4F52_48%,#10273A_100%)] p-5 text-white shadow-[0_28px_80px_rgba(9,78,80,0.22)] sm:p-7 lg:p-8"
+        >
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 opacity-40"
+            style={{
+              backgroundImage:
+                "linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px)",
+              backgroundSize:
+                "44px 44px",
+              maskImage:
+                "linear-gradient(to bottom, black, transparent 82%)",
+            }}
+          />
+
+          <motion.div
+            aria-hidden="true"
+            animate={{
+              x: [
+                0,
+                18,
+                0,
+              ],
+              y: [
+                0,
+                -14,
+                0,
+              ],
+              scale: [
+                1,
+                1.08,
+                1,
+              ],
+            }}
+            transition={{
+              duration:
+                10,
+              repeat:
+                Infinity,
+              ease:
+                "easeInOut",
+            }}
+            className="pointer-events-none absolute -right-24 -top-24 h-80 w-80 rounded-full bg-[#5EEAD4]/[0.22] blur-3xl"
+          />
+
+          <motion.div
+            aria-hidden="true"
+            animate={{
+              x: [
+                0,
+                -14,
+                0,
+              ],
+              y: [
+                0,
+                12,
+                0,
+              ],
+            }}
+            transition={{
+              duration:
+                12,
+              repeat:
+                Infinity,
+              ease:
+                "easeInOut",
+            }}
+            className="pointer-events-none absolute bottom-[-120px] left-[25%] h-72 w-72 rounded-full bg-[#38BDF8]/[0.18] blur-3xl"
+          />
+
+          <div className="relative z-10 grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-end">
+            <div className="min-w-0 max-w-3xl">
+              <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-white/15 bg-white/[0.09] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-white/75 backdrop-blur">
+                <Users className="h-3.5 w-3.5 shrink-0 text-[#7CEFE0]" />
+
+                <span className="truncate">
+                  User intelligence
+                </span>
+              </div>
+
+              <h1 className="mt-4 break-words text-3xl font-black tracking-[-0.035em] sm:text-4xl lg:text-5xl">
+                Users Analytics
+              </h1>
+
+              <p className="mt-3 max-w-2xl break-words text-sm leading-7 text-white/[0.72] sm:text-[15px]">
+                Read-only analytics for Coffer account growth, activity,
+                KYC coverage, wallet adoption, transaction participation
+                and aggregate user risk.
+              </p>
+            </div>
+
+            <div className="flex min-w-0 flex-wrap items-center gap-2 xl:justify-end">
+              {data ? (
+                <StatusPill
+                  status={
+                    data.status
+                  }
+                />
+              ) : null}
+
+              <motion.button
+                type="button"
+                onClick={() => {
+                  if (!isAnalystRole) {
+                    return;
+                  }
+
+                  setRefreshKey(
+                    (current) =>
+                      current + 1
+                  );
+                }}
+                disabled={
+                  loading
                 }
-                onChange={(
-                  event
-                ) =>
-                  setRange(
-                    event.target
-                      .value as AnalystRange
-                  )
-                }
-                className="h-11 min-w-40 rounded-xl border border-border bg-background px-3 text-xs font-bold text-foreground outline-none transition focus:border-primary"
+                whileHover={{
+                  y: -1,
+                }}
+                whileTap={{
+                  scale:
+                    0.985,
+                }}
+                className="inline-flex h-10 items-center gap-2 rounded-2xl border border-white/15 bg-white/[0.10] px-4 text-sm font-bold text-white shadow-[0_8px_24px_rgba(0,0,0,0.12)] backdrop-blur-xl transition hover:bg-white/[0.16] disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {RANGE_OPTIONS.map(
-                  (
-                    option
-                  ) => (
-                    <option
-                      key={
-                        option.value
+                <RefreshCcw
+                  className={`
+                    h-4
+                    w-4
+
+                    ${
+                      loading
+                        ? "animate-spin"
+                        : ""
+                    }
+                  `}
+                />
+
+                {
+                  loading
+                    ? "Refreshing"
+                    : "Refresh"
+                }
+              </motion.button>
+            </div>
+          </div>
+
+          {data ? (
+            <div className="relative z-10 mt-6 grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {[
+                {
+                  label:
+                    "Total users",
+                  value:
+                    formatNumber(
+                      data.population
+                        .totalUsers
+                    ),
+                },
+                {
+                  label:
+                    "Wallet coverage",
+                  value:
+                    formatPercent(
+                      data.population
+                        .walletCoverage
+                    ),
+                },
+                {
+                  label:
+                    "KYC verified",
+                  value:
+                    formatPercent(
+                      data.population
+                        .kycVerificationCoverage
+                    ),
+                },
+                {
+                  label:
+                    "Priority insights",
+                  value:
+                    formatNumber(
+                      highPriorityInsights
+                    ),
+                },
+              ].map(
+                (
+                  item
+                ) => (
+                  <div
+                    key={
+                      item.label
+                    }
+                    className="min-w-0 rounded-2xl border border-white/[0.12] bg-white/[0.085] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl"
+                  >
+                    <p className="break-words text-[10px] font-black uppercase tracking-[0.14em] text-white/[0.55]">
+                      {
+                        item.label
                       }
-                      value={
-                        option.value
+                    </p>
+
+                    <p className="mt-1.5 break-words text-base font-black text-white">
+                      {
+                        item.value
                       }
-                    >
-                      {option.label}
-                    </option>
-                  )
-                )}
-              </select>
-            </label>
+                    </p>
+                  </div>
+                )
+              )}
+            </div>
+          ) : null}
+        </motion.section>
+
+        {/* ===================================================
+            FILTER
+        ==================================================== */}
+
+        <Surface className="relative z-30 overflow-visible p-4 sm:p-5">
+          <div className="grid min-w-0 gap-4 md:grid-cols-[minmax(0,320px)_minmax(0,1fr)] md:items-end">
+            <AnalystSelect
+              label="Analysis period"
+              value={
+                range
+              }
+              options={
+                RANGE_OPTIONS
+              }
+              onChange={(nextRange) => {
+                if (!isAnalystRole) {
+                  return;
+                }
+
+                setRange(nextRange);
+              }}
+            />
+
+            <div className="min-w-0 rounded-[15px] border border-[#DCE7E5] bg-[#F8FBFA] px-4 py-3 dark:border-slate-800 dark:bg-slate-900/70">
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#0B4F52] dark:text-cyan-300">
+                Analyst scope
+              </p>
+
+              <p className="mt-1 break-words text-xs leading-5 text-slate-500 dark:text-slate-400">
+                This page is aggregate and read-only. It does not expose
+                personal user records or mutation controls.
+              </p>
+            </div>
+          </div>
+        </Surface>
+
+        {/* ===================================================
+            ERROR
+        ==================================================== */}
+
+        {error ? (
+          <motion.div
+            variants={
+              itemVariants
+            }
+            className="flex min-w-0 items-start gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-200"
+          >
+            <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+
+            <div className="min-w-0 flex-1">
+              <p className="font-black">
+                User analytics unavailable
+              </p>
+
+              <p className="mt-1 break-words opacity-90">
+                {error}
+              </p>
+            </div>
 
             <button
               type="button"
-              disabled={
-                refreshing
-              }
+              aria-label="Dismiss error"
               onClick={() =>
-                setRefreshKey(
-                  (
-                    current
-                  ) =>
-                    current +
-                    1
+                setError(
+                  null
                 )
               }
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-xs font-bold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              className="shrink-0 rounded-lg p-1 transition hover:bg-red-100 dark:hover:bg-red-900/40"
             >
-              <RefreshCcw
-                className={`h-4 w-4 ${
-                  refreshing
-                    ? "animate-spin"
-                    : ""
-                }`}
-              />
-
-              Refresh
+              <X className="h-4 w-4" />
             </button>
-          </div>
-        </div>
-
-        <div className="relative mt-5 flex flex-wrap gap-x-5 gap-y-2 border-t border-border/70 pt-4 text-[11px] text-muted-foreground">
-          <span>
-            Updated{" "}
-            {formatDateTime(
-              data.generatedAt
-            )}
-          </span>
-
-          <span>
-            role=user only
-          </span>
-
-          <span>
-            Aggregate / read-only
-          </span>
-        </div>
-      </section>
-
-      {/* ERROR */}
-
-      {error && (
-        <div className="flex items-center gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
-          <AlertTriangle className="h-5 w-5 shrink-0" />
-
-          <p>
-            {error}
-          </p>
-        </div>
-      )}
-
-      {/* POPULATION */}
-
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <PopulationCard
-          label="Total users"
-          value={formatNumber(
-            data.population
-              .totalUsers
-          )}
-          detail="Current Coffer wallet users"
-          icon={
-            Users
-          }
-          iconClass="bg-blue-500/10 text-blue-600 dark:text-blue-400"
-        />
-
-        <PopulationCard
-          label="KYC verified"
-          value={formatNumber(
-            data.population
-              .verifiedUsers
-          )}
-          detail={`${formatPercent(
-            data.population
-              .kycVerificationCoverage
-          )} verification coverage`}
-          icon={
-            BadgeCheck
-          }
-          iconClass="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-        />
-
-        <PopulationCard
-          label="Active wallets"
-          value={formatNumber(
-            data.population
-              .activeWallets
-          )}
-          detail={`${formatPercent(
-            data.population
-              .activeWalletCoverage
-          )} of users`}
-          icon={
-            WalletCards
-          }
-          iconClass="bg-violet-500/10 text-violet-600 dark:text-violet-400"
-        />
-
-        <PopulationCard
-          label="Total wallets"
-          value={formatNumber(
-            data.population
-              .totalWallets
-          )}
-          detail={`${formatPercent(
-            data.population
-              .walletCoverage
-          )} wallet coverage`}
-          icon={
-            CircleUserRound
-          }
-          iconClass="bg-cyan-500/10 text-cyan-600 dark:text-cyan-400"
-        />
-      </section>
-
-      {/* PERIOD METRICS */}
-
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard
-          label="Active users"
-          value={formatNumber(
-            data.metrics
-              .activeUsers
-              .value
-          )}
-          metric={
-            data.metrics
-              .activeUsers
-          }
-          icon={
-            UserCheck
-          }
-          iconClass="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-        />
-
-        <MetricCard
-          label="New users"
-          value={formatNumber(
-            data.metrics
-              .newUsers
-              .value
-          )}
-          metric={
-            data.metrics
-              .newUsers
-          }
-          icon={
-            UserPlus
-          }
-          iconClass="bg-blue-500/10 text-blue-600 dark:text-blue-400"
-        />
-
-        <MetricCard
-          label="Transaction users"
-          value={formatNumber(
-            data.metrics
-              .transactionUsers
-              .value
-          )}
-          metric={
-            data.metrics
-              .transactionUsers
-          }
-          icon={
-            Activity
-          }
-          iconClass="bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
-        />
-
-        <MetricCard
-          label="High-risk users"
-          value={formatNumber(
-            data.metrics
-              .highRiskUsers
-              .value
-          )}
-          metric={
-            data.metrics
-              .highRiskUsers
-          }
-          icon={
-            ShieldAlert
-          }
-          iconClass="bg-red-500/10 text-red-600 dark:text-red-400"
-          inverse
-        />
-
-        <MetricCard
-          label="Transactions"
-          value={formatNumber(
-            data.metrics
-              .transactionCount
-              .value
-          )}
-          metric={
-            data.metrics
-              .transactionCount
-          }
-          icon={
-            TrendingUp
-          }
-          iconClass="bg-cyan-500/10 text-cyan-600 dark:text-cyan-400"
-        />
-
-        <MetricCard
-          label="Failed transactions"
-          value={formatNumber(
-            data.metrics
-              .failedTransactionCount
-              .value
-          )}
-          metric={
-            data.metrics
-              .failedTransactionCount
-          }
-          icon={
-            AlertTriangle
-          }
-          iconClass="bg-amber-500/10 text-amber-600 dark:text-amber-400"
-          inverse
-        />
-
-        <MetricCard
-          label="Budget users"
-          value={formatNumber(
-            data.metrics
-              .budgetUsers
-              .value
-          )}
-          metric={
-            data.metrics
-              .budgetUsers
-          }
-          icon={
-            Sparkles
-          }
-          iconClass="bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400"
-        />
-
-        <MetricCard
-          label="Cash-flow users"
-          value={formatNumber(
-            data.metrics
-              .cashFlowUsers
-              .value
-          )}
-          metric={
-            data.metrics
-              .cashFlowUsers
-          }
-          icon={
-            BrainCircuit
-          }
-          iconClass="bg-violet-500/10 text-violet-600 dark:text-violet-400"
-        />
-      </section>
-
-      {/* TREND */}
-
-      <div className="grid gap-5 xl:grid-cols-3">
-        <div className="xl:col-span-2">
-          <Panel
-            title="User activity trend"
-            description="New users, active users and wallet transaction activity across the selected period."
-            action={
-              <span className="rounded-lg bg-muted px-2.5 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                UTC buckets
-              </span>
-            }
-          >
-            {trend.length >
-            0 ? (
-              <div className="h-[350px]">
-                <ResponsiveContainer
-                  width="100%"
-                  height="100%"
-                >
-                  <ComposedChart
-                    data={
-                      trend
-                    }
-                    margin={{
-                      top:
-                        10,
-
-                      right:
-                        10,
-
-                      left:
-                        0,
-
-                      bottom:
-                        0,
-                    }}
-                  >
-                    <defs>
-                      <linearGradient
-                        id="analystUsersActiveGradient"
-                        x1="0"
-                        y1="0"
-                        x2="0"
-                        y2="1"
-                      >
-                        <stop
-                          offset="5%"
-                          stopColor="#2563eb"
-                          stopOpacity={
-                            0.32
-                          }
-                        />
-
-                        <stop
-                          offset="95%"
-                          stopColor="#2563eb"
-                          stopOpacity={
-                            0.02
-                          }
-                        />
-                      </linearGradient>
-                    </defs>
-
-                    <CartesianGrid
-                      strokeDasharray="4 4"
-                      vertical={
-                        false
-                      }
-                      stroke="currentColor"
-                      opacity={
-                        0.08
-                      }
-                    />
-
-                    <XAxis
-                      dataKey="name"
-                      axisLine={
-                        false
-                      }
-                      tickLine={
-                        false
-                      }
-                      minTickGap={
-                        24
-                      }
-                      tick={{
-                        fontSize:
-                          10,
-
-                        fill:
-                          "currentColor",
-
-                        opacity:
-                          0.55,
-                      }}
-                    />
-
-                    <YAxis
-                      allowDecimals={
-                        false
-                      }
-                      axisLine={
-                        false
-                      }
-                      tickLine={
-                        false
-                      }
-                      width={
-                        42
-                      }
-                      tick={{
-                        fontSize:
-                          10,
-
-                        fill:
-                          "currentColor",
-
-                        opacity:
-                          0.55,
-                      }}
-                    />
-
-                    <Tooltip
-                      contentStyle={{
-                        borderRadius:
-                          14,
-
-                        border:
-                          "1px solid var(--border)",
-
-                        background:
-                          "var(--card)",
-
-                        color:
-                          "var(--card-foreground)",
-
-                        fontSize:
-                          12,
-                      }}
-                    />
-
-                    <Area
-                      type="monotone"
-                      dataKey="activeUsers"
-                      name="Active users"
-                      stroke="#2563eb"
-                      strokeWidth={
-                        2.5
-                      }
-                      fill="url(#analystUsersActiveGradient)"
-                    />
-
-                    <Line
-                      type="monotone"
-                      dataKey="newUsers"
-                      name="New users"
-                      stroke="#8b5cf6"
-                      strokeWidth={
-                        2
-                      }
-                      dot={
-                        false
-                      }
-                    />
-
-                    <Line
-                      type="monotone"
-                      dataKey="transactions"
-                      name="Transactions"
-                      stroke="#10b981"
-                      strokeWidth={
-                        2
-                      }
-                      dot={
-                        false
-                      }
-                    />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </div>
-            ) : (
-              <EmptyData
-                message="User activity will appear after real account and wallet activity exists."
-              />
-            )}
-          </Panel>
-        </div>
-
-        {/* ENGAGEMENT */}
-
-        <Panel
-          title="Engagement health"
-          description="How deeply Coffer wallet users engage with platform capabilities."
-        >
-          <div className="space-y-4">
-            {[
-              {
-                label:
-                  "Active user rate",
-
-                value:
-                  data.engagement
-                    .activeRate,
-
-                className:
-                  "bg-blue-500",
-              },
-
-              {
-                label:
-                  "Transaction participation",
-
-                value:
-                  data.engagement
-                    .transactionParticipationRate,
-
-                className:
-                  "bg-emerald-500",
-              },
-
-              {
-                label:
-                  "Budget adoption",
-
-                value:
-                  data.engagement
-                    .budgetAdoptionRate,
-
-                className:
-                  "bg-violet-500",
-              },
-
-              {
-                label:
-                  "Cash-flow adoption",
-
-                value:
-                  data.engagement
-                    .cashFlowAdoptionRate,
-
-                className:
-                  "bg-cyan-500",
-              },
-            ].map(
-              (
-                item
-              ) => (
-                <div
-                  key={
-                    item.label
-                  }
-                >
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <span className="text-xs font-bold text-foreground">
-                      {item.label}
-                    </span>
-
-                    <span className="text-xs font-black text-muted-foreground">
-                      {formatPercent(
-                        item.value
-                      )}
-                    </span>
-                  </div>
-
-                  <div className="h-2 overflow-hidden rounded-full bg-muted">
-                    <div
-                      className={`h-full rounded-full transition-all duration-500 ${item.className}`}
-                      style={{
-                        width:
-                          `${Math.min(
-                            item.value,
-                            100
-                          )}%`,
-                      }}
-                    />
-                  </div>
-                </div>
-              )
-            )}
-
-            <div className="mt-5 rounded-2xl border border-border bg-background p-4">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                Failed transaction rate
-              </p>
-
-              <p
-                className={`mt-2 text-2xl font-black ${
-                  data.engagement
-                    .failedTransactionRate >=
-                  10
-                    ? "text-red-600 dark:text-red-400"
-                    : "text-foreground"
-                }`}
-              >
-                {formatPercent(
-                  data.engagement
-                    .failedTransactionRate
-                )}
-              </p>
-            </div>
-          </div>
-        </Panel>
-      </div>
-
-      {/* BREAKDOWNS */}
-
-      <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
-        <Panel
-          title="KYC distribution"
-          description="Identity verification state across Coffer wallet users."
-        >
-          <BreakdownList
-            items={
-              kycItems
-            }
-          />
-        </Panel>
-
-        <Panel
-          title="Wallet status"
-          description="Wallet provisioning and current wallet status distribution."
-        >
-          <BreakdownList
-            items={
-              walletItems
-            }
-          />
-        </Panel>
-
-        <Panel
-          title="Transaction risk"
-          description="Risk classifications connected to wallet users during the selected period."
-        >
-          {riskChart.length >
-          0 ? (
-            <div className="h-[260px]">
-              <ResponsiveContainer
-                width="100%"
-                height="100%"
-              >
-                <BarChart
-                  data={
-                    riskChart
-                  }
-                  layout="vertical"
-                  margin={{
-                    top:
-                      5,
-
-                    right:
-                      10,
-
-                    left:
-                      5,
-
-                    bottom:
-                      5,
-                  }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="4 4"
-                    horizontal={
-                      false
-                    }
-                    stroke="currentColor"
-                    opacity={
-                      0.08
-                    }
-                  />
-
-                  <XAxis
-                    type="number"
-                    allowDecimals={
-                      false
-                    }
-                    axisLine={
-                      false
-                    }
-                    tickLine={
-                      false
-                    }
-                  />
-
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    width={
-                      70
-                    }
-                    axisLine={
-                      false
-                    }
-                    tickLine={
-                      false
-                    }
-                    tick={{
-                      fontSize:
-                        10,
-
-                      fill:
-                        "currentColor",
-
-                      opacity:
-                        0.7,
-                    }}
-                  />
-
-                  <Tooltip
-                    contentStyle={{
-                      borderRadius:
-                        14,
-
-                      border:
-                        "1px solid var(--border)",
-
-                      background:
-                        "var(--card)",
-
-                      color:
-                        "var(--card-foreground)",
-
-                      fontSize:
-                        12,
-                    }}
-                  />
-
-                  <Bar
-                    dataKey="count"
-                    radius={[
-                      0,
-                      7,
-                      7,
-                      0,
-                    ]}
-                  >
-                    {riskChart.map(
-                      (
-                        item
-                      ) => (
-                        <Cell
-                          key={
-                            item.name
-                          }
-                          fill={
-                            item.fill
-                          }
-                        />
-                      )
-                    )}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <EmptyData
-              message="No wallet transaction risk records exist for this period."
-            />
-          )}
-        </Panel>
-      </div>
-
-      {/* KYC DETAIL */}
-
-      <Panel
-        title="Verification population"
-        description="Current identity-verification population, separate from period activity metrics."
-      >
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {[
-            {
-              label:
-                "Verified",
-
-              value:
-                data.population
-                  .verifiedUsers,
-
-              className:
-                "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-            },
-
-            {
-              label:
-                "Pending",
-
-              value:
-                data.population
-                  .pendingKycUsers,
-
-              className:
-                "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-            },
-
-            {
-              label:
-                "Rejected",
-
-              value:
-                data.population
-                  .rejectedKycUsers,
-
-              className:
-                "bg-red-500/10 text-red-600 dark:text-red-400",
-            },
-
-            {
-              label:
-                "Not started",
-
-              value:
-                data.population
-                  .notStartedKycUsers,
-
-              className:
-                "bg-slate-500/10 text-slate-600 dark:text-slate-400",
-            },
-          ].map(
-            (
-              item
-            ) => (
-              <div
-                key={
-                  item.label
+          </motion.div>
+        ) : null}
+
+        {data ? (
+          <>
+            {/* ===================================================
+                KPI GRID
+            ==================================================== */}
+
+            <motion.div
+              variants={
+                containerVariants
+              }
+              className="grid min-w-0 gap-4 sm:grid-cols-2 xl:grid-cols-4"
+            >
+              <MetricCard
+                label="New users"
+                value={
+                  formatNumber(
+                    data.metrics
+                      .newUsers
+                      .value
+                  )
                 }
-                className="rounded-2xl border border-border bg-background p-4"
-              >
-                <div
-                  className={`inline-flex rounded-xl px-2.5 py-1 text-[10px] font-black uppercase tracking-wider ${item.className}`}
-                >
-                  {item.label}
-                </div>
+                metric={
+                  data.metrics
+                    .newUsers
+                }
+                icon={
+                  CircleUserRound
+                }
+              />
 
-                <p className="mt-4 text-2xl font-black text-foreground">
-                  {formatNumber(
-                    item.value
-                  )}
-                </p>
-              </div>
-            )
-          )}
-        </div>
-      </Panel>
+              <MetricCard
+                label="Active users"
+                value={
+                  formatNumber(
+                    data.metrics
+                      .activeUsers
+                      .value
+                  )
+                }
+                metric={
+                  data.metrics
+                    .activeUsers
+                }
+                icon={
+                  UserCheck
+                }
+              />
 
-      {/* INSIGHTS */}
+              <MetricCard
+                label="Transaction users"
+                value={
+                  formatNumber(
+                    data.metrics
+                      .transactionUsers
+                      .value
+                  )
+                }
+                metric={
+                  data.metrics
+                    .transactionUsers
+                }
+                icon={
+                  Activity
+                }
+              />
 
-      <Panel
-        title="User intelligence"
-        description="Deterministic aggregate insights generated from real platform user activity."
-        action={
-          <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-500/10 px-2.5 py-1.5 text-[10px] font-bold text-blue-600 dark:text-blue-400">
-            <BrainCircuit className="h-3.5 w-3.5" />
+              <MetricCard
+                label="High-risk users"
+                value={
+                  formatNumber(
+                    data.metrics
+                      .highRiskUsers
+                      .value
+                  )
+                }
+                metric={
+                  data.metrics
+                    .highRiskUsers
+                }
+                icon={
+                  ShieldAlert
+                }
+                intent="lower-better"
+              />
 
-            Rules-based
-          </span>
-        }
-      >
-        {data.insights.length >
-        0 ? (
-          <div className="grid gap-3 lg:grid-cols-2">
-            {data.insights.map(
-              (
-                insight
-              ) => (
-                <InsightCard
-                  key={
-                    insight.id
+              <MetricCard
+                label="Transactions"
+                value={
+                  formatNumber(
+                    data.metrics
+                      .transactionCount
+                      .value
+                  )
+                }
+                metric={
+                  data.metrics
+                    .transactionCount
+                }
+                icon={
+                  TrendingUp
+                }
+                intent="neutral"
+              />
+
+              <MetricCard
+                label="Failed transactions"
+                value={
+                  formatNumber(
+                    data.metrics
+                      .failedTransactionCount
+                      .value
+                  )
+                }
+                metric={
+                  data.metrics
+                    .failedTransactionCount
+                }
+                icon={
+                  UserRoundX
+                }
+                intent="lower-better"
+              />
+
+              <MetricCard
+                label="Budget users"
+                value={
+                  formatNumber(
+                    data.metrics
+                      .budgetUsers
+                      .value
+                  )
+                }
+                metric={
+                  data.metrics
+                    .budgetUsers
+                }
+                icon={
+                  WalletMinimal
+                }
+              />
+
+              <MetricCard
+                label="Cash-flow users"
+                value={
+                  formatNumber(
+                    data.metrics
+                      .cashFlowUsers
+                      .value
+                  )
+                }
+                metric={
+                  data.metrics
+                    .cashFlowUsers
+                }
+                icon={
+                  Gauge
+                }
+              />
+            </motion.div>
+
+            {/* ===================================================
+                TREND + ENGAGEMENT
+            ==================================================== */}
+
+            <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1.45fr)_minmax(300px,.75fr)] xl:items-stretch">
+              <Surface className="h-full p-4 sm:p-5 lg:p-6">
+                <SectionHeading
+                  eyebrow="Activity trend"
+                  title="User growth & participation"
+                  description="New users, active users and aggregate high-risk transaction activity across the selected period."
+                  icon={
+                    Activity
                   }
-                  insight={
-                    insight
+                  trailing={
+                    <div className="flex flex-wrap gap-3 text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="h-2.5 w-2.5 rounded-full bg-[#0B4F52]" />
+                        Active
+                      </span>
+
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="h-2.5 w-2.5 rounded-full bg-[#38BDF8]" />
+                        New
+                      </span>
+
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className="h-2.5 w-2.5 rounded-full bg-red-500" />
+                        High risk
+                      </span>
+                    </div>
                   }
                 />
-              )
-            )}
-          </div>
+
+                <div className="mt-5 min-w-0">
+                  <UserActivityChart
+                    points={
+                      data.trend
+                    }
+                  />
+                </div>
+              </Surface>
+
+              <Surface className="h-full p-4 sm:p-5 lg:p-6">
+                <SectionHeading
+                  eyebrow="Engagement"
+                  title="User participation"
+                  description="Coverage and adoption ratios for core Coffer user activity."
+                  icon={
+                    Gauge
+                  }
+                />
+
+                <div className="mt-5 space-y-5">
+                  <ProgressRow
+                    label="Active rate"
+                    value={
+                      data.engagement
+                        .activeRate
+                    }
+                    tone="teal"
+                  />
+
+                  <ProgressRow
+                    label="Transaction participation"
+                    value={
+                      data.engagement
+                        .transactionParticipationRate
+                    }
+                    tone="cyan"
+                  />
+
+                  <ProgressRow
+                    label="Budget adoption"
+                    value={
+                      data.engagement
+                        .budgetAdoptionRate
+                    }
+                    tone="navy"
+                  />
+
+                  <ProgressRow
+                    label="Cash-flow adoption"
+                    value={
+                      data.engagement
+                        .cashFlowAdoptionRate
+                    }
+                    tone="teal"
+                  />
+
+                  <ProgressRow
+                    label="Failed transaction rate"
+                    value={
+                      data.engagement
+                        .failedTransactionRate
+                    }
+                    tone="red"
+                  />
+                </div>
+              </Surface>
+            </div>
+
+            {/* ===================================================
+                POPULATION
+            ==================================================== */}
+
+            <Surface className="p-4 sm:p-5 lg:p-6">
+              <SectionHeading
+                eyebrow="Population"
+                title="Account & wallet coverage"
+                description="Read-only platform population totals and aggregate verification coverage."
+                icon={
+                  Users
+                }
+              />
+
+              <div className="mt-5 grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+                {[
+                  {
+                    label:
+                      "Total users",
+                    value:
+                      formatNumber(
+                        data.population
+                          .totalUsers
+                      ),
+                    icon:
+                      Users,
+                  },
+                  {
+                    label:
+                      "Total wallets",
+                    value:
+                      formatNumber(
+                        data.population
+                          .totalWallets
+                      ),
+                    icon:
+                      WalletCards,
+                  },
+                  {
+                    label:
+                      "Active wallets",
+                    value:
+                      formatNumber(
+                        data.population
+                          .activeWallets
+                      ),
+                    icon:
+                      WalletMinimal,
+                  },
+                  {
+                    label:
+                      "Verified users",
+                    value:
+                      formatNumber(
+                        data.population
+                          .verifiedUsers
+                      ),
+                    icon:
+                      BadgeCheck,
+                  },
+                  {
+                    label:
+                      "Pending KYC",
+                    value:
+                      formatNumber(
+                        data.population
+                          .pendingKycUsers
+                      ),
+                    icon:
+                      ShieldCheck,
+                  },
+                  {
+                    label:
+                      "Rejected KYC",
+                    value:
+                      formatNumber(
+                        data.population
+                          .rejectedKycUsers
+                      ),
+                    icon:
+                      ShieldAlert,
+                  },
+                ].map(
+                  (
+                    item
+                  ) => {
+                    const Icon =
+                      item.icon;
+
+                    return (
+                      <motion.div
+                        key={
+                          item.label
+                        }
+                        whileHover={{
+                          y: -2,
+                        }}
+                        className="min-w-0 rounded-2xl border border-[#DCE7E5] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFA_100%)] p-4 dark:border-slate-800 dark:bg-slate-900/70"
+                      >
+                        <div className="flex min-w-0 items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="break-words text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                              {
+                                item.label
+                              }
+                            </p>
+
+                            <p className="mt-2 break-words text-xl font-black text-[#17324D] dark:text-white">
+                              {
+                                item.value
+                              }
+                            </p>
+                          </div>
+
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#0B4F52]/[0.08] text-[#0B4F52] dark:bg-cyan-400/[0.08] dark:text-cyan-200">
+                            <Icon className="h-4 w-4" />
+                          </div>
+                        </div>
+                      </motion.div>
+                    );
+                  }
+                )}
+              </div>
+
+              <div className="mt-5 grid min-w-0 gap-5 lg:grid-cols-3">
+                <ProgressRow
+                  label="Wallet coverage"
+                  value={
+                    data.population
+                      .walletCoverage
+                  }
+                  helper="Users with an associated Coffer wallet"
+                  tone="teal"
+                />
+
+                <ProgressRow
+                  label="Active wallet coverage"
+                  value={
+                    data.population
+                      .activeWalletCoverage
+                  }
+                  helper="Population covered by active wallets"
+                  tone="cyan"
+                />
+
+                <ProgressRow
+                  label="KYC verification coverage"
+                  value={
+                    data.population
+                      .kycVerificationCoverage
+                  }
+                  helper="Population with verified KYC state"
+                  tone="navy"
+                />
+              </div>
+            </Surface>
+
+            {/* ===================================================
+                BREAKDOWNS
+            ==================================================== */}
+
+            <div className="grid min-w-0 gap-5 xl:grid-cols-3 xl:items-stretch">
+              <Surface className="h-full p-4 sm:p-5">
+                <SectionHeading
+                  eyebrow="KYC"
+                  title="Verification status"
+                  description="Aggregate KYC state across Coffer users."
+                  icon={
+                    BadgeCheck
+                  }
+                />
+
+                <div className="mt-5">
+                  <BreakdownList
+                    items={
+                      data.kycBreakdown
+                    }
+                    labelKey="status"
+                    emptyLabel="No KYC breakdown is available."
+                    tone="teal"
+                  />
+                </div>
+              </Surface>
+
+              <Surface className="h-full p-4 sm:p-5">
+                <SectionHeading
+                  eyebrow="Wallets"
+                  title="Wallet status"
+                  description="Aggregate wallet state connected to the user population."
+                  icon={
+                    WalletCards
+                  }
+                />
+
+                <div className="mt-5">
+                  <BreakdownList
+                    items={
+                      data.walletBreakdown
+                    }
+                    labelKey="status"
+                    emptyLabel="No wallet breakdown is available."
+                    tone="cyan"
+                  />
+                </div>
+              </Surface>
+
+              <Surface className="h-full p-4 sm:p-5">
+                <SectionHeading
+                  eyebrow="Risk"
+                  title="User risk signals"
+                  description="Aggregate user risk classification from current analytics."
+                  icon={
+                    ShieldAlert
+                  }
+                />
+
+                <div className="mt-5">
+                  <BreakdownList
+                    items={
+                      data.riskBreakdown
+                    }
+                    labelKey="risk"
+                    emptyLabel="No risk breakdown is available."
+                    tone="red"
+                  />
+                </div>
+              </Surface>
+            </div>
+
+            {/* ===================================================
+                NOTES
+            ==================================================== */}
+
+            <div className="grid min-w-0 gap-5 lg:grid-cols-2">
+              <Surface className="h-full p-4 sm:p-5">
+                <SectionHeading
+                  eyebrow="Scope"
+                  title="Analytics coverage"
+                  icon={
+                    BrainCircuit
+                  }
+                />
+
+                <p className="mt-4 break-words text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  {
+                    data.scopeNote
+                  }
+                </p>
+              </Surface>
+
+              <Surface className="h-full p-4 sm:p-5">
+                <SectionHeading
+                  eyebrow="Privacy"
+                  title="Read-only privacy boundary"
+                  icon={
+                    ShieldCheck
+                  }
+                />
+
+                <p className="mt-4 break-words text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  {
+                    data.privacyNote
+                  }
+                </p>
+              </Surface>
+            </div>
+
+            {/* ===================================================
+                INSIGHTS
+            ==================================================== */}
+
+            <Surface className="p-4 sm:p-5 lg:p-6">
+              <SectionHeading
+                eyebrow="Deterministic intelligence"
+                title="User insights"
+                description="Review-only signals generated from the current user analytics scope."
+                icon={
+                  Sparkles
+                }
+                trailing={
+                  <span className="inline-flex rounded-full border border-[#0B4F52]/15 bg-[#0B4F52]/[0.06] px-3 py-1.5 text-[10px] font-black text-[#0B4F52] dark:border-cyan-500/20 dark:bg-cyan-500/[0.07] dark:text-cyan-200">
+                    {formatNumber(
+                      data.insights
+                        .length
+                    )}{" "}
+                    signals
+                  </span>
+                }
+              />
+
+              {data.insights.length >
+              0 ? (
+                <motion.div
+                  variants={
+                    containerVariants
+                  }
+                  className="mt-5 grid min-w-0 gap-3 xl:grid-cols-2"
+                >
+                  {data.insights.map(
+                    (
+                      insight
+                    ) => (
+                      <InsightCard
+                        key={
+                          insight.id
+                        }
+                        insight={
+                          insight
+                        }
+                      />
+                    )
+                  )}
+                </motion.div>
+              ) : (
+                <div className="mt-5 rounded-2xl border border-dashed border-[#D4E5E2] p-8 text-center dark:border-slate-800">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#0B4F52]/[0.08] text-[#0B4F52] dark:bg-cyan-400/[0.08] dark:text-cyan-200">
+                    <CircleCheckBig className="h-5 w-5" />
+                  </div>
+
+                  <p className="mt-3 text-sm font-black text-[#17324D] dark:text-white">
+                    No user insights for this period
+                  </p>
+
+                  <p className="mx-auto mt-1 max-w-lg text-xs leading-5 text-slate-500 dark:text-slate-400">
+                    No deterministic review signal was returned by the current analytics scope.
+                  </p>
+                </div>
+              )}
+            </Surface>
+
+            {/* ===================================================
+                FOOTER META
+            ==================================================== */}
+
+            <motion.div
+              variants={
+                itemVariants
+              }
+              className="flex min-w-0 flex-col gap-2 rounded-2xl border border-[#DCE7E5] bg-white/65 px-4 py-3 text-[11px] text-slate-500 backdrop-blur dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-400 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <span className="min-w-0 break-words">
+                Generated:{" "}
+                <strong className="font-bold text-slate-700 dark:text-slate-200">
+                  {formatDateTime(
+                    data.generatedAt
+                  )}
+                </strong>
+              </span>
+
+              <span className="min-w-0 break-words sm:text-right">
+                Range:{" "}
+                <strong className="font-bold text-slate-700 dark:text-slate-200">
+                  {
+                    RANGE_OPTIONS.find(
+                      (
+                        item
+                      ) =>
+                        item.value ===
+                        range
+                    )?.label
+                  }
+                </strong>
+              </span>
+            </motion.div>
+          </>
         ) : (
-          <EmptyData
-            message="No user intelligence signal was generated for this period."
-          />
+          <Surface className="p-8 text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#0B4F52]/[0.08] text-[#0B4F52] dark:bg-cyan-400/[0.08] dark:text-cyan-200">
+              <Users className="h-6 w-6" />
+            </div>
+
+            <p className="mt-4 text-base font-black text-[#17324D] dark:text-white">
+              No user analytics loaded
+            </p>
+
+            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500 dark:text-slate-400">
+              Refresh the page or verify that the analyst user analytics endpoint is available.
+            </p>
+          </Surface>
         )}
-      </Panel>
-
-      {/* PRIVACY */}
-
-      <div className="rounded-2xl border border-border bg-card px-5 py-4">
-        <div className="flex items-start gap-3">
-          <BadgeCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-500" />
-
-          <div>
-            <p className="text-xs font-extrabold text-foreground">
-              Privacy-safe analyst scope
-            </p>
-
-            <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
-              {data.privacyNote}
-            </p>
-
-            <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
-              {data.scopeNote}
-            </p>
-          </div>
-        </div>
-      </div>
+      </motion.main>
     </div>
   );
 }

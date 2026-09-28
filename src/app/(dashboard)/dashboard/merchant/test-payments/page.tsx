@@ -10,6 +10,10 @@ import React, {
 import Link from "next/link";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   AlertCircle,
   ArrowRight,
   CheckCircle2,
@@ -38,6 +42,14 @@ import {
 import {
   motion,
 } from "framer-motion";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   createSandboxOrder,
@@ -132,6 +144,7 @@ const inputClass =
     "mt-2",
     "h-11",
     "w-full",
+    "min-w-0",
     "rounded-xl",
     "border",
     "border-violet-200/70",
@@ -461,10 +474,12 @@ function HeroStat({
           title={value}
           className="
             mt-0.5
-            truncate
+            break-words
             text-xs
             font-black
+            leading-tight
             text-white
+            [overflow-wrap:anywhere]
           "
         >
           {value}
@@ -488,8 +503,10 @@ function OrderStatusBadge({
     <span
       className={`
         inline-flex
+        shrink-0
         items-center
         gap-1.5
+        whitespace-nowrap
         rounded-full
         border
         px-2.5
@@ -520,6 +537,32 @@ function OrderStatusBadge({
 ========================================================= */
 
 export default function MerchantTestPaymentsPage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isMerchantRole =
+    user.role === "merchant";
+
+  useEffect(() => {
+    if (isMerchantRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role,
+      ),
+    );
+  }, [
+    isMerchantRole,
+    router,
+    user.role,
+  ]);
+
   /* =======================================================
      FORM
   ======================================================== */
@@ -702,6 +745,10 @@ export default function MerchantTestPaymentsPage() {
 
   useEffect(
     () => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       const origin =
         window.location.origin;
 
@@ -713,7 +760,9 @@ export default function MerchantTestPaymentsPage() {
         `${origin}/dashboard/merchant/test-payments?result=cancelled`,
       );
     },
-    [],
+    [
+      isMerchantRole,
+    ],
   );
 
   /* =======================================================
@@ -723,6 +772,14 @@ export default function MerchantTestPaymentsPage() {
   const loadOrders =
     useCallback(
       async () => {
+        if (!isMerchantRole) {
+          setLoadingOrders(false);
+          setOrders([]);
+          setError("");
+
+          return;
+        }
+
         try {
           setLoadingOrders(
             true,
@@ -778,6 +835,7 @@ export default function MerchantTestPaymentsPage() {
       },
       [
         appliedSearch,
+        isMerchantRole,
         pagination.limit,
         pagination.page,
         status,
@@ -786,9 +844,16 @@ export default function MerchantTestPaymentsPage() {
 
   useEffect(
     () => {
+      if (!isMerchantRole) {
+        setLoadingOrders(false);
+
+        return;
+      }
+
       void loadOrders();
     },
     [
+      isMerchantRole,
       loadOrders,
     ],
   );
@@ -811,6 +876,7 @@ export default function MerchantTestPaymentsPage() {
           );
 
         return (
+          isMerchantRole &&
           Number.isFinite(
             numericAmount,
           ) &&
@@ -832,6 +898,7 @@ export default function MerchantTestPaymentsPage() {
         amount,
         currency,
         expiresInMinutes,
+        isMerchantRole,
       ],
     );
 
@@ -915,6 +982,10 @@ export default function MerchantTestPaymentsPage() {
       idempotencyKey:
         string,
     ) => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       try {
         setCreating(
           true,
@@ -979,6 +1050,10 @@ export default function MerchantTestPaymentsPage() {
     ) => {
       event.preventDefault();
 
+      if (!isMerchantRole) {
+        return;
+      }
+
       if (
         !canSubmit
       ) {
@@ -1001,6 +1076,10 @@ export default function MerchantTestPaymentsPage() {
 
   const repeatLastRequest =
     async () => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       if (
         !lastRequest ||
         !lastIdempotencyKey
@@ -1024,6 +1103,10 @@ export default function MerchantTestPaymentsPage() {
         explicitOrderId?:
           string,
       ) => {
+        if (!isMerchantRole) {
+          return;
+        }
+
         const orderId =
           explicitOrderId?.trim() ||
           current?.order
@@ -1070,6 +1153,7 @@ export default function MerchantTestPaymentsPage() {
       [
         current?.order
           .orderId,
+        isMerchantRole,
         loadOrders,
       ],
     );
@@ -1083,6 +1167,10 @@ export default function MerchantTestPaymentsPage() {
 
   useEffect(
     () => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       const handleFocus =
         () => {
           if (
@@ -1120,6 +1208,7 @@ export default function MerchantTestPaymentsPage() {
     },
     [
       current,
+      isMerchantRole,
       refreshOrder,
     ],
   );
@@ -1130,6 +1219,10 @@ export default function MerchantTestPaymentsPage() {
 
   const copyOrderId =
     async () => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       if (
         !current?.order
           .orderId
@@ -1175,6 +1268,30 @@ export default function MerchantTestPaymentsPage() {
     "test";
 
   /* =======================================================
+     MERCHANT-ONLY REDIRECTING
+  ======================================================== */
+
+  if (!isMerchantRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center bg-background px-4 text-foreground">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-500/15 bg-violet-500/10 text-violet-700 shadow-sm dark:text-violet-300">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Merchant Sandbox Test Payments is available only to merchant accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  /* =======================================================
      UI
   ======================================================== */
 
@@ -1182,6 +1299,9 @@ export default function MerchantTestPaymentsPage() {
     <main
       className="
         merchant-theme
+        relative
+        z-0
+        isolate
         min-h-full
         px-4
         py-5
@@ -1234,7 +1354,7 @@ export default function MerchantTestPaymentsPage() {
                 lg:justify-between
               "
             >
-              <div className="max-w-3xl">
+              <div className="min-w-0 max-w-3xl">
                 <div
                   className="
                     inline-flex
@@ -1260,9 +1380,12 @@ export default function MerchantTestPaymentsPage() {
                 <h1
                   className="
                     mt-4
+                    break-words
                     text-2xl
                     font-black
+                    leading-tight
                     tracking-tight
+                    [overflow-wrap:anywhere]
 
                     sm:text-3xl
                   "
@@ -1288,9 +1411,11 @@ export default function MerchantTestPaymentsPage() {
               <div
                 className="
                   flex
+                  w-full
                   flex-col
                   gap-2
 
+                  sm:w-auto
                   sm:flex-row
                 "
               >
@@ -1299,8 +1424,11 @@ export default function MerchantTestPaymentsPage() {
                   className="
                     inline-flex
                     h-11
+                    w-full
                     items-center
                     justify-center
+
+                    sm:w-auto
                     gap-2
                     rounded-2xl
                     border
@@ -1326,8 +1454,11 @@ export default function MerchantTestPaymentsPage() {
                   className="
                     inline-flex
                     h-11
+                    w-full
                     items-center
                     justify-center
+
+                    sm:w-auto
                     gap-2
                     rounded-2xl
                     bg-white
@@ -1434,8 +1565,8 @@ export default function MerchantTestPaymentsPage() {
             <ShieldCheck className="h-4 w-4" />
           </div>
 
-          <div>
-            <p className="font-black">
+          <div className="min-w-0">
+            <p className="break-words font-black [overflow-wrap:anywhere]">
               Isolated sandbox environment
             </p>
 
@@ -1478,7 +1609,7 @@ export default function MerchantTestPaymentsPage() {
           >
             <AlertCircle className="mt-0.5 h-5 w-5 shrink-0" />
 
-            <span className="flex-1">
+            <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere]">
               {error}
             </span>
 
@@ -1521,7 +1652,7 @@ export default function MerchantTestPaymentsPage() {
           >
             <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
 
-            <span className="flex-1">
+            <span className="min-w-0 flex-1 break-words [overflow-wrap:anywhere]">
               {notice}
             </span>
 
@@ -1546,7 +1677,7 @@ export default function MerchantTestPaymentsPage() {
             grid
             gap-6
 
-            xl:grid-cols-[minmax(0,1.08fr)_minmax(390px,0.92fr)]
+            xl:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]
           "
         >
           {/* ===============================================
@@ -1580,12 +1711,16 @@ export default function MerchantTestPaymentsPage() {
             <div
               className="
                 flex
-                items-start
-                justify-between
-                gap-4
+                min-w-0
+                flex-col
+                gap-3
+
+                sm:flex-row
+                sm:items-start
+                sm:justify-between
               "
             >
-              <div>
+              <div className="min-w-0">
                 <p
                   className="
                     text-[10px]
@@ -1623,6 +1758,8 @@ export default function MerchantTestPaymentsPage() {
 
               <span
                 className="
+                  w-fit
+                  shrink-0
                   rounded-full
                   bg-violet-500/10
                   px-3
@@ -2168,12 +2305,16 @@ export default function MerchantTestPaymentsPage() {
                 className="
                   relative
                   flex
-                  items-start
-                  justify-between
-                  gap-4
+                  min-w-0
+                  flex-col
+                  gap-3
+
+                  sm:flex-row
+                  sm:items-start
+                  sm:justify-between
                 "
               >
-                <div>
+                <div className="min-w-0">
                   <p
                     className="
                       text-[10px]
@@ -2219,7 +2360,11 @@ export default function MerchantTestPaymentsPage() {
                     className="
                       inline-flex
                       h-10
+                      w-full
                       items-center
+                      justify-center
+
+                      sm:w-auto
                       gap-2
                       rounded-xl
                       bg-white/10
@@ -2252,7 +2397,7 @@ export default function MerchantTestPaymentsPage() {
               <div
                 className="
                   flex
-                  min-h-[430px]
+                  min-h-[320px]
                   flex-col
                   items-center
                   justify-center
@@ -2355,10 +2500,12 @@ export default function MerchantTestPaymentsPage() {
                       )}
                       className="
                         mt-1
-                        truncate
+                        break-words
                         text-xl
                         font-black
+                        leading-tight
                         tracking-tight
+                        [overflow-wrap:anywhere]
                         merchant-text
                       "
                     >
@@ -2757,7 +2904,8 @@ export default function MerchantTestPaymentsPage() {
             <div
               className="
                 flex
-                items-center
+                min-w-0
+                items-start
                 gap-3
               "
             >
@@ -2766,6 +2914,7 @@ export default function MerchantTestPaymentsPage() {
                   flex
                   h-11
                   w-11
+                  shrink-0
                   items-center
                   justify-center
                   rounded-2xl
@@ -2776,7 +2925,7 @@ export default function MerchantTestPaymentsPage() {
                 <History className="h-5 w-5" />
               </div>
 
-              <div>
+              <div className="min-w-0">
                 <h2
                   className="
                     font-black
@@ -2803,9 +2952,11 @@ export default function MerchantTestPaymentsPage() {
             <div
               className="
                 flex
+                w-full
                 flex-col
                 gap-2
 
+                sm:w-auto
                 sm:flex-row
               "
             >
@@ -2814,6 +2965,10 @@ export default function MerchantTestPaymentsPage() {
                   event
                 ) => {
                   event.preventDefault();
+
+                  if (!isMerchantRole) {
+                    return;
+                  }
 
                   setPagination(
                     (
@@ -2829,7 +2984,7 @@ export default function MerchantTestPaymentsPage() {
                     search.trim(),
                   );
                 }}
-                className="relative"
+                className="relative w-full min-w-0 sm:w-auto"
               >
                 <Search
                   className="
@@ -2851,16 +3006,21 @@ export default function MerchantTestPaymentsPage() {
                   }
                   onChange={(
                     event
-                  ) =>
+                  ) => {
+                    if (!isMerchantRole) {
+                      return;
+                    }
+
                     setSearch(
                       event.target
                         .value,
-                    )
-                  }
+                    );
+                  }}
                   placeholder="Search order, reference or customer"
                   className="
                     h-10
                     w-full
+                    min-w-0
                     rounded-xl
                     border
                     border-violet-200/70
@@ -2888,6 +3048,10 @@ export default function MerchantTestPaymentsPage() {
                 onChange={(
                   event
                 ) => {
+                  if (!isMerchantRole) {
+                    return;
+                  }
+
                   setStatus(
                     event.target
                       .value as
@@ -2906,8 +3070,12 @@ export default function MerchantTestPaymentsPage() {
                 }}
                 className="
                   h-10
+                  w-full
+                  min-w-0
                   rounded-xl
                   border
+
+                  sm:w-auto
                   border-violet-200/70
                   bg-transparent
                   px-3
@@ -3127,8 +3295,9 @@ export default function MerchantTestPaymentsPage() {
                         <h3
                           className="
                             max-w-full
-                            truncate
+                            break-all
                             font-mono
+                            leading-5
                             text-xs
                             font-black
                             merchant-text
@@ -3171,7 +3340,7 @@ export default function MerchantTestPaymentsPage() {
                           )}
                         </span>
 
-                        <span>
+                        <span className="min-w-0 break-words [overflow-wrap:anywhere]">
                           {order.merchantReference ||
                             "No reference"}
                         </span>
@@ -3184,7 +3353,7 @@ export default function MerchantTestPaymentsPage() {
 
                         {order.customer
                           ?.email ? (
-                          <span className="truncate">
+                          <span className="min-w-0 break-all">
                             {
                               order
                                 .customer
@@ -3198,8 +3367,10 @@ export default function MerchantTestPaymentsPage() {
                     <div
                       className="
                         flex
+                        flex-col
                         gap-2
 
+                        sm:flex-row
                         lg:shrink-0
                       "
                     >
@@ -3209,6 +3380,10 @@ export default function MerchantTestPaymentsPage() {
                           refreshingOrder
                         }
                         onClick={() => {
+                          if (!isMerchantRole) {
+                            return;
+                          }
+
                           void refreshOrder(
                             order.orderId,
                           );
@@ -3312,8 +3487,11 @@ export default function MerchantTestPaymentsPage() {
             <div
               className="
                 flex
+                flex-wrap
                 items-center
                 gap-2
+
+                sm:justify-end
               "
             >
               <button
@@ -3323,6 +3501,10 @@ export default function MerchantTestPaymentsPage() {
                   loadingOrders
                 }
                 onClick={() => {
+                  if (!isMerchantRole) {
+                    return;
+                  }
+
                   setPagination(
                     (
                       currentPagination,
@@ -3386,6 +3568,10 @@ export default function MerchantTestPaymentsPage() {
                   loadingOrders
                 }
                 onClick={() => {
+                  if (!isMerchantRole) {
+                    return;
+                  }
+
                   setPagination(
                     (
                       currentPagination,
@@ -3464,7 +3650,7 @@ export default function MerchantTestPaymentsPage() {
               <Sparkles className="h-5 w-5" />
             </div>
 
-            <div>
+            <div className="min-w-0">
               <p
                 className="
                   text-sm
@@ -3557,10 +3743,12 @@ function DetailBox({
         title={value}
         className="
           mt-1
-          truncate
+          break-words
           text-xs
           font-black
+          leading-5
           merchant-text
+          [overflow-wrap:anywhere]
         "
       >
         {value}
@@ -3627,6 +3815,8 @@ function FlowStep({
           <div
             className="
               flex
+              min-w-0
+              flex-wrap
               items-center
               gap-2
             "
@@ -3645,9 +3835,12 @@ function FlowStep({
 
             <h3
               className="
+                break-words
                 text-sm
                 font-black
+                leading-tight
                 merchant-text
+                [overflow-wrap:anywhere]
               "
             >
               {title}

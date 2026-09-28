@@ -11,6 +11,10 @@ import React, {
 import Link from "next/link";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   AlertCircle,
   ArrowRight,
   BadgeCheck,
@@ -37,6 +41,14 @@ import {
   AnimatePresence,
   motion,
 } from "framer-motion";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   getMerchantVerification,
@@ -501,8 +513,7 @@ function AccessCard({
           0.07,
       }}
       whileHover={{
-        y: -7,
-        scale: 1.012,
+        scale: 1.006,
       }}
       className="
         merchant-border
@@ -510,6 +521,8 @@ function AccessCard({
 
         group
         relative
+        h-full
+        min-w-0
         overflow-hidden
         rounded-[22px]
         border
@@ -576,13 +589,13 @@ function AccessCard({
             }
           </p>
 
-          <p className="mt-2 text-lg font-black tracking-[-0.03em] text-foreground">
+          <p className="mt-2 break-words text-lg font-black leading-tight tracking-[-0.03em] text-foreground [overflow-wrap:anywhere]">
             {
               value
             }
           </p>
 
-          <p className="mt-2 max-w-[230px] text-[10px] font-semibold leading-4 merchant-muted">
+          <p className="mt-2 max-w-[230px] break-words text-[10px] font-semibold leading-4 merchant-muted [overflow-wrap:anywhere]">
             {
               description
             }
@@ -691,7 +704,7 @@ function RegistrationTypeDropdown({
       ref={
         ref
       }
-      className="relative z-30"
+      className={`relative ${open ? "z-[80]" : "z-30"}`}
     >
       <motion.button
         type="button"
@@ -780,13 +793,17 @@ function RegistrationTypeDropdown({
               left-0
               right-0
               top-full
+              z-[90]
+              min-w-[220px]
+              max-w-[calc(100vw-2rem)]
               overflow-hidden
               rounded-2xl
               border
               merchant-border
               bg-card
               p-1.5
-              shadow-[0_22px_55px_rgba(40,10,70,.20)]
+              shadow-[0_24px_65px_rgba(40,10,70,.24)]
+              backdrop-blur-xl
             "
           >
             {REGISTRATION_OPTIONS.map(
@@ -908,8 +925,7 @@ function FileField({
   return (
     <motion.div
       whileHover={{
-        y: -5,
-        scale: 1.008,
+        scale: 1.004,
       }}
       className="
         merchant-border
@@ -942,7 +958,7 @@ function FileField({
         "
       />
 
-      <div className="relative flex items-start gap-3">
+      <div className="relative flex min-w-0 items-start gap-3">
         <motion.div
           whileHover={{
             rotate: -6,
@@ -1132,6 +1148,32 @@ function FileField({
 ========================================================= */
 
 export default function MerchantVerificationPage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isMerchantRole =
+    user.role === "merchant";
+
+  useEffect(() => {
+    if (isMerchantRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isMerchantRole,
+    router,
+    user.role,
+  ]);
+
   const [
     data,
     setData,
@@ -1230,6 +1272,16 @@ export default function MerchantVerificationPage() {
         silent =
           false
       ) => {
+        if (!isMerchantRole) {
+          setLoading(false);
+          setRefreshing(false);
+          setData(null);
+          setError("");
+          setNotice("");
+
+          return;
+        }
+
         try {
           setError(
             ""
@@ -1304,14 +1356,23 @@ export default function MerchantVerificationPage() {
           );
         }
       },
-      []
+      [
+        isMerchantRole,
+      ]
     );
 
   useEffect(
     () => {
+      if (!isMerchantRole) {
+        setLoading(false);
+
+        return;
+      }
+
       void loadVerification();
     },
     [
+      isMerchantRole,
       loadVerification,
     ]
   );
@@ -1368,6 +1429,10 @@ export default function MerchantVerificationPage() {
         React.FormEvent<HTMLFormElement>
     ) => {
       event.preventDefault();
+
+      if (!isMerchantRole) {
+        return;
+      }
 
       setError(
         ""
@@ -1489,6 +1554,30 @@ export default function MerchantVerificationPage() {
     };
 
   /* =======================================================
+     MERCHANT-ONLY REDIRECTING
+  ======================================================= */
+
+  if (!isMerchantRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center bg-background px-4 text-foreground">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-500/15 bg-violet-500/10 text-violet-700 shadow-sm dark:text-violet-300">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Merchant verification is available only to merchant accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  /* =======================================================
      UI
   ======================================================= */
 
@@ -1515,7 +1604,7 @@ export default function MerchantVerificationPage() {
             duration: 0.6,
           }}
           whileHover={{
-            y: -2,
+            scale: 1.002,
           }}
           className="
             relative
@@ -1544,8 +1633,8 @@ export default function MerchantVerificationPage() {
               lg:justify-between
             "
           >
-            <div className="max-w-[820px]">
-              <div className="flex items-center gap-3">
+            <div className="min-w-0 max-w-[820px]">
+              <div className="flex min-w-0 items-start gap-3">
                 <motion.div
                   whileHover={{
                     rotate: -7,
@@ -1558,6 +1647,7 @@ export default function MerchantVerificationPage() {
                     flex
                     h-12
                     w-12
+                    shrink-0
                     items-center
                     justify-center
                     rounded-2xl
@@ -1570,7 +1660,7 @@ export default function MerchantVerificationPage() {
                   <BadgeCheck className="h-5 w-5" />
                 </motion.div>
 
-                <div>
+                <div className="min-w-0">
                   <p className="text-[9px] font-black uppercase tracking-[0.20em] text-fuchsia-100/55">
                     Merchant KYB
                   </p>
@@ -1630,8 +1720,10 @@ export default function MerchantVerificationPage() {
                   className="
                     mt-3
                     max-w-[800px]
+                    break-words
                     text-[34px]
                     font-black
+                    [overflow-wrap:anywhere]
                     leading-[1.02]
                     tracking-[-0.055em]
 
@@ -1671,19 +1763,26 @@ export default function MerchantVerificationPage() {
               whileTap={{
                 scale: 0.98,
               }}
-              onClick={() =>
+              onClick={() => {
+                if (!isMerchantRole) {
+                  return;
+                }
+
                 void loadVerification(
                   true
-                )
-              }
+                );
+              }}
               disabled={
                 refreshing
               }
               className="
                 inline-flex
                 h-11
+                w-full
                 shrink-0
                 items-center
+
+                sm:w-auto
                 justify-center
                 gap-2
                 rounded-xl
@@ -1758,10 +1857,10 @@ export default function MerchantVerificationPage() {
                 dark:text-red-300
               "
             >
-              <div className="flex items-start gap-3">
+              <div className="flex min-w-0 items-start gap-3">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
 
-                <p className="text-sm font-semibold">
+                <p className="min-w-0 break-words text-sm font-semibold leading-5 [overflow-wrap:anywhere]">
                   {
                     error
                   }
@@ -1770,6 +1869,7 @@ export default function MerchantVerificationPage() {
 
               <button
                 type="button"
+                className="shrink-0"
                 onClick={() =>
                   setError(
                     ""
@@ -1813,10 +1913,10 @@ export default function MerchantVerificationPage() {
                 dark:text-emerald-300
               "
             >
-              <div className="flex items-start gap-3">
+              <div className="flex min-w-0 items-start gap-3">
                 <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
 
-                <p className="text-sm font-semibold">
+                <p className="min-w-0 break-words text-sm font-semibold leading-5 [overflow-wrap:anywhere]">
                   {
                     notice
                   }
@@ -1825,6 +1925,7 @@ export default function MerchantVerificationPage() {
 
               <button
                 type="button"
+                className="shrink-0"
                 onClick={() =>
                   setNotice(
                     ""
@@ -1991,7 +2092,7 @@ export default function MerchantVerificationPage() {
                   sm:justify-between
                 "
               >
-                <div className="flex items-start gap-4">
+                <div className="flex min-w-0 items-start gap-4">
                   <motion.div
                     animate={{
                       scale: [
@@ -2021,7 +2122,7 @@ export default function MerchantVerificationPage() {
                     <StatusIcon className="h-5 w-5" />
                   </motion.div>
 
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-[9px] font-black uppercase tracking-[0.18em] text-fuchsia-100/55">
                       Verification status
                     </p>
@@ -2049,7 +2150,7 @@ export default function MerchantVerificationPage() {
                       </span>
                     </div>
 
-                    <p className="mt-2 max-w-2xl text-xs leading-5 text-white/65">
+                    <p className="mt-2 max-w-2xl break-words text-xs leading-5 text-white/65 [overflow-wrap:anywhere]">
                       {
                         status.description
                       }
@@ -2080,8 +2181,11 @@ export default function MerchantVerificationPage() {
                       className="
                         inline-flex
                         h-11
+                        w-full
                         shrink-0
                         items-center
+
+                        sm:w-auto
                         justify-center
                         gap-2
                         rounded-xl
@@ -2147,11 +2251,11 @@ export default function MerchantVerificationPage() {
                     sm:justify-between
                   "
                 >
-                  <div className="flex items-start gap-3">
+                  <div className="flex min-w-0 items-start gap-3">
                     <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
 
-                    <div>
-                      <h2 className="text-sm font-black">
+                    <div className="min-w-0">
+                      <h2 className="break-words text-sm font-black leading-tight [overflow-wrap:anywhere]">
                         Verify the merchant owner first
                       </h2>
 
@@ -2169,8 +2273,11 @@ export default function MerchantVerificationPage() {
                     className="
                       inline-flex
                       h-10
+                      w-full
                       shrink-0
                       items-center
+
+                      sm:w-auto
                       justify-center
                       gap-2
                       rounded-xl
@@ -2237,6 +2344,7 @@ export default function MerchantVerificationPage() {
                       flex
                       h-9
                       w-9
+                      shrink-0
                       items-center
                       justify-center
                       rounded-xl
@@ -2249,7 +2357,7 @@ export default function MerchantVerificationPage() {
                     <FileCheck2 className="h-4 w-4" />
                   </div>
 
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-[8px] font-black uppercase tracking-[0.15em] text-violet-500">
                       Submitted information
                     </p>
@@ -2330,7 +2438,7 @@ export default function MerchantVerificationPage() {
                             }
                           </p>
 
-                          <p className="mt-2 text-sm font-black leading-6 text-foreground">
+                          <p className="mt-2 break-words text-sm font-black leading-6 text-foreground [overflow-wrap:anywhere]">
                             {
                               item.value
                             }
@@ -2370,7 +2478,7 @@ export default function MerchantVerificationPage() {
                                   0.05,
                               }}
                               whileHover={{
-                                x: 4,
+                                scale: 1.002,
                               }}
                               className="
                                 flex
@@ -2392,6 +2500,7 @@ export default function MerchantVerificationPage() {
                                   flex
                                   h-9
                                   w-9
+                                  shrink-0
                                   items-center
                                   justify-center
                                   rounded-xl
@@ -2446,7 +2555,7 @@ export default function MerchantVerificationPage() {
                           Rejection reason
                         </p>
 
-                        <p className="mt-2 text-sm leading-6">
+                        <p className="mt-2 break-words text-sm leading-6 [overflow-wrap:anywhere]">
                           {
                             data.verification
                               .rejectionReason
@@ -2477,7 +2586,7 @@ export default function MerchantVerificationPage() {
                   merchant-surface
                   merchant-shadow
 
-                  overflow-hidden
+                  overflow-visible
                   rounded-[26px]
                   border
                 "
@@ -2496,7 +2605,7 @@ export default function MerchantVerificationPage() {
                 >
                   <PurpleAuroraBackground />
 
-                  <div className="relative z-10 flex items-center gap-4">
+                  <div className="relative z-10 flex min-w-0 items-start gap-4">
                     <motion.div
                       whileHover={{
                         rotate: -6,
@@ -2506,6 +2615,7 @@ export default function MerchantVerificationPage() {
                         flex
                         h-11
                         w-11
+                        shrink-0
                         items-center
                         justify-center
                         rounded-2xl
@@ -2518,12 +2628,12 @@ export default function MerchantVerificationPage() {
                       <Building2 className="h-5 w-5" />
                     </motion.div>
 
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-[9px] font-black uppercase tracking-[0.17em] text-fuchsia-100/55">
                         Business documents
                       </p>
 
-                      <h2 className="mt-1 text-base font-black">
+                      <h2 className="mt-1 break-words text-base font-black leading-tight [overflow-wrap:anywhere]">
                         {currentStatus ===
                         "rejected"
                           ? "Resubmit verification"
@@ -2608,9 +2718,17 @@ export default function MerchantVerificationPage() {
                         value={
                           registrationType
                         }
-                        onChange={
-                          setRegistrationType
-                        }
+                        onChange={(
+                          value
+                        ) => {
+                          if (!isMerchantRole) {
+                            return;
+                          }
+
+                          setRegistrationType(
+                            value
+                          );
+                        }}
                       />
                     </div>
 
@@ -2819,8 +2937,11 @@ export default function MerchantVerificationPage() {
                       className="
                         inline-flex
                         h-11
+                        w-full
                         shrink-0
                         items-center
+
+                        sm:w-auto
                         justify-center
                         gap-2
                         rounded-xl

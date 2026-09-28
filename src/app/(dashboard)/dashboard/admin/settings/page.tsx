@@ -22,10 +22,12 @@ import {
   CircleGauge,
   Clock3,
   Database,
+  Eye,
   Fingerprint,
   Gauge,
   History,
   KeyRound,
+  Leaf,
   Laptop,
   Monitor,
   Moon,
@@ -46,6 +48,7 @@ import {
   TriangleAlert,
   UserCog,
   Users,
+  Waves,
   X,
   Zap,
   type LucideIcon,
@@ -532,7 +535,322 @@ const getErrorMessage = (
   return "Something went wrong.";
 };
 
+/* =========================================================
+   ADMIN / SUPER ADMIN ACCESS
+========================================================= */
+
+type AccessState =
+  | "checking"
+  | "allowed"
+  | "denied";
+
+const ADMIN_ROLES = new Set([
+  "admin",
+  "super_admin",
+]);
+
+function normalizeRole(
+  value: unknown
+): string {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+function getStoredRole(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const rawUser =
+    window.localStorage.getItem(
+      "auth_user"
+    );
+
+  if (!rawUser) {
+    return "";
+  }
+
+  try {
+    const parsed =
+      JSON.parse(rawUser);
+
+    const candidates = [
+      parsed?.role,
+      parsed?.user?.role,
+      parsed?.data?.role,
+      parsed?.profile?.role,
+    ];
+
+    for (const candidate of candidates) {
+      const role =
+        normalizeRole(candidate);
+
+      if (role) {
+        return role;
+      }
+    }
+  } catch {
+    return "";
+  }
+
+  return "";
+}
+
+function hasAdminAccess(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const authenticated =
+    window.localStorage.getItem(
+      "is_authenticated"
+    );
+
+  if (
+    (
+      authenticated !== "true" &&
+      authenticated !== "1"
+    ) ||
+    !window.localStorage.getItem(
+      "auth_user"
+    )
+  ) {
+    return false;
+  }
+
+  return ADMIN_ROLES.has(
+    getStoredRole()
+  );
+}
+
+function isAuthorizationError(
+  error: unknown
+): boolean {
+  const maybeRecord =
+    error &&
+    typeof error === "object"
+      ? (error as Record<string, unknown>)
+      : null;
+
+  const response =
+    maybeRecord?.response &&
+    typeof maybeRecord.response === "object"
+      ? (
+          maybeRecord.response as
+            Record<string, unknown>
+        )
+      : null;
+
+  const status =
+    Number(
+      maybeRecord?.status ??
+        maybeRecord?.statusCode ??
+        response?.status
+    );
+
+  if (
+    status === 401 ||
+    status === 403 ||
+    status === 404
+  ) {
+    return true;
+  }
+
+  const message =
+    error instanceof Error
+      ? error.message.toLowerCase()
+      : String(error ?? "")
+          .toLowerCase();
+
+  return (
+    message.includes("401") ||
+    message.includes("403") ||
+    message.includes("404") ||
+    message.includes(
+      "unauthorized"
+    ) ||
+    message.includes(
+      "forbidden"
+    ) ||
+    message.includes(
+      "access denied"
+    ) ||
+    message.includes(
+      "not authorized"
+    )
+  );
+}
+
+function AccessCheckingState() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 text-foreground">
+      <motion.div
+        initial={{
+          opacity: 0,
+          y: 8,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        className="text-center"
+      >
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-indigo-500/15 bg-indigo-500/10 text-indigo-600">
+          <RefreshCw className="h-5 w-5 animate-spin" />
+        </div>
+
+        <p className="mt-4 text-sm font-black">
+          Checking access
+        </p>
+
+        <p className="mt-1 text-xs text-muted-foreground">
+          Verifying administrator permissions…
+        </p>
+      </motion.div>
+    </main>
+  );
+}
+
+function AdminNotFoundState() {
+  return (
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-5 text-foreground">
+      <div className="pointer-events-none absolute -left-32 top-24 h-80 w-80 rounded-full bg-indigo-500/[0.07] blur-[100px]" />
+      <div className="pointer-events-none absolute -right-32 bottom-20 h-80 w-80 rounded-full bg-violet-500/[0.07] blur-[100px]" />
+
+      <motion.section
+        initial={{
+          opacity: 0,
+          y: 18,
+          scale: 0.98,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          scale: 1,
+        }}
+        transition={{
+          duration: 0.45,
+          ease: [
+            0.22,
+            1,
+            0.36,
+            1,
+          ],
+        }}
+        className="relative w-full max-w-xl overflow-hidden rounded-[32px] border border-border bg-card p-7 text-center shadow-[0_30px_90px_rgba(15,23,42,.12)] sm:p-10"
+      >
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.035]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(79,70,229,.7) 1px, transparent 1px), linear-gradient(90deg, rgba(79,70,229,.7) 1px, transparent 1px)",
+            backgroundSize:
+              "32px 32px",
+          }}
+        />
+
+        <div className="relative z-10">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] border border-indigo-500/15 bg-indigo-500/10 text-indigo-600">
+            <ShieldAlert className="h-7 w-7" />
+          </div>
+
+          <p className="mt-6 text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600">
+            Error 404
+          </p>
+
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">
+            Page not found
+          </h1>
+
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+            The page you are looking for does not exist or is not available.
+          </p>
+        </div>
+      </motion.section>
+    </main>
+  );
+}
+
+/* =========================================================
+   OUTER ACCESS GATE
+========================================================= */
+
 export default function AdminSettingsPage() {
+  const [
+    access,
+    setAccess,
+  ] =
+    useState<AccessState>(
+      "checking"
+    );
+
+  useEffect(() => {
+    const checkAccess =
+      () => {
+        setAccess(
+          hasAdminAccess()
+            ? "allowed"
+            : "denied"
+        );
+      };
+
+    checkAccess();
+
+    window.addEventListener(
+      "storage",
+      checkAccess
+    );
+
+    window.addEventListener(
+      "coffer-auth-state-changed",
+      checkAccess
+    );
+
+    return () => {
+      window.removeEventListener(
+        "storage",
+        checkAccess
+      );
+
+      window.removeEventListener(
+        "coffer-auth-state-changed",
+        checkAccess
+      );
+    };
+  }, []);
+
+  if (access === "checking") {
+    return (
+      <AccessCheckingState />
+    );
+  }
+
+  if (access === "denied") {
+    return (
+      <AdminNotFoundState />
+    );
+  }
+
+  return (
+    <AdminSettingsContent
+      onUnauthorized={() =>
+        setAccess("denied")
+      }
+    />
+  );
+}
+
+/* =========================================================
+   SETTINGS CONTENT
+========================================================= */
+
+function AdminSettingsContent({
+  onUnauthorized,
+}: {
+  onUnauthorized: () => void;
+}) {
   const [
     mounted,
     setMounted,
@@ -540,6 +858,16 @@ export default function AdminSettingsPage() {
     useState(
       false
     );
+
+  useEffect(() => {
+    if (
+      !hasAdminAccess()
+    ) {
+      onUnauthorized();
+    }
+  }, [
+    onUnauthorized,
+  ]);
 
   const [
     activeSection,
@@ -687,10 +1015,11 @@ export default function AdminSettingsPage() {
     );
 
   const loadPlatformSettings =
-    async (
-      silent =
-        false
-    ) => {
+    useCallback(
+      async (
+        silent =
+          false
+      ) => {
       if (!silent) {
         setLoading(
           true
@@ -723,6 +1052,15 @@ export default function AdminSettingsPage() {
       } catch (
         error
       ) {
+        if (
+          isAuthorizationError(
+            error
+          )
+        ) {
+          onUnauthorized();
+          return;
+        }
+
         const message =
           getErrorMessage(
             error
@@ -747,7 +1085,11 @@ export default function AdminSettingsPage() {
           );
         }
       }
-    };
+    },
+    [
+      onUnauthorized,
+    ]
+  );
 
   useEffect(() => {
     setMounted(
@@ -755,8 +1097,9 @@ export default function AdminSettingsPage() {
     );
 
     void loadPlatformSettings();
-
-  }, []);
+  }, [
+    loadPlatformSettings,
+  ]);
 
   const loadAdminSessions = useCallback(async (silent = false) => {
     if (!silent) setSessionsLoading(true);
@@ -774,15 +1117,45 @@ export default function AdminSettingsPage() {
 
       setSessions(response.sessions ?? []);
     } catch (error) {
-      console.error("ADMIN SESSIONS ERROR:", error);
-      setSessionsError(error instanceof Error ? error.message : "Failed to load active admin sessions.");
+      if (
+        isAuthorizationError(
+          error
+        )
+      ) {
+        onUnauthorized();
+        return;
+      }
+
+      console.error(
+        "ADMIN SESSIONS ERROR:",
+        error
+      );
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to load active admin sessions.";
+
+      setSessionsError(
+        message
+      );
+
       if (silent) {
-        setToast({ type: "error", message: error instanceof Error ? error.message : "Failed to load active admin sessions." });
+        setToast({
+          type: "error",
+          message,
+        });
       }
     } finally {
-      if (!silent) setSessionsLoading(false);
+      if (!silent) {
+        setSessionsLoading(
+          false
+        );
+      }
     }
-  }, []);
+  }, [
+    onUnauthorized,
+  ]);
 
   useEffect(() => {
   void loadAdminSessions();
@@ -1001,7 +1374,22 @@ export default function AdminSettingsPage() {
       setSessions((current) => current.filter((item) => item.id !== sessionId));
       setToast({ type: "success", message: response.message || "Session signed out successfully." });
     } catch (error) {
-      setToast({ type: "error", message: error instanceof Error ? error.message : "Failed to sign out session." });
+      if (
+        isAuthorizationError(
+          error
+        )
+      ) {
+        onUnauthorized();
+        return;
+      }
+
+      setToast({
+        type: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to sign out session.",
+      });
     } finally {
       setSessionActionLoading(null);
     }
@@ -1018,7 +1406,22 @@ export default function AdminSettingsPage() {
       setSessions((current) => current.filter((item) => item.isCurrent));
       setToast({ type: "success", message: response.message || "Other sessions signed out successfully." });
     } catch (error) {
-      setToast({ type: "error", message: error instanceof Error ? error.message : "Failed to sign out other sessions." });
+      if (
+        isAuthorizationError(
+          error
+        )
+      ) {
+        onUnauthorized();
+        return;
+      }
+
+      setToast({
+        type: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to sign out other sessions.",
+      });
     } finally {
       setSessionActionLoading(null);
     }
@@ -1031,7 +1434,22 @@ export default function AdminSettingsPage() {
       await setTheme(nextTheme);
       setToast({ type: "success", message: `Dashboard theme changed to ${nextTheme}.` });
     } catch (error) {
-      setToast({ type: "error", message: error instanceof Error ? error.message : "Failed to change dashboard theme." });
+      if (
+        isAuthorizationError(
+          error
+        )
+      ) {
+        onUnauthorized();
+        return;
+      }
+
+      setToast({
+        type: "error",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Failed to change dashboard theme.",
+      });
     } finally {
       setThemeSaving(false);
     }
@@ -1109,6 +1527,23 @@ export default function AdminSettingsPage() {
       } catch (
         error
       ) {
+        if (
+          isAuthorizationError(
+            error
+          )
+        ) {
+          setReauthOpen(
+            false
+          );
+
+          setReauthPassword(
+            ""
+          );
+
+          onUnauthorized();
+          return;
+        }
+
         setReauthError(
           getErrorMessage(
             error
@@ -1777,82 +2212,34 @@ function SettingsNavigation({
 
   return (
     <aside className="sticky top-3 z-40 min-w-0">
-      <div className="overflow-hidden rounded-[28px] border border-border/90 bg-card/95 shadow-[0_18px_55px_rgba(15,39,69,0.09)] backdrop-blur-xl">
-        <div className="flex flex-col gap-3 p-3 2xl:flex-row 2xl:items-center">
-          <div className="flex shrink-0 items-center justify-between gap-3 rounded-2xl bg-[linear-gradient(135deg,#f8fbff,#ffffff)] px-3 py-2.5 2xl:w-[218px] 2xl:justify-start">
+      <div className="overflow-hidden rounded-[26px] border border-border/80 bg-card/95 shadow-[0_16px_45px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+        <div className="flex flex-col gap-3 p-3 xl:flex-row xl:items-center">
+          <div className="flex shrink-0 items-center justify-between gap-3 rounded-[18px] bg-[#111827] px-3.5 py-3 text-white xl:w-[224px] xl:justify-start">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-950 text-cyan-200 shadow-[0_8px_22px_rgba(15,39,69,.18)]">
+              <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.07] text-indigo-200">
                 <SlidersHorizontal className="h-[18px] w-[18px]" />
-                <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-400">
+                <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-[#111827] bg-emerald-400">
                   <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400 opacity-35" />
                 </span>
               </div>
 
               <div className="min-w-0">
-                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-slate-400">
                   Admin Console
                 </p>
-                <p className="mt-0.5 truncate text-sm font-black tracking-[-0.01em] text-card-foreground">
+                <p className="mt-0.5 truncate text-sm font-black tracking-[-0.01em] text-white">
                   Platform Controls
                 </p>
               </div>
             </div>
 
-            <span className="rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-1 text-[9px] font-black text-emerald-700 2xl:hidden">
+            <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[9px] font-black text-emerald-300 xl:hidden">
               Protected
             </span>
           </div>
 
-          <div className="order-3 grid min-w-0 flex-1 grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-7 2xl:order-2">
-            {sections.length === 0 ? (
-              <div className="col-span-full flex min-h-12 items-center justify-center rounded-2xl border border-dashed border-border bg-muted px-4 text-xs font-bold text-muted-foreground">
-                No matching settings
-              </div>
-            ) : (
-              sections.map((section) => {
-                const Icon = section.icon;
-                const active = activeSection === section.id;
-
-                return (
-                  <motion.button
-                    key={section.id}
-                    type="button"
-                    onClick={() => onSectionChange(section.id)}
-                    title={`${section.label} — ${section.description}`}
-                    whileTap={{ scale: 0.97 }}
-                    className={`group relative flex min-w-0 items-center justify-center gap-2 overflow-hidden rounded-2xl border px-2.5 py-3 transition-all duration-200 ${
-                      active
-                        ? "border-[#143c63] bg-indigo-950 text-white shadow-[0_10px_28px_rgba(15,39,69,0.18)]"
-                        : "border-transparent bg-muted text-card-foreground/75 hover:border-indigo-200/70 dark:border-indigo-500/25 hover:bg-indigo-50 dark:bg-indigo-500/10 hover:text-indigo-600 dark:text-indigo-400"
-                    }`}
-                  >
-                    {active && (
-                      <>
-                        <motion.span
-                          layoutId="admin-settings-dock-active"
-                          className="absolute inset-x-4 bottom-0 h-[3px] rounded-t-full bg-cyan-300"
-                          transition={{ type: "spring", stiffness: 380, damping: 32 }}
-                        />
-                        <motion.span
-                          className="pointer-events-none absolute -right-6 -top-8 h-16 w-16 rounded-full bg-cyan-300/10 blur-xl"
-                          animate={{ scale: [0.8, 1.15, 0.8], opacity: [0.2, 0.6, 0.2] }}
-                          transition={{ duration: 3.4, repeat: Infinity }}
-                        />
-                      </>
-                    )}
-
-                    <Icon className={`relative z-10 h-4 w-4 shrink-0 ${active ? "text-cyan-200" : ""}`} />
-                    <span className="relative z-10 truncate text-[10px] font-black tracking-[-0.01em] sm:text-[11px]">
-                      {shortLabel[section.id]}
-                    </span>
-                  </motion.button>
-                );
-              })
-            )}
-          </div>
-
-          <div className="relative order-2 w-full 2xl:order-3 2xl:w-[260px]">
-            <div className="pointer-events-none absolute left-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg bg-card text-muted-foreground shadow-sm ring-1 ring-slate-100">
+          <div className="relative w-full xl:order-3 xl:w-[240px]">
+            <div className="pointer-events-none absolute left-3 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg bg-card text-muted-foreground ring-1 ring-border/70">
               <Search className="h-3.5 w-3.5" />
             </div>
 
@@ -1860,7 +2247,7 @@ function SettingsNavigation({
               value={searchQuery}
               onChange={(event) => onSearchChange(event.target.value)}
               placeholder="Search controls..."
-              className="h-12 w-full rounded-2xl border border-border bg-muted pl-12 pr-10 text-xs font-semibold text-card-foreground outline-none transition focus:border-blue-300 focus:bg-card focus:ring-4 focus:ring-indigo-500/10"
+              className="h-[46px] w-full rounded-2xl border border-border bg-muted/70 pl-12 pr-10 text-xs font-semibold text-card-foreground outline-none transition focus:border-indigo-400 focus:bg-card focus:ring-4 focus:ring-indigo-500/10"
             />
 
             {searchQuery && (
@@ -1876,14 +2263,46 @@ function SettingsNavigation({
           </div>
         </div>
 
-        <div className="hidden border-t border-border/70 px-4 py-2 2xl:flex 2xl:items-center 2xl:justify-between">
-          <p className="text-[9px] font-semibold text-muted-foreground">
-            Search, switch sections, and stage configuration changes from this control strip.
-          </p>
-          <div className="flex items-center gap-2 text-[9px] font-black text-emerald-700">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            Backend authorization enforced
-          </div>
+        <div className="border-t border-border/70 px-3 py-2.5">
+          {sections.length === 0 ? (
+            <div className="flex min-h-11 items-center justify-center rounded-xl border border-dashed border-border bg-muted/60 px-4 text-xs font-bold text-muted-foreground">
+              No matching settings
+            </div>
+          ) : (
+            <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:thin]">
+              {sections.map((section) => {
+                const Icon = section.icon;
+                const active = activeSection === section.id;
+
+                return (
+                  <motion.button
+                    key={section.id}
+                    type="button"
+                    onClick={() => onSectionChange(section.id)}
+                    title={`${section.label} — ${section.description}`}
+                    whileTap={{ scale: 0.98 }}
+                    className={`group relative flex min-w-[104px] flex-1 items-center justify-center gap-2 overflow-hidden rounded-xl border px-3 py-2.5 transition-all ${
+                      active
+                        ? "border-indigo-500/25 bg-indigo-600 text-white shadow-[0_8px_20px_rgba(79,70,229,0.18)]"
+                        : "border-transparent bg-muted/65 text-muted-foreground hover:border-border hover:bg-muted hover:text-card-foreground"
+                    }`}
+                  >
+                    {active && (
+                      <motion.span
+                        layoutId="admin-settings-dock-active"
+                        className="absolute inset-x-4 bottom-0 h-0.5 rounded-t-full bg-indigo-200"
+                        transition={{ type: "spring", stiffness: 380, damping: 32 }}
+                      />
+                    )}
+                    <Icon className={`relative z-10 h-3.5 w-3.5 shrink-0 ${active ? "text-indigo-100" : ""}`} />
+                    <span className="relative z-10 whitespace-nowrap text-[10px] font-black">
+                      {shortLabel[section.id]}
+                    </span>
+                  </motion.button>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </aside>
@@ -2469,35 +2888,42 @@ function UsersRolesSection({
       </div>
 
       <div className="overflow-hidden rounded-[26px] border border-border bg-card shadow-sm">
-        <div className="border-b border-border/70 px-5 py-4">
-          <h3 className="text-sm font-black">
-            Permission Matrix
-          </h3>
-
-          <p className="mt-1 text-[10px] text-muted-foreground">
-            UI summary only. Backend route authorization remains the source of truth.
-          </p>
+        <div className="flex flex-col gap-3 border-b border-border/70 bg-muted/35 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-sm font-black">Permission Matrix</h3>
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              A compact role snapshot. Backend authorization remains the source of truth.
+            </p>
+          </div>
+          <div className="flex gap-2 text-[9px] font-black">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-emerald-700 dark:text-emerald-300">
+              <CheckCircle2 className="h-3 w-3" /> Allowed
+            </span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-muted-foreground">
+              <Lock className="h-3 w-3" /> Restricted
+            </span>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
           <table className="min-w-[560px] w-full text-left">
-            <thead className="bg-muted">
+            <thead className="bg-muted/55">
               <tr>
-                <th className="px-5 py-4 text-xs font-black text-muted-foreground">
+                <th className="px-5 py-3 text-[10px] font-black uppercase tracking-[0.1em] text-muted-foreground">
                   Capability
                 </th>
 
-                <th className="px-5 py-4 text-center text-xs font-black text-muted-foreground">
+                <th className="w-28 px-4 py-3 text-center text-[10px] font-black uppercase tracking-[0.1em] text-muted-foreground">
                   Admin
                 </th>
 
-                <th className="px-5 py-4 text-center text-xs font-black text-muted-foreground">
+                <th className="w-28 px-4 py-3 text-center text-[10px] font-black uppercase tracking-[0.1em] text-muted-foreground">
                   User
                 </th>
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-border/60">
               {ROLE_MATRIX.map(
                 (
                   row
@@ -2506,9 +2932,9 @@ function UsersRolesSection({
                     key={
                       row.capability
                     }
-                    className="transition hover:bg-muted/70"
+                    className="transition odd:bg-card even:bg-muted/20 hover:bg-indigo-500/[0.045]"
                   >
-                    <td className="px-5 py-4 text-sm font-bold text-card-foreground/85">
+                    <td className="px-5 py-3 text-xs font-bold text-card-foreground/85">
                       {
                         row.capability
                       }
@@ -2538,8 +2964,10 @@ function UsersRolesSection({
 
 function PermissionCell({ allowed }: { allowed: boolean }) {
   return (
-    <td className="px-5 py-4 text-center">
-      {allowed ? <CheckCircle2 className="mx-auto h-5 w-5 text-emerald-500" /> : <Lock className="mx-auto h-4 w-4 text-muted-foreground/60" />}
+    <td className="px-4 py-3 text-center">
+      <span className={`mx-auto flex h-8 w-8 items-center justify-center rounded-xl ${allowed ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-300" : "bg-muted text-muted-foreground/60"}`}>
+        {allowed ? <CheckCircle2 className="h-4 w-4" /> : <Lock className="h-3.5 w-3.5" />}
+      </span>
     </td>
   );
 }
@@ -3203,19 +3631,19 @@ function ActiveSessionsSection({
         icon={Monitor}
       />
 
-      <div className="overflow-hidden rounded-[30px] border border-border bg-card shadow-sm">
-        <div className="flex flex-col justify-between gap-4 border-b border-border/70 p-5 sm:p-6 md:flex-row md:items-center">
+      <div className="overflow-hidden rounded-[28px] border border-border bg-card shadow-sm">
+        <div className="flex flex-col justify-between gap-4 bg-[#111827] p-5 text-white md:flex-row md:items-center">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-1.5 text-[9px] font-black text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400">
+              <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1.5 text-[9px] font-black text-emerald-300">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-500" />
                 Live backend data
               </span>
-              <span className="rounded-full bg-muted px-3 py-1.5 text-[9px] font-black text-muted-foreground">
+              <span className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-[9px] font-black text-slate-300">
                 {sessions.length} active
               </span>
             </div>
-            <p className="mt-3 max-w-2xl text-xs leading-5 text-muted-foreground">
+            <p className="mt-3 max-w-2xl text-xs leading-5 text-slate-400">
               Review where the admin account is logged in and immediately terminate sessions that should no longer have access.
             </p>
           </div>
@@ -3225,7 +3653,7 @@ function ActiveSessionsSection({
               type="button"
               onClick={onReload}
               disabled={loading}
-              className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3.5 py-2.5 text-xs font-black text-card-foreground transition hover:border-indigo-300 hover:bg-indigo-50 dark:hover:border-indigo-500/35 dark:hover:bg-indigo-500/10 disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.07] px-3.5 py-2.5 text-xs font-black text-white transition hover:bg-white/[0.12] disabled:opacity-50"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
               Refresh
@@ -3235,7 +3663,7 @@ function ActiveSessionsSection({
                 type="button"
                 onClick={onTerminateOthers}
                 disabled={actionLoading === "others"}
-                className="inline-flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-black text-red-600 transition hover:bg-red-100 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/15 disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-xl border border-rose-300/20 bg-rose-400/10 px-3.5 py-2.5 text-xs font-black text-rose-200 transition hover:bg-rose-400/15 disabled:opacity-50"
               >
                 {actionLoading === "others" ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <LogOut className="h-3.5 w-3.5" />}
                 Sign out others
@@ -3245,9 +3673,9 @@ function ActiveSessionsSection({
         </div>
 
         {loading && (
-          <div className="divide-y divide-border/70">
+          <div className="grid gap-3 p-4 md:grid-cols-2">
             {[1, 2, 3].map((item) => (
-              <div key={item} className="flex animate-pulse gap-4 p-5 sm:p-6">
+              <div key={item} className="flex animate-pulse gap-4 rounded-2xl border border-border bg-muted/25 p-4">
                 <div className="h-12 w-12 rounded-2xl bg-muted" />
                 <div className="min-w-0 flex-1 space-y-2">
                   <div className="h-4 w-44 rounded bg-muted" />
@@ -3282,7 +3710,7 @@ function ActiveSessionsSection({
         )}
 
         {!loading && !error && sessions.length > 0 && (
-          <div className="divide-y divide-border/70">
+          <div className="grid gap-3 p-4 md:grid-cols-2">
             {sessions.map((session) => {
               const value = `${session.device} ${session.os}`.toLowerCase();
               const Icon = value.includes("iphone") || value.includes("ipad") || value.includes("android") || value.includes("ios") || value.includes("mobile") ? Smartphone : Laptop;
@@ -3292,10 +3720,10 @@ function ActiveSessionsSection({
                   key={session.id}
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="flex flex-col justify-between gap-5 p-5 transition hover:bg-muted/40 sm:p-6 md:flex-row md:items-center"
+                  className={`flex min-h-[190px] flex-col justify-between gap-5 rounded-[22px] border p-4 transition ${session.isCurrent ? "border-indigo-500/25 bg-indigo-500/[0.045]" : "border-border bg-muted/20 hover:bg-muted/45"}`}
                 >
                   <div className="flex min-w-0 items-start gap-4">
-                    <div className={`mt-1 flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${session.isCurrent ? "bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400" : "bg-muted text-muted-foreground"}`}>
+                    <div className={`mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${session.isCurrent ? "bg-indigo-600 text-white" : "bg-muted text-muted-foreground"}`}>
                       <Icon className="h-5 w-5" />
                     </div>
                     <div className="min-w-0">
@@ -3307,7 +3735,7 @@ function ActiveSessionsSection({
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">{session.browser} on {session.os}</p>
                       <p className="mt-1 text-[10px] text-muted-foreground">{session.location}{session.ip ? ` • ${session.ip}` : ""}</p>
-                      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[9px] font-medium text-muted-foreground">
+                      <div className="mt-3 grid gap-1.5 rounded-xl bg-card/70 p-2.5 text-[9px] font-medium text-muted-foreground">
                         <span>Last active {formatAdminRelativeTime(session.lastActiveAt)}</span>
                         <span>Created {formatAdminDate(session.createdAt)}</span>
                         <span>Expires {formatAdminDate(session.expiresAt)}</span>
@@ -3320,7 +3748,7 @@ function ActiveSessionsSection({
                       type="button"
                       onClick={() => onTerminate(session.id)}
                       disabled={actionLoading === session.id}
-                      className="inline-flex items-center justify-center gap-2 self-start rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-black text-red-600 transition hover:bg-red-100 dark:border-red-500/25 dark:bg-red-500/10 dark:text-red-300 dark:hover:bg-red-500/15 disabled:opacity-50 md:self-auto"
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/[0.07] px-3.5 py-2.5 text-xs font-black text-rose-600 transition hover:bg-rose-500/10 dark:text-rose-300 disabled:opacity-50"
                     >
                       {actionLoading === session.id ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <LogOut className="h-3.5 w-3.5" />}
                       Sign out
@@ -3377,6 +3805,9 @@ function AppearanceSection({
     { value: "light", title: "Light", description: "Bright surfaces and high-contrast daytime presentation.", icon: Sun },
     { value: "dark", title: "Dark", description: "Deep surfaces with indigo highlights for low-light work.", icon: Moon },
     { value: "system", title: "System", description: "Automatically follow your operating system appearance preference.", icon: Monitor },
+    { value: "eye-care", title: "Eye Care", description: "Warm, low-glare surfaces for long administrative sessions.", icon: Eye },
+    { value: "ocean", title: "Ocean", description: "Calm blue accents with clean, cool workspace surfaces.", icon: Waves },
+    { value: "forest", title: "Forest", description: "Balanced green accents with soft neutral surfaces.", icon: Leaf },
   ];
 
   return (
@@ -3393,12 +3824,12 @@ function AppearanceSection({
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.14em] text-indigo-600 dark:text-indigo-400">Theme mode</p>
             <h3 className="mt-1 text-xl font-black text-card-foreground">Choose your dashboard appearance</h3>
-            <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">Light, dark, and system modes use the shared theme tokens already defined by the dashboard.</p>
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground">Choose from six supported modes. The selection is applied instantly and persisted securely.</p>
           </div>
           <span className="w-fit rounded-full bg-indigo-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.08em] text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400">Current: {theme}</span>
         </div>
 
-        <div className="mt-5 grid gap-3 lg:grid-cols-3">
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {options.map((option) => {
             const active = theme === option.value;
             const Icon = option.icon;
@@ -3408,12 +3839,12 @@ function AppearanceSection({
                 type="button"
                 onClick={() => onThemeChange(option.value)}
                 disabled={saving}
-                whileHover={{ y: -4 }}
+                whileHover={{ y: -2 }}
                 whileTap={{ scale: 0.985 }}
                 className={`group relative overflow-hidden rounded-[24px] border p-5 text-left transition ${
                   active
-                    ? "border-indigo-500 bg-indigo-50 shadow-sm ring-1 ring-indigo-500/20 dark:border-indigo-400 dark:bg-indigo-500/10"
-                    : "border-border bg-card hover:border-indigo-300 hover:bg-indigo-50/60 dark:hover:border-indigo-500/35 dark:hover:bg-indigo-500/10"
+                    ? "border-indigo-500/60 bg-indigo-500/[0.07] shadow-sm ring-1 ring-indigo-500/15"
+                    : "border-border bg-muted/20 hover:border-indigo-500/30 hover:bg-muted/55"
                 } disabled:cursor-not-allowed disabled:opacity-60`}
               >
                 {active && <motion.span layoutId="admin-theme-active" className="absolute inset-x-5 bottom-0 h-1 rounded-t-full bg-indigo-600 dark:bg-indigo-400" />}
@@ -3431,9 +3862,9 @@ function AppearanceSection({
         </div>
 
         <div className="mt-5 grid gap-3 md:grid-cols-3">
-          <AppearanceNote label="Fixed admin accents" value="Indigo / Violet" />
+          <AppearanceNote label="Admin accent" value="Calm Indigo" />
           <AppearanceNote label="Theme persistence" value="Local + Backend" />
-          <AppearanceNote label="System mode" value="OS preference" />
+          <AppearanceNote label="Available modes" value="6 themes" />
         </div>
       </div>
     </div>
@@ -3765,11 +4196,11 @@ function SystemSection({
 
       <div className="grid items-stretch gap-5 2xl:grid-cols-[minmax(0,1fr)_430px]">
         <div className="rounded-[30px] border border-border bg-card p-5 shadow-[0_14px_38px_rgba(15,39,69,.055)] sm:p-6">
-          <div className="flex flex-col gap-4 rounded-2xl border border-indigo-200/70 dark:border-indigo-500/25 bg-[linear-gradient(135deg,#f7fbff,#ffffff)] p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-4 rounded-2xl border border-border bg-muted/45 p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
-              <div className="relative flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-950 text-cyan-200 shadow-sm">
+              <div className="relative flex h-11 w-11 items-center justify-center rounded-xl bg-[#111827] text-indigo-200 shadow-sm">
                 <Server className="h-5 w-5" />
-                <span className={`absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-white ${draft.platform.maintenanceMode ? "bg-amber-400" : "bg-emerald-400"}`} />
+                <span className={`absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-[#111827] ${draft.platform.maintenanceMode ? "bg-amber-400" : "bg-emerald-400"}`} />
               </div>
 
               <div>
@@ -3834,7 +4265,7 @@ function SystemSection({
                   Choose the preferred display and platform-default currency for supported admin experiences.
                 </p>
               </div>
-              <span className="w-fit rounded-full bg-indigo-50 dark:bg-indigo-500/10 px-3 py-1.5 text-[9px] font-black text-indigo-600 dark:text-indigo-400">
+              <span className="w-fit rounded-full bg-indigo-500/10 px-3 py-1.5 text-[9px] font-black text-indigo-700 dark:text-indigo-300">
                 Current: {draft.platform.defaultCurrency}
               </span>
             </div>
@@ -4003,8 +4434,8 @@ function DangerSection({
         danger
       />
 
-      <div className="relative overflow-hidden rounded-[32px] border border-rose-100 bg-card p-4 shadow-[0_18px_55px_rgba(15,39,69,0.07)] sm:p-5">
-        <div className="relative overflow-hidden rounded-[26px] bg-gradient-to-r from-indigo-950 via-indigo-950 to-red-900 p-5 text-white sm:p-6">
+      <div className="relative overflow-hidden rounded-[32px] border border-border bg-card p-4 shadow-[0_18px_55px_rgba(15,23,42,0.07)] sm:p-5">
+        <div className="relative overflow-hidden rounded-[26px] bg-[linear-gradient(120deg,#111827_0%,#171a2d_58%,#2a1822_100%)] p-5 text-white sm:p-6">
           <div className="pointer-events-none absolute inset-0 opacity-25 [background-image:linear-gradient(rgba(255,255,255,.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.04)_1px,transparent_1px)] [background-size:28px_28px]" />
 
           <motion.div
@@ -4028,7 +4459,7 @@ function DangerSection({
                   transition={{ duration: 2.8, repeat: Infinity }}
                 />
                 <motion.span
-                  className="absolute inset-[8px] rounded-full border border-cyan-300/20 border-l-transparent"
+                  className="absolute inset-[8px] rounded-full border border-white/15 border-l-transparent"
                   animate={{ rotate: -360 }}
                   transition={{ duration: 9, repeat: Infinity, ease: "linear" }}
                 />
@@ -4040,10 +4471,10 @@ function DangerSection({
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="text-[10px] font-black uppercase tracking-[0.16em] text-rose-200/75">Protected Command Gate</p>
-                  <span className="rounded-full bg-card/[0.07] px-2.5 py-1 text-[8px] font-black text-blue-100/60">Admin only</span>
+                  <span className="rounded-full bg-white/[0.07] px-2.5 py-1 text-[8px] font-black text-slate-300">Admin only</span>
                 </div>
                 <h3 className="mt-2 text-xl font-black tracking-[-0.025em] sm:text-2xl">High-impact administration</h3>
-                <p className="mt-2 max-w-2xl text-xs leading-6 text-blue-100/65">
+                <p className="mt-2 max-w-2xl text-xs leading-6 text-slate-300/75">
                   Nothing here is applied silently. Each action stages a configuration change, opens a confirmation gate, and still requires authenticated saving.
                 </p>
 
@@ -4094,7 +4525,7 @@ function DangerSection({
           />
         </div>
 
-        <div className="mt-4 grid gap-3 rounded-[22px] border border-rose-100 bg-[linear-gradient(135deg,#fffafb,#ffffff)] p-4 md:grid-cols-3">
+        <div className="mt-4 grid gap-3 rounded-[22px] border border-border bg-muted/35 p-4 md:grid-cols-3">
           <SafetyItem icon={CheckCircle2} title="Stage first" description="Actions change only the local draft until saved." />
           <SafetyItem icon={KeyRound} title="Verify administrator" description="Sensitive save flow requires current admin credentials." />
           <SafetyItem icon={History} title="Leave an audit trail" description="Successful backend changes are recorded for review." />
@@ -4116,11 +4547,11 @@ function DangerSignal({
       ? "bg-emerald-300/10 text-emerald-200"
       : tone === "amber"
         ? "bg-amber-300/10 text-amber-200"
-        : "bg-cyan-300/10 text-cyan-100";
+        : "bg-white/[0.07] text-slate-200";
 
   return (
     <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[9px] font-black ${cls}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${tone === "green" ? "bg-emerald-300" : tone === "amber" ? "bg-amber-300" : "bg-cyan-300"}`} />
+      <span className={`h-1.5 w-1.5 rounded-full ${tone === "green" ? "bg-emerald-300" : tone === "amber" ? "bg-amber-300" : "bg-indigo-300"}`} />
       {text}
     </span>
   );
@@ -4140,9 +4571,9 @@ function DangerStep({
       whileHover={{ y: -3 }}
       className="rounded-2xl border border-white/10 bg-card/[0.055] px-3 py-3.5 text-center backdrop-blur-sm"
     >
-      <p className="text-[9px] font-black text-cyan-200">{number}</p>
+      <p className="text-[9px] font-black text-indigo-200">{number}</p>
       <p className="mt-1 text-[10px] font-black text-white">{label}</p>
-      <p className="mt-1 text-[8px] leading-4 text-blue-100/40">{detail}</p>
+      <p className="mt-1 text-[8px] leading-4 text-slate-400">{detail}</p>
     </motion.div>
   );
 }
@@ -4157,8 +4588,8 @@ function SafetyItem({
   description: string;
 }) {
   return (
-    <div className="flex gap-3 rounded-2xl bg-card p-3 shadow-sm ring-1 ring-rose-50">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-50 text-rose-500">
+    <div className="flex gap-3 rounded-2xl border border-border/70 bg-card p-3 shadow-sm">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-300">
         <Icon className="h-4 w-4" />
       </span>
       <div>
@@ -4190,25 +4621,25 @@ function DangerActionCard({
     tone === "rose"
       ? {
           accent: "bg-rose-500",
-          border: "border-rose-100 hover:border-rose-200",
-          icon: "bg-rose-50 text-rose-600",
-          status: "text-rose-600",
-          glow: "bg-rose-100",
+          border: "border-border hover:border-rose-500/30",
+          icon: "bg-rose-500/10 text-rose-600 dark:text-rose-300",
+          status: "text-rose-600 dark:text-rose-300",
+          glow: "bg-rose-500/20",
         }
       : tone === "amber"
         ? {
             accent: "bg-amber-500",
-            border: "border-amber-100 hover:border-amber-200",
-            icon: "bg-amber-50 text-amber-600",
-            status: "text-amber-600",
-            glow: "bg-amber-100",
+            border: "border-border hover:border-amber-500/30",
+            icon: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
+            status: "text-amber-700 dark:text-amber-300",
+            glow: "bg-amber-500/15",
           }
         : {
             accent: "bg-indigo-600",
-            border: "border-indigo-200/70 dark:border-indigo-500/25 hover:border-indigo-300/70 dark:border-indigo-500/35",
-            icon: "bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
-            status: "text-indigo-600 dark:text-indigo-400",
-            glow: "bg-blue-100",
+            border: "border-border hover:border-indigo-500/30",
+            icon: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-300",
+            status: "text-indigo-600 dark:text-indigo-300",
+            glow: "bg-indigo-500/15",
           };
 
   return (
@@ -4218,7 +4649,7 @@ function DangerActionCard({
       onClick={onClick}
       whileHover={disabled ? undefined : { y: -5 }}
       whileTap={disabled ? undefined : { scale: 0.985 }}
-      className={`group relative min-h-[210px] overflow-hidden rounded-[24px] border bg-card p-5 text-left shadow-[0_10px_28px_rgba(15,39,69,.045)] transition ${toneClass.border} disabled:cursor-not-allowed disabled:opacity-45`}
+      className={`group relative min-h-[210px] overflow-hidden rounded-[24px] border bg-card p-5 text-left shadow-[0_10px_28px_rgba(15,23,42,.045)] transition ${toneClass.border} disabled:cursor-not-allowed disabled:opacity-45`}
     >
       <span className={`absolute inset-y-5 left-0 w-1 rounded-r-full ${toneClass.accent}`} />
       <motion.div
@@ -5290,8 +5721,8 @@ function CurrencySelect({
               whileTap={{ scale: 0.98 }}
               className={`group relative overflow-hidden rounded-2xl border p-3.5 text-left transition ${
                 active
-                  ? "border-indigo-300/70 dark:border-indigo-500/35 bg-[linear-gradient(135deg,#edf6ff,#ffffff)] shadow-[0_8px_22px_rgba(31,94,168,.09)] ring-1 ring-blue-100"
-                  : "border-border bg-muted/50 hover:border-indigo-200/70 dark:border-indigo-500/25 hover:bg-card"
+                  ? "border-indigo-500/45 bg-indigo-500/[0.07] shadow-sm ring-1 ring-indigo-500/15"
+                  : "border-border bg-muted/35 hover:border-indigo-500/25 hover:bg-muted/65"
               }`}
             >
               {active && (
@@ -5302,7 +5733,7 @@ function CurrencySelect({
               )}
 
               <div className="flex items-start justify-between gap-3">
-                <span className={`flex h-9 w-9 items-center justify-center rounded-xl text-sm font-black ${active ? "bg-indigo-600 text-white" : "bg-card text-muted-foreground shadow-sm ring-1 ring-slate-100"}`}>
+                <span className={`flex h-9 w-9 items-center justify-center rounded-xl text-sm font-black ${active ? "bg-indigo-600 text-white" : "bg-card text-muted-foreground shadow-sm ring-1 ring-border/70"}`}>
                   {option.symbol}
                 </span>
                 {active && <CheckCircle2 className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />}

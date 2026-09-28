@@ -25,8 +25,54 @@ export type ThemeMode =
   | "ocean"
   | "forest";
 
+export type ResolvedTheme =
+  | "light"
+  | "dark";
+
+export interface ThemeTokens {
+  pageBg: string;
+  pageBgSecondary: string;
+  surface: string;
+  surfaceMuted: string;
+  surfaceElevated: string;
+  text: string;
+  textSoft: string;
+  textMuted: string;
+  border: string;
+  borderStrong: string;
+  primary: string;
+  primaryStrong: string;
+  primarySoft: string;
+  primarySoftText: string;
+  success: string;
+  successSoft: string;
+  warning: string;
+  warningSoft: string;
+  danger: string;
+  dangerSoft: string;
+  inputBg: string;
+  inputText: string;
+  inputPlaceholder: string;
+  heroFrom: string;
+  heroTo: string;
+  heroGlow: string;
+  heroGlowSecondary: string;
+  ring: string;
+  shadow: string;
+  shadowStrong: string;
+}
+
 interface ThemeContextValue {
   theme: ThemeMode;
+
+  resolvedTheme:
+    ResolvedTheme;
+
+  tokens:
+    ThemeTokens;
+
+  isDark:
+    boolean;
 
   setTheme: (
     theme: ThemeMode
@@ -57,6 +103,165 @@ const AUTH_CHANGE_EVENT =
 
 const DEFAULT_THEME: ThemeMode =
   "light";
+
+const LIGHT_TOKENS: ThemeTokens = {
+  pageBg: "#F6F8FD",
+  pageBgSecondary: "#EEF2FF",
+  surface: "#FFFFFF",
+  surfaceMuted: "#F8FAFC",
+  surfaceElevated:
+    "rgba(255,255,255,0.86)",
+  text: "#0F172A",
+  textSoft: "#475569",
+  textMuted: "#64748B",
+  border:
+    "rgba(99,102,241,0.14)",
+  borderStrong:
+    "rgba(99,102,241,0.26)",
+  primary: "#7C3AED",
+  primaryStrong: "#6D28D9",
+  primarySoft:
+    "rgba(124,58,237,0.12)",
+  primarySoftText: "#5B21B6",
+  success: "#0F9D7A",
+  successSoft:
+    "rgba(15,157,122,0.12)",
+  warning: "#F59E0B",
+  warningSoft:
+    "rgba(245,158,11,0.14)",
+  danger: "#EF4444",
+  dangerSoft:
+    "rgba(239,68,68,0.12)",
+  inputBg: "#FFFFFF",
+  inputText: "#0F172A",
+  inputPlaceholder: "#94A3B8",
+  heroFrom: "#17052F",
+  heroTo: "#5B21B6",
+  heroGlow:
+    "rgba(139,92,246,0.34)",
+  heroGlowSecondary:
+    "rgba(168,85,247,0.24)",
+  ring:
+    "rgba(124,58,237,0.28)",
+  shadow:
+    "0 16px 40px rgba(15,23,42,0.08)",
+  shadowStrong:
+    "0 24px 60px rgba(91,33,182,0.18)",
+};
+
+const DARK_TOKENS: ThemeTokens = {
+  pageBg: "#060814",
+  pageBgSecondary: "#0B1020",
+  surface: "#0E1426",
+  surfaceMuted: "#10192F",
+  surfaceElevated:
+    "rgba(14,20,38,0.86)",
+  text: "#F8FAFC",
+  textSoft: "#CBD5E1",
+  textMuted: "#94A3B8",
+  border:
+    "rgba(148,163,184,0.16)",
+  borderStrong:
+    "rgba(139,92,246,0.35)",
+  primary: "#A855F7",
+  primaryStrong: "#9333EA",
+  primarySoft:
+    "rgba(168,85,247,0.14)",
+  primarySoftText: "#E9D5FF",
+  success: "#34D399",
+  successSoft:
+    "rgba(52,211,153,0.12)",
+  warning: "#FBBF24",
+  warningSoft:
+    "rgba(251,191,36,0.12)",
+  danger: "#FB7185",
+  dangerSoft:
+    "rgba(251,113,133,0.12)",
+  inputBg: "#0B1222",
+  inputText: "#F8FAFC",
+  inputPlaceholder: "#64748B",
+  heroFrom: "#120322",
+  heroTo: "#4C1D95",
+  heroGlow:
+    "rgba(147,51,234,0.36)",
+  heroGlowSecondary:
+    "rgba(76,29,149,0.28)",
+  ring:
+    "rgba(168,85,247,0.34)",
+  shadow:
+    "0 18px 48px rgba(0,0,0,0.34)",
+  shadowStrong:
+    "0 24px 64px rgba(91,33,182,0.28)",
+};
+
+const EYE_CARE_TOKENS: ThemeTokens = {
+  ...LIGHT_TOKENS,
+  pageBg: "#F4F1E8",
+  pageBgSecondary: "#EEE8DA",
+  surface: "#FFFDF8",
+  surfaceMuted: "#FAF7F0",
+  surfaceElevated:
+    "rgba(255,253,248,0.90)",
+  text: "#292524",
+  textSoft: "#57534E",
+  textMuted: "#78716C",
+  border:
+    "rgba(161,98,7,0.12)",
+  borderStrong:
+    "rgba(124,58,237,0.20)",
+  inputBg: "#FFFDF8",
+  inputText: "#292524",
+};
+
+const OCEAN_TOKENS: ThemeTokens = {
+  ...LIGHT_TOKENS,
+  pageBg: "#F4FAFF",
+  pageBgSecondary: "#E8F6FF",
+  surface: "#FFFFFF",
+  surfaceMuted: "#F0F9FF",
+  border:
+    "rgba(8,145,178,0.14)",
+  borderStrong:
+    "rgba(14,116,144,0.24)",
+  primary: "#0891B2",
+  primaryStrong: "#0E7490",
+  primarySoft:
+    "rgba(8,145,178,0.12)",
+  primarySoftText: "#0F766E",
+  heroFrom: "#08203E",
+  heroTo: "#164E63",
+  heroGlow:
+    "rgba(34,211,238,0.28)",
+  heroGlowSecondary:
+    "rgba(8,145,178,0.18)",
+  ring:
+    "rgba(8,145,178,0.28)",
+};
+
+const FOREST_TOKENS: ThemeTokens = {
+  ...LIGHT_TOKENS,
+  pageBg: "#F5FBF7",
+  pageBgSecondary: "#ECF8F0",
+  surface: "#FFFFFF",
+  surfaceMuted: "#F0FDF4",
+  border:
+    "rgba(22,163,74,0.12)",
+  borderStrong:
+    "rgba(21,128,61,0.24)",
+  primary: "#16A34A",
+  primaryStrong: "#15803D",
+  primarySoft:
+    "rgba(22,163,74,0.12)",
+  primarySoftText: "#166534",
+  heroFrom: "#052E16",
+  heroTo: "#166534",
+  heroGlow:
+    "rgba(34,197,94,0.24)",
+  heroGlowSecondary:
+    "rgba(22,101,52,0.18)",
+  ring:
+    "rgba(34,197,94,0.28)",
+};
 
 /* =========================================================
    VALIDATION
@@ -146,7 +351,7 @@ function isAuthenticationError(
 
 function getEffectiveTheme(
   theme: ThemeMode
-): "light" | "dark" {
+): ResolvedTheme {
   if (
     theme === "dark"
   ) {
@@ -171,6 +376,133 @@ function getEffectiveTheme(
   ).matches
     ? "dark"
     : "light";
+}
+
+
+/* =========================================================
+   THEME TOKENS
+========================================================= */
+
+function getThemeTokens(
+  theme: ThemeMode
+): ThemeTokens {
+  if (
+    theme === "dark"
+  ) {
+    return DARK_TOKENS;
+  }
+
+  if (
+    theme === "eye-care"
+  ) {
+    return EYE_CARE_TOKENS;
+  }
+
+  if (
+    theme === "ocean"
+  ) {
+    return OCEAN_TOKENS;
+  }
+
+  if (
+    theme === "forest"
+  ) {
+    return FOREST_TOKENS;
+  }
+
+  if (
+    theme === "system" &&
+    getEffectiveTheme(
+      theme
+    ) === "dark"
+  ) {
+    return DARK_TOKENS;
+  }
+
+  return LIGHT_TOKENS;
+}
+
+function applyThemeVariables(
+  root: HTMLElement,
+  tokens: ThemeTokens
+): void {
+  const variables:
+    Record<string, string> = {
+      "--coffer-page-bg":
+        tokens.pageBg,
+      "--coffer-page-bg-secondary":
+        tokens.pageBgSecondary,
+      "--coffer-surface":
+        tokens.surface,
+      "--coffer-surface-muted":
+        tokens.surfaceMuted,
+      "--coffer-surface-elevated":
+        tokens.surfaceElevated,
+      "--coffer-text":
+        tokens.text,
+      "--coffer-text-soft":
+        tokens.textSoft,
+      "--coffer-text-muted":
+        tokens.textMuted,
+      "--coffer-border":
+        tokens.border,
+      "--coffer-border-strong":
+        tokens.borderStrong,
+      "--coffer-primary":
+        tokens.primary,
+      "--coffer-primary-strong":
+        tokens.primaryStrong,
+      "--coffer-primary-soft":
+        tokens.primarySoft,
+      "--coffer-primary-soft-text":
+        tokens.primarySoftText,
+      "--coffer-success":
+        tokens.success,
+      "--coffer-success-soft":
+        tokens.successSoft,
+      "--coffer-warning":
+        tokens.warning,
+      "--coffer-warning-soft":
+        tokens.warningSoft,
+      "--coffer-danger":
+        tokens.danger,
+      "--coffer-danger-soft":
+        tokens.dangerSoft,
+      "--coffer-input-bg":
+        tokens.inputBg,
+      "--coffer-input-text":
+        tokens.inputText,
+      "--coffer-input-placeholder":
+        tokens.inputPlaceholder,
+      "--coffer-hero-from":
+        tokens.heroFrom,
+      "--coffer-hero-to":
+        tokens.heroTo,
+      "--coffer-hero-glow":
+        tokens.heroGlow,
+      "--coffer-hero-glow-secondary":
+        tokens.heroGlowSecondary,
+      "--coffer-ring":
+        tokens.ring,
+      "--coffer-shadow":
+        tokens.shadow,
+      "--coffer-shadow-strong":
+        tokens.shadowStrong,
+    };
+
+  Object.entries(
+    variables
+  ).forEach(
+    ([
+      key,
+      value,
+    ]) => {
+      root.style.setProperty(
+        key,
+        value
+      );
+    }
+  );
 }
 
 /* =========================================================
@@ -209,6 +541,16 @@ function applyTheme(
     "dark",
     effectiveTheme ===
       "dark"
+  );
+
+  root.style.colorScheme =
+    effectiveTheme;
+
+  applyThemeVariables(
+    root,
+    getThemeTokens(
+      theme
+    )
   );
 }
 
@@ -348,6 +690,32 @@ export function ThemeProvider({
     useState<ThemeMode>(
       DEFAULT_THEME
     );
+
+
+  /*
+   * The existing "system" listener already updates the DOM.
+   * This tiny revision state only forces Context consumers to
+   * receive refreshed resolvedTheme/tokens when the OS theme changes.
+   */
+  const [
+    ,
+    setSystemThemeRevision,
+  ] =
+    useState(0);
+
+  const resolvedTheme =
+    getEffectiveTheme(
+      theme
+    );
+
+  const tokens =
+    getThemeTokens(
+      theme
+    );
+
+  const isDark =
+    resolvedTheme ===
+    "dark";
 
   /* =======================================================
      LOAD SERVER THEME
@@ -601,6 +969,11 @@ export function ThemeProvider({
           applyTheme(
             "system"
           );
+
+          setSystemThemeRevision(
+            (current) =>
+              current + 1
+          );
         };
 
       media.addEventListener(
@@ -636,6 +1009,13 @@ export function ThemeProvider({
       ) {
         return;
       }
+
+      /*
+       * Keep the last confirmed value so the Admin Settings page can
+       * recover cleanly when the persistence request fails.
+       */
+      const previousTheme =
+        theme;
 
       /*
        * Immediate UI update.
@@ -750,7 +1130,10 @@ export function ThemeProvider({
         if (
           !response.success
         ) {
-          return;
+          throw new Error(
+            response.message ||
+              "Unable to save the selected theme."
+          );
         }
 
         const savedTheme =
@@ -787,10 +1170,28 @@ export function ThemeProvider({
           return;
         }
 
-        console.warn(
-          "Unable to persist theme:",
-          error
+        /*
+         * Admin Settings uses the rejected promise to show an error toast.
+         * Roll back only on a real persistence failure. Anonymous/auth-expired
+         * behavior above remains unchanged.
+         */
+        setThemeState(
+          previousTheme
         );
+
+        applyTheme(
+          previousTheme
+        );
+
+        saveLocalTheme(
+          previousTheme
+        );
+
+        throw error instanceof Error
+          ? error
+          : new Error(
+              "Unable to save the selected theme."
+            );
       }
     };
 
@@ -798,6 +1199,9 @@ export function ThemeProvider({
     <ThemeContext.Provider
       value={{
         theme,
+        resolvedTheme,
+        tokens,
+        isDark,
         setTheme,
       }}
     >
