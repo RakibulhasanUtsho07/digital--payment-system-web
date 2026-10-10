@@ -11,6 +11,10 @@ import {
 import Link from "next/link";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   AlertCircle,
   ArrowRight,
   ChevronLeft,
@@ -24,6 +28,14 @@ import {
   WalletCards,
   X,
 } from "lucide-react";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   getMerchantInvoices,
@@ -276,18 +288,18 @@ function StatCard({
   iconClassName: string;
 }) {
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-sm">
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
+    <div className="h-full min-w-0 overflow-hidden rounded-2xl border border-border bg-card p-5 text-card-foreground shadow-sm">
+      <div className="flex min-w-0 items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
           <p className="text-xs font-semibold text-muted-foreground">
             {label}
           </p>
 
-          <p className="mt-2 truncate text-2xl font-black text-foreground">
+          <p className="mt-2 break-words text-2xl font-black leading-tight text-foreground [overflow-wrap:anywhere]">
             {value}
           </p>
 
-          <p className="mt-1 text-[11px] text-muted-foreground">
+          <p className="mt-1 break-words text-[11px] leading-5 text-muted-foreground [overflow-wrap:anywhere]">
             {description}
           </p>
         </div>
@@ -382,6 +394,32 @@ function InvoiceEmptyState({
 ========================================================= */
 
 export default function MerchantInvoicesPage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isMerchantRole =
+    user.role === "merchant";
+
+  useEffect(() => {
+    if (isMerchantRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isMerchantRole,
+    router,
+    user.role,
+  ]);
+
   const [
     invoices,
     setInvoices,
@@ -454,6 +492,15 @@ export default function MerchantInvoicesPage() {
       }: {
         silent?: boolean;
       } = {}) => {
+        if (!isMerchantRole) {
+          setLoading(false);
+          setRefreshing(false);
+          setInvoices([]);
+          setError("");
+
+          return;
+        }
+
         try {
           setError("");
 
@@ -493,6 +540,7 @@ export default function MerchantInvoicesPage() {
         }
       },
       [
+        isMerchantRole,
         page,
         status,
         mode,
@@ -501,8 +549,17 @@ export default function MerchantInvoicesPage() {
     );
 
   useEffect(() => {
+    if (!isMerchantRole) {
+      setLoading(false);
+
+      return;
+    }
+
     void loadInvoices();
-  }, [loadInvoices]);
+  }, [
+    isMerchantRole,
+    loadInvoices,
+  ]);
 
   /* =======================================================
      FILTER HANDLERS
@@ -515,6 +572,10 @@ export default function MerchantInvoicesPage() {
     ) => {
       event.preventDefault();
 
+      if (!isMerchantRole) {
+        return;
+      }
+
       setPage(1);
 
       setAppliedSearch(
@@ -523,6 +584,10 @@ export default function MerchantInvoicesPage() {
     };
 
   const clearFilters = () => {
+    if (!isMerchantRole) {
+      return;
+    }
+
     setSearchInput("");
     setAppliedSearch("");
     setStatus("");
@@ -621,6 +686,30 @@ export default function MerchantInvoicesPage() {
     );
 
   /* =======================================================
+     MERCHANT-ONLY REDIRECTING
+  ======================================================= */
+
+  if (!isMerchantRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center bg-background px-4 text-foreground">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-primary/15 bg-primary/10 text-primary shadow-sm">
+            <RefreshCw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-foreground">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">
+            Merchant Invoices is available only to merchant accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  /* =======================================================
      RENDER
   ======================================================= */
 
@@ -630,12 +719,12 @@ export default function MerchantInvoicesPage() {
         {/* Header */}
 
         <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
+          <div className="min-w-0">
             <p className="text-[11px] font-black uppercase tracking-[0.18em] text-primary">
               Merchant Billing
             </p>
 
-            <h1 className="mt-2 text-2xl font-black tracking-tight text-foreground sm:text-3xl">
+            <h1 className="mt-2 break-words text-2xl font-black leading-tight tracking-tight text-foreground sm:text-3xl [overflow-wrap:anywhere]">
               Invoices
             </h1>
 
@@ -644,16 +733,20 @@ export default function MerchantInvoicesPage() {
             </p>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
             <button
               type="button"
-              onClick={() =>
+              onClick={() => {
+                if (!isMerchantRole) {
+                  return;
+                }
+
                 void loadInvoices({
                   silent: true,
-                })
-              }
+                });
+              }}
               disabled={refreshing}
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-border bg-card px-4 text-sm font-bold text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl sm:w-auto border border-border bg-card px-4 text-sm font-bold text-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-60"
             >
               <RefreshCw
                 className={`h-4 w-4 ${
@@ -670,7 +763,7 @@ export default function MerchantInvoicesPage() {
 
             <Link
               href="/dashboard/merchant/invoices/create"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground shadow-sm transition hover:opacity-90"
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl sm:w-auto bg-primary px-5 text-sm font-bold text-primary-foreground shadow-sm transition hover:opacity-90"
             >
               <Plus className="h-4 w-4" />
               Create Invoice
@@ -726,11 +819,11 @@ export default function MerchantInvoicesPage() {
 
         {/* Filters */}
 
-        <section className="mt-6 rounded-2xl border border-border bg-card p-4 shadow-sm">
-          <div className="flex flex-col gap-3 xl:flex-row">
+        <section className="relative z-20 mt-6 overflow-visible rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <div className="flex min-w-0 flex-col gap-3 xl:flex-row xl:items-center">
             <form
               onSubmit={handleSearch}
-              className="flex min-w-0 flex-1 gap-2"
+              className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row"
             >
               <div className="relative min-w-0 flex-1">
                 <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -742,12 +835,16 @@ export default function MerchantInvoicesPage() {
                   }
                   onChange={(
                     event
-                  ) =>
+                  ) => {
+                    if (!isMerchantRole) {
+                      return;
+                    }
+
                     setSearchInput(
                       event.target
                         .value
-                    )
-                  }
+                    );
+                  }}
                   placeholder="Search invoice, customer or reference"
                   className="h-11 w-full rounded-xl border border-border bg-background pl-10 pr-4 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/10"
                 />
@@ -755,7 +852,7 @@ export default function MerchantInvoicesPage() {
 
               <button
                 type="submit"
-                className="inline-flex h-11 shrink-0 items-center justify-center rounded-xl bg-foreground px-5 text-sm font-bold text-background transition hover:opacity-90"
+                className="inline-flex h-11 w-full shrink-0 items-center justify-center rounded-xl bg-foreground px-5 text-sm font-bold text-background transition hover:opacity-90 sm:w-auto"
               >
                 Search
               </button>
@@ -767,6 +864,10 @@ export default function MerchantInvoicesPage() {
                 onChange={(
                   event
                 ) => {
+                  if (!isMerchantRole) {
+                    return;
+                  }
+
                   setStatus(
                     event.target
                       .value as
@@ -776,7 +877,7 @@ export default function MerchantInvoicesPage() {
 
                   setPage(1);
                 }}
-                className="h-11 rounded-xl border border-border bg-background px-3 text-sm font-semibold text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+                className="h-11 min-w-0 rounded-xl border border-border bg-background px-3 text-sm font-semibold text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
               >
                 {statusOptions.map(
                   (option) => (
@@ -800,6 +901,10 @@ export default function MerchantInvoicesPage() {
                 onChange={(
                   event
                 ) => {
+                  if (!isMerchantRole) {
+                    return;
+                  }
+
                   setMode(
                     event.target
                       .value as
@@ -809,7 +914,7 @@ export default function MerchantInvoicesPage() {
 
                   setPage(1);
                 }}
-                className="h-11 rounded-xl border border-border bg-background px-3 text-sm font-semibold text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
+                className="h-11 min-w-0 rounded-xl border border-border bg-background px-3 text-sm font-semibold text-foreground outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/10"
               >
                 {modeOptions.map(
                   (option) => (
@@ -835,7 +940,7 @@ export default function MerchantInvoicesPage() {
                 onClick={
                   clearFilters
                 }
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-border px-4 text-sm font-bold text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-border px-4 text-sm font-bold text-muted-foreground transition hover:bg-muted hover:text-foreground xl:w-auto"
               >
                 <X className="h-4 w-4" />
                 Clear
@@ -847,8 +952,8 @@ export default function MerchantInvoicesPage() {
         {/* Table */}
 
         <section className="mt-6 overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-          <div className="flex items-center justify-between border-b border-border px-5 py-4">
-            <div>
+          <div className="flex min-w-0 flex-col gap-2 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
               <h2 className="text-sm font-black text-foreground">
                 Invoice records
               </h2>
@@ -858,7 +963,7 @@ export default function MerchantInvoicesPage() {
               </p>
             </div>
 
-            <p className="text-xs font-bold text-muted-foreground">
+            <p className="shrink-0 text-xs font-bold text-muted-foreground">
               {pagination.total} records
             </p>
           </div>
@@ -866,17 +971,21 @@ export default function MerchantInvoicesPage() {
           {error &&
           invoices.length >
             0 ? (
-            <div className="flex items-center justify-between gap-4 border-b border-red-500/20 bg-red-500/10 px-5 py-3">
-              <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-300">
+            <div className="flex flex-col gap-3 border-b border-red-500/20 bg-red-500/10 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-start gap-2 text-sm text-red-600 dark:text-red-300">
                 <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>{error}</span>
+                <span className="min-w-0 break-words [overflow-wrap:anywhere]">{error}</span>
               </div>
 
               <button
                 type="button"
-                onClick={() =>
-                  void loadInvoices()
-                }
+                onClick={() => {
+                  if (!isMerchantRole) {
+                    return;
+                  }
+
+                  void loadInvoices();
+                }}
                 className="shrink-0 text-xs font-black text-red-600 underline dark:text-red-300"
               >
                 Retry
@@ -904,9 +1013,13 @@ export default function MerchantInvoicesPage() {
 
               <button
                 type="button"
-                onClick={() =>
-                  void loadInvoices()
-                }
+                onClick={() => {
+                  if (!isMerchantRole) {
+                    return;
+                  }
+
+                  void loadInvoices();
+                }}
                 className="mt-5 inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground"
               >
                 <RefreshCw className="h-4 w-4" />
@@ -979,14 +1092,14 @@ export default function MerchantInvoicesPage() {
                               href={`/dashboard/merchant/invoices/${encodeURIComponent(
                                 invoice.invoiceId
                               )}`}
-                              className="font-black text-foreground transition hover:text-primary"
+                              className="break-words font-black leading-tight text-foreground transition hover:text-primary [overflow-wrap:anywhere]"
                             >
                               {
                                 invoice.invoiceNumber
                               }
                             </Link>
 
-                            <p className="mt-1 max-w-[180px] truncate text-[10px] font-medium text-muted-foreground">
+                            <p className="mt-1 max-w-[180px] break-all text-[10px] font-medium leading-4 text-muted-foreground">
                               {
                                 invoice.invoiceId
                               }
@@ -994,14 +1107,14 @@ export default function MerchantInvoicesPage() {
                           </td>
 
                           <td className="px-5 py-4">
-                            <p className="max-w-[190px] truncate text-sm font-bold text-foreground">
+                            <p className="max-w-[190px] break-words text-sm font-bold leading-tight text-foreground [overflow-wrap:anywhere]">
                               {
                                 invoice.customer
                                   .name
                               }
                             </p>
 
-                            <p className="mt-1 max-w-[190px] truncate text-[11px] text-muted-foreground">
+                            <p className="mt-1 max-w-[190px] break-all text-[11px] leading-4 text-muted-foreground">
                               {
                                 invoice.customer
                                   .email
@@ -1026,7 +1139,7 @@ export default function MerchantInvoicesPage() {
                           </td>
 
                           <td className="px-5 py-4 text-right">
-                            <p className="text-sm font-black text-foreground">
+                            <p className="whitespace-nowrap text-sm font-black text-foreground">
                               {formatMoney(
                                 invoice.total,
                                 invoice.currency
@@ -1036,7 +1149,7 @@ export default function MerchantInvoicesPage() {
 
                           <td className="px-5 py-4 text-right">
                             <p
-                              className={`text-sm font-black ${
+                              className={`whitespace-nowrap text-sm font-black ${
                                 invoice.amountDueMinor >
                                 0
                                   ? "text-amber-600 dark:text-amber-300"
@@ -1101,10 +1214,14 @@ export default function MerchantInvoicesPage() {
                   </span>
                 </p>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-center gap-2 sm:justify-end">
                   <button
                     type="button"
-                    onClick={() =>
+                    onClick={() => {
+                      if (!isMerchantRole) {
+                        return;
+                      }
+
                       setPage(
                         (
                           current
@@ -1114,8 +1231,8 @@ export default function MerchantInvoicesPage() {
                               1,
                             1
                           )
-                      )
-                    }
+                      );
+                    }}
                     disabled={
                       page <= 1
                     }
@@ -1132,7 +1249,11 @@ export default function MerchantInvoicesPage() {
 
                   <button
                     type="button"
-                    onClick={() =>
+                    onClick={() => {
+                      if (!isMerchantRole) {
+                        return;
+                      }
+
                       setPage(
                         (
                           current
@@ -1142,8 +1263,8 @@ export default function MerchantInvoicesPage() {
                               1,
                             totalPages
                           )
-                      )
-                    }
+                      );
+                    }}
                     disabled={
                       page >=
                       totalPages

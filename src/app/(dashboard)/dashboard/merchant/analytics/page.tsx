@@ -8,6 +8,10 @@ import React, {
 } from "react";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   Activity,
   BarChart3,
   Check,
@@ -45,6 +49,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   getMerchantAnalytics,
@@ -373,7 +385,12 @@ function PeriodDropdown({
         option.value ===
         value
     ) ??
-    PERIOD_OPTIONS[1];
+    PERIOD_OPTIONS.find(
+      (option) =>
+        option.value ===
+        "30d"
+    ) ??
+    PERIOD_OPTIONS[0];
 
   useEffect(
     () => {
@@ -457,11 +474,13 @@ function PeriodDropdown({
       ref={rootRef}
       className={`
         relative
+        w-full
+        sm:w-auto
 
         ${
           open
-            ? "z-50"
-            : "z-20"
+            ? "z-[90]"
+            : "z-30"
         }
       `}
     >
@@ -473,10 +492,13 @@ function PeriodDropdown({
               !current
           )
         }
+        aria-haspopup="listbox"
+        aria-expanded={open}
         className="
           flex
           h-11
-          min-w-[180px]
+          w-full
+          min-w-0
           items-center
           justify-between
           gap-3
@@ -488,13 +510,17 @@ function PeriodDropdown({
           text-sm
           font-black
           text-white
-          backdrop-blur
+          shadow-sm
+          backdrop-blur-xl
           transition
 
+          hover:-translate-y-0.5
           hover:bg-white/15
+
+          sm:min-w-[190px]
         "
       >
-        <span>
+        <span className="min-w-0 truncate">
           {
             selected.label
           }
@@ -524,18 +550,30 @@ function PeriodDropdown({
             y: 0,
             scale: 1,
           }}
+          role="listbox"
           className="
             absolute
-            right-0
+            left-0
             top-[calc(100%+8px)]
-            z-50
-            w-full
-            min-w-[210px]
+            z-[100]
+            w-[260px]
+            max-w-[calc(100vw-2rem)]
             overflow-hidden
             rounded-2xl
-            merchant-surface
+            border
+            border-violet-200/60
+            bg-white/95
             p-1.5
-            shadow-[0_22px_55px_rgba(35,15,70,0.18)]
+            shadow-[0_24px_65px_rgba(35,15,70,0.22)]
+            backdrop-blur-2xl
+
+            dark:border-white/10
+            dark:bg-[#10091f]/95
+
+            sm:left-auto
+            sm:right-0
+            sm:w-full
+            sm:min-w-[220px]
           "
         >
           {PERIOD_OPTIONS.map(
@@ -557,11 +595,15 @@ function PeriodDropdown({
 
                     setOpen(false);
                   }}
+                  role="option"
+                  aria-selected={active}
                   className={`
                     flex
                     w-full
+                    min-w-0
                     items-center
                     justify-between
+                    gap-3
                     rounded-xl
                     px-3
                     py-2.5
@@ -572,14 +614,16 @@ function PeriodDropdown({
 
                     ${
                       active
-                        ? "bg-violet-500/10 text-violet-600"
+                        ? "bg-violet-500/10 text-violet-700 dark:text-violet-300"
                         : "merchant-text hover:bg-violet-500/[0.05]"
                     }
                   `}
                 >
-                  {
-                    option.label
-                  }
+                  <span className="min-w-0 truncate">
+                    {
+                      option.label
+                    }
+                  </span>
 
                   {active ? (
                     <Check className="h-4 w-4" />
@@ -637,6 +681,7 @@ function KpiCard({
         y: -3,
       }}
       className={`
+        h-full
         min-w-0
         overflow-hidden
         rounded-[24px]
@@ -680,11 +725,14 @@ function KpiCard({
             title={value}
             className={`
               mt-3
-              truncate
+              min-h-[3.25rem]
+              break-words
               text-[clamp(1rem,1.8vw,1.55rem)]
               font-black
+              leading-tight
               tracking-[-0.035em]
               tabular-nums
+              [overflow-wrap:anywhere]
 
               ${
                 featured
@@ -699,8 +747,10 @@ function KpiCard({
           <p
             className={`
               mt-2
+              break-words
               text-xs
               leading-5
+              [overflow-wrap:anywhere]
 
               ${
                 featured
@@ -775,7 +825,9 @@ function SmallKpi({
         y: -2,
       }}
       className="
+        h-full
         min-w-0
+        overflow-hidden
         rounded-[22px]
         merchant-surface
         p-4
@@ -805,7 +857,7 @@ function SmallKpi({
 
           <p
             title={value}
-            className="mt-1 truncate text-base font-black merchant-text"
+            className="mt-1 break-words text-base font-black leading-tight merchant-text [overflow-wrap:anywhere]"
           >
             {value}
           </p>
@@ -826,7 +878,9 @@ function HeroStat({
   return (
     <div
       className="
+        h-full
         min-w-0
+        overflow-hidden
         rounded-2xl
         border
         border-white/10
@@ -840,7 +894,7 @@ function HeroStat({
 
       <p
         title={value}
-        className="mt-1 truncate text-sm font-black text-white"
+        className="mt-1 break-words text-sm font-black leading-tight text-white [overflow-wrap:anywhere]"
       >
         {value}
       </p>
@@ -882,6 +936,7 @@ function ChartPanel({
       }}
       className="
         min-w-0
+        overflow-hidden
         rounded-[28px]
         merchant-surface
         p-5
@@ -900,16 +955,16 @@ function ChartPanel({
           sm:justify-between
         "
       >
-        <div>
+        <div className="min-w-0">
           <p className="text-[10px] font-black uppercase tracking-[0.13em] text-violet-600">
             {eyebrow}
           </p>
 
-          <h2 className="mt-1 text-lg font-black merchant-text">
+          <h2 className="mt-1 break-words text-lg font-black leading-tight merchant-text [overflow-wrap:anywhere]">
             {title}
           </h2>
 
-          <p className="mt-1 text-xs leading-5 merchant-muted">
+          <p className="mt-1 break-words text-xs leading-5 merchant-muted [overflow-wrap:anywhere]">
             {subtitle}
           </p>
         </div>
@@ -1156,14 +1211,14 @@ function PieLegend({
                 }}
               />
 
-              <span className="truncate text-xs font-bold merchant-text">
+              <span className="min-w-0 break-words text-xs font-bold leading-tight merchant-text [overflow-wrap:anywhere]">
                 {
                   item.label
                 }
               </span>
             </div>
 
-            <span className="shrink-0 text-xs font-black text-violet-600">
+            <span className="max-w-[55%] shrink-0 break-words text-right text-xs font-black leading-tight text-violet-600 [overflow-wrap:anywhere]">
               {valueType ===
               "volume"
                 ? formatMoney(
@@ -1194,7 +1249,9 @@ function EmptyChart({
     <div
       className="
         flex
-        min-h-[260px]
+        min-h-[180px]
+        px-4
+        py-8
         items-center
         justify-center
         text-center
@@ -1216,6 +1273,32 @@ function EmptyChart({
 ========================================================= */
 
 export default function MerchantAnalyticsPage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isMerchantRole =
+    user.role === "merchant";
+
+  useEffect(() => {
+    if (isMerchantRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isMerchantRole,
+    router,
+    user.role,
+  ]);
+
   /* =======================================================
      HOOKS
 
@@ -1279,6 +1362,15 @@ export default function MerchantAnalyticsPage() {
         refresh =
           false
       ) => {
+        if (!isMerchantRole) {
+          setLoading(false);
+          setRefreshing(false);
+          setData(null);
+          setError(null);
+
+          return;
+        }
+
         try {
           if (
             refresh
@@ -1341,18 +1433,50 @@ export default function MerchantAnalyticsPage() {
         }
       },
       [
+        isMerchantRole,
         period,
       ]
     );
 
   useEffect(
     () => {
+      if (!isMerchantRole) {
+        setLoading(false);
+
+        return;
+      }
+
       void loadAnalytics();
     },
     [
+      isMerchantRole,
       loadAnalytics,
     ]
   );
+
+  /* =======================================================
+     MERCHANT-ONLY REDIRECTING
+  ======================================================== */
+
+  if (!isMerchantRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center bg-background px-4 text-foreground">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-500/15 bg-violet-500/10 text-violet-700 shadow-sm dark:text-violet-300">
+            <RefreshCw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Merchant Payment Analytics is available only to merchant accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   /* =======================================================
      INITIAL ERROR
@@ -1408,11 +1532,15 @@ export default function MerchantAnalyticsPage() {
 
             <button
               type="button"
-              onClick={() =>
+              onClick={() => {
+                if (!isMerchantRole) {
+                  return;
+                }
+
                 void loadAnalytics(
                   true
-                )
-              }
+                );
+              }}
               className="
                 mt-5
                 inline-flex
@@ -1724,6 +1852,7 @@ export default function MerchantAnalyticsPage() {
             }}
             className="
               relative
+              z-30
               overflow-visible
               rounded-[30px]
               px-5
@@ -1745,7 +1874,7 @@ export default function MerchantAnalyticsPage() {
               <PurpleAuroraBackground />
             </div>
 
-            <div className="relative">
+            <div className="relative z-10">
               <div
                 className="
                   flex
@@ -1794,21 +1923,30 @@ export default function MerchantAnalyticsPage() {
                 <div
                   className="
                     relative
-                    z-40
+                    z-[70]
                     flex
+                    w-full
                     flex-col
                     gap-2
 
+                    sm:w-auto
                     sm:flex-row
+                    sm:items-center
                   "
                 >
                   <PeriodDropdown
                     value={
                       period
                     }
-                    onChange={
-                      setPeriod
-                    }
+                    onChange={(nextPeriod) => {
+                      if (!isMerchantRole) {
+                        return;
+                      }
+
+                      setPeriod(
+                        nextPeriod
+                      );
+                    }}
                   />
 
                   <motion.button
@@ -1822,11 +1960,15 @@ export default function MerchantAnalyticsPage() {
                     disabled={
                       refreshing
                     }
-                    onClick={() =>
+                    onClick={() => {
+                      if (!isMerchantRole) {
+                        return;
+                      }
+
                       void loadAnalytics(
                         true
-                      )
-                    }
+                      );
+                    }}
                     className="
                       inline-flex
                       h-11
@@ -3409,14 +3551,14 @@ function SnapshotItem({
 
       <p
         title={value}
-        className="mt-2 truncate text-lg font-black text-white"
+        className="mt-2 break-words text-lg font-black leading-tight text-white [overflow-wrap:anywhere]"
       >
         {value}
       </p>
 
       <p
         title={secondary}
-        className="mt-1 truncate text-[10px] text-violet-100/70"
+        className="mt-1 break-words text-[10px] leading-4 text-violet-100/70 [overflow-wrap:anywhere]"
       >
         {secondary}
       </p>

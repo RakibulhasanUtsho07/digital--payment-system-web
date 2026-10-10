@@ -109,7 +109,208 @@ const EMPTY_ATTENTION: SupportAttention = {
   unassigned: 0,
 };
 
+/* =========================================================
+   ADMIN / SUPER ADMIN ACCESS
+========================================================= */
+
+type AccessState =
+  | "checking"
+  | "allowed"
+  | "denied";
+
+const ADMIN_ROLES = new Set([
+  "admin",
+  "super_admin",
+]);
+
+function normalizeRole(
+  value: unknown
+): string {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+function getStoredRole(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const rawUser =
+    window.localStorage.getItem(
+      "auth_user"
+    );
+
+  if (!rawUser) {
+    return "";
+  }
+
+  try {
+    const parsed =
+      JSON.parse(rawUser);
+
+    const candidates = [
+      parsed?.role,
+      parsed?.user?.role,
+      parsed?.data?.role,
+      parsed?.profile?.role,
+    ];
+
+    for (const candidate of candidates) {
+      const role =
+        normalizeRole(candidate);
+
+      if (role) {
+        return role;
+      }
+    }
+  } catch {
+    return "";
+  }
+
+  return "";
+}
+
+function hasAdminAccess(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const authenticated =
+    window.localStorage.getItem(
+      "is_authenticated"
+    );
+
+  if (
+    authenticated !== "true" &&
+    authenticated !== "1"
+  ) {
+    return false;
+  }
+
+  return ADMIN_ROLES.has(
+    getStoredRole()
+  );
+}
+
+function isAuthorizationError(
+  error: unknown
+): boolean {
+  const message =
+    error instanceof Error
+      ? error.message
+      : String(error ?? "");
+
+  const normalized =
+    message.toLowerCase();
+
+  return (
+    normalized.includes("401") ||
+    normalized.includes("403") ||
+    normalized.includes("unauthorized") ||
+    normalized.includes("forbidden") ||
+    normalized.includes("access denied") ||
+    normalized.includes("not authorized")
+  );
+}
+
+function AccessCheckingState() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 text-foreground">
+      <motion.div
+        initial={{
+          opacity: 0,
+          y: 8,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        className="text-center"
+      >
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-indigo-500/15 bg-indigo-500/10 text-indigo-600">
+          <Loader2 className="h-5 w-5 animate-spin" />
+        </div>
+
+        <p className="mt-4 text-sm font-black">
+          Checking access
+        </p>
+
+        <p className="mt-1 text-xs text-muted-foreground">
+          Verifying administrator permissions…
+        </p>
+      </motion.div>
+    </main>
+  );
+}
+
+function AdminNotFoundState() {
+  return (
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-5 text-foreground">
+      <div className="pointer-events-none absolute -left-32 top-24 h-80 w-80 rounded-full bg-indigo-500/[0.07] blur-[100px]" />
+      <div className="pointer-events-none absolute -right-32 bottom-20 h-80 w-80 rounded-full bg-violet-500/[0.07] blur-[100px]" />
+
+      <motion.section
+        initial={{
+          opacity: 0,
+          y: 18,
+          scale: 0.98,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          scale: 1,
+        }}
+        transition={{
+          duration: 0.45,
+          ease: [
+            0.22,
+            1,
+            0.36,
+            1,
+          ],
+        }}
+        className="relative w-full max-w-xl overflow-hidden rounded-[32px] border border-border bg-card p-7 text-center shadow-[0_30px_90px_rgba(15,23,42,.12)] sm:p-10"
+      >
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.035]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(79,70,229,.7) 1px, transparent 1px), linear-gradient(90deg, rgba(79,70,229,.7) 1px, transparent 1px)",
+            backgroundSize:
+              "32px 32px",
+          }}
+        />
+
+        <div className="relative z-10">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] border border-indigo-500/15 bg-indigo-500/10 text-indigo-600">
+            <ShieldAlert className="h-7 w-7" />
+          </div>
+
+          <p className="mt-6 text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600">
+            Error 404
+          </p>
+
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">
+            Page not found
+          </h1>
+
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+            The page you are looking for does not exist or is not available.
+          </p>
+        </div>
+      </motion.section>
+    </main>
+  );
+}
+
 export default function SupportDashboard() {
+  const [access, setAccess] =
+    useState<AccessState>(
+      "checking"
+    );
+
   const [metrics, setMetrics] =
     useState<SupportMetrics>(EMPTY_METRICS);
   const [attention, setAttention] =
@@ -147,6 +348,38 @@ export default function SupportDashboard() {
   const [toast, setToast] =
     useState<string | null>(null);
 
+  useEffect(() => {
+    const timer =
+      window.setTimeout(
+        () => {
+          setAccess(
+            hasAdminAccess()
+              ? "allowed"
+              : "denied"
+          );
+        },
+        0
+      );
+
+    return () =>
+      window.clearTimeout(
+        timer
+      );
+  }, []);
+
+  const handleUnauthorized =
+    useCallback(() => {
+      setAccess("denied");
+      setMetrics(EMPTY_METRICS);
+      setAttention(EMPTY_ATTENTION);
+      setTickets([]);
+      setSelectedTicketId(null);
+      setSelectedTicket(null);
+      setCreateOpen(false);
+      setError("");
+      setToast(null);
+    }, []);
+
   const query: TicketListQuery = useMemo(
     () => ({
       search: search.trim() || undefined,
@@ -169,6 +402,12 @@ export default function SupportDashboard() {
 
   const loadDashboard = useCallback(
     async (mode: "load" | "refresh" = "load") => {
+      if (
+        access !== "allowed"
+      ) {
+        return;
+      }
+
       mode === "load"
         ? setIsLoading(true)
         : setIsRefreshing(true);
@@ -188,6 +427,15 @@ export default function SupportDashboard() {
         setPages(queue.pagination.pages);
         setTotal(queue.pagination.total);
       } catch (loadError) {
+        if (
+          isAuthorizationError(
+            loadError
+          )
+        ) {
+          handleUnauthorized();
+          return;
+        }
+
         setError(
           loadError instanceof Error
             ? loadError.message
@@ -198,17 +446,30 @@ export default function SupportDashboard() {
         setIsRefreshing(false);
       }
     },
-    [query]
+    [
+      access,
+      handleUnauthorized,
+      query,
+    ]
   );
 
   useEffect(() => {
+    if (
+      access !== "allowed"
+    ) {
+      return;
+    }
+
     const timer = window.setTimeout(
       () => void loadDashboard("load"),
       220
     );
 
     return () => window.clearTimeout(timer);
-  }, [loadDashboard]);
+  }, [
+    access,
+    loadDashboard,
+  ]);
 
   useEffect(() => {
     setPage(1);
@@ -226,6 +487,13 @@ export default function SupportDashboard() {
   }, [toast]);
 
   useEffect(() => {
+    if (
+      access !== "allowed"
+    ) {
+      setSelectedTicket(null);
+      return;
+    }
+
     if (!selectedTicketId) {
       setSelectedTicket(null);
       return;
@@ -241,28 +509,63 @@ export default function SupportDashboard() {
         }
       })
       .catch((detailError) => {
-        if (active) {
-          setToast(
-            detailError instanceof Error
-              ? detailError.message
-              : "Unable to load ticket details."
-          );
+        if (!active) {
+          return;
         }
+
+        if (
+          isAuthorizationError(
+            detailError
+          )
+        ) {
+          handleUnauthorized();
+          return;
+        }
+
+        setToast(
+          detailError instanceof Error
+            ? detailError.message
+            : "Unable to load ticket details."
+        );
       });
 
     return () => {
       active = false;
     };
-  }, [selectedTicketId]);
+  }, [
+    access,
+    handleUnauthorized,
+    selectedTicketId,
+  ]);
 
   const refreshSelectedTicket = async (
     ticketId: string
   ) => {
-    const response =
-      await supportApi.getTicket(ticketId);
+    if (
+      access !== "allowed"
+    ) {
+      handleUnauthorized();
+      return;
+    }
 
-    setSelectedTicket(response.ticket);
-    await loadDashboard("refresh");
+    try {
+      const response =
+        await supportApi.getTicket(ticketId);
+
+      setSelectedTicket(response.ticket);
+      await loadDashboard("refresh");
+    } catch (refreshError) {
+      if (
+        isAuthorizationError(
+          refreshError
+        )
+      ) {
+        handleUnauthorized();
+        return;
+      }
+
+      throw refreshError;
+    }
   };
 
   const filterForAttention = (
@@ -325,6 +628,18 @@ export default function SupportDashboard() {
     sla !== "All",
   ].filter(Boolean).length;
 
+  if (access === "checking") {
+    return (
+      <AccessCheckingState />
+    );
+  }
+
+  if (access === "denied") {
+    return (
+      <AdminNotFoundState />
+    );
+  }
+
   return (
     <main className="min-h-screen bg-transparent px-4 py-5 font-sans text-card-foreground sm:px-6 md:px-8">
       <div className="mx-auto max-w-[1600px]">
@@ -336,6 +651,15 @@ export default function SupportDashboard() {
               await supportApi.downloadExport(query);
               setToast("Support queue export prepared.");
             } catch (exportError) {
+              if (
+                isAuthorizationError(
+                  exportError
+                )
+              ) {
+                handleUnauthorized();
+                return;
+              }
+
               setToast(
                 exportError instanceof Error
                   ? exportError.message
@@ -472,6 +796,9 @@ export default function SupportDashboard() {
             <TicketDrawer
               ticket={selectedTicket}
               onClose={() => setSelectedTicketId(null)}
+              onUnauthorized={
+                handleUnauthorized
+              }
               onUpdated={async (ticketId, message) => {
                 setToast(message);
                 await refreshSelectedTicket(ticketId);
@@ -484,6 +811,9 @@ export default function SupportDashboard() {
       <CreateTicketModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
+        onUnauthorized={
+          handleUnauthorized
+        }
         onCreated={async (ticket) => {
           setCreateOpen(false);
           setToast(
@@ -1622,6 +1952,7 @@ function TicketDrawer({
   ticket,
   onClose,
   onUpdated,
+  onUnauthorized,
 }: {
   ticket: SupportTicketDetail | null;
   onClose: () => void;
@@ -1629,6 +1960,7 @@ function TicketDrawer({
     ticketId: string,
     message: string
   ) => Promise<void>;
+  onUnauthorized: () => void;
 }) {
   const [reply, setReply] = useState("");
   const [note, setNote] = useState("");
@@ -1654,16 +1986,27 @@ function TicketDrawer({
           setAdmins(response.admins);
         }
       })
-      .catch(() => {
-        if (active) {
-          setAdmins([]);
+      .catch((adminsError) => {
+        if (!active) {
+          return;
         }
+
+        if (
+          isAuthorizationError(
+            adminsError
+          )
+        ) {
+          onUnauthorized();
+          return;
+        }
+
+        setAdmins([]);
       });
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [onUnauthorized]);
 
   const run = async (
     action: string,
@@ -1678,6 +2021,15 @@ function TicketDrawer({
       await work();
       await onUpdated(ticket.id, message);
     } catch (actionError) {
+      if (
+        isAuthorizationError(
+          actionError
+        )
+      ) {
+        onUnauthorized();
+        return;
+      }
+
       window.alert(
         actionError instanceof Error
           ? actionError.message
@@ -2265,12 +2617,14 @@ function CreateTicketModal({
   open,
   onClose,
   onCreated,
+  onUnauthorized,
 }: {
   open: boolean;
   onClose: () => void;
   onCreated: (
     ticket: SupportTicketDetail
   ) => Promise<void>;
+  onUnauthorized: () => void;
 }) {
   const [form, setForm] =
     useState<CreateSupportTicketInput>({
@@ -2346,6 +2700,15 @@ function CreateTicketModal({
 
       await onCreated(response.ticket);
     } catch (submitError) {
+      if (
+        isAuthorizationError(
+          submitError
+        )
+      ) {
+        onUnauthorized();
+        return;
+      }
+
       setError(
         submitError instanceof Error
           ? submitError.message

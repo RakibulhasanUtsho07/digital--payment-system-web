@@ -6,2974 +6,2412 @@ import {
   useMemo,
   useRef,
   useState,
-  type Dispatch,
-  type ReactNode,
-  type SetStateAction,
+  type ComponentType,
 } from "react";
-
 import {
-  AnimatePresence,
-  motion,
-} from "framer-motion";
-
-import {
-  AlertCircle,
   ArrowLeft,
   ArrowRight,
   BadgeCheck,
   Camera,
   Check,
-  CheckCircle2,
   Clock3,
   FileCheck2,
   Fingerprint,
   Loader2,
-  RefreshCw,
-  ScanFace,
+  LockKeyhole,
+  MessageCircle,
+  Phone,
+  RefreshCcw,
   ShieldCheck,
-  UploadCloud,
+  Sparkles,
+  Upload,
+  UserRoundCheck,
   XCircle,
 } from "lucide-react";
 
 import {
-  createLivenessChallenge,
-  getCurrentEKYC,
-  submitEKYC,
-} from "@/lib/api/ekycApi";
+  useRouter,
+} from "next/navigation";
 
 import {
-  getPasskeys,
-  registerDevicePasskey,
-  type PasskeySummary,
-} from "@/lib/api/passkeyApi";
-
+  createLivenessChallenge,
+  getCurrentEKYC,
+  getKycPhone,
+  requestKycPhoneOtp,
+  submitEKYC,
+  validateNidDocuments,
+  verifyKycDeviceBiometric,
+  verifyKycPhoneOtp,
+} from "@/lib/api/ekycApi";
 import type {
   ActiveLivenessAction,
+  ActiveLivenessChallengeSession,
   CompletedLivenessCapture,
-  EKYCStatus,
+  DeviceBiometricProof,
   EKYCVerification,
+  NIDDocumentValidation,
+  PhoneOtpChallenge,
+  PhoneOtpChannel,
 } from "@/types/ekyc";
+import { useTheme } from "@/context/ThemeContext";
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
-/* =========================================================
-   FILE CONFIG
-========================================================= */
+type Step = 1 | 2 | 3 | 4 | 5;
 
-const MAX_FILE_BYTES = 1024 * 1024;
-const TARGET_FILE_BYTES = 800 * 1024;
+const STEPS = [
+  { id: 1, label: "Phone", icon: Phone },
+  { id: 2, label: "NID", icon: FileCheck2 },
+  { id: 3, label: "Face", icon: Camera },
+  { id: 4, label: "Biometric", icon: Fingerprint },
+  { id: 5, label: "Review", icon: ShieldCheck },
+] as const;
 
-const allowedTypes = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-]);
-
-/* =========================================================
-   FORM STATE
-========================================================= */
-
-interface FormState {
-  claimedName: string;
-  dateOfBirth: string;
-  nid: string;
-  frontImage: File | null;
-  backImage: File | null;
-  selfieImage: File | null;
-  liveness: CompletedLivenessCapture | null;
-}
-
-const emptyForm: FormState = {
-  claimedName: "",
-  dateOfBirth: "",
-  nid: "",
-  frontImage: null,
-  backImage: null,
-  selfieImage: null,
-  liveness: null,
+const ACTION_LABEL: Record<ActiveLivenessAction, string> = {
+  BLINK: "Blink naturally twice",
+  TURN_LEFT: "Slowly turn your head left",
+  TURN_RIGHT: "Slowly turn your head right",
 };
 
-/* =========================================================
-   AGE
-========================================================= */
+const messageOf = (error: unknown) =>
+  error instanceof Error
+    ? error.message
+    : "Something went wrong. Please try again.";
 
-function ageFromDOB(value: string): number {
-  const birth = new Date(`${value}T00:00:00Z`);
+function cameraErrorMessage(error: unknown): string {
+  const name = error instanceof DOMException ? error.name : "";
+  if (["NotAllowedError", "SecurityError"].includes(name)) {
+    return "Camera permission was denied. Allow camera access in the browser and try again.";
+  }
+  if (["NotFoundError", "DevicesNotFoundError"].includes(name)) {
+    return "No camera was found.";
+  }
+  if (["NotReadableError", "TrackStartError"].includes(name)) {
+    return "The camera is busy in another app. Close it there and try again.";
+  }
+  return "The camera could not start. Check browser permission, HTTPS, and the selected camera.";
+}
 
-  if (!Number.isFinite(birth.getTime())) {
-    return -1;
+function validateIdentity(name: string, nid: string, dob: string): string | null {
+  if (name.trim().length < 2) return "Enter the full name printed on the NID.";
+
+  if (!/^(?:\d{10}|\d{13}|\d{17})$/.test(nid.replace(/[\s-]/g, ""))) {
+    return "NID number must contain 10, 13, or 17 digits.";
   }
 
-  const today = new Date();
+  const birth = new Date(`${dob}T00:00:00Z`);
+  if (!dob || Number.isNaN(birth.getTime())) return "Enter a valid date of birth.";
 
-  let age =
-    today.getUTCFullYear() -
-    birth.getUTCFullYear();
+  const now = new Date();
+  let age = now.getUTCFullYear() - birth.getUTCFullYear();
 
   if (
-    today.getUTCMonth() <
-      birth.getUTCMonth() ||
-    (
-      today.getUTCMonth() ===
-        birth.getUTCMonth() &&
-      today.getUTCDate() <
-        birth.getUTCDate()
-    )
+    now.getUTCMonth() < birth.getUTCMonth() ||
+    (now.getUTCMonth() === birth.getUTCMonth() &&
+      now.getUTCDate() < birth.getUTCDate())
   ) {
     age -= 1;
   }
 
-  return age;
+  return age < 18 ? "The applicant must be at least 18 years old." : null;
 }
 
-/* =========================================================
-   IMAGE COMPRESSION
-========================================================= */
-
-async function compressImage(
-  file: File,
-): Promise<File> {
-  if (!allowedTypes.has(file.type)) {
-    throw new Error(
-      "Only JPG, PNG and WEBP images are supported.",
-    );
+async function prepareImage(file: File): Promise<File> {
+  if (!new Set(["image/jpeg", "image/png", "image/webp"]).has(file.type)) {
+    throw new Error("Use a JPG, PNG, or WEBP image.");
   }
 
-  if (file.size <= TARGET_FILE_BYTES) {
-    return file;
-  }
+  if (file.size <= 950 * 1024) return file;
 
-  const bitmap =
-    await createImageBitmap(file);
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
 
-  const scale = Math.min(
-    1,
-    1800 /
-      Math.max(
-        bitmap.width,
-        bitmap.height,
-      ),
-  );
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
 
-  const canvas =
-    document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("The image could not be prepared.");
 
-  canvas.width = Math.max(
-    1,
-    Math.round(
-      bitmap.width * scale,
-    ),
-  );
-
-  canvas.height = Math.max(
-    1,
-    Math.round(
-      bitmap.height * scale,
-    ),
-  );
-
-  const context =
-    canvas.getContext("2d");
-
-  if (!context) {
-    bitmap.close();
-
-    throw new Error(
-      "Your browser could not optimize the selected image.",
-    );
-  }
-
-  context.drawImage(
-    bitmap,
-    0,
-    0,
-    canvas.width,
-    canvas.height,
-  );
-
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   bitmap.close();
 
-  let quality = 0.88;
-  let blob: Blob | null = null;
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, "image/jpeg", 0.8)
+  );
 
-  while (quality >= 0.5) {
-    blob =
-      await new Promise<Blob | null>(
-        (resolve) => {
-          canvas.toBlob(
-            resolve,
-            "image/jpeg",
-            quality,
-          );
-        },
-      );
-
-    if (
-      blob &&
-      blob.size <= TARGET_FILE_BYTES
-    ) {
-      break;
-    }
-
-    quality -= 0.08;
+  if (!blob || blob.size > 1024 * 1024) {
+    throw new Error("The image is too large. Upload a clear image smaller than 1 MB.");
   }
 
-  if (
-    !blob ||
-    blob.size > MAX_FILE_BYTES
-  ) {
-    throw new Error(
-      "The image is still larger than 1 MB after optimization.",
-    );
-  }
+  return new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), {
+    type: "image/jpeg",
+    lastModified: Date.now(),
+  });
+}
 
-  return new File(
-    [blob],
-    `${file.name.replace(
-      /\.[^.]+$/,
-      "",
-    )}.jpg`,
-    {
-      type: "image/jpeg",
-      lastModified: Date.now(),
-    },
+function StepCircle(props: {
+  id: number;
+  label: string;
+  active: boolean;
+  done: boolean;
+  icon: ComponentType<{ className?: string }>;
+  primary: string;
+  success: string;
+  border: string;
+  surface: string;
+  textSoft: string;
+}) {
+  const Icon = props.icon;
+
+  return (
+    <div className="relative z-10 flex w-14 min-w-[56px] flex-col items-center gap-2 sm:w-16 sm:min-w-[64px] lg:w-20 lg:min-w-[80px]">
+      <span
+        className="grid h-10 w-10 place-items-center rounded-full border-4 border-white transition-all duration-300 sm:h-11 sm:w-11 lg:h-12 lg:w-12"
+        style={{
+          background: props.done
+            ? props.success
+            : props.active
+              ? props.primary
+              : props.surface,
+          color: props.done || props.active ? "#FFFFFF" : props.textSoft,
+          boxShadow: props.active ? `0 0 0 6px ${props.primary}18` : "none",
+          borderColor: "#ffffff",
+        }}
+      >
+        {props.done ? <Check className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
+      </span>
+
+      <small
+        className="text-center text-[10px] font-black uppercase tracking-[0.14em] sm:text-[11px]"
+        style={{ color: props.active ? props.primary : props.textSoft }}
+      >
+        {props.label}
+      </small>
+    </div>
   );
 }
 
-/* =========================================================
-   REJECTION MESSAGE
-========================================================= */
+function StatusCard({
+  verification,
+}: {
+  verification: EKYCVerification;
+}) {
+  const { tokens } = useTheme();
 
-function reasonMessage(
-  reasons: string[],
-): string {
-  const reason = reasons[0];
+  const pending = ["QUEUED", "PROCESSING", "PENDING_MANUAL_REVIEW"].includes(
+    verification.status
+  );
+  const verified = verification.status === "VERIFIED";
 
-  const messages: Record<string, string> = {
-    AGE_UNDER_18:
-      "The applicant must be at least 18 years old.",
+  const Icon = verified ? BadgeCheck : pending ? Clock3 : XCircle;
 
-    NID_MISMATCH:
-      "The submitted NID did not match the authoritative identity record.",
+  const tone = verified
+    ? {
+        bg: tokens.successSoft,
+        text: tokens.success,
+      }
+    : pending
+      ? {
+          bg: tokens.warningSoft,
+          text: tokens.warning,
+        }
+      : {
+          bg: tokens.dangerSoft,
+          text: tokens.danger,
+        };
 
-    DOB_MISMATCH:
-      "The date of birth did not match the identity record.",
+  return (
+    <div
+      className="mx-auto max-w-3xl rounded-[32px] border p-8 backdrop-blur-xl"
+      style={{
+        background: tokens.surfaceElevated,
+        borderColor: tokens.border,
+        boxShadow: tokens.shadowStrong,
+      }}
+    >
+      <span
+        className="grid h-16 w-16 place-items-center rounded-2xl"
+        style={{ background: tone.bg, color: tone.text }}
+      >
+        <Icon className="h-8 w-8" />
+      </span>
 
-    OCR_NID_MISMATCH:
-      "The NID number could not be confirmed from the uploaded card.",
+      <p
+        className="mt-6 text-xs font-black uppercase tracking-[.2em]"
+        style={{ color: tokens.primary }}
+      >
+        Identity verification
+      </p>
 
-    OCR_DOB_MISMATCH:
-      "The date of birth could not be confirmed from the uploaded card.",
+      <h1
+        className="mt-2 text-3xl font-black"
+        style={{ color: tokens.text }}
+      >
+        {verified
+          ? "Your identity is verified"
+          : pending
+            ? "Waiting for admin review"
+            : "Verification needs attention"}
+      </h1>
 
-    FACE_SCORE_REJECTED:
-      "The selfie could not be matched confidently with the NID photograph.",
+      <p
+        className="mt-3 text-sm leading-6"
+        style={{ color: tokens.textSoft }}
+      >
+        {verified
+          ? "A Coffer administrator approved your e-KYC application."
+          : pending
+            ? "Automated checks prepare evidence only. An administrator must approve or reject every application."
+            : "Your previous application was rejected. You may submit a corrected application."}
+      </p>
 
-    LIVENESS_FAILED:
-      "The live-person check was not completed successfully.",
-
-    NID_ALREADY_VERIFIED:
-      "This NID is already linked to another verified account.",
-
-    ADMIN_OVERRIDE:
-      "The verification was declined after manual review.",
-  };
-
-  return reason
-    ? messages[reason] ||
-        "The verification could not be approved."
-    : "The verification could not be approved.";
+      <span
+        className="mt-6 inline-flex rounded-full px-4 py-2 text-xs font-bold"
+        style={{
+          background: tokens.surfaceMuted,
+          color: tokens.textSoft,
+          border: `1px solid ${tokens.border}`,
+        }}
+      >
+        {verification.status.replaceAll("_", " ")}
+      </span>
+    </div>
+  );
 }
 
-/* =========================================================
-   STATUS CONTENT
-========================================================= */
+function UploadField(props: {
+  label: string;
+  hint: string;
+  file: File | null;
+  onFile: (file: File) => Promise<void>;
+  inputBg: string;
+  surface: string;
+  border: string;
+  text: string;
+  textSoft: string;
+  primary: string;
+}) {
+  const [working, setWorking] = useState(false);
 
-const statusContent: Record<
-  EKYCStatus,
-  {
-    title: string;
-    description: string;
-    icon: typeof Clock3;
-    tone: string;
-  }
-> = {
-  QUEUED: {
-    title: "Verification queued",
-    description:
-      "Your encrypted application is waiting for automated processing.",
-    icon: Clock3,
-    tone:
-      "border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-800/60 dark:bg-indigo-950/30 dark:text-indigo-300",
-  },
+  return (
+    <label
+      className="block cursor-pointer rounded-3xl border border-dashed p-5 transition-all duration-300 hover:-translate-y-0.5"
+      style={{
+        borderColor: props.border,
+        background: props.inputBg,
+      }}
+    >
+      <input
+        className="sr-only"
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        disabled={working}
+        onChange={(event) => {
+          const selected = event.target.files?.[0];
+          if (!selected) return;
 
-  PROCESSING: {
-    title: "Identity checks in progress",
-    description:
-      "OCR, liveness, face matching, duplicate detection and compliance screening are running.",
-    icon: ScanFace,
-    tone:
-      "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800/60 dark:bg-violet-950/30 dark:text-violet-300",
-  },
+          setWorking(true);
+          void props.onFile(selected).finally(() => setWorking(false));
+        }}
+      />
 
-  PENDING_MANUAL_REVIEW: {
-    title: "Manual review required",
-    description:
-      "A protected reviewer will inspect the verification signals before making a final decision.",
-    icon: ShieldCheck,
-    tone:
-      "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800/60 dark:bg-amber-950/30 dark:text-amber-300",
-  },
+      <span className="flex gap-4">
+        <span
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl shadow-sm"
+          style={{
+            background: props.surface,
+            color: props.primary,
+            border: `1px solid ${props.border}`,
+          }}
+        >
+          {working ? (
+            <Loader2 className="h-5 w-5 animate-spin" />
+          ) : props.file ? (
+            <Check className="h-5 w-5" />
+          ) : (
+            <Upload className="h-5 w-5" />
+          )}
+        </span>
 
-  VERIFIED: {
-    title: "Identity verified",
-    description:
-      "Your advanced e-KYC verification has been completed successfully.",
-    icon: BadgeCheck,
-    tone:
-      "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/60 dark:bg-emerald-950/30 dark:text-emerald-300",
-  },
+        <span>
+          <b
+            className="block text-sm"
+            style={{ color: props.text }}
+          >
+            {props.label}
+          </b>
+          <small
+            className="mt-1 block"
+            style={{ color: props.textSoft }}
+          >
+            {props.file?.name || props.hint}
+          </small>
+        </span>
+      </span>
+    </label>
+  );
+}
 
-  REJECTED: {
-    title: "Verification not approved",
-    description:
-      "Review the reason below, correct the information and submit a new attempt.",
-    icon: XCircle,
-    tone:
-      "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800/60 dark:bg-rose-950/30 dark:text-rose-300",
-  },
-};
+function HeroStatCard(props: {
+  label: string;
+  value: string;
+  icon: ComponentType<{ className?: string }>;
+  accent: string;
+}) {
+  const Icon = props.icon;
 
-/* =========================================================
-   PAGE
-========================================================= */
+  return (
+    <div className="kyc-stat-card relative overflow-hidden rounded-2xl border border-white/12 bg-white/10 p-4 backdrop-blur-md sm:p-5">
+      <div className="kyc-stat-shine absolute inset-y-0 -left-1/3 w-1/2 bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
-export default function AdvancedKYCPage() {
-  const [
-    verification,
-    setVerification,
-  ] =
-    useState<EKYCVerification | null>(
-      null,
-    );
+      <div
+        className="grid h-10 w-10 place-items-center rounded-2xl border border-white/12"
+        style={{
+          background: `${props.accent}20`,
+          color: "#FFFFFF",
+        }}
+      >
+        <Icon className="h-5 w-5" />
+      </div>
 
-  const [
-    form,
-    setForm,
-  ] =
-    useState<FormState>(
-      emptyForm,
-    );
+      <div className="mt-4 text-[10px] font-black uppercase tracking-[0.16em] text-white/65">
+        {props.label}
+      </div>
 
-  const [
-    step,
-    setStep,
-  ] =
-    useState<1 | 2 | 3 | 4>(1);
+      <div className="mt-2 break-words text-sm font-extrabold leading-6 text-white sm:text-base">
+        {props.value}
+      </div>
+    </div>
+  );
+}
 
-  const [
-    loading,
-    setLoading,
-  ] =
-    useState(true);
+export default function KycPage() {
+  const { tokens } = useTheme();
+  const router = useRouter();
 
-  const [
-    refreshing,
-    setRefreshing,
-  ] =
-    useState(false);
+  /*
+   * DashboardSessionContext is populated from the
+   * authenticated backend profile by the dashboard layout.
+   * The backend-confirmed role is the source of truth.
+   */
+  const {
+    user,
+  } = useDashboardSession();
 
-  const [
-    submitting,
-    setSubmitting,
-  ] =
-    useState(false);
-
-  const [
-    processingFile,
-    setProcessingFile,
-  ] =
-    useState<string | null>(null);
-
-  const [
-    error,
-    setError,
-  ] =
-    useState("");
-
-  /* =======================================================
-     LOAD STATUS
-  ====================================================== */
-
-  const loadStatus =
-    useCallback(
-      async (silent = false) => {
-        try {
-          if (silent) {
-            setRefreshing(true);
-          } else {
-            setLoading(true);
-          }
-
-          const current =
-            await getCurrentEKYC();
-
-          setVerification(current);
-          setError("");
-        } catch (loadError) {
-          setError(
-            loadError instanceof Error
-              ? loadError.message
-              : "Unable to load e-KYC status.",
-          );
-        } finally {
-          setLoading(false);
-          setRefreshing(false);
-        }
-      },
-      [],
-    );
+  const isUserRole =
+    user.role === "user";
 
   /* =======================================================
-     INITIAL LOAD
-  ====================================================== */
+     USER-ONLY PAGE GUARD
+
+     Only personal role=user accounts can access e-KYC.
+     Merchant / Analyst / Support / Admin / Super Admin
+     are redirected to their own dashboard home.
+  ======================================================= */
 
   useEffect(() => {
-    void loadStatus();
-  }, [loadStatus]);
+    if (isUserRole) {
+      return;
+    }
 
-  /* =======================================================
-     POLLING
-  ====================================================== */
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isUserRole,
+    router,
+    user.role,
+  ]);
+
+  const [step, setStep] = useState<Step>(1);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [verification, setVerification] = useState<EKYCVerification | null>(null);
+
+  const [phone, setPhone] = useState("");
+  const [phoneChannel, setPhoneChannel] = useState<PhoneOtpChannel>("sms");
+  const [phoneChallenge, setPhoneChallenge] = useState<PhoneOtpChallenge | null>(null);
+  const [phoneChallengeId, setPhoneChallengeId] = useState("");
+  const [otp, setOtp] = useState("");
+  const [phoneVerified, setPhoneVerified] = useState(false);
+
+  const [name, setName] = useState("");
+  const [nid, setNid] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [frontImage, setFrontImage] = useState<File | null>(null);
+  const [backImage, setBackImage] = useState<File | null>(null);
+  const [documentValidation, setDocumentValidation] =
+    useState<NIDDocumentValidation | null>(null);
+
+  const [liveness, setLiveness] = useState<CompletedLivenessCapture | null>(null);
+  const [livenessSession, setLivenessSession] =
+    useState<ActiveLivenessChallengeSession | null>(null);
+  const [actionIndex, setActionIndex] = useState(0);
+  const [recording, setRecording] = useState(false);
+
+  const [biometric, setBiometric] = useState<DeviceBiometricProof | null>(null);
+  const [biometricSkipped, setBiometricSkipped] = useState(false);
+
+  const [biometricSupported] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      "PublicKeyCredential" in window &&
+      Boolean(navigator.credentials)
+  );
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const startedAtRef = useRef<string | null>(null);
+
+  // Prevent duplicate OTP API calls before React has time to
+  // commit the busy state and disable the buttons.
+  const otpRequestInFlightRef = useRef(false);
+  const otpVerifyInFlightRef = useRef(false);
+
+  // Keep the newest challenge ID synchronously as well as in React state.
+  // This removes any chance of verifying a stale challenge after resend.
+  const phoneChallengeIdRef = useRef("");
+
+  const stopCamera = useCallback(() => {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+
+    setRecording(false);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    if (!isUserRole) {
+      setLoading(false);
+      stopCamera();
+
+      return () => {
+        active = false;
+        stopCamera();
+      };
+    }
+
+    void Promise.all([
+      getCurrentEKYC(),
+      getKycPhone(),
+    ])
+      .then(
+        ([
+          current,
+          currentPhone,
+        ]) => {
+          if (!active) {
+            return;
+          }
+
+          setVerification(
+            current
+          );
+
+          setPhone(
+            typeof currentPhone ===
+              "string"
+              ? currentPhone
+              : ""
+          );
+        }
+      )
+      .catch(
+        (
+          requestError
+        ) => {
+          if (active) {
+            setError(
+              messageOf(
+                requestError
+              )
+            );
+          }
+        }
+      )
+      .finally(() => {
+        if (active) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+      stopCamera();
+    };
+  }, [
+    isUserRole,
+    stopCamera,
+  ]);
 
   useEffect(() => {
     if (
+      !isUserRole ||
       !verification ||
       ![
         "QUEUED",
         "PROCESSING",
       ].includes(
-        verification.status,
+        verification.status
       )
     ) {
       return;
     }
 
-    const interval =
+    const timer =
       window.setInterval(
         () => {
-          void loadStatus(true);
+          void getCurrentEKYC()
+            .then(
+              setVerification
+            )
+            .catch(
+              () =>
+                undefined
+            );
         },
-        4000,
+        5000
       );
 
-    return () => {
+    return () =>
       window.clearInterval(
-        interval,
+        timer
       );
-    };
   }, [
+    isUserRole,
     verification,
-    loadStatus,
   ]);
 
-  /* =======================================================
-     IDENTITY VALIDATION
-  ====================================================== */
+  const progress = useMemo(() => ((step - 1) / 4) * 100, [step]);
 
-  const validateIdentity = () => {
-    const nid =
-      form.nid.replace(
-        /[\s-]/g,
-        "",
+  const inputStyle = useMemo(
+    () => ({
+      background: tokens.inputBg,
+      color: tokens.inputText,
+      borderColor: tokens.border,
+      boxShadow: "none",
+    }),
+    [tokens]
+  );
+
+  async function sendOtp() {
+    if (!isUserRole) {
+      router.replace(
+        getDashboardHome(
+          user.role
+        )
       );
 
-    if (
-      form.claimedName.trim().length <
-      2
-    ) {
-      return "Enter your full name exactly as it appears on the NID.";
-    }
-
-    if (!form.dateOfBirth) {
-      return "Select your date of birth.";
-    }
-
-    if (
-      ageFromDOB(
-        form.dateOfBirth,
-      ) < 18
-    ) {
-      return "The applicant must be at least 18 years old.";
-    }
-
-    if (
-      ![10, 13, 17].includes(
-        nid.length,
-      ) ||
-      !/^\d+$/.test(nid)
-    ) {
-      return "NID must contain exactly 10, 13, or 17 digits.";
-    }
-
-    return "";
-  };
-
-  /* =======================================================
-     FILE SELECT
-  ====================================================== */
-
-  const selectFile = async (
-    field:
-      | "frontImage"
-      | "backImage"
-      | "selfieImage",
-    file?: File,
-  ) => {
-    if (!file) {
       return;
+    }
+
+    if (
+      otpRequestInFlightRef.current ||
+      otpVerifyInFlightRef.current
+    ) {
+      return;
+    }
+
+    if (!phone?.trim()) {
+      setError(
+        "Enter a valid phone number."
+      );
+      return;
+    }
+
+    otpRequestInFlightRef.current =
+      true;
+
+    setBusy(true);
+    setError("");
+
+    try {
+      const challenge =
+        await requestKycPhoneOtp(
+          phone,
+          phoneChannel
+        );
+
+      /*
+       * Every send/resend creates a new challenge.
+       * Always replace both the visible challenge and the ID used
+       * by the verify request so a stale challenge can never be sent.
+       */
+      setPhoneChallenge(
+        challenge
+      );
+
+      phoneChallengeIdRef.current =
+        challenge.challengeId;
+
+      setPhoneChallengeId(
+        challenge.challengeId
+      );
+
+      setPhoneVerified(
+        false
+      );
+
+      setOtp("");
+    } catch (
+      requestError
+    ) {
+      setError(
+        messageOf(
+          requestError
+        )
+      );
+    } finally {
+      otpRequestInFlightRef.current =
+        false;
+
+      setBusy(false);
+    }
+  }
+
+  async function confirmOtp() {
+    if (!isUserRole) {
+      router.replace(
+        getDashboardHome(
+          user.role
+        )
+      );
+
+      return;
+    }
+
+    /*
+     * setBusy(true) alone is not enough to stop two very fast clicks,
+     * because React state updates are asynchronous.
+     *
+     * This ref changes synchronously, so only one verification request
+     * can leave this page at a time.
+     */
+    if (
+      otpVerifyInFlightRef.current ||
+      otpRequestInFlightRef.current
+    ) {
+      return;
+    }
+
+    const currentChallengeId =
+      (
+        phoneChallengeIdRef.current ||
+        phoneChallenge?.challengeId ||
+        phoneChallengeId
+      ).trim();
+
+    const currentOtp =
+      otp.trim();
+
+    if (
+      !currentChallengeId
+    ) {
+      setError(
+        "Request a new verification code first."
+      );
+      return;
+    }
+
+    if (
+      !/^\d{6}$/.test(
+        currentOtp
+      )
+    ) {
+      setError(
+        "Enter the 6-digit verification code."
+      );
+      return;
+    }
+
+    otpVerifyInFlightRef.current =
+      true;
+
+    setBusy(true);
+    setError("");
+
+    try {
+      const result =
+        await verifyKycPhoneOtp(
+          {
+            challengeId:
+              currentChallengeId,
+
+            otp:
+              currentOtp,
+          }
+        );
+
+      setPhone(
+        result.phone
+      );
+
+      setPhoneVerified(
+        true
+      );
+
+      setStep(2);
+    } catch (
+      requestError
+    ) {
+      const message =
+        messageOf(
+          requestError
+        );
+
+      setError(
+        message
+      );
+
+      if (
+        message.includes(
+          "Request a new code"
+        ) ||
+        message.includes(
+          "challenge was not found"
+        ) ||
+        message.includes(
+          "already been used"
+        )
+      ) {
+        phoneChallengeIdRef.current =
+          "";
+
+        setPhoneChallengeId(
+          ""
+        );
+      }
+    } finally {
+      otpVerifyInFlightRef.current =
+        false;
+
+      setBusy(false);
+    }
+  }
+
+  async function chooseImage(kind: "front" | "back", file: File) {
+    if (!isUserRole) {
+      router.replace(
+        getDashboardHome(
+          user.role
+        )
+      );
+
+      return;
+    }
+
+    setError("");
+
+    try {
+      const prepared = await prepareImage(file);
+      if (kind === "front") {
+        setFrontImage(prepared);
+      } else {
+        setBackImage(prepared);
+      }
+      setDocumentValidation(null);
+    } catch (imageError) {
+      setError(messageOf(imageError));
+    }
+  }
+
+  async function validateDocumentsAndContinue() {
+    if (!isUserRole) {
+      router.replace(
+        getDashboardHome(
+          user.role
+        )
+      );
+
+      return;
+    }
+
+    const identityError = validateIdentity(name, nid, dateOfBirth);
+    if (identityError) {
+      setError(identityError);
+      return;
+    }
+
+    if (!frontImage || !backImage) {
+      setError("Upload both sides of the NID.");
+      return;
+    }
+
+    setBusy(true);
+    setError("");
+
+    try {
+      const validation = await validateNidDocuments({
+        phoneChallengeId,
+        frontImage,
+        backImage,
+      });
+
+      setDocumentValidation(validation);
+      setStep(3);
+    } catch (requestError) {
+      setError(messageOf(requestError));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function requestCamera(): Promise<MediaStream> {
+    if (!isUserRole) {
+      router.replace(
+        getDashboardHome(
+          user.role
+        )
+      );
+
+      throw new Error(
+        "This verification flow is available only to personal user accounts."
+      );
+    }
+
+    const local = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+
+    if (!window.isSecureContext && !local) {
+      throw new Error("Live face verification requires HTTPS.");
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error("This browser does not support camera capture.");
     }
 
     try {
-      setProcessingFile(field);
-      setError("");
-
-      const optimized =
-        await compressImage(file);
-
-      setForm(
-        (current) => ({
-          ...current,
-          [field]: optimized,
-        }),
-      );
-    } catch (fileError) {
-      setError(
-        fileError instanceof Error
-          ? fileError.message
-          : "Unable to process the image.",
-      );
-    } finally {
-      setProcessingFile(null);
-    }
-  };
-
-  /* =======================================================
-     NEXT STEP
-  ====================================================== */
-
-  const goNext = () => {
-    setError("");
-
-    if (step === 1) {
-      const validationError =
-        validateIdentity();
-
-      if (validationError) {
-        setError(
-          validationError,
-        );
-        return;
-      }
-
-      setStep(2);
-      return;
-    }
-
-    if (step === 2) {
+      return await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: { ideal: "user" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 24, max: 30 },
+        },
+      });
+    } catch (firstError) {
       if (
-        !form.frontImage ||
-        !form.backImage
+        firstError instanceof DOMException &&
+        ["NotAllowedError", "SecurityError"].includes(firstError.name)
       ) {
-        setError(
-          "Upload clear images of the NID front and back.",
-        );
-        return;
+        throw firstError;
       }
 
-      setStep(3);
-      return;
+      return navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: true,
+      });
     }
-
-    if (step === 3) {
-      if (
-        !form.liveness ||
-        !form.selfieImage
-      ) {
-        setError(
-          "Complete the live camera challenge before continuing.",
-        );
-        return;
-      }
-
-      setStep(4);
-    }
-  };
-
-  /* =======================================================
-     SUBMIT
-  ====================================================== */
-
-  const submit =
-    async () => {
-      if (
-        !form.frontImage ||
-        !form.backImage ||
-        !form.selfieImage ||
-        !form.liveness
-      ) {
-        return;
-      }
-
-      try {
-        setSubmitting(true);
-        setError("");
-
-        const response =
-          await submitEKYC({
-            claimedName:
-              form.claimedName,
-
-            dateOfBirth:
-              form.dateOfBirth,
-
-            nid:
-              form.nid,
-
-            frontImage:
-              form.frontImage,
-
-            backImage:
-              form.backImage,
-
-            selfieImage:
-              form.selfieImage,
-
-            liveness:
-              form.liveness,
-          });
-
-        setVerification(
-          response.verification,
-        );
-
-        setForm(
-          emptyForm,
-        );
-
-        setStep(1);
-      } catch (submitError) {
-        setError(
-          submitError instanceof
-            Error
-            ? submitError.message
-            : "Unable to submit e-KYC.",
-        );
-      } finally {
-        setSubmitting(false);
-      }
-    };
-
-  /* =======================================================
-     START AGAIN
-  ====================================================== */
-
-  const startAgain =
-    () => {
-      setVerification(null);
-      setForm(emptyForm);
-      setStep(1);
-      setError("");
-    };
-
-  /* =======================================================
-     LOADING
-  ====================================================== */
-
-  if (loading) {
-    return <LoadingState />;
   }
 
+  async function startLiveness() {
+    if (!isUserRole) {
+      router.replace(
+        getDashboardHome(
+          user.role
+        )
+      );
+
+      return;
+    }
+
+    setBusy(true);
+    setError("");
+    stopCamera();
+
+    try {
+      if (!("MediaRecorder" in window)) {
+        throw new Error("This browser cannot record liveness video.");
+      }
+
+      const [session, stream] = await Promise.all([
+        createLivenessChallenge(),
+        requestCamera(),
+      ]);
+
+      streamRef.current = stream;
+
+      if (!videoRef.current) {
+        throw new Error("Camera preview is unavailable.");
+      }
+
+      videoRef.current.srcObject = stream;
+      await videoRef.current.play();
+
+      const mimeType = [
+        "video/webm;codecs=vp9",
+        "video/webm;codecs=vp8",
+        "video/webm",
+      ].find((type) => MediaRecorder.isTypeSupported(type));
+
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+
+      chunksRef.current = [];
+      recorder.ondataavailable = (event) => {
+        if (event.data.size) {
+          chunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.start(500);
+      recorderRef.current = recorder;
+      startedAtRef.current = new Date().toISOString();
+
+      setLivenessSession(session);
+      setActionIndex(0);
+      setRecording(true);
+      setLiveness(null);
+    } catch (cameraError) {
+      stopCamera();
+      setError(
+        cameraError instanceof DOMException
+          ? cameraErrorMessage(cameraError)
+          : messageOf(cameraError)
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function captureSelfie(): Promise<File> {
+    const video = videoRef.current;
+
+    if (!video?.videoWidth || !video.videoHeight) {
+      return Promise.reject(new Error("The camera frame is not ready."));
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const context = canvas.getContext("2d");
+    if (!context) {
+      return Promise.reject(new Error("The camera frame could not be captured."));
+    }
+
+    context.drawImage(video, 0, 0);
+
+    return new Promise((resolve, reject) =>
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error("The selfie could not be captured."));
+          return;
+        }
+
+        resolve(
+          new File([blob], "ekyc-selfie.jpg", {
+            type: "image/jpeg",
+            lastModified: Date.now(),
+          })
+        );
+      }, "image/jpeg", 0.9)
+    );
+  }
+
+  async function finishLiveness() {
+    const recorder = recorderRef.current;
+
+    if (!recorder || !livenessSession || !startedAtRef.current || recorder.state === "inactive") {
+      throw new Error("The liveness recording is unavailable.");
+    }
+
+    if (Date.now() - new Date(startedAtRef.current).getTime() < 6500) {
+      throw new Error("Complete the actions slowly for at least 7 seconds before capture.");
+    }
+
+    const selfie = await captureSelfie();
+    const startedAt = startedAtRef.current;
+    const completedAt = new Date().toISOString();
+
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      recorder.onstop = () =>
+        resolve(
+          new Blob(chunksRef.current, {
+            type: recorder.mimeType || "video/webm",
+          })
+        );
+      recorder.onerror = () => reject(new Error("The liveness recording failed."));
+      recorder.stop();
+    });
+
+    const extension = blob.type.includes("mp4") ? "mp4" : "webm";
+    const video = new File([blob], `ekyc-liveness.${extension}`, {
+      type: blob.type || "video/webm",
+      lastModified: Date.now(),
+    });
+
+    if (video.size > 8 * 1024 * 1024) {
+      throw new Error("The liveness recording is larger than 8 MB.");
+    }
+
+    const session = livenessSession;
+
+    stopCamera();
+    setLiveness({
+      session,
+      startedAt,
+      completedAt,
+      selfie,
+      video,
+    });
+    setStep(4);
+  }
+
+  async function completeAction() {
+    if (!isUserRole) {
+      router.replace(
+        getDashboardHome(
+          user.role
+        )
+      );
+
+      return;
+    }
+
+    if (!livenessSession || !recording) return;
+
+    setError("");
+
+    if (actionIndex < livenessSession.challenges.length - 1) {
+      setActionIndex((value) => value + 1);
+      return;
+    }
+
+    setBusy(true);
+    try {
+      await finishLiveness();
+    } catch (captureError) {
+      setError(messageOf(captureError));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function verifyBiometric() {
+    if (!isUserRole) {
+      router.replace(
+        getDashboardHome(
+          user.role
+        )
+      );
+
+      return;
+    }
+
+    setBusy(true);
+    setError("");
+
+    try {
+      const result = await verifyKycDeviceBiometric();
+      setBiometric(result);
+      setBiometricSkipped(false);
+      setStep(5);
+    } catch (biometricError) {
+      setError(messageOf(biometricError));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submit() {
+    if (!isUserRole) {
+      router.replace(
+        getDashboardHome(
+          user.role
+        )
+      );
+
+      return;
+    }
+
+    if (!frontImage || !backImage || !documentValidation || !liveness || !phoneVerified) {
+      setError("One or more required verification steps are incomplete.");
+      return;
+    }
+
+    setBusy(true);
+    setError("");
+
+    try {
+      const result = await submitEKYC({
+        claimedName: name,
+        dateOfBirth,
+        nid,
+        frontImage,
+        backImage,
+        selfieImage: liveness.selfie,
+        liveness,
+        phoneChallengeId,
+        documentValidationId: documentValidation.validationId,
+        biometricSessionId: biometric?.sessionId,
+      });
+
+      setVerification(result.verification);
+    } catch (submitError) {
+      setError(messageOf(submitError));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!isUserRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center bg-transparent px-4">
+        <div className="flex flex-col items-center text-center">
+          <div
+            className="grid h-14 w-14 place-items-center rounded-2xl border shadow-sm"
+            style={{
+              background:
+                tokens.primarySoft,
+              borderColor:
+                tokens.border,
+              color:
+                tokens.primary,
+            }}
+          >
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p
+            className="mt-4 text-sm font-black"
+            style={{
+              color:
+                tokens.text,
+            }}
+          >
+            Opening your workspace
+          </p>
+
+          <p
+            className="mt-1 max-w-sm text-xs leading-5"
+            style={{
+              color:
+                tokens.textSoft,
+            }}
+          >
+            e-KYC is available only to personal user accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="grid min-h-[70vh] place-items-center bg-transparent">
+        <Loader2
+          className="h-8 w-8 animate-spin"
+          style={{ color: tokens.primary }}
+        />
+      </div>
+    );
+  }
+
+  if (verification && verification.status !== "REJECTED") {
+    return (
+      <main className="min-h-screen bg-transparent px-4 py-10">
+        <StatusCard verification={verification} />
+      </main>
+    );
+  }
+
+  const title =
+    [
+      "",
+      "Verify your phone",
+      "Validate your NID",
+      "Prove you are present",
+      "Device biometric",
+      "Review and submit",
+    ][step] ?? "";
+
+  const description =
+    [
+      "",
+      "The registration number is loaded automatically and may be changed before OTP.",
+      "OCR rejects unrelated images before submission.",
+      "The server validates random blink and head-turn evidence.",
+      "WebAuthn keeps the raw fingerprint or face template inside the device.",
+      "Submission creates a pending case; it never auto-verifies the account.",
+    ][step] ?? "";
+
+  const currentAction = livenessSession?.challenges?.[actionIndex] ?? null;
+
+  const heroStats = [
+    {
+      label: "Step progress",
+      value: `${step}/5`,
+      icon: BadgeCheck,
+      accent: tokens.primary,
+    },
+    {
+      label: "Verification mode",
+      value: "Protected",
+      icon: ShieldCheck,
+      accent: tokens.success,
+    },
+    {
+      label: "Biometric",
+      value: biometricSupported ? "Supported" : "Optional",
+      icon: Fingerprint,
+      accent: tokens.primaryStrong,
+    },
+  ] as const;
+
   return (
-    <main className="min-h-screen bg-background px-3 py-5 text-foreground sm:px-5 sm:py-6 lg:px-8">
-      <div className="mx-auto w-full max-w-7xl">
-
-        {/* =================================================
-            TOP HERO
-        ================================================= */}
-
-        <motion.header
-          initial={{
-            opacity: 0,
-            y: -18,
+    <main
+      className="min-h-screen bg-transparent px-3 py-6 sm:px-6 sm:py-8 lg:px-8"
+      style={{
+        color: tokens.text,
+      }}
+    >
+      <div className="mx-auto max-w-7xl">
+        {/* HERO */}
+        <section
+          className="kyc-hero relative overflow-hidden rounded-[28px] border p-5 sm:rounded-[34px] sm:p-7 lg:p-8 xl:p-10"
+          style={{
+            background: `linear-gradient(135deg, ${tokens.heroFrom} 0%, ${tokens.heroTo} 100%)`,
+            borderColor: `${tokens.primary}33`,
+            boxShadow: tokens.shadowStrong,
           }}
-          animate={{
-            opacity: 1,
-            y: 0,
-          }}
-          transition={{
-            duration: 0.5,
-            ease: [
-              0.22,
-              1,
-              0.36,
-              1,
-            ],
-          }}
-          className="relative isolate overflow-hidden rounded-[30px] border border-indigo-900/20 bg-gradient-to-br from-[#170C35] via-[#31205F] to-[#5B35A6] p-5 text-white shadow-[0_28px_80px_rgba(49,32,106,.22)] sm:p-7 lg:p-8"
         >
-          <motion.div
-            animate={{
-              scale: [
-                0.9,
-                1.1,
-                0.9,
-              ],
-              opacity: [
-                0.1,
-                0.24,
-                0.1,
-              ],
-            }}
-            transition={{
-              duration: 7,
-              repeat: Infinity,
-              ease: "easeInOut",
-            }}
-            className="pointer-events-none absolute -right-24 -top-28 h-[350px] w-[350px] rounded-full bg-indigo-300/15 blur-[100px]"
+          <div className="kyc-hero-grid absolute inset-0 opacity-35" />
+          <div
+            className="kyc-orb absolute -right-10 top-8 h-44 w-44 rounded-full blur-3xl"
+            style={{ background: tokens.heroGlow }}
+          />
+          <div
+            className="kyc-orb absolute bottom-0 left-1/2 h-40 w-40 -translate-x-1/2 rounded-full blur-3xl"
+            style={{ background: tokens.heroGlowSecondary }}
+          />
+          <div
+            className="kyc-hero-beam absolute -left-24 top-1/2 h-32 w-72 -translate-y-1/2 rounded-full blur-3xl"
+            style={{ background: `${tokens.primary}30` }}
           />
 
-          <motion.div
-            animate={{
-              x: [
-                -15,
-                20,
-                -15,
-              ],
-              opacity: [
-                0.06,
-                0.18,
-                0.06,
-              ],
-            }}
-            transition={{
-              duration: 8,
-              repeat: Infinity,
-              ease: "easeInOut",
-            }}
-            className="pointer-events-none absolute -bottom-40 left-[25%] h-[290px] w-[290px] rounded-full bg-violet-300/10 blur-[100px]"
-          />
-
-          <div className="pointer-events-none absolute inset-0 opacity-[0.045] [background-image:linear-gradient(rgba(255,255,255,.25)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.25)_1px,transparent_1px)] [background-size:34px_34px]" />
-
-          <div className="relative z-10 flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex min-w-0 items-start gap-4 sm:gap-5">
-              <motion.div
-                whileHover={{
-                  scale: 1.05,
-                  rotate: 2,
+          <div className="relative z-10 grid gap-8 xl:grid-cols-[minmax(0,1fr)_340px] xl:items-center">
+            <div className="max-w-3xl">
+              <div
+                className="inline-flex flex-wrap items-center gap-2 rounded-full border px-4 py-2 text-[11px] font-black uppercase tracking-[0.16em]"
+                style={{
+                  background: "rgba(255,255,255,0.08)",
+                  borderColor: "rgba(255,255,255,0.14)",
+                  color: "rgba(255,255,255,0.92)",
                 }}
-                whileTap={{
-                  scale: 0.97,
-                }}
-                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,.14),0_15px_35px_rgba(0,0,0,.14)] backdrop-blur"
               >
-                <Fingerprint className="h-7 w-7 text-violet-200" />
-              </motion.div>
+                <ShieldCheck className="h-4 w-4" />
+                Secure e-KYC Workspace
+                <span className="h-1 w-1 rounded-full bg-white/60" />
+                Live onboarding
+              </div>
 
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="inline-flex items-center gap-2 rounded-full border border-violet-200/15 bg-white/10 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.18em] text-violet-100">
-                    <ShieldCheck className="h-3.5 w-3.5" />
-                    Identity Security
-                  </span>
+              <h1 className="mt-5 max-w-3xl text-3xl font-black leading-tight text-white sm:text-4xl lg:text-5xl xl:text-[56px]">
+                Complete your identity verification
+              </h1>
 
-                  <span className="inline-flex items-center gap-2 rounded-full border border-emerald-300/15 bg-emerald-300/10 px-3 py-1.5 text-[9px] font-bold text-emerald-100">
-                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-300" />
-                    Protected
-                  </span>
-                </div>
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-white/78 sm:text-base">
+                Confirm phone ownership, validate your NID, complete live face
+                capture and optionally verify device biometric in one protected
+                flow.
+              </p>
 
-                <h1 className="mt-4 text-3xl font-black tracking-[-0.04em] sm:text-4xl lg:text-[42px]">
-                  Advanced e-KYC
-                </h1>
-
-                <p className="mt-3 max-w-3xl text-xs leading-6 text-violet-100/70 sm:text-sm">
-                  Verify your Bangladesh NID through encrypted
-                  document capture, live liveness checks,
-                  identity matching and protected compliance
-                  processing.
-                </p>
-
-                <div className="mt-4 flex flex-wrap gap-2 text-[9px] font-bold text-violet-100/55">
-                  <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5">
-                    NID verification
-                  </span>
-
-                  <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5">
-                    Live biometric check
-                  </span>
-
-                  <span className="rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5">
-                    Secure processing
-                  </span>
-                </div>
+              <div className="mt-6 flex flex-wrap gap-3">
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-bold text-white/90 backdrop-blur">
+                  <LockKeyhole className="h-4 w-4" />
+                  Encrypted evidence
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-bold text-white/90 backdrop-blur">
+                  <ShieldCheck className="h-4 w-4" />
+                  Manual admin approval
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-bold text-white/90 backdrop-blur">
+                  <Sparkles className="h-4 w-4" />
+                  Professional secure flow
+                </span>
               </div>
             </div>
 
-            {verification && (
-              <motion.button
-                whileHover={{
-                  y: -2,
-                }}
-                whileTap={{
-                  scale: 0.98,
-                }}
-                type="button"
-                onClick={() =>
-                  void loadStatus(
-                    true,
-                  )
-                }
-                disabled={refreshing}
-                className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.08] px-4 text-[11px] font-black text-white backdrop-blur transition hover:bg-white/[0.15] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <RefreshCw
-                  className={
-                    refreshing
-                      ? "h-4 w-4 animate-spin"
-                      : "h-4 w-4"
-                  }
-                />
+            <div className="relative w-full">
+              <div className="pointer-events-none absolute inset-0 hidden xl:block">
+                <div className="kyc-radar absolute right-6 top-1/2 h-52 w-52 -translate-y-1/2 rounded-full border border-white/10" />
+                <div className="kyc-radar-delay absolute right-12 top-1/2 h-40 w-40 -translate-y-1/2 rounded-full border border-white/10" />
+                <div className="kyc-radar-delay-2 absolute right-[4.5rem] top-1/2 h-28 w-28 -translate-y-1/2 rounded-full border border-white/12" />
+                <div className="absolute right-[8.2rem] top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-white shadow-[0_0_22px_rgba(255,255,255,0.95)]" />
+              </div>
 
-                {refreshing
-                  ? "Refreshing..."
-                  : "Refresh status"}
-              </motion.button>
-            )}
+              <div className="grid gap-3 min-[560px]:grid-cols-3 xl:grid-cols-1">
+                {heroStats.map((item) => (
+                  <HeroStatCard
+                    key={item.label}
+                    label={item.label}
+                    value={item.value}
+                    icon={item.icon}
+                    accent={item.accent}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
-        </motion.header>
+        </section>
 
-        {/* =================================================
-            ERROR
-        ================================================= */}
+        {/* STEPPER */}
+        <section
+          className="mt-6 rounded-[28px] border p-4 sm:p-5 backdrop-blur-xl"
+          style={{
+            background: tokens.surfaceElevated,
+            borderColor: tokens.border,
+            boxShadow: tokens.shadow,
+          }}
+        >
+          <div className="-mx-1 overflow-x-auto pb-2">
+            <div className="relative flex min-w-[560px] justify-between gap-3 px-1 sm:min-w-0">
+              <div
+                className="absolute left-5 right-5 top-5 h-1 rounded-full"
+                style={{ background: tokens.primarySoft }}
+              />
+              <div
+                className="absolute left-5 top-5 h-1 rounded-full transition-all duration-500"
+                style={{
+                  width: `calc((100% - 2.5rem) * ${progress / 100})`,
+                  background: `linear-gradient(90deg, ${tokens.primary} 0%, ${tokens.primaryStrong} 100%)`,
+                }}
+              />
 
-        <AnimatePresence>
-          {error && (
-            <motion.div
-              initial={{
-                opacity: 0,
-                y: -8,
+              {STEPS.map(({ id, label, icon }) => (
+                <StepCircle
+                  key={id}
+                  id={id}
+                  label={label}
+                  icon={icon}
+                  active={id === step}
+                  done={id < step}
+                  primary={tokens.primary}
+                  success={tokens.success}
+                  border={tokens.border}
+                  surface={tokens.surface}
+                  textSoft={tokens.textSoft}
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* MAIN PANEL */}
+        <section
+          className="mt-6 overflow-hidden rounded-[28px] sm:rounded-[32px] border"
+          style={{
+            background: tokens.surface,
+            borderColor: tokens.border,
+            boxShadow: tokens.shadowStrong,
+          }}
+        >
+          <div className="grid lg:grid-cols-[300px_minmax(0,1fr)] xl:grid-cols-[330px_minmax(0,1fr)]">
+            {/* LEFT SIDEBAR */}
+            <aside
+              className="relative overflow-hidden p-6 sm:p-8"
+              style={{
+                background: `linear-gradient(180deg, ${tokens.heroFrom} 0%, ${tokens.heroTo} 100%)`,
               }}
-              animate={{
-                opacity: 1,
-                y: 0,
-              }}
-              exit={{
-                opacity: 0,
-                y: -6,
-              }}
-              className="mt-4"
             >
-              <div className="flex items-start gap-3 rounded-[20px] border border-rose-200 bg-rose-50 p-4 dark:border-rose-900/60 dark:bg-rose-950/25">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-background text-rose-600 shadow-sm dark:text-rose-400">
-                  <AlertCircle className="h-4 w-4" />
-                </div>
+              <div
+                className="kyc-orb absolute right-2 top-4 h-32 w-32 rounded-full blur-3xl"
+                style={{ background: tokens.heroGlow }}
+              />
+              <div className="relative z-10">
+                <p className="text-xs font-black uppercase tracking-[.2em] text-white/70">
+                  Step {step} of 5
+                </p>
 
-                <div className="min-w-0">
-                  <p className="text-[9px] font-black uppercase tracking-[0.13em] text-rose-600 dark:text-rose-400">
-                    Verification notice
+                <h2 className="mt-3 text-2xl font-black text-white">
+                  {title}
+                </h2>
+
+                <p className="mt-3 text-sm leading-6 text-white/72">
+                  {description}
+                </p>
+
+                <div className="mt-8 space-y-3 text-xs text-white/80">
+                  <p className="flex gap-3">
+                    <ShieldCheck className="h-4 w-4 text-white" />
+                    Manual admin approval required
                   </p>
-
-                  <p className="mt-1 text-xs font-semibold leading-5 text-rose-800 dark:text-rose-200">
-                    {error}
+                  <p className="flex gap-3">
+                    <LockKeyhole className="h-4 w-4 text-white" />
+                    Sensitive evidence encrypted
+                  </p>
+                  <p className="flex gap-3">
+                    <Fingerprint className="h-4 w-4 text-white" />
+                    No raw biometric stored
                   </p>
                 </div>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            </aside>
 
-        {/* =================================================
-            FORM / STATUS
-        ================================================= */}
-
-        <AnimatePresence mode="wait">
-          {verification ? (
-            <StatusPanel
-              key="status"
-              verification={
-                verification
-              }
-              onStartAgain={
-                startAgain
-              }
-            />
-          ) : (
-            <motion.section
-              key="form"
-              initial={{
-                opacity: 0,
-                y: 14,
-              }}
-              animate={{
-                opacity: 1,
-                y: 0,
-              }}
-              exit={{
-                opacity: 0,
-                y: -10,
-              }}
-              transition={{
-                duration: 0.35,
-              }}
-              className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]"
-            >
-              <div className="overflow-hidden rounded-[30px] border border-border bg-card shadow-[0_18px_55px_rgba(15,23,42,.06)] dark:shadow-none">
-                <div className="border-b border-border bg-muted/40 p-5 sm:p-7">
-                  <StepHeader
-                    step={step}
-                  />
+            {/* RIGHT CONTENT */}
+            <div className="min-h-[560px] p-5 sm:p-8 lg:min-h-[620px] lg:p-10">
+              {error && (
+                <div
+                  role="alert"
+                  className="mb-6 rounded-2xl border px-4 py-3 text-sm font-semibold"
+                  style={{
+                    borderColor: `${tokens.danger}40`,
+                    background: tokens.dangerSoft,
+                    color: tokens.danger,
+                  }}
+                >
+                  {error}
                 </div>
+              )}
 
-                <div className="p-5 sm:p-7">
-                  <AnimatePresence mode="wait">
-                    {step === 1 && (
-                      <motion.div
-                        key="identity"
-                        initial={{
-                          opacity: 0,
-                          x: 16,
-                        }}
-                        animate={{
-                          opacity: 1,
-                          x: 0,
-                        }}
-                        exit={{
-                          opacity: 0,
-                          x: -16,
-                        }}
-                      >
-                        <IdentityStep
-                          form={form}
-                          setForm={
-                            setForm
-                          }
-                        />
-                      </motion.div>
-                    )}
+              {/* STEP 1 */}
+              {step === 1 && (
+                <div className="mx-auto max-w-2xl">
+                  <h3
+                    className="text-2xl font-black"
+                    style={{ color: tokens.text }}
+                  >
+                    Phone number & OTP
+                  </h3>
 
-                    {step === 2 && (
-                      <motion.div
-                        key="documents"
-                        initial={{
-                          opacity: 0,
-                          x: 16,
-                        }}
-                        animate={{
-                          opacity: 1,
-                          x: 0,
-                        }}
-                        exit={{
-                          opacity: 0,
-                          x: -16,
-                        }}
-                      >
-                        <DocumentsStep
-                          form={form}
-                          processingFile={
-                            processingFile
-                          }
-                          onSelect={
-                            selectFile
-                          }
-                          onRemove={(
-                            field,
-                          ) =>
-                            setForm(
-                              (
-                                current,
-                              ) => ({
-                                ...current,
-                                [field]:
-                                  null,
-                              }),
-                            )
-                          }
-                        />
-                      </motion.div>
-                    )}
+                  <p
+                    className="mt-2 text-sm"
+                    style={{ color: tokens.textSoft }}
+                  >
+                    Confirm a number you control before uploading identity documents.
+                  </p>
 
-                    {step === 3 && (
-                      <motion.div
-                        key="biometrics"
-                        initial={{
-                          opacity: 0,
-                          x: 16,
-                        }}
-                        animate={{
-                          opacity: 1,
-                          x: 0,
-                        }}
-                        exit={{
-                          opacity: 0,
-                          x: -16,
-                        }}
-                      >
-                        <BiometricsStep
-                          form={form}
-                          setForm={
-                            setForm
-                          }
-                          onError={
-                            setError
-                          }
-                        />
-                      </motion.div>
-                    )}
+                  <label className="mt-8 block text-xs font-black uppercase tracking-[0.14em]">
+                    <span style={{ color: tokens.primarySoftText }}>
+                      Mobile number
+                    </span>
+                  </label>
 
-                    {step === 4 && (
-                      <motion.div
-                        key="review"
-                        initial={{
-                          opacity: 0,
-                          x: 16,
-                        }}
-                        animate={{
-                          opacity: 1,
-                          x: 0,
-                        }}
-                        exit={{
-                          opacity: 0,
-                          x: -16,
-                        }}
-                      >
-                        <ReviewStep
-                          form={form}
-                        />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                  <div className="mt-2">
+                    <input
+                      className="w-full rounded-2xl border px-4 py-3.5 font-bold outline-none transition-all focus:ring-4"
+                      style={{
+                        ...inputStyle,
+                        boxShadow: `0 0 0 0 ${tokens.ring}`,
+                      }}
+                      value={phone}
+                      onChange={(e) => {
+                        setPhone(e.target.value);
+                        setPhoneChallenge(null);
+                        setPhoneChallengeId("");
+                        setOtp("");
+                        setPhoneVerified(false);
+                      }}
+                      placeholder="+8801XXXXXXXXX"
+                    />
+                  </div>
 
-                  <div className="mt-8 flex items-center justify-between gap-3 border-t border-border pt-5">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setStep(
-                          (
-                            current,
-                          ) =>
-                            Math.max(
-                              1,
-                              current -
-                                1,
-                            ) as
-                              | 1
-                              | 2
-                              | 3
-                              | 4,
-                        )
-                      }
-                      disabled={
-                        step === 1 ||
-                        submitting
-                      }
-                      className="inline-flex h-11 items-center gap-2 rounded-xl px-4 text-xs font-black text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:invisible"
+                  <div className="mt-6">
+                    <p
+                      className="text-xs font-black uppercase tracking-[0.14em]"
+                      style={{ color: tokens.primarySoftText }}
                     >
-                      <ArrowLeft className="h-4 w-4" />
+                      Receive verification code via
+                    </p>
+
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        disabled={busy}
+                        aria-pressed={phoneChannel === "whatsapp"}
+                        onClick={() => {
+                          setPhoneChannel("whatsapp");
+                          setPhoneChallenge(null);
+                          setPhoneChallengeId("");
+                          setOtp("");
+                        }}
+                        className="group rounded-2xl border p-4 text-left transition-all duration-300 disabled:opacity-50"
+                        style={{
+                          borderColor:
+                            phoneChannel === "whatsapp"
+                              ? tokens.success
+                              : tokens.border,
+                          background:
+                            phoneChannel === "whatsapp"
+                              ? tokens.successSoft
+                              : tokens.surfaceMuted,
+                          boxShadow:
+                            phoneChannel === "whatsapp"
+                              ? `0 12px 28px ${tokens.success}18`
+                              : "none",
+                        }}
+                      >
+                        <span className="flex items-center gap-3">
+                          <span
+                            className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl"
+                            style={{
+                              background:
+                                phoneChannel === "whatsapp"
+                                  ? `${tokens.success}18`
+                                  : tokens.surface,
+                              color: tokens.success,
+                              border: `1px solid ${tokens.border}`,
+                            }}
+                          >
+                            <MessageCircle className="h-5 w-5" />
+                          </span>
+
+                          <span className="min-w-0">
+                            <b
+                              className="block text-sm"
+                              style={{ color: tokens.text }}
+                            >
+                              WhatsApp
+                            </b>
+
+                            <small
+                              className="mt-1 block"
+                              style={{ color: tokens.textSoft }}
+                            >
+                              Best for Meta test-number verification
+                            </small>
+                          </span>
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={busy}
+                        aria-pressed={phoneChannel === "sms"}
+                        onClick={() => {
+                          setPhoneChannel("sms");
+                          setPhoneChallenge(null);
+                          setPhoneChallengeId("");
+                          setOtp("");
+                        }}
+                        className="group rounded-2xl border p-4 text-left transition-all duration-300 disabled:opacity-50"
+                        style={{
+                          borderColor:
+                            phoneChannel === "sms"
+                              ? tokens.primary
+                              : tokens.border,
+                          background:
+                            phoneChannel === "sms"
+                              ? tokens.primarySoft
+                              : tokens.surfaceMuted,
+                          boxShadow:
+                            phoneChannel === "sms"
+                              ? `0 12px 28px ${tokens.primary}18`
+                              : "none",
+                        }}
+                      >
+                        <span className="flex items-center gap-3">
+                          <span
+                            className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl"
+                            style={{
+                              background:
+                                phoneChannel === "sms"
+                                  ? `${tokens.primary}18`
+                                  : tokens.surface,
+                              color: tokens.primary,
+                              border: `1px solid ${tokens.border}`,
+                            }}
+                          >
+                            <Phone className="h-5 w-5" />
+                          </span>
+
+                          <span className="min-w-0">
+                            <b
+                              className="block text-sm"
+                              style={{ color: tokens.text }}
+                            >
+                              SMS
+                            </b>
+
+                            <small
+                              className="mt-1 block"
+                              style={{ color: tokens.textSoft }}
+                            >
+                              Use your configured Bangladesh SMS provider
+                            </small>
+                          </span>
+                        </span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={busy || !phone?.trim()}
+                    onClick={() => void sendOtp()}
+                    className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-black text-white transition-all duration-300 disabled:opacity-50"
+                    style={{
+                      background:
+                        phoneChannel === "whatsapp"
+                          ? `linear-gradient(135deg, ${tokens.success} 0%, #10B981 100%)`
+                          : `linear-gradient(135deg, ${tokens.primary} 0%, ${tokens.primaryStrong} 100%)`,
+                      boxShadow:
+                        phoneChannel === "whatsapp"
+                          ? `0 14px 28px ${tokens.success}24`
+                          : `0 14px 28px ${tokens.primary}2a`,
+                    }}
+                  >
+                    {busy && <Loader2 className="h-4 w-4 animate-spin" />}
+
+                    {phoneChallenge
+                      ? `Resend on ${
+                          phoneChannel === "whatsapp" ? "WhatsApp" : "SMS"
+                        }`
+                      : `Send code on ${
+                          phoneChannel === "whatsapp" ? "WhatsApp" : "SMS"
+                        }`}
+                  </button>
+
+                  {phoneChallenge && (
+                    <div
+                      className="mt-6 rounded-[28px] border p-5"
+                      style={{
+                        background: tokens.primarySoft,
+                        borderColor: tokens.borderStrong,
+                      }}
+                    >
+                      <p
+                        className="text-sm font-bold"
+                        style={{ color: tokens.text }}
+                      >
+                        Code sent by{" "}
+                        {(phoneChallenge.channel ?? phoneChannel) === "whatsapp"
+                          ? "WhatsApp"
+                          : "SMS"}{" "}
+                        to {phoneChallenge.maskedPhone}
+                      </p>
+
+                      <input
+                        inputMode="numeric"
+                        maxLength={6}
+                        value={otp}
+                        onChange={(e) => {
+                          setOtp(
+                            e.target.value
+                              .replace(/\D/g, "")
+                              .slice(0, 6)
+                          );
+
+                          if (error) {
+                            setError("");
+                          }
+                        }}
+                        className="mt-4 w-full rounded-2xl border px-4 py-3 text-center text-xl font-black tracking-[.4em] outline-none"
+                        style={inputStyle}
+                        placeholder="000000"
+                      />
+
+                      <button
+                        type="button"
+                        disabled={
+                          busy ||
+                          otp.length !== 6 ||
+                          !phoneChallengeId
+                        }
+                        onClick={() =>
+                          void confirmOtp()
+                        }
+                        className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-sm font-black text-white transition-all disabled:cursor-not-allowed disabled:opacity-50"
+                        style={{
+                          background: `linear-gradient(135deg, ${tokens.primary} 0%, ${tokens.primaryStrong} 100%)`,
+                        }}
+                      >
+                        {busy && (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        )}
+
+                        {busy
+                          ? "Verifying..."
+                          : "Verify and continue"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* STEP 2 */}
+              {step === 2 && (
+                <div>
+                  <h3
+                    className="text-2xl font-black"
+                    style={{ color: tokens.text }}
+                  >
+                    NID details & document check
+                  </h3>
+
+                  <p
+                    className="mt-2 text-sm"
+                    style={{ color: tokens.textSoft }}
+                  >
+                    Enter exactly what appears on the card and upload both sides.
+                  </p>
+
+                  <div className="mt-7 grid gap-5 sm:grid-cols-2">
+                    <label className="sm:col-span-2">
+                      <small
+                        className="font-black uppercase tracking-[0.12em]"
+                        style={{ color: tokens.primarySoftText }}
+                      >
+                        Full name on NID
+                      </small>
+                      <input
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="mt-2 w-full rounded-2xl border px-4 py-3.5 outline-none"
+                        style={inputStyle}
+                        placeholder="Enter full name"
+                      />
+                    </label>
+
+                    <label>
+                      <small
+                        className="font-black uppercase tracking-[0.12em]"
+                        style={{ color: tokens.primarySoftText }}
+                      >
+                        NID number
+                      </small>
+                      <input
+                        inputMode="numeric"
+                        value={nid}
+                        onChange={(e) =>
+                          setNid(e.target.value.replace(/[^\d\s-]/g, ""))
+                        }
+                        className="mt-2 w-full rounded-2xl border px-4 py-3.5 outline-none"
+                        style={inputStyle}
+                        placeholder="10 / 13 / 17 digits"
+                      />
+                    </label>
+
+                    <label>
+                      <small
+                        className="font-black uppercase tracking-[0.12em]"
+                        style={{ color: tokens.primarySoftText }}
+                      >
+                        Date of birth
+                      </small>
+                      <input
+                        type="date"
+                        value={dateOfBirth}
+                        onChange={(e) => setDateOfBirth(e.target.value)}
+                        className="mt-2 w-full rounded-2xl border px-4 py-3.5 outline-none"
+                        style={inputStyle}
+                      />
+                    </label>
+
+                    <UploadField
+                      label="NID front"
+                      hint="Clear, readable, all corners visible"
+                      file={frontImage}
+                      onFile={(file) => chooseImage("front", file)}
+                      inputBg={tokens.inputBg}
+                      surface={tokens.surface}
+                      border={tokens.border}
+                      text={tokens.text}
+                      textSoft={tokens.textSoft}
+                      primary={tokens.primary}
+                    />
+
+                    <UploadField
+                      label="NID back"
+                      hint="Clear, readable, all corners visible"
+                      file={backImage}
+                      onFile={(file) => chooseImage("back", file)}
+                      inputBg={tokens.inputBg}
+                      surface={tokens.surface}
+                      border={tokens.border}
+                      text={tokens.text}
+                      textSoft={tokens.textSoft}
+                      primary={tokens.primary}
+                    />
+                  </div>
+
+                  <div className="mt-8 flex flex-col justify-between gap-3 sm:flex-row">
+                    <button
+                      onClick={() => setStep(1)}
+                      className="rounded-2xl border px-5 py-3 font-black transition-all"
+                      style={{
+                        borderColor: tokens.border,
+                        color: tokens.text,
+                        background: tokens.surface,
+                      }}
+                    >
+                      <ArrowLeft className="mr-2 inline h-4 w-4" />
                       Back
                     </button>
 
-                    {step < 4 ? (
-                      <motion.button
-                        whileHover={{
-                          y: -2,
-                        }}
-                        whileTap={{
-                          scale: 0.98,
-                        }}
-                        type="button"
-                        onClick={
-                          goNext
-                        }
-                        className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 text-xs font-black text-white shadow-[0_12px_28px_rgba(79,70,229,.20)] transition hover:from-indigo-700 hover:to-violet-700"
-                      >
-                        Continue
-                        <ArrowRight className="h-4 w-4" />
-                      </motion.button>
-                    ) : (
-                      <motion.button
-                        whileHover={{
-                          y: -2,
-                        }}
-                        whileTap={{
-                          scale: 0.98,
-                        }}
-                        type="button"
-                        onClick={() =>
-                          void submit()
-                        }
-                        disabled={
-                          submitting
-                        }
-                        className="inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 text-xs font-black text-white shadow-[0_12px_28px_rgba(79,70,229,.20)] transition hover:from-indigo-700 hover:to-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {submitting ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <ShieldCheck className="h-4 w-4" />
-                        )}
+                    <button
+                      disabled={busy}
+                      onClick={() => void validateDocumentsAndContinue()}
+                      className="rounded-2xl px-6 py-3 font-black text-white transition-all disabled:opacity-50"
+                      style={{
+                        background: `linear-gradient(135deg, ${tokens.primary} 0%, ${tokens.primaryStrong} 100%)`,
+                        boxShadow: `0 14px 28px ${tokens.primary}24`,
+                      }}
+                    >
+                      {busy ? (
+                        <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
+                      ) : (
+                        <FileCheck2 className="mr-2 inline h-4 w-4" />
+                      )}
+                      Validate documents
+                    </button>
+                  </div>
+                </div>
+              )}
 
-                        {submitting
-                          ? "Submitting securely..."
-                          : "Submit verification"}
-                      </motion.button>
+              {/* STEP 3 */}
+              {step === 3 && (
+                <div>
+                  <h3
+                    className="text-2xl font-black"
+                    style={{ color: tokens.text }}
+                  >
+                    Live face verification
+                  </h3>
+
+                  <p
+                    className="mt-2 text-sm"
+                    style={{ color: tokens.textSoft }}
+                  >
+                    Use a real camera, keep one face visible, and follow each
+                    action slowly.
+                  </p>
+
+                  <div
+                    className="mt-6 overflow-hidden rounded-[30px] border"
+                    style={{
+                      borderColor: tokens.border,
+                      background: tokens.surfaceMuted,
+                    }}
+                  >
+                    <div
+                      className="relative aspect-video overflow-hidden"
+                      style={{
+                        background: "linear-gradient(180deg, #090B16 0%, #111827 100%)",
+                      }}
+                    >
+                      <video
+                        ref={videoRef}
+                        playsInline
+                        muted
+                        className="h-full w-full object-cover [transform:scaleX(-1)]"
+                      />
+
+                      {!recording && (
+                        <div className="absolute inset-0 grid place-items-center text-center">
+                          <div>
+                            <div
+                              className="mx-auto grid h-20 w-20 place-items-center rounded-3xl border shadow-lg"
+                              style={{
+                                background: "rgba(255,255,255,0.08)",
+                                borderColor: "rgba(255,255,255,0.10)",
+                                color: "#FFFFFF",
+                              }}
+                            >
+                              <Camera className="h-10 w-10" />
+                            </div>
+                            <p className="mt-4 font-bold text-white">
+                              Camera preview
+                            </p>
+                            <p className="mt-1 text-sm text-white/60">
+                              Professional secure capture will start here
+                            </p>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="pointer-events-none absolute inset-6 rounded-[28px] border-2 border-white/20">
+                        <div className="absolute left-4 top-4 h-8 w-8 border-l-4 border-t-4 border-white/80" />
+                        <div className="absolute right-4 top-4 h-8 w-8 border-r-4 border-t-4 border-white/80" />
+                        <div className="absolute bottom-4 left-4 h-8 w-8 border-b-4 border-l-4 border-white/80" />
+                        <div className="absolute bottom-4 right-4 h-8 w-8 border-b-4 border-r-4 border-white/80" />
+                      </div>
+
+                      {recording && (
+                        <>
+                          <div className="kyc-scan-line absolute inset-x-8 top-10 h-[2px] rounded-full bg-cyan-300/80 shadow-[0_0_18px_rgba(103,232,249,0.75)]" />
+                          <div className="absolute left-4 top-4 flex items-center gap-2 rounded-full bg-black/45 px-3 py-2 text-xs font-bold text-white backdrop-blur">
+                            <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-rose-500" />
+                            Recording
+                          </div>
+                        </>
+                      )}
+
+                      {recording && livenessSession && currentAction && (
+                        <div className="absolute inset-x-4 bottom-4 rounded-2xl bg-slate-950/70 p-4 text-center text-white backdrop-blur">
+                          <small className="font-black uppercase tracking-widest text-violet-200">
+                            Challenge {actionIndex + 1} of{" "}
+                            {livenessSession.challenges.length}
+                          </small>
+                          <p className="mt-1 text-lg font-black">
+                            {ACTION_LABEL[currentAction]}
+                          </p>
+
+                          <div className="mt-3 flex justify-center gap-2">
+                            {livenessSession.challenges.map((_, index) => (
+                              <span
+                                key={index}
+                                className="h-2.5 w-10 rounded-full"
+                                style={{
+                                  background:
+                                    index <= actionIndex
+                                      ? tokens.primary
+                                      : "rgba(255,255,255,0.18)",
+                                }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <p
+                    className="mt-3 text-center text-xs font-semibold"
+                    style={{ color: tokens.textMuted }}
+                  >
+                    Keep your full face centered in good light. Server-side
+                    liveness validates the recorded actions.
+                  </p>
+
+                  <div className="mt-6 flex flex-col justify-between gap-3 sm:flex-row">
+                    <button
+                      onClick={() => {
+                        stopCamera();
+                        setStep(2);
+                      }}
+                      className="rounded-2xl border px-5 py-3 font-black"
+                      style={{
+                        borderColor: tokens.border,
+                        color: tokens.text,
+                        background: tokens.surface,
+                      }}
+                    >
+                      <ArrowLeft className="mr-2 inline h-4 w-4" />
+                      Back
+                    </button>
+
+                    {!recording ? (
+                      <button
+                        disabled={busy}
+                        onClick={() => void startLiveness()}
+                        className="rounded-2xl px-6 py-3 font-black text-white transition-all"
+                        style={{
+                          background: `linear-gradient(135deg, ${tokens.primary} 0%, ${tokens.primaryStrong} 100%)`,
+                          boxShadow: `0 14px 28px ${tokens.primary}24`,
+                        }}
+                      >
+                        <Camera className="mr-2 inline h-4 w-4" />
+                        Start secure camera
+                      </button>
+                    ) : (
+                      <button
+                        disabled={busy}
+                        onClick={() => void completeAction()}
+                        className="rounded-2xl px-6 py-3 font-black text-white transition-all"
+                        style={{
+                          background: `linear-gradient(135deg, ${tokens.success} 0%, #10B981 100%)`,
+                        }}
+                      >
+                        <Check className="mr-2 inline h-4 w-4" />
+                        {actionIndex === 2
+                          ? "Capture & continue"
+                          : "Action completed"}
+                      </button>
                     )}
                   </div>
                 </div>
-              </div>
-
-              <SecurityAside />
-            </motion.section>
-          )}
-        </AnimatePresence>
-      </div>
-    </main>
-  );
-}
-
-/* =========================================================
-   STEP HEADER
-========================================================= */
-
-function StepHeader({
-  step,
-}: {
-  step: 1 | 2 | 3 | 4;
-}) {
-  const labels = [
-    "Identity",
-    "Documents",
-    "Biometrics",
-    "Review",
-  ];
-
-  return (
-    <div>
-      <div className="mb-4 flex items-end justify-between gap-3">
-        <div>
-          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-indigo-600 dark:text-indigo-400">
-            Verification progress
-          </p>
-
-          <p className="mt-1 text-sm font-black text-foreground">
-            Step {step} of 4
-          </p>
-        </div>
-
-        <span className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-[9px] font-black text-violet-700 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-300">
-          {
-            labels[
-              step - 1
-            ]
-          }
-        </span>
-      </div>
-
-      <div className="grid grid-cols-4 gap-2">
-        {labels.map(
-          (
-            label,
-            index,
-          ) => {
-            const value =
-              index + 1;
-
-            const active =
-              value <= step;
-
-            return (
-              <div key={label}>
-                <motion.div
-                  animate={{
-                    scaleX:
-                      active
-                        ? 1
-                        : 0.97,
-                  }}
-                  className={`h-1.5 origin-left rounded-full transition-all duration-300 ${
-                    active
-                      ? "bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-500"
-                      : "bg-muted"
-                  }`}
-                />
-
-                <p
-                  className={`mt-2 text-[9px] font-black uppercase tracking-wider ${
-                    active
-                      ? "text-indigo-600 dark:text-indigo-400"
-                      : "text-muted-foreground"
-                  }`}
-                >
-                  {value}.{" "}
-                  {label}
-                </p>
-              </div>
-            );
-          },
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* =========================================================
-   IDENTITY STEP
-========================================================= */
-
-function IdentityStep({
-  form,
-  setForm,
-}: {
-  form: FormState;
-  setForm: Dispatch<
-    SetStateAction<FormState>
-  >;
-}) {
-  const field = (
-    key:
-      | "claimedName"
-      | "dateOfBirth"
-      | "nid",
-    value: string,
-  ) =>
-    setForm(
-      (
-        current,
-      ) => ({
-        ...current,
-        [key]: value,
-      }),
-    );
-
-  return (
-    <div>
-      <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-300">
-          <BadgeCheck className="h-5 w-5" />
-        </div>
-
-        <div>
-          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-indigo-600 dark:text-indigo-400">
-            Step 01
-          </p>
-
-          <h2 className="mt-1 text-xl font-black tracking-tight text-foreground">
-            Personal identity
-          </h2>
-
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            Enter the information exactly as printed
-            on your Bangladesh NID.
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-7 grid gap-5 sm:grid-cols-2">
-        <Field
-          label="Full name on NID"
-          className="sm:col-span-2"
-        >
-          <input
-            value={
-              form.claimedName
-            }
-            onChange={(
-              event,
-            ) =>
-              field(
-                "claimedName",
-                event.target.value,
-              )
-            }
-            autoComplete="name"
-            maxLength={160}
-            placeholder="Enter your full legal name"
-            className="h-12 w-full rounded-2xl border border-border bg-background px-4 text-sm font-semibold text-foreground outline-none transition placeholder:text-muted-foreground focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
-          />
-        </Field>
-
-        <Field label="Date of birth">
-          <input
-            type="date"
-            value={
-              form.dateOfBirth
-            }
-            onChange={(
-              event,
-            ) =>
-              field(
-                "dateOfBirth",
-                event.target.value,
-              )
-            }
-            autoComplete="bday"
-            className="h-12 w-full rounded-2xl border border-border bg-background px-4 text-sm font-semibold text-foreground outline-none transition focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
-          />
-        </Field>
-
-        <Field label="NID number">
-          <input
-            inputMode="numeric"
-            value={form.nid}
-            onChange={(
-              event,
-            ) =>
-              field(
-                "nid",
-                event.target.value.replace(
-                  /[^\d\s-]/g,
-                  "",
-                ),
-              )
-            }
-            autoComplete="off"
-            placeholder="10, 13 or 17 digits"
-            className="h-12 w-full rounded-2xl border border-border bg-background px-4 text-sm font-semibold text-foreground outline-none transition placeholder:text-muted-foreground focus:border-violet-500 focus:ring-4 focus:ring-violet-500/10"
-          />
-        </Field>
-      </div>
-
-      <div className="mt-5 flex items-start gap-3 rounded-[20px] border border-indigo-200 bg-indigo-50 p-4 text-[11px] leading-5 text-indigo-800 dark:border-indigo-900/70 dark:bg-indigo-950/25 dark:text-indigo-200">
-        <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-400" />
-
-        <div>
-          <p className="font-black">
-            Protected identity information
-          </p>
-
-          <p className="mt-1 opacity-75">
-            Your NID number, date of birth and name
-            are encrypted before they are stored.
-            They are never placed in the processing
-            queue.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* =========================================================
-   FIELD
-========================================================= */
-
-function Field({
-  label,
-  className = "",
-  children,
-}: {
-  label: string;
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <label className={className}>
-      <span className="mb-2 block text-[9px] font-black uppercase tracking-[0.14em] text-muted-foreground">
-        {label}
-      </span>
-
-      {children}
-    </label>
-  );
-}
-
-/* =========================================================
-   DOCUMENTS
-========================================================= */
-
-function DocumentsStep({
-  form,
-  processingFile,
-  onSelect,
-  onRemove,
-}: {
-  form: FormState;
-  processingFile:
-    | string
-    | null;
-  onSelect: (
-    field:
-      | "frontImage"
-      | "backImage"
-      | "selfieImage",
-    file?: File,
-  ) => void;
-  onRemove: (
-    field:
-      | "frontImage"
-      | "backImage"
-      | "selfieImage",
-  ) => void;
-}) {
-  return (
-    <div>
-      <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-50 text-violet-600 dark:bg-violet-950/30 dark:text-violet-300">
-          <FileCheck2 className="h-5 w-5" />
-        </div>
-
-        <div>
-          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-violet-600 dark:text-violet-400">
-            Step 02
-          </p>
-
-          <h2 className="mt-1 text-xl font-black tracking-tight text-foreground">
-            Identity documents
-          </h2>
-
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            Use clear, uncropped images. Each file is
-            optimized and must remain below 1 MB.
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-7 grid gap-4 md:grid-cols-2">
-        <UploadCard
-          title="NID front"
-          hint="All details readable"
-          file={
-            form.frontImage
-          }
-          loading={
-            processingFile ===
-            "frontImage"
-          }
-          icon={
-            <FileCheck2 />
-          }
-          onSelect={(
-            file,
-          ) =>
-            onSelect(
-              "frontImage",
-              file,
-            )
-          }
-          onRemove={() =>
-            onRemove(
-              "frontImage",
-            )
-          }
-        />
-
-        <UploadCard
-          title="NID back"
-          hint="Complete back side"
-          file={
-            form.backImage
-          }
-          loading={
-            processingFile ===
-            "backImage"
-          }
-          icon={
-            <FileCheck2 />
-          }
-          onSelect={(
-            file,
-          ) =>
-            onSelect(
-              "backImage",
-              file,
-            )
-          }
-          onRemove={() =>
-            onRemove(
-              "backImage",
-            )
-          }
-        />
-      </div>
-
-      <div className="mt-5 flex items-start gap-3 rounded-[20px] border border-violet-200 bg-violet-50 p-4 text-[11px] leading-5 text-violet-800 dark:border-violet-900/70 dark:bg-violet-950/25 dark:text-violet-200">
-        <Camera className="mt-0.5 h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400" />
-
-        <div>
-          <p className="font-black">
-            Live selfie comes next
-          </p>
-
-          <p className="mt-1 opacity-75">
-            Your selfie will be captured directly
-            from the live camera in the next step.
-            Gallery uploads are not accepted as live
-            evidence.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* =========================================================
-   LIVENESS LABELS
-========================================================= */
-
-const challengeLabels: Record<
-  ActiveLivenessAction,
-  string
-> = {
-  BLINK:
-    "Blink both eyes naturally",
-
-  TURN_LEFT:
-    "Slowly turn your head left",
-
-  TURN_RIGHT:
-    "Slowly turn your head right",
-};
-
-/* =========================================================
-   BIOMETRICS
-========================================================= */
-
-function BiometricsStep({
-  form,
-  setForm,
-  onError,
-}: {
-  form: FormState;
-  setForm: Dispatch<
-    SetStateAction<FormState>
-  >;
-  onError: (
-    message: string,
-  ) => void;
-}) {
-  const videoRef =
-    useRef<HTMLVideoElement | null>(
-      null,
-    );
-
-  const streamRef =
-    useRef<MediaStream | null>(
-      null,
-    );
-
-  const recorderRef =
-    useRef<MediaRecorder | null>(
-      null,
-    );
-
-  const chunksRef =
-    useRef<Blob[]>([]);
-
-  const sessionRef =
-    useRef<
-      Awaited<
-        ReturnType<
-          typeof createLivenessChallenge
-        >
-      > | null
-    >(null);
-
-  const startedAtRef =
-    useRef("");
-
-  const [
-    cameraStarting,
-    setCameraStarting,
-  ] =
-    useState(false);
-
-  const [
-    recording,
-    setRecording,
-  ] =
-    useState(false);
-
-  const [
-    challengeIndex,
-    setChallengeIndex,
-  ] =
-    useState(0);
-
-  const stopCamera =
-    useCallback(() => {
-      streamRef.current
-        ?.getTracks()
-        .forEach(
-          (
-            track,
-          ) =>
-            track.stop(),
-        );
-
-      streamRef.current =
-        null;
-
-      if (videoRef.current) {
-        videoRef.current.srcObject =
-          null;
-      }
-    }, []);
-
-  useEffect(
-    () => () => {
-      stopCamera();
-    },
-    [stopCamera],
-  );
-
-  /* =======================================================
-     BEGIN LIVE CHECK
-  ====================================================== */
-
-  const beginLiveness =
-    async () => {
-      if (
-        !navigator.mediaDevices
-          ?.getUserMedia ||
-        typeof MediaRecorder ===
-          "undefined"
-      ) {
-        onError(
-          "This browser does not support secure live camera recording. Use a current Chrome or Edge browser.",
-        );
-
-        return;
-      }
-
-      try {
-        setCameraStarting(
-          true,
-        );
-
-        onError("");
-
-        setForm(
-          (
-            current,
-          ) => ({
-            ...current,
-            selfieImage:
-              null,
-            liveness:
-              null,
-          }),
-        );
-
-        const session =
-          await createLivenessChallenge();
-
-        const stream =
-          await navigator.mediaDevices.getUserMedia(
-            {
-              audio: false,
-              video: {
-                facingMode: "user",
-                width: {
-                  ideal: 1280,
-                },
-                height: {
-                  ideal: 720,
-                },
-              },
-            },
-          );
-
-        streamRef.current =
-          stream;
-
-        if (videoRef.current) {
-          videoRef.current.srcObject =
-            stream;
-
-          await videoRef.current.play();
-        }
-
-        const candidates = [
-          "video/webm;codecs=vp9",
-          "video/webm;codecs=vp8",
-          "video/webm",
-          "video/mp4",
-        ];
-
-        const mimeType =
-          candidates.find(
-            (
-              value,
-            ) =>
-              MediaRecorder.isTypeSupported(
-                value,
-              ),
-          );
-
-        const recorder =
-          new MediaRecorder(
-            stream,
-            mimeType
-              ? {
-                  mimeType,
-                }
-              : undefined,
-          );
-
-        chunksRef.current = [];
-
-        recorder.ondataavailable =
-          (
-            event,
-          ) => {
-            if (
-              event.data.size >
-              0
-            ) {
-              chunksRef.current.push(
-                event.data,
-              );
-            }
-          };
-
-        recorder.start(
-          500,
-        );
-
-        recorderRef.current =
-          recorder;
-
-        sessionRef.current =
-          session;
-
-        startedAtRef.current =
-          new Date().toISOString();
-
-        setChallengeIndex(0);
-        setRecording(true);
-      } catch (captureError) {
-        stopCamera();
-
-        onError(
-          captureError instanceof
-            Error
-            ? captureError.message
-            : "Unable to start the live camera.",
-        );
-      } finally {
-        setCameraStarting(
-          false,
-        );
-      }
-    };
-
-  /* =======================================================
-     FINISH LIVE CHECK
-  ====================================================== */
-
-  const finishLiveness =
-    async () => {
-      const recorder =
-        recorderRef.current;
-
-      const session =
-        sessionRef.current;
-
-      const video =
-        videoRef.current;
-
-      if (
-        !recorder ||
-        !session ||
-        !video ||
-        challengeIndex <
-          session.challenges.length
-      ) {
-        return;
-      }
-
-      const completedAt =
-        new Date().toISOString();
-
-      const duration =
-        new Date(
-          completedAt,
-        ).getTime() -
-        new Date(
-          startedAtRef.current,
-        ).getTime();
-
-      if (
-        duration <
-        6000
-      ) {
-        onError(
-          "Keep the camera running for at least 6 seconds, then finish the live check.",
-        );
-
-        return;
-      }
-
-      try {
-        onError("");
-
-        const canvas =
-          document.createElement(
-            "canvas",
-          );
-
-        canvas.width =
-          video.videoWidth ||
-          720;
-
-        canvas.height =
-          video.videoHeight ||
-          720;
-
-        const context =
-          canvas.getContext(
-            "2d",
-          );
-
-        if (!context) {
-          throw new Error(
-            "Unable to capture the live selfie frame.",
-          );
-        }
-
-        context.drawImage(
-          video,
-          0,
-          0,
-          canvas.width,
-          canvas.height,
-        );
-
-        const selfieBlob =
-          await new Promise<Blob>(
-            (
-              resolve,
-              reject,
-            ) => {
-              canvas.toBlob(
-                (
-                  blob,
-                ) => {
-                  if (
-                    blob
-                  ) {
-                    resolve(
-                      blob,
-                    );
-                  } else {
-                    reject(
-                      new Error(
-                        "Unable to create the live selfie.",
-                      ),
-                    );
-                  }
-                },
-                "image/jpeg",
-                0.88,
-              );
-            },
-          );
-
-        const selfie =
-          await compressImage(
-            new File(
-              [
-                selfieBlob,
-              ],
-              "live-selfie.jpg",
-              {
-                type: "image/jpeg",
-              },
-            ),
-          );
-
-        const recordingBlob =
-          await new Promise<Blob>(
-            (
-              resolve,
-              reject,
-            ) => {
-              recorder.onerror =
-                () =>
-                  reject(
-                    new Error(
-                      "Live recording failed.",
-                    ),
-                  );
-
-              recorder.onstop =
-                () => {
-                  const type =
-                    recorder.mimeType.startsWith(
-                      "video/mp4",
-                    )
-                      ? "video/mp4"
-                      : "video/webm";
-
-                  resolve(
-                    new Blob(
-                      chunksRef.current,
-                      {
-                        type,
-                      },
-                    ),
-                  );
-                };
-
-              recorder.stop();
-            },
-          );
-
-        if (
-          !recordingBlob.size ||
-          recordingBlob.size >
-            8 *
-              1024 *
-              1024
-        ) {
-          throw new Error(
-            "The liveness recording must be smaller than 8 MB. Please retry.",
-          );
-        }
-
-        const extension =
-          recordingBlob.type ===
-          "video/mp4"
-            ? "mp4"
-            : "webm";
-
-        const liveness: CompletedLivenessCapture =
-          {
-            session,
-            startedAt:
-              startedAtRef.current,
-            completedAt,
-            selfie,
-            video:
-              new File(
-                [
-                  recordingBlob,
-                ],
-                `active-liveness.${extension}`,
-                {
-                  type:
-                    recordingBlob.type,
-                },
-              ),
-          };
-
-        setForm(
-          (
-            current,
-          ) => ({
-            ...current,
-            selfieImage:
-              selfie,
-            liveness,
-          }),
-        );
-
-        setRecording(false);
-        stopCamera();
-      } catch (captureError) {
-        if (
-          recorder.state !==
-          "inactive"
-        ) {
-          recorder.stop();
-        }
-
-        setRecording(false);
-        stopCamera();
-
-        onError(
-          captureError instanceof
-            Error
-            ? captureError.message
-            : "Unable to finish the live check.",
-        );
-      }
-    };
-
-  const session =
-    sessionRef.current;
-
-  const currentChallenge =
-    session?.challenges[
-      challengeIndex
-    ];
-
-  return (
-    <div>
-      <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-300">
-          <ScanFace className="h-5 w-5" />
-        </div>
-
-        <div>
-          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-indigo-600 dark:text-indigo-400">
-            Step 03
-          </p>
-
-          <h2 className="mt-1 text-xl font-black tracking-tight text-foreground">
-            Live biometric checks
-          </h2>
-
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            Complete the live camera challenge. After
-            your identity is verified, you can protect
-            payments with Windows Hello or your device passkey.
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-7 grid gap-5 lg:grid-cols-[minmax(0,1.25fr)_minmax(260px,.75fr)]">
-        {/* CAMERA */}
-        <section className="overflow-hidden rounded-[24px] border border-border bg-muted shadow-sm">
-          <div className="relative aspect-video overflow-hidden bg-slate-950">
-            <video
-              ref={videoRef}
-              muted
-              playsInline
-              className={`h-full w-full scale-x-[-1] object-cover ${
-                recording
-                  ? "block"
-                  : "hidden"
-              }`}
-            />
-
-            {!recording && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center px-6 text-center text-white">
-                <div className="flex h-16 w-16 items-center justify-center rounded-[20px] border border-violet-200/10 bg-white/[0.07]">
-                  {form.liveness ? (
-                    <CheckCircle2 className="h-8 w-8 text-emerald-400" />
-                  ) : (
-                    <ScanFace className="h-8 w-8 text-violet-300" />
-                  )}
-                </div>
-
-                <p className="mt-4 text-base font-black">
-                  {form.liveness
-                    ? "Live check completed"
-                    : "Camera is off"}
-                </p>
-
-                <p className="mt-2 max-w-sm text-[10px] leading-5 text-slate-400">
-                  Use good lighting and keep your
-                  full face visible.
-                </p>
-              </div>
-            )}
-
-            {recording && (
-              <span className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full border border-rose-200/10 bg-rose-600 px-3 py-1.5 text-[9px] font-black text-white shadow-lg">
-                <span className="h-2 w-2 animate-pulse rounded-full bg-white" />
-                LIVE
-              </span>
-            )}
-          </div>
-
-          <div className="bg-card p-4">
-            {recording &&
-            session ? (
-              <>
-                <div className="grid grid-cols-3 gap-2">
-                  {session.challenges.map(
-                    (
-                      challenge,
-                      index,
-                    ) => (
-                      <div
-                        key={
-                          challenge
-                        }
-                        className={`rounded-xl border p-2.5 text-center text-[9px] font-black ${
-                          index <
-                          challengeIndex
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/25 dark:text-emerald-300"
-                            : index ===
-                              challengeIndex
-                              ? "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-300"
-                              : "border-border bg-muted text-muted-foreground"
-                        }`}
-                      >
-                        {index <
-                        challengeIndex
-                          ? "✓ "
-                          : `${index + 1}. `}
-
-                        {challenge.replace(
-                          "_",
-                          " ",
-                        )}
-                      </div>
-                    ),
-                  )}
-                </div>
-
-                <div className="mt-5 rounded-[18px] border border-indigo-200 bg-indigo-50 p-4 text-center dark:border-indigo-900/60 dark:bg-indigo-950/25">
-                  <p className="text-[8px] font-black uppercase tracking-[0.14em] text-indigo-500 dark:text-indigo-400">
-                    Current action
-                  </p>
-
-                  <p className="mt-1 text-sm font-black text-foreground">
-                    {currentChallenge
-                      ? challengeLabels[
-                          currentChallenge
-                        ]
-                      : "All actions completed"}
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    currentChallenge
-                      ? setChallengeIndex(
-                          (
-                            value,
-                          ) =>
-                            value +
-                            1,
-                        )
-                      : void finishLiveness()
-                  }
-                  className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 text-xs font-black text-white transition hover:from-indigo-700 hover:to-violet-700"
-                >
-                  {currentChallenge ? (
-                    <>
-                      <Check className="h-4 w-4" />
-                      I completed this action
-                    </>
-                  ) : (
-                    <>
-                      <Camera className="h-4 w-4" />
-                      Finish live capture
-                    </>
-                  )}
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                onClick={() =>
-                  void beginLiveness()
-                }
-                disabled={
-                  cameraStarting
-                }
-                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 text-xs font-black text-white transition hover:from-indigo-700 hover:to-violet-700 disabled:opacity-60"
-              >
-                {cameraStarting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Camera className="h-4 w-4" />
-                )}
-
-                {form.liveness
-                  ? "Retake live check"
-                  : cameraStarting
-                    ? "Starting camera..."
-                    : "Start live camera check"}
-              </button>
-            )}
-          </div>
-        </section>
-
-        {/* DEVICE BIOMETRIC */}
-        <section className="rounded-[24px] border border-border bg-muted/40 p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-card text-violet-600 shadow-sm dark:text-violet-300">
-              <Fingerprint className="h-6 w-6" />
-            </div>
-
-            <span className="rounded-full border border-violet-200 bg-background px-2.5 py-1 text-[8px] font-black text-violet-700 dark:border-violet-800 dark:text-violet-300">
-              After KYC
-            </span>
-          </div>
-
-          <h3 className="mt-5 text-sm font-black text-foreground">
-            Windows Hello protection
-          </h3>
-
-          <p className="mt-2 text-[10px] leading-5 text-muted-foreground">
-            Once e-KYC is verified, register this device
-            using Windows Hello, fingerprint, face unlock,
-            or device PIN. Your biometric never leaves the
-            device; the server stores only a public key.
-          </p>
-
-          <div className="mt-5 flex items-start gap-3 rounded-[18px] border border-indigo-200 bg-indigo-50 p-4 dark:border-indigo-900/60 dark:bg-indigo-950/25">
-            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-400" />
-            <p className="text-[10px] leading-5 text-indigo-800 dark:text-indigo-200">
-              This is real WebAuthn device verification,
-              not a simulated fingerprint capture.
-            </p>
-          </div>
-        </section>
-      </div>
-    </div>
-  );
-}
-
-/* =========================================================
-   UPLOAD CARD
-========================================================= */
-
-function UploadCard({
-  title,
-  hint,
-  file,
-  loading,
-  icon,
-  onSelect,
-  onRemove,
-  capture,
-}: {
-  title: string;
-  hint: string;
-  file: File | null;
-  loading: boolean;
-  icon: ReactNode;
-  onSelect: (
-    file?: File,
-  ) => void;
-  onRemove: () => void;
-  capture?: "user";
-}) {
-  const preview =
-    useMemo(
-      () =>
-        file
-          ? URL.createObjectURL(
-              file,
-            )
-          : "",
-      [file],
-    );
-
-  const fileName =
-    file?.name ?? "";
-
-  useEffect(
-    () => () => {
-      if (preview) {
-        URL.revokeObjectURL(
-          preview,
-        );
-      }
-    },
-    [preview],
-  );
-
-  return (
-    <motion.div
-      whileHover={{
-        y: -2,
-      }}
-      transition={{
-        duration: 0.2,
-      }}
-      className={`relative min-h-[255px] overflow-hidden rounded-[24px] border-2 border-dashed ${
-        file
-          ? "border-emerald-200 bg-emerald-50 dark:border-emerald-900/60 dark:bg-emerald-950/20"
-          : "border-violet-200 bg-violet-50/50 dark:border-violet-900/60 dark:bg-violet-950/20"
-      }`}
-    >
-      {preview ? (
-        <>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={preview}
-            alt={`${title} preview`}
-            className="h-[175px] w-full object-cover"
-          />
-
-          <div className="border-t border-border bg-card p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-
-                  <p className="truncate text-xs font-black text-foreground">
-                    {title}
-                  </p>
-                </div>
-
-                <p className="mt-1 truncate text-[9px] text-muted-foreground">
-                  {fileName}
-                </p>
-              </div>
-
-              <span className="rounded-full bg-emerald-50 px-2 py-1 text-[8px] font-black text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300">
-                Ready
-              </span>
-            </div>
-
-            <button
-              type="button"
-              onClick={onRemove}
-              className="mt-2 text-[10px] font-bold text-rose-600 hover:underline dark:text-rose-400"
-            >
-              Remove and replace
-            </button>
-          </div>
-        </>
-      ) : (
-        <label className="flex min-h-[255px] cursor-pointer flex-col items-center justify-center p-6 text-center transition hover:bg-card">
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            capture={capture}
-            className="sr-only"
-            onChange={(event) =>
-              onSelect(
-                event.target.files?.[0],
-              )
-            }
-          />
-
-          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-card text-violet-600 shadow-sm ring-1 ring-violet-100 dark:text-violet-300 dark:ring-violet-900/60">
-            {loading ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              icon
-            )}
-          </span>
-
-          <span className="mt-4 text-sm font-black text-foreground">
-            {loading
-              ? "Optimizing..."
-              : title}
-          </span>
-
-          <span className="mt-1 max-w-[220px] text-[10px] leading-5 text-muted-foreground">
-            {hint}
-          </span>
-
-          <span className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-[9px] font-black text-violet-700 dark:border-violet-800 dark:bg-violet-950/30 dark:text-violet-300">
-            <UploadCloud className="h-3.5 w-3.5" />
-            Choose image
-          </span>
-
-          <span className="mt-3 text-[8px] font-semibold text-muted-foreground">
-            JPG · PNG · WEBP
-          </span>
-        </label>
-      )}
-    </motion.div>
-  );
-}
-
-/* =========================================================
-   REVIEW
-========================================================= */
-
-function ReviewStep({
-  form,
-}: {
-  form: FormState;
-}) {
-  const rows = [
-    [
-      "Full name",
-      form.claimedName,
-    ],
-
-    [
-      "Date of birth",
-      form.dateOfBirth,
-    ],
-
-    [
-      "NID number",
-      form.nid.replace(
-        /\d(?=\d{4})/g,
-        "•",
-      ),
-    ],
-
-    [
-      "NID front",
-      form.frontImage?.name ||
-        "Missing",
-    ],
-
-    [
-      "NID back",
-      form.backImage?.name ||
-        "Missing",
-    ],
-
-    [
-      "Selfie",
-      form.selfieImage?.name ||
-        "Missing",
-    ],
-
-    [
-      "Live challenge",
-      form.liveness
-        ? "Completed"
-        : "Missing",
-    ],
-
-    [
-      "Device biometric",
-      "Windows Hello setup becomes available after verification",
-    ],
-  ];
-
-  return (
-    <div>
-      <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-50 text-violet-600 dark:bg-violet-950/30 dark:text-violet-300">
-          <CheckCircle2 className="h-5 w-5" />
-        </div>
-
-        <div>
-          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-violet-600 dark:text-violet-400">
-            Step 04
-          </p>
-
-          <h2 className="mt-1 text-xl font-black tracking-tight text-foreground">
-            Review and submit
-          </h2>
-
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            Confirm the information before starting
-            automated verification.
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-7 overflow-hidden rounded-[22px] border border-border bg-card">
-        {rows.map(
-          (
-            [label, value],
-            index,
-          ) => (
-            <div
-              key={label}
-              className={`flex items-center justify-between gap-5 px-4 py-4 ${
-                index <
-                rows.length - 1
-                  ? "border-b border-border"
-                  : ""
-              }`}
-            >
-              <div className="min-w-0">
-                <p className="text-[8px] font-black uppercase tracking-[0.14em] text-muted-foreground">
-                  {label}
-                </p>
-
-                <p className="mt-1 truncate text-xs font-bold text-foreground">
-                  {value}
-                </p>
-              </div>
-
-              <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
-            </div>
-          ),
-        )}
-      </div>
-
-      <div className="mt-5 flex items-start gap-3 rounded-[20px] border border-amber-200 bg-amber-50 p-4 text-[11px] leading-5 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/25 dark:text-amber-200">
-        <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-
-        <div>
-          <p className="font-black">
-            Final confirmation
-          </p>
-
-          <p className="mt-1 opacity-75">
-            By submitting, you confirm that the
-            information and images belong to you and
-            may be used only for identity verification
-            and fraud prevention.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* =========================================================
-   SECURITY ASIDE
-========================================================= */
-
-function SecurityAside() {
-  const items = [
-    [
-      "Encrypted identity fields",
-      "AES-256-GCM protects sensitive values at rest.",
-    ],
-
-    [
-      "Private image delivery",
-      "Workers receive short-lived signed evidence URLs.",
-    ],
-
-    [
-      "Layered verification",
-      "OCR, liveness, identity, duplicate and compliance checks.",
-    ],
-
-    [
-      "Tamper-evident history",
-      "Important actions are written to a hash-linked audit trail.",
-    ],
-  ];
-
-  return (
-    <motion.aside
-      initial={{
-        opacity: 0,
-        x: 12,
-      }}
-      animate={{
-        opacity: 1,
-        x: 0,
-      }}
-      transition={{
-        duration: 0.4,
-      }}
-      className="relative overflow-hidden rounded-[30px] border border-violet-900/40 bg-gradient-to-br from-[#170C35] via-[#28144F] to-[#4A2A82] p-6 text-white shadow-[0_22px_65px_rgba(48,31,105,.18)]"
-    >
-      <div className="pointer-events-none absolute -right-16 -top-14 h-48 w-48 rounded-full bg-violet-300/10 blur-3xl" />
-
-      <div className="relative z-10">
-        <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-white/10">
-          <ShieldCheck className="h-5 w-5 text-violet-200" />
-        </div>
-
-        <p className="mt-5 text-[9px] font-black uppercase tracking-[0.16em] text-violet-200/60">
-          Secure pipeline
-        </p>
-
-        <h2 className="mt-1 text-xl font-black">
-          Protected verification
-        </h2>
-
-        <p className="mt-2 text-xs leading-5 text-violet-100/55">
-          Your evidence moves through a restricted
-          verification pipeline.
-        </p>
-
-        <div className="mt-7 space-y-5">
-          {items.map(
-            (
-              [title, text],
-              index,
-            ) => (
-              <motion.div
-                key={title}
-                initial={{
-                  opacity: 0,
-                  y: 8,
-                }}
-                animate={{
-                  opacity: 1,
-                  y: 0,
-                }}
-                transition={{
-                  delay:
-                    0.08 +
-                    index *
-                      0.06,
-                }}
-                className="flex gap-3"
-              >
-                <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-violet-400/10 text-violet-200">
-                  <Check className="h-3 w-3" />
-                </span>
-
-                <div>
-                  <p className="text-[10px] font-black text-white">
-                    {title}
-                  </p>
-
-                  <p className="mt-1 text-[9px] leading-4 text-slate-400">
-                    {text}
-                  </p>
-                </div>
-              </motion.div>
-            ),
-          )}
-        </div>
-      </div>
-    </motion.aside>
-  );
-}
-
-/* =========================================================
-   STATUS PANEL
-========================================================= */
-
-function StatusPanel({
-  verification,
-  onStartAgain,
-}: {
-  verification: EKYCVerification;
-  onStartAgain: () => void;
-}) {
-  const [passkeys, setPasskeys] =
-    useState<PasskeySummary[]>([]);
-
-  const [passkeyLoading, setPasskeyLoading] =
-    useState(false);
-
-  const [passkeyMessage, setPasskeyMessage] =
-    useState("");
-
-  const loadRegisteredPasskeys =
-    useCallback(async () => {
-      if (verification.status !== "VERIFIED") {
-        return;
-      }
-
-      try {
-        const registered =
-          await getPasskeys();
-
-        setPasskeys(registered);
-      } catch (passkeyError) {
-        setPasskeyMessage(
-          passkeyError instanceof Error
-            ? passkeyError.message
-            : "Unable to load registered devices.",
-        );
-      }
-    }, [verification.status]);
-
-  useEffect(() => {
-    void loadRegisteredPasskeys();
-  }, [loadRegisteredPasskeys]);
-
-  const setupDevicePasskey =
-    async () => {
-      try {
-        setPasskeyLoading(true);
-        setPasskeyMessage("");
-
-        await registerDevicePasskey(
-          "Windows Hello",
-        );
-
-        await loadRegisteredPasskeys();
-        setPasskeyMessage(
-          "Windows Hello was registered successfully.",
-        );
-      } catch (passkeyError) {
-        setPasskeyMessage(
-          passkeyError instanceof Error
-            ? passkeyError.message
-            : "Windows Hello registration failed.",
-        );
-      } finally {
-        setPasskeyLoading(false);
-      }
-    };
-
-  const config =
-    statusContent[
-      verification.status
-    ];
-
-  const Icon =
-    config.icon;
-
-  const activeStep =
-    verification.status ===
-    "QUEUED"
-      ? 1
-      : verification.status ===
-          "PROCESSING"
-        ? 2
-        : 3;
-
-  return (
-    <motion.section
-      initial={{
-        opacity: 0,
-        y: 14,
-      }}
-      animate={{
-        opacity: 1,
-        y: 0,
-      }}
-      transition={{
-        duration: 0.4,
-      }}
-      className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]"
-    >
-      <div className="overflow-hidden rounded-[30px] border border-border bg-card shadow-[0_18px_55px_rgba(49,32,106,.06)] dark:shadow-none">
-        <div className="relative overflow-hidden bg-muted/35 p-6 sm:p-8">
-          <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-violet-500/5 blur-3xl" />
-
-          <div className="relative z-10">
-            <div
-              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.13em] ${config.tone}`}
-            >
-              <Icon
-                className={`h-4 w-4 ${
-                  verification.status ===
-                  "PROCESSING"
-                    ? "animate-pulse"
-                    : ""
-                }`}
-              />
-
-              {verification.status.replaceAll(
-                "_",
-                " ",
               )}
-            </div>
 
-            <h2 className="mt-6 text-2xl font-black tracking-tight text-foreground sm:text-3xl">
-              {config.title}
-            </h2>
+              {/* STEP 4 */}
+              {step === 4 && (
+                <div className="mx-auto max-w-2xl text-center">
+                  <span
+                    className="mx-auto grid h-24 w-24 place-items-center rounded-[28px] border"
+                    style={{
+                      background: tokens.primarySoft,
+                      color: tokens.primary,
+                      borderColor: tokens.borderStrong,
+                      boxShadow: tokens.shadow,
+                    }}
+                  >
+                    <Fingerprint className="h-11 w-11" />
+                  </span>
 
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-              {
-                config.description
-              }
-            </p>
+                  <h3
+                    className="mt-6 text-2xl font-black"
+                    style={{ color: tokens.text }}
+                  >
+                    Verify this device
+                  </h3>
 
-            {verification.status ===
-              "REJECTED" && (
-              <div className="mt-5 flex items-start gap-3 rounded-[20px] border border-rose-200 bg-rose-50 p-4 dark:border-rose-900/60 dark:bg-rose-950/20">
-                <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600 dark:text-rose-400" />
-
-                <div>
-                  <p className="text-[9px] font-black uppercase tracking-[0.12em] text-rose-600 dark:text-rose-400">
-                    Review reason
+                  <p
+                    className="mt-3 text-sm leading-7"
+                    style={{ color: tokens.textSoft }}
+                  >
+                    Windows Hello, Touch ID, Android screen lock, or another
+                    platform authenticator confirms user presence. The operating
+                    system keeps biometric templates in secure hardware.
                   </p>
 
-                  <p className="mt-1 text-xs leading-5 text-rose-700 dark:text-rose-200">
-                    {reasonMessage(
-                      verification.reasonCodes,
-                    )}
-                  </p>
-                </div>
-              </div>
-            )}
+                  <div
+                    className="mt-7 rounded-2xl border p-4 text-left text-sm"
+                    style={{
+                      borderColor: `${tokens.success}40`,
+                      background: tokens.successSoft,
+                      color: tokens.text,
+                    }}
+                  >
+                    <b>No fingerprint image is uploaded.</b> Only a one-time
+                    verified WebAuthn credential reference is attached.
+                  </div>
 
-            <div className="mt-8 grid gap-3 sm:grid-cols-3">
-              {[
-                "Application secured",
-                "Automated checks",
-                "Final decision",
-              ].map(
-                (
-                  label,
-                  index,
-                ) => {
-                  const done =
-                    index + 1 <=
-                    activeStep;
-
-                  return (
+                  {!biometricSupported && (
                     <div
-                      key={label}
-                      className={`rounded-[20px] border p-4 ${
-                        done
-                          ? "border-indigo-200 bg-indigo-50 dark:border-indigo-900/60 dark:bg-indigo-950/25"
-                          : "border-border bg-muted"
-                      }`}
+                      className="mt-4 rounded-2xl border p-4 text-sm font-semibold"
+                      style={{
+                        borderColor: `${tokens.warning}40`,
+                        background: tokens.warningSoft,
+                        color: tokens.warning,
+                      }}
                     >
-                      <div
-                        className={`flex h-8 w-8 items-center justify-center rounded-xl ${
-                          done
-                            ? "bg-gradient-to-br from-indigo-600 to-violet-600 text-white"
-                            : "bg-muted-foreground/10 text-muted-foreground"
-                        }`}
-                      >
-                        {done ? (
-                          <Check className="h-4 w-4" />
-                        ) : (
-                          index + 1
-                        )}
-                      </div>
-
-                      <p
-                        className={`mt-3 text-[9px] font-black ${
-                          done
-                            ? "text-indigo-700 dark:text-indigo-300"
-                            : "text-muted-foreground"
-                        }`}
-                      >
-                        {label}
-                      </p>
+                      This browser does not support device biometrics. Continue
+                      without it.
                     </div>
-                  );
-                },
-              )}
-            </div>
-
-            {verification.canResubmit && (
-              <button
-                type="button"
-                onClick={
-                  onStartAgain
-                }
-                className="mt-7 inline-flex h-11 items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 text-xs font-black text-white shadow-[0_12px_24px_rgba(79,70,229,.20)] transition hover:from-indigo-700 hover:to-violet-700"
-              >
-                <RefreshCw className="h-4 w-4" />
-                Start a new attempt
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-[30px] border border-border bg-card p-6 shadow-[0_14px_45px_rgba(49,32,106,.05)] dark:shadow-none">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950/30 dark:text-indigo-300">
-            <FileCheck2 className="h-5 w-5" />
-          </div>
-
-          <div>
-            <p className="text-[9px] font-black uppercase tracking-[0.15em] text-muted-foreground">
-              Verification reference
-            </p>
-
-            <p className="mt-1 text-xs font-black text-foreground">
-              Current application
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-5 rounded-[20px] border border-indigo-200 bg-indigo-50 p-4 dark:border-indigo-900/60 dark:bg-indigo-950/25">
-          <p className="text-[8px] font-black uppercase tracking-[0.13em] text-indigo-500 dark:text-indigo-400">
-            Reference ID
-          </p>
-
-          <p className="mt-2 break-all font-mono text-xs font-bold leading-5 text-indigo-900 dark:text-indigo-200">
-            {verification.id}
-          </p>
-        </div>
-
-        <div className="mt-5 border-t border-border pt-5">
-          <p className="text-[9px] font-black uppercase tracking-[0.15em] text-muted-foreground">
-            Submitted
-          </p>
-
-          <p className="mt-2 text-xs font-bold text-foreground">
-            {verification.submittedAt
-              ? new Date(
-                  verification.submittedAt,
-                ).toLocaleString()
-              : "Just now"}
-          </p>
-        </div>
-
-        <div className="mt-5 rounded-[20px] border border-violet-200 bg-violet-50 p-4 dark:border-violet-900/60 dark:bg-violet-950/20">
-          <div className="flex items-start gap-3">
-            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-violet-600 dark:text-violet-400" />
-
-            <p className="text-[10px] leading-5 text-muted-foreground">
-              Do not share your verification
-              reference or identity images with
-              anyone.
-            </p>
-          </div>
-        </div>
-
-        {verification.status === "VERIFIED" && (
-          <div className="mt-5 rounded-[20px] border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900/60 dark:bg-emerald-950/20">
-            <div className="flex items-start gap-3">
-              <Fingerprint className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
-
-              <div className="min-w-0 flex-1">
-                <p className="text-[9px] font-black uppercase tracking-[0.13em] text-emerald-600 dark:text-emerald-400">
-                  Payment protection
-                </p>
-
-                <p className="mt-1 text-xs font-black text-foreground">
-                  {passkeys.length > 0
-                    ? `${passkeys.length} device passkey${passkeys.length === 1 ? "" : "s"} registered`
-                    : "Set up Windows Hello"}
-                </p>
-
-                <p className="mt-2 text-[10px] leading-5 text-muted-foreground">
-                  Approve future payments with the biometric or PIN protected by this device. The server stores only the credential public key.
-                </p>
-
-                {passkeyMessage && (
-                  <p className="mt-3 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
-                    {passkeyMessage}
-                  </p>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    void setupDevicePasskey()
-                  }
-                  disabled={passkeyLoading}
-                  className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-[10px] font-black text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {passkeyLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Fingerprint className="h-4 w-4" />
                   )}
 
-                  {passkeyLoading
-                    ? "Waiting for Windows Hello..."
-                    : passkeys.length > 0
-                      ? "Add another device"
-                      : "Set up this device"}
-                </button>
-              </div>
+                  <div className="mt-8 grid gap-3 sm:grid-cols-2">
+                    <button
+                      disabled={busy || !biometricSupported}
+                      onClick={() => void verifyBiometric()}
+                      className="rounded-2xl px-5 py-3.5 font-black text-white disabled:opacity-40"
+                      style={{
+                        background: `linear-gradient(135deg, ${tokens.primary} 0%, ${tokens.primaryStrong} 100%)`,
+                      }}
+                    >
+                      {busy ? (
+                        <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
+                      ) : (
+                        <Fingerprint className="mr-2 inline h-4 w-4" />
+                      )}
+                      Verify on device
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setBiometricSkipped(true);
+                        setStep(5);
+                      }}
+                      className="rounded-2xl border px-5 py-3.5 font-black"
+                      style={{
+                        borderColor: tokens.border,
+                        color: tokens.text,
+                        background: tokens.surface,
+                      }}
+                    >
+                      Continue without biometric
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={() => setStep(3)}
+                    className="mt-6 text-sm font-black"
+                    style={{ color: tokens.textSoft }}
+                  >
+                    <ArrowLeft className="mr-2 inline h-4 w-4" />
+                    Back to face check
+                  </button>
+                </div>
+              )}
+
+              {/* STEP 5 */}
+              {step === 5 && (
+                <div>
+                  <h3
+                    className="text-2xl font-black"
+                    style={{ color: tokens.text }}
+                  >
+                    Review your submission
+                  </h3>
+
+                  <p
+                    className="mt-2 text-sm"
+                    style={{ color: tokens.textSoft }}
+                  >
+                    Submission creates a pending admin-review case.
+                  </p>
+
+                  <div className="mt-7 grid gap-4 sm:grid-cols-2">
+                    {[
+                      ["Verified phone", phone],
+                      ["NID name", name],
+                      ["NID number", `••••••${nid.replace(/\D/g, "").slice(-4)}`],
+                      ["Date of birth", dateOfBirth],
+                      ["Documents", documentValidation ? "OCR preflight passed" : "Incomplete"],
+                      ["Live face", liveness ? "Challenge captured" : "Incomplete"],
+                      [
+                        "Device biometric",
+                        biometric
+                          ? "WebAuthn verified"
+                          : biometricSkipped
+                            ? "Skipped / unavailable"
+                            : "Incomplete",
+                      ],
+                      ["Final decision", "Admin approval required"],
+                    ].map(([label, value]) => (
+                      <div
+                        key={label}
+                        className="rounded-2xl border p-4"
+                        style={{
+                          background: tokens.surfaceMuted,
+                          borderColor: tokens.border,
+                        }}
+                      >
+                        <small
+                          className="font-black uppercase tracking-widest"
+                          style={{ color: tokens.textMuted }}
+                        >
+                          {label}
+                        </small>
+                        <p
+                          className="mt-1 break-words font-extrabold"
+                          style={{ color: tokens.text }}
+                        >
+                          {value}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div
+                    className="mt-6 rounded-2xl border p-4 text-sm leading-6"
+                    style={{
+                      borderColor: tokens.borderStrong,
+                      background: tokens.primarySoft,
+                      color: tokens.text,
+                    }}
+                  >
+                    <b>Strict approval rule:</b> OCR, face matching, liveness,
+                    and duplicate checks provide risk signals only. They cannot
+                    verify the account.
+                  </div>
+
+                  <div className="mt-8 flex flex-col justify-between gap-3 sm:flex-row">
+                    <button
+                      onClick={() => setStep(4)}
+                      className="rounded-2xl border px-5 py-3 font-black"
+                      style={{
+                        borderColor: tokens.border,
+                        color: tokens.text,
+                        background: tokens.surface,
+                      }}
+                    >
+                      <ArrowLeft className="mr-2 inline h-4 w-4" />
+                      Back
+                    </button>
+
+                    <button
+                      disabled={busy}
+                      onClick={() => void submit()}
+                      className="rounded-2xl px-7 py-3.5 font-black text-white disabled:opacity-50"
+                      style={{
+                        background: `linear-gradient(135deg, ${tokens.primary} 0%, ${tokens.primaryStrong} 100%)`,
+                        boxShadow: `0 14px 28px ${tokens.primary}24`,
+                      }}
+                    >
+                      {busy ? (
+                        <Loader2 className="mr-2 inline h-4 w-4 animate-spin" />
+                      ) : (
+                        <UserRoundCheck className="mr-2 inline h-4 w-4" />
+                      )}
+                      Submit for admin review
+                      <ArrowRight className="ml-2 inline h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
+          </div>
+        </section>
+
+        {verification?.status === "REJECTED" && (
+          <div
+            className="mt-5 flex items-center justify-between rounded-2xl border p-4 text-sm font-semibold"
+            style={{
+              borderColor: `${tokens.danger}3a`,
+              background: tokens.dangerSoft,
+              color: tokens.danger,
+            }}
+          >
+            <span>
+              Your earlier application was rejected. This form creates a new
+              attempt.
+            </span>
+            <RefreshCcw className="h-5 w-5" />
           </div>
         )}
       </div>
-    </motion.section>
-  );
-}
 
-/* =========================================================
-   LOADING
-========================================================= */
+      <style jsx>{`
+        .kyc-orb {
+          animation: floatGlow 7s ease-in-out infinite;
+        }
 
-function LoadingState() {
-  return (
-    <main className="min-h-screen bg-background px-4 py-8">
-      <div className="mx-auto max-w-7xl">
-        <div className="overflow-hidden rounded-[30px] border border-border bg-card">
-          <div className="h-36 animate-pulse bg-gradient-to-r from-indigo-950/10 via-violet-950/10 to-slate-500/10" />
+        .kyc-hero {
+          animation: fadeUp 0.7s ease;
+        }
 
-          <div className="space-y-4 p-6 sm:p-8">
-            <div className="h-5 w-36 animate-pulse rounded-full bg-muted" />
+        .kyc-hero-grid {
+          background-image:
+            linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+          background-size: 26px 26px;
+          mask-image: radial-gradient(circle at center, black 28%, transparent 88%);
+          animation: gridDrift 18s linear infinite;
+        }
 
-            <div className="h-8 w-64 animate-pulse rounded-xl bg-muted" />
+        .kyc-hero-beam {
+          animation: beamFloat 8s ease-in-out infinite;
+        }
 
-            <div className="h-4 max-w-xl animate-pulse rounded-full bg-muted" />
+        .kyc-radar,
+        .kyc-radar-delay,
+        .kyc-radar-delay-2 {
+          opacity: 0.45;
+        }
 
-            <div className="grid gap-4 pt-3 lg:grid-cols-[1fr_320px]">
-              <div className="h-52 animate-pulse rounded-2xl bg-muted" />
+        .kyc-radar {
+          animation: pulseRing 3.8s ease-out infinite;
+        }
 
-              <div className="h-52 animate-pulse rounded-2xl bg-muted" />
-            </div>
-          </div>
-        </div>
+        .kyc-radar-delay {
+          animation: pulseRing 3.8s ease-out 1.2s infinite;
+        }
 
-        <div className="flex items-center justify-center pt-8">
-          <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-5 py-3 shadow-sm">
-            <Loader2 className="h-5 w-5 animate-spin text-violet-600 dark:text-violet-400" />
+        .kyc-radar-delay-2 {
+          animation: pulseRing 3.8s ease-out 2.2s infinite;
+        }
 
-            <p className="text-xs font-black text-muted-foreground">
-              Loading advanced e-KYC...
-            </p>
-          </div>
-        </div>
-      </div>
+        .kyc-stat-card:hover {
+          transform: translateY(-2px);
+          transition: transform 0.3s ease;
+        }
+
+        .kyc-stat-shine {
+          animation: statShine 5.8s linear infinite;
+        }
+
+        .kyc-scan-line {
+          animation: scanLine 2.2s linear infinite;
+        }
+
+        @keyframes floatGlow {
+          0%,
+          100% {
+            transform: translateY(0px) scale(1);
+          }
+          50% {
+            transform: translateY(-10px) scale(1.04);
+          }
+        }
+
+        @keyframes gridDrift {
+          0% {
+            transform: translate3d(0, 0, 0);
+          }
+          100% {
+            transform: translate3d(26px, 26px, 0);
+          }
+        }
+
+        @keyframes beamFloat {
+          0%,
+          100% {
+            transform: translateY(-50%) translateX(0);
+            opacity: 0.28;
+          }
+          50% {
+            transform: translateY(-50%) translateX(42px);
+            opacity: 0.5;
+          }
+        }
+
+        @keyframes pulseRing {
+          0% {
+            transform: translateY(-50%) scale(0.92);
+            opacity: 0.12;
+          }
+          50% {
+            transform: translateY(-50%) scale(1);
+            opacity: 0.42;
+          }
+          100% {
+            transform: translateY(-50%) scale(1.08);
+            opacity: 0.08;
+          }
+        }
+
+        @keyframes statShine {
+          0% {
+            transform: translateX(-140%);
+            opacity: 0;
+          }
+          12% {
+            opacity: 1;
+          }
+          50% {
+            transform: translateX(320%);
+            opacity: 0.45;
+          }
+          100% {
+            transform: translateX(320%);
+            opacity: 0;
+          }
+        }
+
+        @keyframes scanLine {
+          0% {
+            transform: translateY(0px);
+            opacity: 0.15;
+          }
+          15% {
+            opacity: 0.95;
+          }
+          50% {
+            transform: translateY(210px);
+            opacity: 0.85;
+          }
+          100% {
+            transform: translateY(420px);
+            opacity: 0.1;
+          }
+        }
+
+        @keyframes fadeUp {
+          0% {
+            opacity: 0;
+            transform: translateY(14px);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
     </main>
   );
 }

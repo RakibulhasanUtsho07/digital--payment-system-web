@@ -39,6 +39,14 @@ import {
   X,
 } from "lucide-react";
 
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
+
 import { getMyWallet, type WalletData } from "@/lib/api/walletApi";
 
 import {
@@ -248,6 +256,42 @@ function isValidAmount(value: string): boolean {
 export default function AddMoneyPage() {
   const router = useRouter();
 
+  /*
+   * DashboardSessionContext is populated from the
+   * authenticated backend profile by the dashboard layout.
+   * Do not use localStorage role for authorization.
+   */
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isUserRole =
+    user.role === "user";
+
+  /* =======================================================
+     USER-ONLY PAGE GUARD
+
+     Only role=user may stay on Add Money.
+     Every other dashboard role is immediately sent back
+     to its own dashboard home.
+  ====================================================== */
+
+  useEffect(() => {
+    if (isUserRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isUserRole,
+    router,
+    user.role,
+  ]);
+
   /* =======================================================
      WALLET
   ====================================================== */
@@ -345,6 +389,19 @@ export default function AddMoneyPage() {
   ====================================================== */
 
   const loadWallet = useCallback(async (silent = false) => {
+    /*
+     * Important:
+     * A merchant/admin/analyst/support/super_admin account
+     * must not even start the personal-wallet request from
+     * this page.
+     */
+    if (!isUserRole) {
+      setLoadingWallet(false);
+      setRefreshing(false);
+
+      return;
+    }
+
     try {
       if (silent) {
         setRefreshing(true);
@@ -372,11 +429,18 @@ export default function AddMoneyPage() {
 
       setRefreshing(false);
     }
-  }, []);
+  }, [isUserRole]);
 
   useEffect(() => {
+    if (!isUserRole) {
+      return;
+    }
+
     void loadWallet();
-  }, [loadWallet]);
+  }, [
+    isUserRole,
+    loadWallet,
+  ]);
 
   /* =======================================================
      RESET SOURCE VERIFICATION
@@ -473,6 +537,16 @@ export default function AddMoneyPage() {
   ====================================================== */
 
   const verifySourceAccount = async () => {
+    if (!isUserRole) {
+      router.replace(
+        getDashboardHome(
+          user.role
+        )
+      );
+
+      return;
+    }
+
     setVerificationError("");
 
     setVerifiedAccount(null);
@@ -610,6 +684,16 @@ export default function AddMoneyPage() {
   const openConfirmation = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
+    if (!isUserRole) {
+      router.replace(
+        getDashboardHome(
+          user.role
+        )
+      );
+
+      return;
+    }
+
     setErrorMessage("");
 
     setSuccessMessage("");
@@ -690,6 +774,16 @@ export default function AddMoneyPage() {
   ====================================================== */
 
   const submitDeposit = async () => {
+    if (!isUserRole) {
+      router.replace(
+        getDashboardHome(
+          user.role
+        )
+      );
+
+      return;
+    }
+
     if (!wallet) {
       return;
     }
@@ -829,6 +923,32 @@ export default function AddMoneyPage() {
   ====================================================== */
 
   const balance = Number(wallet?.balance) || 0;
+
+  /* =======================================================
+     ROLE REDIRECTING
+
+     Do not render Add Money UI for any non-user role.
+  ====================================================== */
+
+  if (!isUserRole) {
+    return (
+      <div className="flex min-h-[72vh] items-center justify-center px-4">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-gradient-to-br from-violet-800 to-indigo-600 text-white shadow-[0_14px_35px_rgba(79,70,229,.2)]">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-foreground">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 text-xs text-muted-foreground">
+            Add Money is available only to personal user accounts.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   /* =======================================================
      LOADING

@@ -12,6 +12,10 @@ import {
 } from "framer-motion";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   Bell,
   ShieldAlert,
   AlertTriangle,
@@ -37,6 +41,14 @@ import {
   RefreshCw,
   Save,
 } from "lucide-react";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   archiveNotificationApi,
@@ -96,6 +108,45 @@ const DEFAULT_PREFERENCES: Preferences = {
 ========================================================= */
 
 export default function NotificationCenterPage() {
+  const router =
+    useRouter();
+
+  /*
+   * DashboardSessionContext is populated from the
+   * authenticated backend profile by the dashboard layout.
+   * The backend-confirmed role is the source of truth.
+   */
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isUserRole =
+    user.role === "user";
+
+  /* =========================================================
+     USER-ONLY PAGE GUARD
+
+     Only role=user can stay in Notification Center.
+     Merchant / Analyst / Support / Admin / Super Admin
+     are redirected to their own dashboard home.
+  ========================================================== */
+
+  useEffect(() => {
+    if (isUserRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isUserRole,
+    router,
+    user.role,
+  ]);
+
   const [isMounted, setIsMounted] =
     useState(false);
 
@@ -161,6 +212,18 @@ export default function NotificationCenterPage() {
     async (
       silent = false
     ) => {
+      /*
+       * Non-user roles must not start personal notification
+       * or preference requests from this page.
+       */
+      if (!isUserRole) {
+        setLoading(false);
+        setRefreshing(false);
+        setIsMounted(true);
+
+        return;
+      }
+
       try {
         if (silent) {
           setRefreshing(true);
@@ -245,8 +308,19 @@ export default function NotificationCenterPage() {
     };
 
   useEffect(() => {
+    if (!isUserRole) {
+      setLoading(false);
+      setRefreshing(false);
+      setIsMounted(true);
+
+      return;
+    }
+
     void loadNotificationCenter();
-  }, []);
+
+    // Authenticated dashboard role is stable for this session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isUserRole]);
 
   /* =========================================================
      DERIVED STATE
@@ -531,6 +605,16 @@ export default function NotificationCenterPage() {
     async (
       id: string
     ) => {
+      if (!isUserRole) {
+        router.replace(
+          getDashboardHome(
+            user.role
+          )
+        );
+
+        return;
+      }
+
       const current =
         notifications.find(
           (notification) =>
@@ -580,6 +664,16 @@ export default function NotificationCenterPage() {
     async (
       id: string
     ) => {
+      if (!isUserRole) {
+        router.replace(
+          getDashboardHome(
+            user.role
+          )
+        );
+
+        return;
+      }
+
       try {
         const response =
           await archiveNotificationApi(
@@ -615,6 +709,16 @@ export default function NotificationCenterPage() {
 
   const handleMarkAllRead =
     async () => {
+      if (!isUserRole) {
+        router.replace(
+          getDashboardHome(
+            user.role
+          )
+        );
+
+        return;
+      }
+
       try {
         const response =
           await markAllNotificationsRead();
@@ -686,6 +790,16 @@ export default function NotificationCenterPage() {
         | "archive"
         | "delete"
     ) => {
+      if (!isUserRole) {
+        router.replace(
+          getDashboardHome(
+            user.role
+          )
+        );
+
+        return;
+      }
+
       if (
         selectedIds.size ===
         0
@@ -774,6 +888,16 @@ export default function NotificationCenterPage() {
 
   const handleSavePreferences =
     async () => {
+      if (!isUserRole) {
+        router.replace(
+          getDashboardHome(
+            user.role
+          )
+        );
+
+        return;
+      }
+
       try {
         setSavingPreferences(
           true
@@ -813,6 +937,16 @@ export default function NotificationCenterPage() {
     (
       path: string
     ) => {
+      if (!isUserRole) {
+        router.replace(
+          getDashboardHome(
+            user.role
+          )
+        );
+
+        return;
+      }
+
       window.location.href =
         path;
     };
@@ -820,6 +954,26 @@ export default function NotificationCenterPage() {
   /* =========================================================
      HYDRATION GUARD
   ========================================================== */
+
+  if (!isUserRole) {
+    return (
+      <div className="flex min-h-[70vh] items-center justify-center bg-background px-4 text-foreground">
+        <div className="flex flex-col items-center text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-200/50 bg-violet-50 text-violet-700 shadow-sm dark:border-violet-900/60 dark:bg-violet-950/30 dark:text-violet-200">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-foreground">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-muted-foreground">
+            Notification Center is available only to personal user accounts.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (
     !isMounted ||

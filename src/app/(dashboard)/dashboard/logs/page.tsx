@@ -105,10 +105,219 @@ const NODE_POSITIONS = [
 ] as const;
 
 /* =========================================================
+   ADMIN / SUPER ADMIN ACCESS
+========================================================= */
+
+type AccessState =
+  | "checking"
+  | "allowed"
+  | "denied";
+
+const ADMIN_ROLES = new Set([
+  "admin",
+  "super_admin",
+]);
+
+function normalizeRole(
+  value: unknown
+): string {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+function getStoredRole(): string {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const rawUser =
+    window.localStorage.getItem(
+      "auth_user"
+    );
+
+  if (!rawUser) {
+    return "";
+  }
+
+  try {
+    const parsed =
+      JSON.parse(rawUser);
+
+    const candidates = [
+      parsed?.role,
+      parsed?.user?.role,
+      parsed?.data?.role,
+      parsed?.profile?.role,
+    ];
+
+    for (const candidate of candidates) {
+      const role =
+        normalizeRole(candidate);
+
+      if (role) {
+        return role;
+      }
+    }
+  } catch {
+    return "";
+  }
+
+  return "";
+}
+
+function hasAdminAccess(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  const authenticated =
+    window.localStorage.getItem(
+      "is_authenticated"
+    );
+
+  if (
+    authenticated !== "true" &&
+    authenticated !== "1"
+  ) {
+    return false;
+  }
+
+  return ADMIN_ROLES.has(
+    getStoredRole()
+  );
+}
+
+function isAuthorizationError(
+  error: unknown
+): boolean {
+  const message =
+    error instanceof Error
+      ? error.message
+      : String(error ?? "");
+
+  const normalized =
+    message.toLowerCase();
+
+  return (
+    normalized.includes("401") ||
+    normalized.includes("403") ||
+    normalized.includes(
+      "unauthorized"
+    ) ||
+    normalized.includes(
+      "forbidden"
+    ) ||
+    normalized.includes(
+      "access denied"
+    ) ||
+    normalized.includes(
+      "not authorized"
+    )
+  );
+}
+
+function AccessCheckingState() {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-background px-4 text-foreground">
+      <motion.div
+        initial={{
+          opacity: 0,
+          y: 8,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+        }}
+        className="text-center"
+      >
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-indigo-500/15 bg-indigo-500/10 text-indigo-600">
+          <RefreshCw className="h-5 w-5 animate-spin" />
+        </div>
+
+        <p className="mt-4 text-sm font-black">
+          Checking access
+        </p>
+
+        <p className="mt-1 text-xs text-muted-foreground">
+          Verifying administrator permissions…
+        </p>
+      </motion.div>
+    </main>
+  );
+}
+
+function AdminNotFoundState() {
+  return (
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background px-5 text-foreground">
+      <div className="pointer-events-none absolute -left-32 top-24 h-80 w-80 rounded-full bg-indigo-500/[0.07] blur-[100px]" />
+      <div className="pointer-events-none absolute -right-32 bottom-20 h-80 w-80 rounded-full bg-violet-500/[0.07] blur-[100px]" />
+
+      <motion.section
+        initial={{
+          opacity: 0,
+          y: 18,
+          scale: 0.98,
+        }}
+        animate={{
+          opacity: 1,
+          y: 0,
+          scale: 1,
+        }}
+        transition={{
+          duration: 0.45,
+          ease: [
+            0.22,
+            1,
+            0.36,
+            1,
+          ],
+        }}
+        className="relative w-full max-w-xl overflow-hidden rounded-[32px] border border-border bg-card p-7 text-center shadow-[0_30px_90px_rgba(15,23,42,.12)] sm:p-10"
+      >
+        <div
+          className="pointer-events-none absolute inset-0 opacity-[0.035]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(99,102,241,.7) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,.7) 1px, transparent 1px)",
+            backgroundSize:
+              "32px 32px",
+          }}
+        />
+
+        <div className="relative z-10">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] border border-indigo-500/15 bg-indigo-500/10 text-indigo-600">
+            <Shield className="h-7 w-7" />
+          </div>
+
+          <p className="mt-6 text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600">
+            Error 404
+          </p>
+
+          <h1 className="mt-2 text-3xl font-black tracking-[-0.04em] sm:text-4xl">
+            Page not found
+          </h1>
+
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-muted-foreground">
+            The page you are looking for does not exist or is not available.
+          </p>
+        </div>
+      </motion.section>
+    </main>
+  );
+}
+
+/* =========================================================
    PAGE
 ========================================================= */
 
 export default function SystemLogsPage() {
+  const [access, setAccess] =
+    useState<AccessState>(
+      "checking"
+    );
+
   const [range, setRange] =
     useState<SystemLogsRange>("24h");
 
@@ -154,10 +363,39 @@ export default function SystemLogsPage() {
   const [lastUpdated, setLastUpdated] =
     useState<Date | null>(null);
 
+  /* =========================================================
+     ACCESS CHECK
+  ========================================================= */
+
+  useEffect(() => {
+    const timer =
+      window.setTimeout(
+        () => {
+          setAccess(
+            hasAdminAccess()
+              ? "allowed"
+              : "denied"
+          );
+        },
+        0
+      );
+
+    return () =>
+      window.clearTimeout(
+        timer
+      );
+  }, []);
+
   const loadDashboard = useCallback(
     async (
       manualRefresh = false
     ): Promise<void> => {
+      if (
+        access !== "allowed"
+      ) {
+        return;
+      }
+
       if (manualRefresh) {
         setRefreshing(true);
       } else {
@@ -258,6 +496,23 @@ export default function SystemLogsPage() {
       } catch (
         cause: unknown
       ) {
+        if (
+          isAuthorizationError(
+            cause
+          )
+        ) {
+          setAccess("denied");
+          setSummary(null);
+          setServices([]);
+          setHeatmap([]);
+          setAnomalies([]);
+          setLogs([]);
+          setTrace(null);
+          setRootCause(null);
+          setError(null);
+          return;
+        }
+
         setError(
           cause instanceof Error
             ? cause.message
@@ -268,7 +523,10 @@ export default function SystemLogsPage() {
         setRefreshing(false);
       }
     },
-    [range]
+    [
+      access,
+      range,
+    ]
   );
 
   /* =========================================================
@@ -276,14 +534,29 @@ export default function SystemLogsPage() {
   ========================================================= */
 
   useEffect(() => {
+    if (
+      access !== "allowed"
+    ) {
+      return;
+    }
+
     void loadDashboard(false);
-  }, [loadDashboard]);
+  }, [
+    access,
+    loadDashboard,
+  ]);
 
   /* =========================================================
      LIVE POLLING
   ========================================================= */
 
   useEffect(() => {
+    if (
+      access !== "allowed"
+    ) {
+      return;
+    }
+
     const intervalId =
       window.setInterval(() => {
         void loadDashboard(true);
@@ -294,7 +567,10 @@ export default function SystemLogsPage() {
         intervalId
       );
     };
-  }, [loadDashboard]);
+  }, [
+    access,
+    loadDashboard,
+  ]);
 
   /* =========================================================
      LATEST TRACE ID
@@ -341,6 +617,14 @@ export default function SystemLogsPage() {
   ========================================================= */
 
   useEffect(() => {
+    if (
+      access !== "allowed"
+    ) {
+      setTrace(null);
+      setTraceLoading(false);
+      return;
+    }
+
     if (!latestTraceId) {
       setTrace(null);
       setTraceLoading(false);
@@ -360,8 +644,18 @@ export default function SystemLogsPage() {
 
         setTrace(data);
       })
-      .catch(() => {
+      .catch((cause: unknown) => {
         if (cancelled) return;
+
+        if (
+          isAuthorizationError(
+            cause
+          )
+        ) {
+          setAccess("denied");
+          setTrace(null);
+          return;
+        }
 
         setTrace(null);
       })
@@ -374,13 +668,24 @@ export default function SystemLogsPage() {
     return () => {
       cancelled = true;
     };
-  }, [latestTraceId]);
+  }, [
+    access,
+    latestTraceId,
+  ]);
 
   /* =========================================================
      ROOT CAUSE LOAD
   ========================================================= */
 
   useEffect(() => {
+    if (
+      access !== "allowed"
+    ) {
+      setRootCause(null);
+      setRootCauseLoading(false);
+      return;
+    }
+
     if (!latestRequestId) {
       setRootCause(null);
       setRootCauseLoading(false);
@@ -400,8 +705,18 @@ export default function SystemLogsPage() {
 
         setRootCause(data);
       })
-      .catch(() => {
+      .catch((cause: unknown) => {
         if (cancelled) return;
+
+        if (
+          isAuthorizationError(
+            cause
+          )
+        ) {
+          setAccess("denied");
+          setRootCause(null);
+          return;
+        }
 
         setRootCause(null);
       })
@@ -414,7 +729,10 @@ export default function SystemLogsPage() {
     return () => {
       cancelled = true;
     };
-  }, [latestRequestId]);
+  }, [
+    access,
+    latestRequestId,
+  ]);
 
   /* =========================================================
      PULSE NODES
@@ -555,6 +873,16 @@ export default function SystemLogsPage() {
       } catch (
         cause: unknown
       ) {
+        if (
+          isAuthorizationError(
+            cause
+          )
+        ) {
+          setAccess("denied");
+          setError(null);
+          return;
+        }
+
         setError(
           cause instanceof Error
             ? cause.message
@@ -600,7 +928,18 @@ export default function SystemLogsPage() {
           setTrace(
             traceData
           );
-        } catch {
+        } catch (
+          cause: unknown
+        ) {
+          if (
+            isAuthorizationError(
+              cause
+            )
+          ) {
+            setAccess("denied");
+            return;
+          }
+
           // Keep current trace state.
         } finally {
           setTraceLoading(false);
@@ -621,13 +960,36 @@ export default function SystemLogsPage() {
           setRootCause(
             rootData
           );
-        } catch {
+        } catch (
+          cause: unknown
+        ) {
+          if (
+            isAuthorizationError(
+              cause
+            )
+          ) {
+            setAccess("denied");
+            return;
+          }
+
           // Keep current root cause state.
         } finally {
           setRootCauseLoading(false);
         }
       }
     };
+
+  if (access === "checking") {
+    return (
+      <AccessCheckingState />
+    );
+  }
+
+  if (access === "denied") {
+    return (
+      <AdminNotFoundState />
+    );
+  }
 
   return (
     <main className="

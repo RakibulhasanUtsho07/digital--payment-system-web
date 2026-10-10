@@ -212,7 +212,7 @@ export default function SupportChat() {
         onClick={() => setOpen((current) => !current)}
         whileHover={prefersReducedMotion ? undefined : { y: -3, scale: 1.02 }}
         whileTap={prefersReducedMotion ? undefined : { scale: 0.96 }}
-        className="fixed bottom-24 right-4 z-[70] flex h-14 items-center gap-3 rounded-full border border-violet-300/25 bg-[#130b2d] px-4 text-white shadow-[0_18px_55px_rgba(76,29,149,.34)] outline-none transition hover:bg-[#1b1040] focus-visible:ring-4 focus-visible:ring-violet-300/40 sm:bottom-6 sm:right-6"
+        className="fixed bottom-24 left-4 z-[70] flex h-14 items-center gap-3 rounded-full border border-violet-300/25 bg-[#130b2d] px-4 text-white shadow-[0_18px_55px_rgba(76,29,149,.34)] outline-none transition hover:bg-[#1b1040] focus-visible:ring-4 focus-visible:ring-violet-300/40 sm:bottom-6 sm:left-6"
       >
         <span className="relative grid h-9 w-9 place-items-center rounded-full bg-violet-500">
           <AnimatePresence mode="wait" initial={false}>
@@ -249,7 +249,7 @@ export default function SupportChat() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: 18, scale: 0.97 }}
             transition={{ duration: prefersReducedMotion ? 0.01 : 0.28, ease: [0.22, 1, 0.36, 1] }}
-            className="fixed bottom-40 right-3 z-[69] flex max-h-[min(720px,calc(100dvh-11rem))] w-[calc(100vw-1.5rem)] max-w-[400px] flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_30px_100px_rgba(15,7,40,.28)] sm:bottom-24 sm:right-6 sm:max-h-[min(720px,calc(100dvh-7rem))]"
+            className="fixed bottom-40 left-3 z-[69] flex max-h-[min(720px,calc(100dvh-11rem))] w-[calc(100vw-1.5rem)] max-w-[400px] flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_30px_100px_rgba(15,7,40,.28)] sm:bottom-24 sm:left-6 sm:max-h-[min(720px,calc(100dvh-7rem))]"
           >
             <header className="relative overflow-hidden bg-[#0b0718] px-5 pb-5 pt-5 text-white">
               <div className="pointer-events-none absolute inset-0 opacity-30 [background-image:radial-gradient(rgba(167,139,250,.65)_1px,transparent_1px)] [background-size:22px_22px] [mask-image:linear-gradient(to_bottom,black,transparent)]" />

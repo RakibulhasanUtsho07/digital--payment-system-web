@@ -4,6 +4,10 @@ import {
   useState,
 } from "react";
 
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
 import Link from "next/link";
 
 import {
@@ -163,6 +167,13 @@ export default function IssueRefundButton({
   mode,
   onCompleted,
 }: IssueRefundButtonProps) {
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isMerchantRole =
+    user.role === "merchant";
+
   const [
     open,
     setOpen,
@@ -237,6 +248,7 @@ export default function IssueRefundButton({
     );
 
   if (
+    !isMerchantRole ||
     !refundable
   ) {
     return null;
@@ -251,6 +263,10 @@ export default function IssueRefundButton({
 
   const openModal =
     () => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       setAmount(
         paymentAmount.toFixed(
           2
@@ -281,6 +297,7 @@ export default function IssueRefundButton({
   const closeModal =
     () => {
       if (
+        !isMerchantRole ||
         submitting
       ) {
         return;
@@ -293,6 +310,10 @@ export default function IssueRefundButton({
 
   const submitRefund =
     async () => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       const numericAmount =
         Number(
           amount
@@ -440,11 +461,15 @@ export default function IssueRefundButton({
               inset-0
               z-[100]
               flex
-              items-center
+              items-start
               justify-center
+              overflow-y-auto
               bg-black/60
-              p-4
+              px-4
+              py-6
               backdrop-blur-md
+
+              sm:items-center
             "
           >
             <motion.div
@@ -467,9 +492,12 @@ export default function IssueRefundButton({
                 merchant-border
                 merchant-surface
 
+                my-auto
+                max-h-[calc(100vh-3rem)]
                 w-full
                 max-w-lg
-                overflow-hidden
+                overflow-x-hidden
+                overflow-y-auto
                 rounded-[28px]
                 border
               "
@@ -479,8 +507,8 @@ export default function IssueRefundButton({
               <div className="relative overflow-hidden p-5 text-white sm:p-6">
                 <PurpleModalBackground />
 
-                <div className="relative z-10 flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-3">
+                <div className="relative z-10 flex min-w-0 items-start justify-between gap-4">
+                  <div className="flex min-w-0 items-start gap-3">
                     <div
                       className="
                         flex
@@ -499,14 +527,14 @@ export default function IssueRefundButton({
                       <RefreshCcw className="h-5 w-5" />
                     </div>
 
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-[8px] font-black uppercase tracking-[0.17em] text-fuchsia-100/55">
                         Wallet refund
                       </p>
 
                       <h2
                         id="refund-modal-title"
-                        className="mt-1 text-xl font-black"
+                        className="mt-1 break-words text-xl font-black leading-tight [overflow-wrap:anywhere]"
                       >
                         Issue payment refund
                       </h2>
@@ -529,6 +557,7 @@ export default function IssueRefundButton({
                       flex
                       h-9
                       w-9
+                      shrink-0
                       items-center
                       justify-center
                       rounded-xl
@@ -657,13 +686,13 @@ export default function IssueRefundButton({
                         }
                       </p>
 
-                      <div className="mt-4 flex items-center justify-between gap-4">
-                        <div>
+                      <div className="mt-4 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                        <div className="min-w-0">
                           <p className="text-[9px] font-black uppercase tracking-wide merchant-muted">
                             Maximum refund
                           </p>
 
-                          <p className="mt-1 text-lg font-black text-violet-700 dark:text-violet-200">
+                          <p className="mt-1 break-words text-lg font-black leading-tight text-violet-700 dark:text-violet-200 [overflow-wrap:anywhere]">
                             {
                               currency
                             }{" "}
@@ -678,6 +707,7 @@ export default function IssueRefundButton({
                             flex
                             h-10
                             w-10
+                            shrink-0
                             items-center
                             justify-center
                             rounded-xl
@@ -714,7 +744,7 @@ export default function IssueRefundButton({
                       >
                         <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
 
-                        <p className="text-sm text-red-600 dark:text-red-300">
+                        <p className="min-w-0 break-words text-sm leading-5 text-red-600 dark:text-red-300 [overflow-wrap:anywhere]">
                           {
                             error
                           }
@@ -765,24 +795,32 @@ export default function IssueRefundButton({
                             }
                             onChange={(
                               event
-                            ) =>
+                            ) => {
+                              if (!isMerchantRole) {
+                                return;
+                              }
+
                               setAmount(
                                 event.target.value
-                              )
-                            }
+                              );
+                            }}
                             className="h-12 min-w-0 flex-1 bg-transparent px-3 text-sm text-foreground outline-none"
                           />
                         </div>
 
                         <button
                           type="button"
-                          onClick={() =>
+                          onClick={() => {
+                            if (!isMerchantRole) {
+                              return;
+                            }
+
                             setAmount(
                               paymentAmount.toFixed(
                                 2
                               )
-                            )
-                          }
+                            );
+                          }}
                           className="mt-2 text-xs font-black text-violet-600 hover:text-fuchsia-600"
                         >
                           Use full amount
@@ -810,11 +848,15 @@ export default function IssueRefundButton({
                           }
                           onChange={(
                             event
-                          ) =>
+                          ) => {
+                            if (!isMerchantRole) {
+                              return;
+                            }
+
                             setReason(
                               event.target.value
-                            )
-                          }
+                            );
+                          }}
                           placeholder="Customer request, duplicate payment..."
                           className="
                             mt-2
@@ -854,11 +896,15 @@ export default function IssueRefundButton({
                           }
                           onChange={(
                             event
-                          ) =>
+                          ) => {
+                            if (!isMerchantRole) {
+                              return;
+                            }
+
                             setMerchantReference(
                               event.target.value
-                            )
-                          }
+                            );
+                          }}
                           placeholder="Optional internal reference"
                           className="
                             mt-2
@@ -893,8 +939,11 @@ export default function IssueRefundButton({
                         className="
                           inline-flex
                           h-11
+                          w-full
                           items-center
                           justify-center
+
+                          sm:w-auto
                           rounded-xl
                           border
                           merchant-border
@@ -928,9 +977,12 @@ export default function IssueRefundButton({
                         className="
                           inline-flex
                           h-11
+                          w-full
                           items-center
                           justify-center
                           gap-2
+
+                          sm:w-auto
                           rounded-xl
                           bg-gradient-to-r
                           from-violet-700

@@ -21,6 +21,7 @@ import {
   LogOut,
   ChevronRight,
   Bell,
+  Bot,
 } from "lucide-react";
 
 import { motion } from "framer-motion";
@@ -84,6 +85,11 @@ const navItems = [
     label: "Security",
     href: "/dashboard/security",
     icon: ShieldCheck,
+  },
+  {
+    label: "Coffer AI",
+    href: "/dashboard/ai-assistant",
+    icon: Bot,
   },
   {
     label: "AI Insights",

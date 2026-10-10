@@ -11,6 +11,10 @@ import React, {
 import Link from "next/link";
 
 import {
+  useRouter,
+} from "next/navigation";
+
+import {
   AlertCircle,
   ArrowLeft,
   ArrowRight,
@@ -37,6 +41,14 @@ import {
   AnimatePresence,
   motion,
 } from "framer-motion";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   apiClient,
@@ -910,7 +922,7 @@ function FilterDropdown({
         ref={
           ref
         }
-        className="relative z-30"
+        className={`relative ${open ? "z-[80]" : "z-30"}`}
       >
         <motion.button
           type="button"
@@ -988,6 +1000,8 @@ function FilterDropdown({
                 left-0
                 right-0
                 top-full
+                z-[90]
+                min-w-[200px]
                 overflow-hidden
                 rounded-2xl
                 border
@@ -1050,14 +1064,14 @@ function FilterDropdown({
                         }
                       `}
                     >
-                      <span className="text-xs font-bold">
+                      <span className="min-w-0 truncate text-xs font-bold">
                         {
                           option.label
                         }
                       </span>
 
                       {active && (
-                        <Check className="h-4 w-4 text-violet-600" />
+                        <Check className="h-4 w-4 shrink-0 text-violet-600" />
                       )}
                     </motion.button>
                   );
@@ -1213,6 +1227,32 @@ function EmptyState({
 ========================================================= */
 
 export default function MerchantPaymentsPage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isMerchantRole =
+    user.role === "merchant";
+
+  useEffect(() => {
+    if (isMerchantRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role
+      )
+    );
+  }, [
+    isMerchantRole,
+    router,
+    user.role,
+  ]);
+
   const [
     payments,
     setPayments,
@@ -1282,6 +1322,15 @@ export default function MerchantPaymentsPage() {
           silent?: boolean;
         }
       ) => {
+        if (!isMerchantRole) {
+          setLoading(false);
+          setRefreshing(false);
+          setPayments([]);
+          setError("");
+
+          return;
+        }
+
         const isSilent =
           options?.silent ===
           true;
@@ -1365,17 +1414,25 @@ export default function MerchantPaymentsPage() {
       },
       [
         appliedFilters,
+        isMerchantRole,
       ]
     );
 
   useEffect(
     () => {
+      if (!isMerchantRole) {
+        setLoading(false);
+
+        return;
+      }
+
       void fetchPayments(
         1,
         appliedFilters
       );
     },
     [
+      isMerchantRole,
       fetchPayments,
       appliedFilters,
     ]
@@ -1437,6 +1494,10 @@ export default function MerchantPaymentsPage() {
       value:
         string
     ) => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       setFilters(
         (
           current
@@ -1450,6 +1511,10 @@ export default function MerchantPaymentsPage() {
 
   const applyFilters =
     () => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       setAppliedFilters({
         ...filters,
       });
@@ -1457,6 +1522,10 @@ export default function MerchantPaymentsPage() {
 
   const clearFilters =
     () => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       const cleared =
         getInitialFilters();
 
@@ -1474,6 +1543,10 @@ export default function MerchantPaymentsPage() {
       page:
         number
     ) => {
+      if (!isMerchantRole) {
+        return;
+      }
+
       if (
         page <
           1 ||
@@ -1563,6 +1636,26 @@ export default function MerchantPaymentsPage() {
       ]
     );
 
+  if (!isMerchantRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center bg-background px-4 text-foreground">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-500/15 bg-violet-500/10 text-violet-700 shadow-sm dark:text-violet-300">
+            <RefreshCw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Merchant Payments is available only to merchant accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <div className="merchant-theme min-h-full">
       <div className="min-h-full px-4 py-5 sm:px-6 lg:px-8">
@@ -1607,7 +1700,7 @@ export default function MerchantPaymentsPage() {
                 xl:justify-between
               "
             >
-              <div className="max-w-[850px]">
+              <div className="min-w-0 max-w-[850px]">
                 <div className="flex items-center gap-3">
                   <motion.div
                     whileHover={{
@@ -1668,7 +1761,9 @@ export default function MerchantPaymentsPage() {
                     className="
                       mt-3
                       max-w-[800px]
+                      break-words
                       text-[34px]
+                      [overflow-wrap:anywhere]
                       font-black
                       leading-[1.02]
                       tracking-[-0.055em]
@@ -2205,15 +2300,15 @@ export default function MerchantPaymentsPage() {
                 sm:justify-between
               "
             >
-              <div className="flex items-start gap-3">
+              <div className="flex min-w-0 items-start gap-3">
                 <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
 
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm font-black text-foreground">
                     Unable to load payments
                   </p>
 
-                  <p className="mt-1 text-sm merchant-muted">
+                  <p className="mt-1 break-words text-sm leading-5 merchant-muted [overflow-wrap:anywhere]">
                     {
                       error
                     }
@@ -2223,12 +2318,16 @@ export default function MerchantPaymentsPage() {
 
               <button
                 type="button"
-                onClick={() =>
+                onClick={() => {
+                  if (!isMerchantRole) {
+                    return;
+                  }
+
                   void fetchPayments(
                     pagination.page,
                     appliedFilters
-                  )
-                }
+                  );
+                }}
                 className="
                   inline-flex
                   items-center
@@ -2285,7 +2384,7 @@ export default function MerchantPaymentsPage() {
               <PurpleAuroraBackground />
 
               <div className="relative z-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
+                <div className="min-w-0">
                   <p className="text-[8px] font-black uppercase tracking-[0.17em] text-fuchsia-100/55">
                     Transaction records
                   </p>

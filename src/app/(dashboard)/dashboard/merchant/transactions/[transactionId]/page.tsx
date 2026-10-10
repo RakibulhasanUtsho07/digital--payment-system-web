@@ -11,6 +11,7 @@ import Link from "next/link";
 
 import {
   useParams,
+  useRouter,
 } from "next/navigation";
 
 import {
@@ -35,6 +36,14 @@ import {
 import {
   motion,
 } from "framer-motion";
+
+import {
+  useDashboardSession,
+} from "@/context/DashboardSessionContext";
+
+import {
+  getDashboardHome,
+} from "@/lib/auth/dashboardRoles";
 
 import {
   getMerchantTransactionDetail,
@@ -264,14 +273,14 @@ function DetailRow({
     boolean;
 }) {
   return (
-    <div className="flex flex-col gap-2 border-b py-3.5 last:border-b-0 merchant-border sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex min-w-0 flex-col gap-2 border-b py-3.5 last:border-b-0 merchant-border sm:flex-row sm:items-start sm:justify-between sm:gap-6">
       <span className="text-xs font-bold merchant-muted">
         {label}
       </span>
 
-      <div className="flex min-w-0 items-center gap-2 sm:max-w-[68%]">
+      <div className="flex min-w-0 items-start gap-2 sm:max-w-[68%] sm:justify-end">
         <span
-          className={`break-all text-right text-sm font-bold merchant-text ${
+          className={`min-w-0 break-words text-left text-sm font-bold leading-5 merchant-text [overflow-wrap:anywhere] sm:text-right ${
             mono
               ? "font-mono text-xs"
               : ""
@@ -322,7 +331,7 @@ function Section({
     boolean;
 }) {
   return (
-    <section className="overflow-hidden rounded-2xl border merchant-border merchant-surface">
+    <section className="min-w-0 overflow-hidden rounded-2xl border merchant-border merchant-surface">
       <div
         className={`border-b px-5 py-4 merchant-border ${
           purple
@@ -338,9 +347,9 @@ function Section({
             : undefined
         }
       >
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-start gap-3">
           <div
-            className={`flex h-10 w-10 items-center justify-center rounded-xl ${
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
               purple
                 ? "border border-white/15 bg-white/10"
                 : "bg-violet-500/10 text-violet-600"
@@ -349,9 +358,9 @@ function Section({
             <Icon className="h-5 w-5" />
           </div>
 
-          <div>
+          <div className="min-w-0">
             <h2
-              className={`text-sm font-black ${
+              className={`break-words text-sm font-black leading-tight [overflow-wrap:anywhere] ${
                 purple
                   ? "text-white"
                   : "merchant-text"
@@ -361,7 +370,7 @@ function Section({
             </h2>
 
             <p
-              className={`mt-0.5 text-xs ${
+              className={`mt-0.5 break-words text-xs leading-5 [overflow-wrap:anywhere] ${
                 purple
                   ? "text-violet-100/75"
                   : "merchant-muted"
@@ -476,6 +485,32 @@ function getTypeIcon(
 ========================================================= */
 
 export default function MerchantTransactionDetailPage() {
+  const router =
+    useRouter();
+
+  const {
+    user,
+  } = useDashboardSession();
+
+  const isMerchantRole =
+    user.role === "merchant";
+
+  useEffect(() => {
+    if (isMerchantRole) {
+      return;
+    }
+
+    router.replace(
+      getDashboardHome(
+        user.role,
+      ),
+    );
+  }, [
+    isMerchantRole,
+    router,
+    user.role,
+  ]);
+
   const params =
     useParams();
 
@@ -552,6 +587,15 @@ export default function MerchantTransactionDetailPage() {
         fullLoader =
           true,
       ) => {
+        if (!isMerchantRole) {
+          setLoading(false);
+          setRefreshing(false);
+          setData(null);
+          setError("");
+
+          return;
+        }
+
         if (
           !transactionId
         ) {
@@ -611,20 +655,52 @@ export default function MerchantTransactionDetailPage() {
         }
       },
       [
+        isMerchantRole,
         transactionId,
       ],
     );
 
   useEffect(
     () => {
+      if (!isMerchantRole) {
+        setLoading(false);
+
+        return;
+      }
+
       void loadDetail(
         true,
       );
     },
     [
+      isMerchantRole,
       loadDetail,
     ],
   );
+
+  /* =======================================================
+     MERCHANT-ONLY REDIRECTING
+  ======================================================== */
+
+  if (!isMerchantRole) {
+    return (
+      <main className="grid min-h-[70vh] place-items-center bg-background px-4 text-foreground">
+        <div className="text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-violet-500/15 bg-violet-500/10 text-violet-700 shadow-sm dark:text-violet-300">
+            <RefreshCw className="h-6 w-6 animate-spin" />
+          </div>
+
+          <p className="mt-4 text-sm font-black text-slate-950 dark:text-white">
+            Opening your workspace
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500 dark:text-slate-400">
+            Merchant transaction details are available only to merchant accounts.
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   /* =======================================================
      LOADING
@@ -691,7 +767,7 @@ export default function MerchantTransactionDetailPage() {
               Unable to load transaction
             </h1>
 
-            <p className="mt-2 text-sm merchant-muted">
+            <p className="mt-2 break-words text-sm leading-6 merchant-muted [overflow-wrap:anywhere]">
               {error ||
                 "Transaction not found."}
             </p>
@@ -707,11 +783,15 @@ export default function MerchantTransactionDetailPage() {
 
               <button
                 type="button"
-                onClick={() =>
+                onClick={() => {
+                  if (!isMerchantRole) {
+                    return;
+                  }
+
                   void loadDetail(
                     true,
-                  )
-                }
+                  );
+                }}
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-violet-700"
               >
                 <RefreshCw className="h-4 w-4" />
@@ -796,12 +876,16 @@ export default function MerchantTransactionDetailPage() {
             disabled={
               refreshing
             }
-            onClick={() =>
+            onClick={() => {
+              if (!isMerchantRole) {
+                return;
+              }
+
               void loadDetail(
                 false,
-              )
-            }
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border px-4 text-sm font-bold merchant-border merchant-surface merchant-text disabled:opacity-50"
+              );
+            }}
+            className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border px-4 text-sm font-bold merchant-border merchant-surface merchant-text disabled:opacity-50 sm:w-auto"
           >
             <RefreshCw
               className={`h-4 w-4 ${
@@ -876,12 +960,12 @@ export default function MerchantTransactionDetailPage() {
           </div>
 
           <div className="relative mt-7 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-white/10 bg-white/[0.08] p-4">
+            <div className="h-full min-w-0 overflow-hidden rounded-xl border border-white/10 bg-white/[0.08] p-4">
               <p className="text-[10px] font-black uppercase tracking-[0.12em] text-violet-100/70">
                 Amount
               </p>
 
-              <p className="mt-2 text-xl font-black">
+              <p className="mt-2 break-words text-xl font-black leading-tight [overflow-wrap:anywhere]">
                 {formatCurrency(
                   transaction.amount,
                   transaction.currency,
@@ -889,13 +973,13 @@ export default function MerchantTransactionDetailPage() {
               </p>
             </div>
 
-            <div className="rounded-xl border border-white/10 bg-white/[0.08] p-4">
+            <div className="h-full min-w-0 overflow-hidden rounded-xl border border-white/10 bg-white/[0.08] p-4">
               <p className="text-[10px] font-black uppercase tracking-[0.12em] text-violet-100/70">
                 Balance impact
               </p>
 
               <p
-                className={`mt-2 text-xl font-black ${
+                className={`mt-2 break-words text-xl font-black leading-tight [overflow-wrap:anywhere] ${
                   positive
                     ? "text-emerald-300"
                     : "text-rose-300"
@@ -911,12 +995,12 @@ export default function MerchantTransactionDetailPage() {
               </p>
             </div>
 
-            <div className="rounded-xl border border-white/10 bg-white/[0.08] p-4">
+            <div className="h-full min-w-0 overflow-hidden rounded-xl border border-white/10 bg-white/[0.08] p-4">
               <p className="text-[10px] font-black uppercase tracking-[0.12em] text-violet-100/70">
                 Reference
               </p>
 
-              <p className="mt-2 truncate font-mono text-sm font-black">
+              <p className="mt-2 break-all font-mono text-sm font-black leading-5">
                 {transaction.referenceId}
               </p>
             </div>
@@ -926,7 +1010,7 @@ export default function MerchantTransactionDetailPage() {
         {/* SUMMARY */}
 
         <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-4">
-          <div className="rounded-2xl border p-5 merchant-border merchant-surface">
+          <div className="h-full min-w-0 overflow-hidden rounded-2xl border p-5 merchant-border merchant-surface">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600">
               <CircleDollarSign className="h-5 w-5" />
             </div>
@@ -935,7 +1019,7 @@ export default function MerchantTransactionDetailPage() {
               Amount
             </p>
 
-            <p className="mt-1 text-xl font-black merchant-text">
+            <p className="mt-1 break-words text-xl font-black leading-tight merchant-text [overflow-wrap:anywhere]">
               {formatCurrency(
                 transaction.amount,
                 transaction.currency,
@@ -943,7 +1027,7 @@ export default function MerchantTransactionDetailPage() {
             </p>
           </div>
 
-          <div className="rounded-2xl border p-5 merchant-border merchant-surface">
+          <div className="h-full min-w-0 overflow-hidden rounded-2xl border p-5 merchant-border merchant-surface">
             <div
               className={`flex h-10 w-10 items-center justify-center rounded-xl ${
                 positive
@@ -963,7 +1047,7 @@ export default function MerchantTransactionDetailPage() {
             </p>
 
             <p
-              className={`mt-1 text-xl font-black ${
+              className={`mt-1 break-words text-xl font-black leading-tight [overflow-wrap:anywhere] ${
                 positive
                   ? "text-emerald-600"
                   : "text-rose-600"
@@ -979,7 +1063,7 @@ export default function MerchantTransactionDetailPage() {
             </p>
           </div>
 
-          <div className="rounded-2xl border p-5 merchant-border merchant-surface">
+          <div className="h-full min-w-0 overflow-hidden rounded-2xl border p-5 merchant-border merchant-surface">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600">
               <WalletCards className="h-5 w-5" />
             </div>
@@ -997,7 +1081,7 @@ export default function MerchantTransactionDetailPage() {
             </div>
           </div>
 
-          <div className="rounded-2xl border p-5 merchant-border merchant-surface">
+          <div className="h-full min-w-0 overflow-hidden rounded-2xl border p-5 merchant-border merchant-surface">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600">
               <ShieldCheck className="h-5 w-5" />
             </div>
@@ -1186,7 +1270,7 @@ export default function MerchantTransactionDetailPage() {
                         >
                           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                             <div className="min-w-0">
-                              <p className="font-mono text-xs font-black merchant-text">
+                              <p className="break-all font-mono text-xs font-black leading-5 merchant-text">
                                 {entry.transactionId}
                               </p>
 

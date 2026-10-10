@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type FormEvent,
   type KeyboardEvent,
 } from "react";
@@ -66,11 +67,183 @@ interface CofferAiOpenDetail {
   resourceId?: string;
 }
 
+type CofferAiVisualRole =
+  | "user"
+  | "admin"
+  | "super_admin"
+  | "merchant"
+  | "analyst"
+  | "support";
+
 interface CofferAiCopilotProps {
   userName?: string;
   portal?:
     | "personal"
     | "merchant";
+  role?:
+    CofferAiVisualRole;
+}
+
+interface CofferAiVisualTheme {
+  key:
+    | "default"
+    | "merchant"
+    | "analyst"
+    | "support";
+  buttonGradient: string;
+  buttonOverlay: string;
+  headerGradient: string;
+  headerBase: string;
+  primary: string;
+  secondary: string;
+  softBg: string;
+  softBorder: string;
+  softHover: string;
+  softText: string;
+  lightText: string;
+  mutedLightText: string;
+  border: string;
+  shadow: string;
+  glowA: string;
+  glowB: string;
+  messageGradient: string;
+  assistantGradient: string;
+  sendGradient: string;
+}
+
+const DEFAULT_AI_THEME: CofferAiVisualTheme = {
+  key: "default",
+  buttonGradient:
+    "#120b27",
+  buttonOverlay:
+    "radial-gradient(circle at 20% 20%, rgba(167,139,250,.34), transparent 42%), linear-gradient(135deg, rgba(91,51,163,.32), rgba(15,9,35,.10))",
+  headerGradient:
+    "#100821",
+  headerBase: "#100821",
+  primary: "#7c3aed",
+  secondary: "#a855f7",
+  softBg: "rgba(124,58,237,0.08)",
+  softBorder: "rgba(139,92,246,0.24)",
+  softHover: "rgba(124,58,237,0.13)",
+  softText: "#6d28d9",
+  lightText: "#ede9fe",
+  mutedLightText: "rgba(237,233,254,0.66)",
+  border: "rgba(196,181,253,0.30)",
+  shadow: "rgba(65,31,132,0.38)",
+  glowA: "rgba(139,92,246,0.25)",
+  glowB: "rgba(217,70,239,0.15)",
+  messageGradient:
+    "linear-gradient(135deg, #50308a 0%, #271843 100%)",
+  assistantGradient:
+    "linear-gradient(135deg, #1a102f 0%, #2e1f4f 100%)",
+  sendGradient:
+    "linear-gradient(135deg, #5b3594 0%, #271641 100%)",
+};
+
+const MERCHANT_AI_THEME: CofferAiVisualTheme = {
+  key: "merchant",
+  buttonGradient:
+    "linear-gradient(135deg, #160827 0%, #4c1d95 52%, #7c3aed 100%)",
+  buttonOverlay:
+    "radial-gradient(circle at 20% 20%, rgba(216,180,254,.35), transparent 42%), linear-gradient(135deg, rgba(126,34,206,.34), rgba(49,10,101,.12))",
+  headerGradient:
+    "linear-gradient(135deg, #160827 0%, #3b146f 48%, #6d28d9 100%)",
+  headerBase: "#160827",
+  primary: "#7c3aed",
+  secondary: "#c026d3",
+  softBg: "rgba(124,58,237,0.09)",
+  softBorder: "rgba(192,132,252,0.28)",
+  softHover: "rgba(124,58,237,0.14)",
+  softText: "#7c3aed",
+  lightText: "#f3e8ff",
+  mutedLightText: "rgba(243,232,255,0.70)",
+  border: "rgba(216,180,254,0.30)",
+  shadow: "rgba(91,33,182,0.38)",
+  glowA: "rgba(168,85,247,0.28)",
+  glowB: "rgba(217,70,239,0.18)",
+  messageGradient:
+    "linear-gradient(135deg, #7c3aed 0%, #4c1d95 100%)",
+  assistantGradient:
+    "linear-gradient(135deg, #2e1065 0%, #4c1d95 100%)",
+  sendGradient:
+    "linear-gradient(135deg, #8b5cf6 0%, #6d28d9 55%, #4c1d95 100%)",
+};
+
+const ANALYST_AI_THEME: CofferAiVisualTheme = {
+  key: "analyst",
+  buttonGradient:
+    "linear-gradient(135deg, #10243A 0%, #0B4F52 52%, #10273A 100%)",
+  buttonOverlay:
+    "radial-gradient(circle at 20% 20%, rgba(34,211,238,.30), transparent 42%), linear-gradient(135deg, rgba(20,184,166,.24), rgba(16,39,58,.10))",
+  headerGradient:
+    "linear-gradient(135deg, #10243A 0%, #0B4F52 52%, #10273A 100%)",
+  headerBase: "#10243A",
+  primary: "#0f9f9a",
+  secondary: "#22d3ee",
+  softBg: "rgba(20,184,166,0.08)",
+  softBorder: "rgba(103,232,249,0.24)",
+  softHover: "rgba(20,184,166,0.13)",
+  softText: "#0f9f9a",
+  lightText: "#cffafe",
+  mutedLightText: "rgba(207,250,254,0.68)",
+  border: "rgba(103,232,249,0.26)",
+  shadow: "rgba(13,148,136,0.34)",
+  glowA: "rgba(34,211,238,0.20)",
+  glowB: "rgba(45,212,191,0.16)",
+  messageGradient:
+    "linear-gradient(135deg, #0f766e 0%, #115e59 100%)",
+  assistantGradient:
+    "linear-gradient(135deg, #10243A 0%, #0B4F52 100%)",
+  sendGradient:
+    "linear-gradient(135deg, #14b8a6 0%, #0f766e 60%, #0B4F52 100%)",
+};
+
+const SUPPORT_AI_THEME: CofferAiVisualTheme = {
+  key: "support",
+  buttonGradient:
+    "linear-gradient(135deg, #10b981 0%, #059669 48%, #0f766e 100%)",
+  buttonOverlay:
+    "radial-gradient(circle at 20% 20%, rgba(209,250,229,.34), transparent 42%), linear-gradient(135deg, rgba(16,185,129,.20), rgba(15,118,110,.12))",
+  headerGradient:
+    "linear-gradient(135deg, #10b981 0%, #059669 48%, #0f766e 100%)",
+  headerBase: "#059669",
+  primary: "#059669",
+  secondary: "#14b8a6",
+  softBg: "rgba(16,185,129,0.08)",
+  softBorder: "rgba(110,231,183,0.28)",
+  softHover: "rgba(16,185,129,0.13)",
+  softText: "#047857",
+  lightText: "#d1fae5",
+  mutedLightText: "rgba(209,250,229,0.72)",
+  border: "rgba(167,243,208,0.30)",
+  shadow: "rgba(16,185,129,0.34)",
+  glowA: "rgba(167,243,208,0.22)",
+  glowB: "rgba(103,232,249,0.16)",
+  messageGradient:
+    "linear-gradient(135deg, #10b981 0%, #047857 100%)",
+  assistantGradient:
+    "linear-gradient(135deg, #065f46 0%, #0f766e 100%)",
+  sendGradient:
+    "linear-gradient(135deg, #10b981 0%, #059669 55%, #0f766e 100%)",
+};
+
+function getCofferAiTheme(
+  role:
+    CofferAiVisualRole
+): CofferAiVisualTheme {
+  if (role === "merchant") {
+    return MERCHANT_AI_THEME;
+  }
+
+  if (role === "analyst") {
+    return ANALYST_AI_THEME;
+  }
+
+  if (role === "support") {
+    return SUPPORT_AI_THEME;
+  }
+
+  return DEFAULT_AI_THEME;
 }
 
 interface UiMessage {
@@ -304,6 +477,7 @@ function VerificationBadge({
 export default function CofferAiCopilot({
   userName,
   portal = "personal",
+  role,
 }: CofferAiCopilotProps) {
   const pathname =
     usePathname();
@@ -322,6 +496,42 @@ export default function CofferAiCopilot({
 
   const isMerchant =
     portal === "merchant";
+
+  const visualRole:
+    CofferAiVisualRole =
+    role ??
+    (
+      isMerchant
+        ? "merchant"
+        : "user"
+    );
+
+  const aiTheme =
+    getCofferAiTheme(
+      visualRole
+    );
+
+  const aiThemeStyle =
+    {
+      "--ai-primary":
+        aiTheme.primary,
+      "--ai-secondary":
+        aiTheme.secondary,
+      "--ai-soft-bg":
+        aiTheme.softBg,
+      "--ai-soft-border":
+        aiTheme.softBorder,
+      "--ai-soft-hover":
+        aiTheme.softHover,
+      "--ai-soft-text":
+        aiTheme.softText,
+      "--ai-light":
+        aiTheme.lightText,
+      "--ai-muted-light":
+        aiTheme.mutedLightText,
+      "--ai-border":
+        aiTheme.border,
+    } as CSSProperties;
 
   const merchantPaymentId =
     useMemo(
@@ -972,9 +1182,22 @@ export default function CofferAiCopilot({
         whileTap={{
           scale: 0.96,
         }}
-        className="group fixed bottom-4 right-4 z-[120] flex h-[58px] items-center gap-3 overflow-hidden rounded-[20px] border border-violet-300/25 bg-[#120b27] px-3.5 text-white shadow-[0_22px_65px_rgba(65,31,132,.38)] outline-none focus-visible:ring-4 focus-visible:ring-violet-400/35 sm:bottom-6 sm:right-6"
+        className="group fixed bottom-4 right-4 z-[120] flex h-[58px] items-center gap-3 overflow-hidden rounded-[20px] border bg-card px-3.5 text-card-foreground outline-none transition hover:bg-muted focus-visible:ring-4 dark:bg-[#0B0F19] dark:text-slate-100 sm:bottom-6 sm:right-6"
+        style={{
+          borderColor:
+            aiTheme.border,
+          boxShadow:
+            `0 18px 48px ${aiTheme.shadow}`,
+        }}
       >
-        <span className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(167,139,250,.34),transparent_42%),linear-gradient(135deg,rgba(91,51,163,.32),rgba(15,9,35,.1))]" />
+        <span
+          className="pointer-events-none absolute inset-x-5 top-0 h-px"
+          style={{
+            background:
+              `linear-gradient(90deg, transparent, ${aiTheme.primary}, transparent)`,
+            opacity: 0.7,
+          }}
+        />
 
         {!reduceMotion && (
           <motion.span
@@ -995,7 +1218,13 @@ export default function CofferAiCopilot({
           />
         )}
 
-        <span className="relative flex h-9 w-9 items-center justify-center rounded-[13px] border border-white/15 bg-white/10 shadow-inner">
+        <span
+          className="relative flex h-9 w-9 items-center justify-center rounded-[13px] border bg-muted/70 shadow-inner"
+          style={{
+            borderColor: aiTheme.softBorder,
+            color: aiTheme.primary,
+          }}
+        >
           <AnimatePresence
             mode="wait"
             initial={false}
@@ -1034,19 +1263,36 @@ export default function CofferAiCopilot({
           </AnimatePresence>
 
           {!open && (
-            <span className="absolute -right-1 -top-1 flex h-3 w-3 items-center justify-center rounded-full border-2 border-[#120b27] bg-emerald-400">
+            <span
+              className="absolute -right-1 -top-1 flex h-3 w-3 items-center justify-center rounded-full border-2 bg-emerald-400"
+              style={{
+                borderColor:
+                  "var(--card)",
+              }}
+            >
               <span className="h-1 w-1 rounded-full bg-white" />
             </span>
           )}
         </span>
 
         <span className="relative hidden pr-1 text-left sm:block">
-          <span className="block text-[11px] font-black tracking-[-0.01em]">
+          <span
+            className="block text-[11px] font-black tracking-[-0.01em]"
+            style={{
+              color: aiTheme.primary,
+            }}
+          >
             {isMerchant
               ? "Merchant AI"
               : "Coffer AI"}
           </span>
-          <span className="mt-0.5 block text-[8px] font-bold uppercase tracking-[0.16em] text-violet-200/70">
+          <span
+            className="mt-0.5 block text-[8px] font-bold uppercase tracking-[0.16em]"
+            style={{
+              color:
+                aiTheme.softText,
+            }}
+          >
             {isMerchant
               ? "Gateway copilot"
               : "Verified copilot"}
@@ -1096,24 +1342,57 @@ export default function CofferAiCopilot({
                 1,
               ],
             }}
-            className="fixed inset-0 z-[140] flex overflow-hidden bg-card text-card-foreground shadow-[0_35px_120px_rgba(15,7,40,.34)] sm:inset-auto sm:bottom-[94px] sm:right-6 sm:h-[min(760px,calc(100dvh-7.5rem))] sm:w-[440px] sm:rounded-[30px] sm:border sm:border-violet-200/70 dark:sm:border-white/10"
+            className="fixed inset-0 z-[140] flex overflow-hidden bg-card text-card-foreground shadow-[0_35px_120px_rgba(15,7,40,.34)] sm:inset-auto sm:bottom-[94px] sm:right-6 sm:h-[min(760px,calc(100dvh-7.5rem))] sm:w-[440px] sm:rounded-[30px] sm:border dark:sm:border-white/10"
+            style={{
+              ...aiThemeStyle,
+              borderColor:
+                aiTheme.border,
+            }}
           >
             <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
-              <header className="relative shrink-0 overflow-hidden bg-[#100821] px-4 pb-4 pt-4 text-white sm:px-5 sm:pt-5">
-                <div className="pointer-events-none absolute -right-16 -top-24 h-56 w-56 rounded-full bg-violet-500/25 blur-[70px]" />
-                <div className="pointer-events-none absolute -bottom-24 -left-12 h-44 w-44 rounded-full bg-fuchsia-500/15 blur-[65px]" />
-                <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,transparent,rgba(255,255,255,.04),transparent)]" />
+              <header
+                className="relative shrink-0 overflow-hidden border-b border-border bg-card px-4 pb-4 pt-4 text-card-foreground dark:border-white/10 dark:bg-[#0B0F19] dark:text-slate-100 sm:px-5 sm:pt-5"
+              >
+                <div
+                  className="pointer-events-none absolute inset-x-8 top-0 h-px"
+                  style={{
+                    background:
+                      `linear-gradient(90deg, transparent, ${aiTheme.primary}, ${aiTheme.secondary}, transparent)`,
+                    opacity: 0.85,
+                  }}
+                />
 
                 <div className="relative flex items-start justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">
-                    <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] border border-white/15 bg-white/10 shadow-[0_10px_30px_rgba(139,92,246,.16)] backdrop-blur-xl">
-                      <Sparkles className="h-5 w-5 text-violet-100" />
-                      <span className="absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full border-[3px] border-[#100821] bg-emerald-400" />
+                    <div
+                      className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-[15px] border bg-muted/70 backdrop-blur-xl"
+                      style={{
+                        borderColor:
+                          aiTheme.softBorder,
+                        color:
+                          aiTheme.primary,
+                        boxShadow:
+                          `0 10px 30px ${aiTheme.shadow}`,
+                      }}
+                    >
+                      <Sparkles className="h-5 w-5" />
+                      <span
+                        className="absolute -bottom-1 -right-1 h-3.5 w-3.5 rounded-full border-[3px] bg-emerald-400"
+                        style={{
+                          borderColor:
+                            "var(--card)",
+                        }}
+                      />
                     </div>
 
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <h2 className="truncate text-[15px] font-black tracking-[-0.025em]">
+                        <h2
+                          className="truncate text-[15px] font-black tracking-[-0.025em]"
+                          style={{
+                            color: aiTheme.primary,
+                          }}
+                        >
                           {isMerchant
                             ? "Coffer Merchant Copilot"
                             : "Coffer AI Copilot"}
@@ -1123,7 +1402,13 @@ export default function CofferAiCopilot({
                         </span>
                       </div>
 
-                      <p className="mt-1 truncate text-[9px] font-semibold text-violet-100/60">
+                      <p
+                        className="mt-1 truncate text-[9px] font-semibold"
+                        style={{
+                          color:
+                            aiTheme.softText,
+                        }}
+                      >
                         {isMerchant
                           ? "Evidence-backed gateway assistance"
                           : "Evidence-backed wallet assistance"}
@@ -1141,7 +1426,11 @@ export default function CofferAiCopilot({
                             !current,
                         )
                       }
-                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.07] text-violet-100 transition hover:bg-white/[0.13]"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl border bg-muted/60 transition hover:bg-muted"
+                      style={{
+                        borderColor: aiTheme.softBorder,
+                        color: aiTheme.primary,
+                      }}
                     >
                       <History className="h-4 w-4" />
                     </button>
@@ -1152,7 +1441,11 @@ export default function CofferAiCopilot({
                       onClick={
                         startNewConversation
                       }
-                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.07] text-violet-100 transition hover:bg-white/[0.13]"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl border bg-muted/60 transition hover:bg-muted"
+                      style={{
+                        borderColor: aiTheme.softBorder,
+                        color: aiTheme.primary,
+                      }}
                     >
                       <Plus className="h-4 w-4" />
                     </button>
@@ -1164,15 +1457,29 @@ export default function CofferAiCopilot({
                         setOpen(false);
                         setHistoryOpen(false);
                       }}
-                      className="flex h-9 w-9 items-center justify-center rounded-xl border border-white/10 bg-white/[0.07] text-violet-100 transition hover:bg-white/[0.13] sm:hidden"
+                      className="flex h-9 w-9 items-center justify-center rounded-xl border bg-muted/60 transition hover:bg-muted sm:hidden"
+                      style={{
+                        borderColor: aiTheme.softBorder,
+                        color: aiTheme.primary,
+                      }}
                     >
                       <X className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
 
-                <div className="relative mt-4 flex items-center gap-2 rounded-[14px] border border-white/10 bg-white/[0.055] px-3 py-2.5 text-[9px] font-semibold leading-4 text-violet-100/70">
-                  <LockKeyhole className="h-3.5 w-3.5 shrink-0 text-emerald-300" />
+                <div
+                  className="relative mt-4 flex items-center gap-2 rounded-[14px] border bg-muted/50 px-3 py-2.5 text-[9px] font-semibold leading-4 text-muted-foreground"
+                  style={{
+                    borderColor: aiTheme.softBorder,
+                  }}
+                >
+                  <LockKeyhole
+                    className="h-3.5 w-3.5 shrink-0"
+                    style={{
+                      color: aiTheme.primary,
+                    }}
+                  />
                   {isMerchant
                     ? "It can inspect only payments owned by this merchant account."
                     : "It can inspect only records owned by your signed-in account."}
@@ -1181,11 +1488,21 @@ export default function CofferAiCopilot({
 
               <div
                 ref={scrollRef}
-                className="relative min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(circle_at_top_right,rgba(139,92,246,.07),transparent_30%),var(--background)] px-4 py-5 sm:px-5"
+                className="relative min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-5"
+                style={{
+                  background:
+                    "var(--background)",
+                }}
               >
                 {loadingMessages ? (
                   <div className="flex h-full min-h-[260px] flex-col items-center justify-center text-center">
-                    <Loader2 className="h-6 w-6 animate-spin text-violet-600 dark:text-violet-300" />
+                    <Loader2
+                      className="h-6 w-6 animate-spin"
+                      style={{
+                        color:
+                          aiTheme.primary,
+                      }}
+                    />
                     <p className="mt-3 text-xs font-bold text-foreground">
                       Loading conversation
                     </p>
@@ -1205,12 +1522,28 @@ export default function CofferAiCopilot({
                         opacity: 1,
                         scale: 1,
                       }}
-                      className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] border border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 text-violet-700 shadow-[0_16px_40px_rgba(109,40,217,.12)] dark:border-violet-800/70 dark:from-violet-950/50 dark:to-fuchsia-950/30 dark:text-violet-200"
+                      className="mx-auto flex h-16 w-16 items-center justify-center rounded-[22px] border"
+                      style={{
+                        borderColor:
+                          aiTheme.softBorder,
+                        background:
+                          "var(--card)",
+                        color:
+                          aiTheme.primary,
+                        boxShadow:
+                          `0 16px 40px ${aiTheme.shadow.replace("0.38", "0.14").replace("0.34", "0.14")}`,
+                      }}
                     >
                       <Bot className="h-7 w-7" />
                     </motion.div>
 
-                    <p className="mt-5 text-[9px] font-black uppercase tracking-[0.19em] text-violet-600 dark:text-violet-300">
+                    <p
+                      className="mt-5 text-[9px] font-black uppercase tracking-[0.19em]"
+                      style={{
+                        color:
+                          aiTheme.primary,
+                      }}
+                    >
                       {isMerchant
                         ? "Merchant gateway copilot"
                         : "Personal wallet copilot"}
@@ -1237,13 +1570,27 @@ export default function CofferAiCopilot({
                             merchantPaymentId,
                           )
                         }
-                        className="mt-5 flex w-full items-center justify-between gap-3 rounded-[15px] border border-violet-300 bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3.5 py-3 text-left text-[10px] font-black text-white shadow-[0_12px_28px_rgba(109,40,217,.22)] transition hover:-translate-y-0.5 hover:brightness-110"
+                        className="mt-5 flex w-full items-center justify-between gap-3 rounded-[15px] border px-3.5 py-3 text-left text-[10px] font-black text-white transition hover:-translate-y-0.5 hover:brightness-110"
+                        style={{
+                          borderColor:
+                            aiTheme.border,
+                          background:
+                            aiTheme.buttonGradient,
+                          boxShadow:
+                            `0 12px 28px ${aiTheme.shadow}`,
+                        }}
                       >
                         <span className="min-w-0">
                           <span className="block">
                             Analyze this payment
                           </span>
-                          <span className="mt-0.5 block truncate font-mono text-[8px] text-violet-100/80">
+                          <span
+                            className="mt-0.5 block truncate font-mono text-[8px]"
+                            style={{
+                              color:
+                                aiTheme.mutedLightText,
+                            }}
+                          >
                             {merchantPaymentId}
                           </span>
                         </span>
@@ -1262,12 +1609,22 @@ export default function CofferAiCopilot({
                                 suggestion,
                               )
                             }
-                            className="group flex w-full items-center justify-between gap-3 rounded-[15px] border border-border bg-card px-3.5 py-3 text-left text-[10px] font-bold text-foreground shadow-sm transition hover:-translate-y-0.5 hover:border-violet-300 hover:bg-violet-50 dark:hover:border-violet-700 dark:hover:bg-violet-950/25"
+                            className="group flex w-full items-center justify-between gap-3 rounded-[15px] border bg-card px-3.5 py-3 text-left text-[10px] font-bold text-foreground shadow-sm transition hover:-translate-y-0.5"
+                            style={{
+                              borderColor:
+                                aiTheme.softBorder,
+                            }}
                           >
                             <span>
                               {suggestion}
                             </span>
-                            <ArrowRight className="h-3.5 w-3.5 shrink-0 text-violet-500 transition group-hover:translate-x-0.5" />
+                            <ArrowRight
+                              className="h-3.5 w-3.5 shrink-0 transition group-hover:translate-x-0.5"
+                              style={{
+                                color:
+                                  aiTheme.primary,
+                              }}
+                            />
                           </button>
                         ),
                       )}
@@ -1283,7 +1640,11 @@ export default function CofferAiCopilot({
                             : "/dashboard/transactions",
                         );
                       }}
-                      className="mx-auto mt-5 inline-flex items-center gap-2 text-[10px] font-black text-violet-700 transition hover:text-violet-900 dark:text-violet-300 dark:hover:text-violet-200"
+                      className="mx-auto mt-5 inline-flex items-center gap-2 text-[10px] font-black transition hover:brightness-90"
+                      style={{
+                        color:
+                          aiTheme.primary,
+                      }}
                     >
                       <MessageSquareText className="h-3.5 w-3.5" />
                       {isMerchant
@@ -1314,18 +1675,35 @@ export default function CofferAiCopilot({
                               }
                               className="flex justify-end"
                             >
-                              <div className="max-w-[84%] rounded-[19px] rounded-br-[6px] bg-gradient-to-br from-[#50308a] to-[#271843] px-4 py-3 text-[11px] font-semibold leading-5 text-white shadow-[0_10px_28px_rgba(60,35,105,.18)]">
+                              <div
+                                className="max-w-[84%] rounded-[19px] rounded-br-[6px] border bg-muted px-4 py-3 text-[11px] font-semibold leading-5 text-foreground"
+                                style={{
+                                  borderColor:
+                                    aiTheme.softBorder,
+                                  boxShadow:
+                                    `0 10px 28px ${aiTheme.shadow}`,
+                                }}
+                              >
                                 <p>
                                   {message.content}
                                 </p>
 
                                 {(message.pending ||
                                   message.failed) && (
-                                  <span className={`mt-2 inline-flex items-center gap-1 text-[8px] font-bold uppercase tracking-[0.1em] ${
-                                    message.failed
-                                      ? "text-rose-200"
-                                      : "text-violet-200"
-                                  }`}>
+                                  <span
+                                    className={`mt-2 inline-flex items-center gap-1 text-[8px] font-bold uppercase tracking-[0.1em] ${
+                                      message.failed
+                                        ? "text-rose-500"
+                                        : ""
+                                    }`}
+                                    style={
+                                      message.failed
+                                        ? undefined
+                                        : {
+                                            color: aiTheme.primary,
+                                          }
+                                    }
+                                  >
                                     {message.pending ? (
                                       <Loader2 className="h-2.5 w-2.5 animate-spin" />
                                     ) : (
@@ -1348,7 +1726,17 @@ export default function CofferAiCopilot({
                             }
                             className="flex items-start gap-2.5"
                           >
-                            <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] bg-[#1a102f] text-violet-100 shadow-[0_8px_22px_rgba(65,31,132,.18)]">
+                            <div
+                              className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] border bg-card"
+                              style={{
+                                borderColor:
+                                  aiTheme.softBorder,
+                                color:
+                                  aiTheme.primary,
+                                boxShadow:
+                                  `0 8px 22px ${aiTheme.shadow}`,
+                              }}
+                            >
                               <Sparkles className="h-3.5 w-3.5" />
                             </div>
 
@@ -1395,7 +1783,15 @@ export default function CofferAiCopilot({
                                             title={
                                               source.reference
                                             }
-                                            className="inline-flex max-w-full items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-1 text-[8px] font-bold text-violet-700 dark:border-violet-800/60 dark:bg-violet-950/30 dark:text-violet-300"
+                                            className="inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-1 text-[8px] font-bold"
+                                            style={{
+                                              borderColor:
+                                                aiTheme.softBorder,
+                                              background:
+                                                aiTheme.softBg,
+                                              color:
+                                                aiTheme.softText,
+                                            }}
                                           >
                                             <ShieldCheck className="h-2.5 w-2.5 shrink-0" />
                                             <span className="truncate">
@@ -1428,7 +1824,11 @@ export default function CofferAiCopilot({
                                           disabled={
                                             !action.href
                                           }
-                                          className="rounded-[10px] border border-border bg-muted px-2.5 py-1.5 text-[8px] font-black text-foreground transition enabled:hover:border-violet-300 enabled:hover:text-violet-700 disabled:cursor-default disabled:opacity-70 dark:enabled:hover:border-violet-700 dark:enabled:hover:text-violet-300"
+                                          className="rounded-[10px] border bg-muted px-2.5 py-1.5 text-[8px] font-black text-foreground transition enabled:hover:-translate-y-0.5 disabled:cursor-default disabled:opacity-70"
+                                          style={{
+                                            borderColor:
+                                              aiTheme.softBorder,
+                                          }}
                                         >
                                           {action.label}
                                         </button>
@@ -1509,7 +1909,15 @@ export default function CofferAiCopilot({
 
                     {sending && (
                       <div className="flex items-start gap-2.5">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] bg-[#1a102f] text-violet-100">
+                        <div
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[11px] border bg-card"
+                          style={{
+                            borderColor:
+                              aiTheme.softBorder,
+                            color:
+                              aiTheme.primary,
+                          }}
+                        >
                           <Sparkles className="h-3.5 w-3.5" />
                         </div>
 
@@ -1536,7 +1944,11 @@ export default function CofferAiCopilot({
                                   delay:
                                     index * 0.12,
                                 }}
-                                className="h-1.5 w-1.5 rounded-full bg-violet-500"
+                                className="h-1.5 w-1.5 rounded-full"
+                                style={{
+                                  background:
+                                    aiTheme.primary,
+                                }}
                               />
                             ),
                           )}
@@ -1573,14 +1985,34 @@ export default function CofferAiCopilot({
                 className="shrink-0 border-t border-border bg-card px-3.5 pb-[max(14px,env(safe-area-inset-bottom))] pt-3 sm:px-4"
               >
                 {activeResourceId && (
-                  <div className="mb-2 flex items-center justify-between gap-2 rounded-[11px] border border-violet-200 bg-violet-50 px-3 py-2 dark:border-violet-800/60 dark:bg-violet-950/30">
+                  <div
+                    className="mb-2 flex items-center justify-between gap-2 rounded-[11px] border px-3 py-2"
+                    style={{
+                      borderColor:
+                        aiTheme.softBorder,
+                      background:
+                        "var(--muted)",
+                    }}
+                  >
                     <div className="min-w-0">
-                      <p className="text-[8px] font-black uppercase tracking-[0.13em] text-violet-600 dark:text-violet-300">
+                      <p
+                        className="text-[8px] font-black uppercase tracking-[0.13em]"
+                        style={{
+                          color:
+                            aiTheme.softText,
+                        }}
+                      >
                         {isMerchant
                           ? "Attached merchant payment"
                           : "Attached transaction"}
                       </p>
-                      <p className="mt-0.5 truncate font-mono text-[9px] font-bold text-violet-900 dark:text-violet-100">
+                      <p
+                        className="mt-0.5 truncate font-mono text-[9px] font-bold"
+                        style={{
+                          color:
+                            aiTheme.primary,
+                        }}
+                      >
                         {activeResourceId}
                       </p>
                     </div>
@@ -1596,14 +2028,26 @@ export default function CofferAiCopilot({
                           null,
                         )
                       }
-                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-violet-500 transition hover:bg-violet-100 dark:hover:bg-violet-900/50"
+                      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition hover:opacity-80"
+                      style={{
+                        color:
+                          aiTheme.primary,
+                      }}
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 )}
 
-                <div className="flex items-end gap-2 rounded-[18px] border border-border bg-muted/70 p-2 transition focus-within:border-violet-400 focus-within:bg-card focus-within:ring-4 focus-within:ring-violet-500/10">
+                <div
+                  className="flex items-end gap-2 rounded-[18px] border bg-muted/70 p-2 transition focus-within:bg-card focus-within:ring-4"
+                  style={{
+                    borderColor:
+                      aiTheme.softBorder,
+                    boxShadow:
+                      "none",
+                  }}
+                >
                   <textarea
                     value={input}
                     onChange={(
@@ -1637,7 +2081,13 @@ export default function CofferAiCopilot({
                     whileTap={{
                       scale: 0.9,
                     }}
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] bg-gradient-to-br from-[#5b3594] to-[#271641] text-white shadow-[0_8px_20px_rgba(75,42,130,.24)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[13px] text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                    style={{
+                      background:
+                        aiTheme.sendGradient,
+                      boxShadow:
+                        `0 8px 20px ${aiTheme.shadow}`,
+                    }}
                   >
                     {sending ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
@@ -1691,13 +2141,25 @@ export default function CofferAiCopilot({
                               false,
                             )
                           }
-                          className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-muted text-foreground transition hover:bg-violet-50 hover:text-violet-700 dark:hover:bg-violet-950/30 dark:hover:text-violet-300"
+                          className="flex h-9 w-9 items-center justify-center rounded-xl border bg-muted text-foreground transition hover:opacity-80"
+                          style={{
+                            borderColor:
+                              aiTheme.softBorder,
+                            color:
+                              aiTheme.primary,
+                          }}
                         >
                           <ChevronLeft className="h-4 w-4" />
                         </button>
 
                         <div>
-                          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-violet-600 dark:text-violet-300">
+                          <p
+                            className="text-[9px] font-black uppercase tracking-[0.16em]"
+                            style={{
+                              color:
+                                aiTheme.primary,
+                            }}
+                          >
                             Coffer AI
                           </p>
                           <h3 className="mt-0.5 text-sm font-black text-foreground">
@@ -1715,7 +2177,13 @@ export default function CofferAiCopilot({
                         disabled={
                           loadingHistory
                         }
-                        className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-muted text-muted-foreground transition hover:text-violet-600 disabled:opacity-50"
+                        className="flex h-9 w-9 items-center justify-center rounded-xl border bg-muted text-muted-foreground transition hover:opacity-80 disabled:opacity-50"
+                        style={{
+                          borderColor:
+                            aiTheme.softBorder,
+                          color:
+                            aiTheme.primary,
+                        }}
                       >
                         <RefreshCw
                           className={`h-4 w-4 ${
@@ -1733,16 +2201,42 @@ export default function CofferAiCopilot({
                         onClick={
                           startNewConversation
                         }
-                        className="flex w-full items-center gap-3 rounded-[16px] border border-dashed border-violet-300 bg-violet-50/70 p-3.5 text-left transition hover:border-violet-500 hover:bg-violet-50 dark:border-violet-700 dark:bg-violet-950/25 dark:hover:border-violet-500"
+                        className="flex w-full items-center gap-3 rounded-[16px] border border-dashed p-3.5 text-left transition hover:brightness-[0.98]"
+                        style={{
+                          borderColor:
+                            aiTheme.softBorder,
+                          background:
+                            "var(--card)",
+                        }}
                       >
-                        <span className="flex h-10 w-10 items-center justify-center rounded-[13px] bg-violet-700 text-white shadow-sm">
+                        <span
+                          className="flex h-10 w-10 items-center justify-center rounded-[13px] text-white shadow-sm"
+                          style={{
+                            background:
+                              aiTheme.buttonGradient,
+                          }}
+                        >
                           <Plus className="h-4 w-4" />
                         </span>
                         <span>
-                          <span className="block text-[11px] font-black text-violet-900 dark:text-violet-100">
+                          <span
+                            className="block text-[11px] font-black"
+                            style={{
+                              color:
+                                aiTheme.primary,
+                            }}
+                          >
                             Start a new conversation
                           </span>
-                          <span className="mt-0.5 block text-[9px] font-semibold text-violet-600/75 dark:text-violet-300/70">
+                          <span
+                            className="mt-0.5 block text-[9px] font-semibold"
+                            style={{
+                              color:
+                                aiTheme.softText,
+                              opacity:
+                                0.78,
+                            }}
+                          >
                             {isMerchant
                               ? "Check another merchant payment"
                               : "Check another transaction"}
@@ -1752,7 +2246,13 @@ export default function CofferAiCopilot({
 
                       {loadingHistory ? (
                         <div className="flex min-h-[260px] items-center justify-center">
-                          <Loader2 className="h-6 w-6 animate-spin text-violet-600" />
+                          <Loader2
+                            className="h-6 w-6 animate-spin"
+                            style={{
+                              color:
+                                aiTheme.primary,
+                            }}
+                          />
                         </div>
                       ) : conversations.length === 0 ? (
                         <div className="flex min-h-[300px] flex-col items-center justify-center px-6 text-center">
@@ -1780,15 +2280,34 @@ export default function CofferAiCopilot({
                                     conversation.conversationId,
                                   )
                                 }
-                                className={`group w-full rounded-[16px] border p-3.5 text-left transition hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-sm dark:hover:border-violet-700 ${
+                                className={`group w-full rounded-[16px] border p-3.5 text-left transition hover:-translate-y-0.5 hover:shadow-sm ${
                                   selectedConversationId ===
                                   conversation.conversationId
-                                    ? "border-violet-300 bg-violet-50 dark:border-violet-700 dark:bg-violet-950/25"
+                                    ? ""
                                     : "border-border bg-card"
                                 }`}
+                                style={
+                                  selectedConversationId ===
+                                  conversation.conversationId
+                                    ? {
+                                        borderColor:
+                                          aiTheme.softBorder,
+                                        background:
+                                          "var(--muted)",
+                                      }
+                                    : undefined
+                                }
                               >
                                 <div className="flex items-start gap-3">
-                                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] bg-muted text-violet-600 transition group-hover:bg-violet-100 dark:text-violet-300 dark:group-hover:bg-violet-950/40">
+                                  <span
+                                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] transition"
+                                    style={{
+                                      background:
+                                        "var(--muted)",
+                                      color:
+                                        aiTheme.primary,
+                                    }}
+                                  >
                                     <MessageSquareText className="h-4 w-4" />
                                   </span>
 
@@ -1809,7 +2328,13 @@ export default function CofferAiCopilot({
                                     </span>
                                   </span>
 
-                                  <ArrowRight className="mt-1 h-3.5 w-3.5 shrink-0 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-violet-600" />
+                                  <ArrowRight
+                                    className="mt-1 h-3.5 w-3.5 shrink-0 transition group-hover:translate-x-0.5"
+                                    style={{
+                                      color:
+                                        aiTheme.primary,
+                                    }}
+                                  />
                                 </div>
                               </button>
                             ),
